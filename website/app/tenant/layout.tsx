@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase/client';
 import { TenantSidebar } from '@/components/layout/TenantSidebar';
 import { DashboardHeader } from '@/components/layout/DashboardHeader';
+
+const supabase = createClient();
 
 const breadcrumbMap: Record<string, string> = {
   '/tenant': 'Dashboard',

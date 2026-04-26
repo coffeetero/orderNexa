@@ -6,7 +6,7 @@ import { Menu, Bell, Search, User, LogOut, Wheat, ChevronRight, Settings, Lock, 
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase/client';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,6 +14,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+
+const supabase = createClient();
 
 interface DashboardHeaderProps {
   title: string;
