@@ -1,65 +1,16 @@
-'use client';
+import { redirect } from 'next/navigation';
+import { TenantLayoutShell } from '@/components/layout/TenantLayoutShell';
+import { createClient } from '@/lib/supabase/server';
 
-import { useState, useEffect } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
-import { TenantSidebar } from '@/components/layout/TenantSidebar';
-import { DashboardHeader } from '@/components/layout/DashboardHeader';
+export default async function TenantLayout({ children }: { children: React.ReactNode }) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-const supabase = createClient();
-
-const breadcrumbMap: Record<string, string> = {
-  '/tenant': 'Dashboard',
-  '/tenant/orders': 'Orders',
-  '/tenant/customers': 'Customers',
-};
-
-export default function TenantLayout({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
-  const pathname = usePathname();
-
-  const [collapsed, setCollapsed] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  const breadcrumb = breadcrumbMap[pathname] ?? '';
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (!data.session) {
-        router.replace('/login');
-      } else {
-        setLoading(false);
-      }
-    });
-  }, []);
-
-  if (loading) {
-    return <div className="p-6">Loading...</div>;
+  if (!user) {
+    redirect('/login');
   }
 
-  return (
-    <div className="flex h-screen overflow-hidden">
-      <TenantSidebar
-        collapsed={collapsed}
-        onCollapse={setCollapsed}
-        mobileOpen={mobileOpen}
-        onMobileClose={() => setMobileOpen(false)}
-      />
-
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <DashboardHeader
-          title="Bakery Dashboard"
-          breadcrumb={breadcrumb}
-          onMobileMenuOpen={() => setMobileOpen(true)}
-          userName="Jacques Moreaux"
-          userRole="Bakery Admin"
-        />
-
-        <main className="flex-1 overflow-y-auto bg-background p-4 sm:p-6 scrollbar-thin">
-          {children}
-        </main>
-      </div>
-    </div>
-  );
+  return <TenantLayoutShell>{children}</TenantLayoutShell>;
 }

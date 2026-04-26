@@ -53,7 +53,7 @@ const navSections: NavSection[] = [
     label: 'Customers',
     icon: Users,
     children: [
-      { label: 'Manage Profiles', href: '/tenant/customers', icon: Users },
+      { label: 'Customer Management', href: '/tenant/customers', icon: Users },
       { label: 'Pricing Lists', href: '/tenant/customers/pricing', icon: Tags },
       { label: 'Reports', href: '/tenant/customers/reports', icon: BarChart2 },
       { label: 'Exports', href: '/tenant/customers/exports', icon: FileText },

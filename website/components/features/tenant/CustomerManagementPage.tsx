@@ -1,0 +1,710 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { createClient } from '@/lib/supabase/client';
+
+type TenantOption = {
+  tenant_id: number;
+  tenant_name: string;
+};
+
+type CustomerRow = {
+  customer_id: number;
+  tenant_id: number;
+  customer_parent_id: number | null;
+  customer_name: string;
+  customer_number: string | null;
+  customer_type: string;
+  legacy_id: number | null;
+  level: number;
+  sort_path: string;
+  invoice_copy_count: number;
+  is_standing_order: boolean;
+  is_signature_required: boolean;
+  is_active: boolean;
+  is_label_required: boolean;
+  is_invoice_required: boolean;
+  is_cost_on_invoice: boolean;
+  is_cost_on_bill_of_lading: boolean;
+  is_returns_allowed: boolean;
+};
+
+type CustomerFormState = {
+  customer_id: number | null;
+  tenant_id: number;
+  customer_parent_id: number | null;
+  customer_name: string;
+  customer_number: string;
+  customer_type: string;
+  legacy_id: string;
+  invoice_copy_count: string;
+  is_standing_order: boolean;
+  is_signature_required: boolean;
+  is_active: boolean;
+  is_label_required: boolean;
+  is_invoice_required: boolean;
+  is_cost_on_invoice: boolean;
+  is_cost_on_bill_of_lading: boolean;
+  is_returns_allowed: boolean;
+};
+
+type SetCustomerResult = {
+  success?: boolean;
+  customer_id?: number;
+  message?: string;
+};
+
+type CustomerManagementPageProps = {
+  tenants: TenantOption[];
+  initialTenantId: number | null;
+  initialCustomers: CustomerRow[];
+  initialMessage?: string | null;
+};
+
+const CUSTOMER_TYPES = ['ACCOUNT', 'SITE', 'LOCATION'] as const;
+
+function toNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function toBoolean(value: unknown, fallback = false): boolean {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    if (value.toLowerCase() === 'true') return true;
+    if (value.toLowerCase() === 'false') return false;
+  }
+  return fallback;
+}
+
+function emptyForm(tenantId: number): CustomerFormState {
+  return {
+    customer_id: null,
+    tenant_id: tenantId,
+    customer_parent_id: null,
+    customer_name: '',
+    customer_number: '',
+    customer_type: 'ACCOUNT',
+    legacy_id: '',
+    invoice_copy_count: '1',
+    is_standing_order: false,
+    is_signature_required: false,
+    is_active: true,
+    is_label_required: false,
+    is_invoice_required: false,
+    is_cost_on_invoice: false,
+    is_cost_on_bill_of_lading: false,
+    is_returns_allowed: true,
+  };
+}
+
+function toFormState(customer: CustomerRow): CustomerFormState {
+  return {
+    customer_id: customer.customer_id,
+    tenant_id: customer.tenant_id,
+    customer_parent_id: customer.customer_parent_id,
+    customer_name: customer.customer_name,
+    customer_number: customer.customer_number ?? '',
+    customer_type: customer.customer_type,
+    legacy_id: customer.legacy_id === null ? '' : String(customer.legacy_id),
+    invoice_copy_count: String(customer.invoice_copy_count),
+    is_standing_order: customer.is_standing_order,
+    is_signature_required: customer.is_signature_required,
+    is_active: customer.is_active,
+    is_label_required: customer.is_label_required,
+    is_invoice_required: customer.is_invoice_required,
+    is_cost_on_invoice: customer.is_cost_on_invoice,
+    is_cost_on_bill_of_lading: customer.is_cost_on_bill_of_lading,
+    is_returns_allowed: customer.is_returns_allowed,
+  };
+}
+
+function rowMatchesSearch(row: CustomerRow, searchLower: string) {
+  if (!searchLower) return true;
+  return (
+    row.customer_name.toLowerCase().includes(searchLower) ||
+    (row.customer_number ?? '').toLowerCase().includes(searchLower)
+  );
+}
+
+function normalizeCustomerRows(rows: unknown[]): CustomerRow[] {
+  return rows
+    .map((row) => {
+      const candidate = row as Partial<CustomerRow>;
+      const customerId = toNumber(candidate.customer_id);
+      const tenantId = toNumber(candidate.tenant_id);
+      if (customerId === null || tenantId === null) {
+        return null;
+      }
+
+      return {
+        customer_id: customerId,
+        tenant_id: tenantId,
+        customer_parent_id: toNumber(candidate.customer_parent_id),
+        customer_name: candidate.customer_name ?? '',
+        customer_number: candidate.customer_number ?? null,
+        customer_type: candidate.customer_type ?? 'ACCOUNT',
+        legacy_id: toNumber(candidate.legacy_id),
+        level: toNumber(candidate.level) ?? 0,
+        sort_path: candidate.sort_path ?? '',
+        invoice_copy_count: toNumber(candidate.invoice_copy_count) ?? 1,
+        is_standing_order: toBoolean(candidate.is_standing_order, false),
+        is_signature_required: toBoolean(candidate.is_signature_required, false),
+        is_active: toBoolean(candidate.is_active, true),
+        is_label_required: toBoolean(candidate.is_label_required, false),
+        is_invoice_required: toBoolean(candidate.is_invoice_required, false),
+        is_cost_on_invoice: toBoolean(candidate.is_cost_on_invoice, false),
+        is_cost_on_bill_of_lading: toBoolean(candidate.is_cost_on_bill_of_lading, false),
+        is_returns_allowed: toBoolean(candidate.is_returns_allowed, true),
+      };
+    })
+    .filter((row): row is CustomerRow => row !== null)
+    .sort((a, b) => a.sort_path.localeCompare(b.sort_path));
+}
+
+export function CustomerManagementPage({
+  tenants,
+  initialTenantId,
+  initialCustomers,
+  initialMessage = null,
+}: CustomerManagementPageProps) {
+  const supabase = useMemo(() => createClient(), []);
+  const searchRef = useRef<HTMLInputElement | null>(null);
+
+  const [tenantId, setTenantId] = useState<number | null>(initialTenantId);
+  const [customers, setCustomers] = useState<CustomerRow[]>(initialCustomers);
+  const [search, setSearch] = useState('');
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
+  const [selectedOriginal, setSelectedOriginal] = useState<CustomerRow | null>(null);
+  const [formState, setFormState] = useState<CustomerFormState>(() =>
+    emptyForm(initialTenantId ?? tenants[0]?.tenant_id ?? 0)
+  );
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(initialMessage);
+
+  const customersById = useMemo(() => {
+    const map = new Map<number, CustomerRow>();
+    customers.forEach((customer) => map.set(customer.customer_id, customer));
+    return map;
+  }, [customers]);
+
+  const childrenByParent = useMemo(() => {
+    const map = new Map<number | null, number[]>();
+    customers.forEach((customer) => {
+      const key = customer.customer_parent_id;
+      const existing = map.get(key) ?? [];
+      existing.push(customer.customer_id);
+      map.set(key, existing);
+    });
+    return map;
+  }, [customers]);
+
+  const visibleCustomers = useMemo(() => {
+    if (!search.trim()) {
+      return customers;
+    }
+
+    const searchLower = search.toLowerCase();
+    const included = new Set<number>();
+
+    const includeAncestors = (customerId: number) => {
+      let current = customersById.get(customerId);
+      while (current) {
+        included.add(current.customer_id);
+        if (current.customer_parent_id === null) break;
+        current = customersById.get(current.customer_parent_id);
+      }
+    };
+
+    const includeDescendants = (customerId: number) => {
+      const queue = [...(childrenByParent.get(customerId) ?? [])];
+      while (queue.length > 0) {
+        const id = queue.shift()!;
+        included.add(id);
+        const nested = childrenByParent.get(id) ?? [];
+        queue.push(...nested);
+      }
+    };
+
+    customers.forEach((customer) => {
+      if (rowMatchesSearch(customer, searchLower)) {
+        includeAncestors(customer.customer_id);
+        includeDescendants(customer.customer_id);
+        included.add(customer.customer_id);
+      }
+    });
+
+    return customers.filter((customer) => included.has(customer.customer_id));
+  }, [childrenByParent, customers, customersById, search]);
+
+  const fetchCustomers = useCallback(
+    async (nextTenantId: number) => {
+      setIsLoadingCustomers(true);
+      setStatusMessage(null);
+
+      const { data, error } = await supabase.rpc('get_customers', {
+        p_tenant_id: nextTenantId,
+      });
+      console.log('[tenant/customers] get_customers raw (client fetch)', {
+        tenantId: nextTenantId,
+        hasError: Boolean(error),
+        error: error?.message ?? null,
+        dataType: Array.isArray(data) ? 'array' : typeof data,
+        rowCount: Array.isArray(data) ? data.length : null,
+        sample: Array.isArray(data) ? data.slice(0, 3) : data,
+      });
+
+      if (error) {
+        setCustomers([]);
+        setStatusMessage(error.message);
+        setIsLoadingCustomers(false);
+        return [] as CustomerRow[];
+      }
+
+      const normalized = normalizeCustomerRows(Array.isArray(data) ? data : []);
+      console.log('[tenant/customers] customers normalized (client fetch)', {
+        tenantId: nextTenantId,
+        count: normalized.length,
+        sample: normalized.slice(0, 3),
+      });
+      setCustomers(normalized);
+      setSelectedCustomerId(null);
+      setSelectedOriginal(null);
+      setFormState(emptyForm(nextTenantId));
+      setActiveIndex(0);
+      setIsLoadingCustomers(false);
+      return normalized;
+    },
+    [supabase]
+  );
+
+  useEffect(() => {
+    searchRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    console.log('[tenant/customers] initial props', {
+      tenantCount: tenants.length,
+      initialTenantId,
+      initialCustomersCount: initialCustomers.length,
+      initialMessage,
+    });
+  }, [initialCustomers.length, initialMessage, initialTenantId, tenants.length]);
+
+  useEffect(() => {
+    if (!tenantId) return;
+    setFormState((prev) => ({ ...prev, tenant_id: tenantId }));
+  }, [tenantId]);
+
+  useEffect(() => {
+    if (!search.trim()) {
+      setActiveIndex(0);
+      return;
+    }
+
+    const searchLower = search.toLowerCase();
+    const firstDirectMatch = visibleCustomers.findIndex((customer) =>
+      rowMatchesSearch(customer, searchLower)
+    );
+    setActiveIndex(firstDirectMatch >= 0 ? firstDirectMatch : 0);
+  }, [search, visibleCustomers]);
+
+  const handleTenantChange = async (value: string) => {
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed)) return;
+    setTenantId(parsed);
+    await fetchCustomers(parsed);
+  };
+
+  const handleSelectCustomer = (customer: CustomerRow) => {
+    setSelectedCustomerId(customer.customer_id);
+    setSelectedOriginal(customer);
+    setFormState(toFormState(customer));
+    setStatusMessage(null);
+  };
+
+  const handleCreateClick = () => {
+    if (!tenantId) return;
+    setSelectedCustomerId(null);
+    setSelectedOriginal(null);
+    setFormState(emptyForm(tenantId));
+    setStatusMessage('Creating a new customer.');
+  };
+
+  const handleSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (visibleCustomers.length === 0) return;
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setActiveIndex((current) => Math.min(current + 1, visibleCustomers.length - 1));
+      return;
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setActiveIndex((current) => Math.max(current - 1, 0));
+      return;
+    }
+
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      const candidate = visibleCustomers[activeIndex];
+      if (candidate) {
+        handleSelectCustomer(candidate);
+      }
+    }
+  };
+
+  const toggleField = (field: keyof CustomerFormState, checked: boolean) => {
+    setFormState((prev) => ({ ...prev, [field]: checked }));
+  };
+
+  const updateField = (field: keyof CustomerFormState, value: string | number | null) => {
+    setFormState((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSave = async () => {
+    if (!tenantId) {
+      setStatusMessage('Select a tenant first.');
+      return;
+    }
+
+    if (!formState.customer_name.trim()) {
+      setStatusMessage('Customer name is required.');
+      return;
+    }
+
+    if (!formState.customer_type.trim()) {
+      setStatusMessage('Customer type is required.');
+      return;
+    }
+
+    const isCreate = selectedCustomerId === null;
+    const payload: Record<string, unknown> = {
+      customer_name: formState.customer_name.trim(),
+      customer_number: formState.customer_number.trim() || null,
+      customer_type: formState.customer_type.trim(),
+      customer_parent_id: formState.customer_parent_id,
+      legacy_id: formState.legacy_id.trim() ? Number(formState.legacy_id) : null,
+      invoice_copy_count: Number(formState.invoice_copy_count || 1),
+      is_standing_order: formState.is_standing_order,
+      is_signature_required: formState.is_signature_required,
+      is_active: formState.is_active,
+      is_label_required: formState.is_label_required,
+      is_invoice_required: formState.is_invoice_required,
+      is_cost_on_invoice: formState.is_cost_on_invoice,
+      is_cost_on_bill_of_lading: formState.is_cost_on_bill_of_lading,
+      is_returns_allowed: formState.is_returns_allowed,
+    };
+
+    const updatePayload = isCreate
+      ? payload
+      : Object.fromEntries(
+          Object.entries(payload).filter(([key, value]) => {
+            if (!selectedOriginal) return true;
+            const oldValue = (selectedOriginal as unknown as Record<string, unknown>)[key];
+            return oldValue !== value;
+          })
+        );
+
+    setIsSaving(true);
+    setStatusMessage(null);
+
+    const { data, error } = await supabase.rpc('set_customer', {
+      p_tenant_id: tenantId,
+      p_customer_id: selectedCustomerId,
+      p_action: isCreate ? 'create' : 'update',
+      p_payload: updatePayload,
+    });
+
+    if (error) {
+      setStatusMessage(error.message);
+      setIsSaving(false);
+      return;
+    }
+
+    const result = (data ?? {}) as SetCustomerResult;
+    const nextSelectedId = typeof result.customer_id === 'number' ? result.customer_id : null;
+
+    const refreshedCustomers = await fetchCustomers(tenantId);
+
+    if (nextSelectedId !== null) {
+      const selected = refreshedCustomers.find((customer) => customer.customer_id === nextSelectedId);
+      if (selected) {
+        handleSelectCustomer(selected);
+      }
+    }
+
+    setStatusMessage(result.message ?? 'Saved successfully.');
+    setIsSaving(false);
+  };
+
+  const tenantSelectHidden = tenants.length <= 1;
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2
+          className="text-2xl font-bold text-foreground"
+          style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+        >
+          Customer Management
+        </h2>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Manage customer hierarchy and profile settings.
+        </p>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
+        <Card className="border-border/60">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold">Customer Lookup</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {!tenantSelectHidden && (
+              <div className="space-y-1.5">
+                <Label htmlFor="tenant">Tenant</Label>
+                <Select value={tenantId === null ? '' : String(tenantId)} onValueChange={handleTenantChange}>
+                  <SelectTrigger id="tenant">
+                    <SelectValue placeholder="Select tenant" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tenants.map((tenant) => (
+                      <SelectItem key={tenant.tenant_id} value={String(tenant.tenant_id)}>
+                        {tenant.tenant_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label htmlFor="customer-search">Search</Label>
+              <Input
+                id="customer-search"
+                ref={searchRef}
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                onKeyDown={handleSearchKeyDown}
+                placeholder="Search number or name"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Customers</Label>
+              <div
+                role="listbox"
+                aria-label="Customers list"
+                className="h-80 overflow-y-auto rounded-md border border-input bg-background p-1"
+              >
+                {isLoadingCustomers ? (
+                  <div className="px-2 py-2 text-xs text-muted-foreground">Loading customers...</div>
+                ) : visibleCustomers.length === 0 ? (
+                  <div className="px-2 py-2 text-xs text-muted-foreground">No customers found.</div>
+                ) : (
+                  visibleCustomers.map((customer, index) => {
+                    const isSelected = customer.customer_id === selectedCustomerId;
+                    const isActive = index === activeIndex;
+                    const label = `${customer.customer_number ?? ''} - ${customer.customer_name}`;
+                    return (
+                      <button
+                        key={customer.customer_id}
+                        type="button"
+                        role="option"
+                        aria-selected={isSelected}
+                        className={`block w-full rounded-sm px-2 py-1 text-left text-sm ${
+                          isSelected
+                            ? 'bg-primary text-primary-foreground'
+                            : isActive
+                              ? 'bg-muted'
+                              : 'hover:bg-muted/70'
+                        }`}
+                        onMouseEnter={() => setActiveIndex(index)}
+                        onClick={() => handleSelectCustomer(customer)}
+                      >
+                        <span className="font-mono text-xs whitespace-pre">
+                          {' '.repeat(customer.level * 2)}
+                          {label}
+                        </span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/60">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="text-base font-semibold">Customer Form</CardTitle>
+              <Button type="button" variant="outline" size="sm" onClick={handleCreateClick} disabled={!tenantId}>
+                Create Customer
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="customer_number">Customer Number</Label>
+                <Input
+                  id="customer_number"
+                  value={formState.customer_number}
+                  onChange={(event) => updateField('customer_number', event.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="customer_name">Customer Name</Label>
+                <Input
+                  id="customer_name"
+                  value={formState.customer_name}
+                  onChange={(event) => updateField('customer_name', event.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="customer_type">Customer Type</Label>
+                <Select
+                  value={formState.customer_type}
+                  onValueChange={(value) => updateField('customer_type', value)}
+                >
+                  <SelectTrigger id="customer_type">
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CUSTOMER_TYPES.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="parent_id">Parent Customer ID</Label>
+                <Input
+                  id="parent_id"
+                  type="number"
+                  value={formState.customer_parent_id ?? ''}
+                  onChange={(event) =>
+                    updateField(
+                      'customer_parent_id',
+                      event.target.value === '' ? null : Number(event.target.value)
+                    )
+                  }
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="legacy_id">Legacy ID</Label>
+                <Input
+                  id="legacy_id"
+                  type="number"
+                  value={formState.legacy_id}
+                  onChange={(event) => updateField('legacy_id', event.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="invoice_copy_count">Invoice Copy Count</Label>
+                <Input
+                  id="invoice_copy_count"
+                  type="number"
+                  min={1}
+                  value={formState.invoice_copy_count}
+                  onChange={(event) => updateField('invoice_copy_count', event.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="h-2" />
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={formState.is_standing_order}
+                  onCheckedChange={(checked) => toggleField('is_standing_order', checked === true)}
+                />
+                Standing Order
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={formState.is_signature_required}
+                  onCheckedChange={(checked) => toggleField('is_signature_required', checked === true)}
+                />
+                Signature Required
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={formState.is_active}
+                  onCheckedChange={(checked) => toggleField('is_active', checked === true)}
+                />
+                Active
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={formState.is_label_required}
+                  onCheckedChange={(checked) => toggleField('is_label_required', checked === true)}
+                />
+                Label Required
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={formState.is_invoice_required}
+                  onCheckedChange={(checked) => toggleField('is_invoice_required', checked === true)}
+                />
+                Invoice Required
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={formState.is_cost_on_invoice}
+                  onCheckedChange={(checked) => toggleField('is_cost_on_invoice', checked === true)}
+                />
+                Cost On Invoice
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={formState.is_cost_on_bill_of_lading}
+                  onCheckedChange={(checked) => toggleField('is_cost_on_bill_of_lading', checked === true)}
+                />
+                Cost On Bill Of Lading
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={formState.is_returns_allowed}
+                  onCheckedChange={(checked) => toggleField('is_returns_allowed', checked === true)}
+                />
+                Returns Allowed
+              </label>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button type="button" onClick={handleSave} disabled={isSaving || !tenantId}>
+                {isSaving ? 'Saving...' : 'Save'}
+              </Button>
+              {statusMessage && <p className="text-xs text-muted-foreground">{statusMessage}</p>}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+

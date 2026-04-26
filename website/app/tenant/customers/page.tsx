@@ -1,93 +1,153 @@
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CustomersTable } from '@/components/features/tenant/CustomersTable';
-import { mockCustomers } from '@/lib/mock-data';
-import { Plus, Download, Search } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import { CustomerManagementPage } from '@/components/features/tenant/CustomerManagementPage';
+import { createClient } from '@/lib/supabase/server';
 
-export default function ManageCustomersPage() {
-  const activeCount = mockCustomers.filter((c) => c.status === 'active').length;
-  const totalBalance = mockCustomers.reduce((acc, c) => acc + c.balance, 0);
+type TenantOption = {
+  tenant_id: number;
+  tenant_name: string;
+};
+
+type CustomerRow = {
+  customer_id: number;
+  tenant_id: number;
+  customer_parent_id: number | null;
+  customer_name: string;
+  customer_number: string | null;
+  customer_type: string;
+  legacy_id: number | null;
+  level: number;
+  sort_path: string;
+  invoice_copy_count: number;
+  is_standing_order: boolean;
+  is_signature_required: boolean;
+  is_active: boolean;
+  is_label_required: boolean;
+  is_invoice_required: boolean;
+  is_cost_on_invoice: boolean;
+  is_cost_on_bill_of_lading: boolean;
+  is_returns_allowed: boolean;
+};
+
+function toNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function toBoolean(value: unknown, fallback = false): boolean {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    if (value.toLowerCase() === 'true') return true;
+    if (value.toLowerCase() === 'false') return false;
+  }
+  return fallback;
+}
+
+function normalizeTenants(data: unknown): TenantOption[] {
+  if (!Array.isArray(data)) return [];
+  return data
+    .map((tenant) => {
+      const candidate = tenant as Partial<TenantOption>;
+      const tenantId = toNumber(candidate.tenant_id);
+      if (tenantId === null) return null;
+      return {
+        tenant_id: tenantId,
+        tenant_name: candidate.tenant_name ?? `Tenant ${tenantId}`,
+      };
+    })
+    .filter((tenant): tenant is TenantOption => tenant !== null);
+}
+
+function normalizeCustomers(data: unknown): CustomerRow[] {
+  if (!Array.isArray(data)) return [];
+  return data
+    .map((row) => {
+      const candidate = row as Partial<CustomerRow>;
+      const customerId = toNumber(candidate.customer_id);
+      const tenantId = toNumber(candidate.tenant_id);
+      if (customerId === null || tenantId === null) {
+        return null;
+      }
+
+      return {
+        customer_id: customerId,
+        tenant_id: tenantId,
+        customer_parent_id: toNumber(candidate.customer_parent_id),
+        customer_name: candidate.customer_name ?? '',
+        customer_number: candidate.customer_number ?? null,
+        customer_type: candidate.customer_type ?? 'ACCOUNT',
+        legacy_id: toNumber(candidate.legacy_id),
+        level: toNumber(candidate.level) ?? 0,
+        sort_path: candidate.sort_path ?? '',
+        invoice_copy_count: toNumber(candidate.invoice_copy_count) ?? 1,
+        is_standing_order: toBoolean(candidate.is_standing_order, false),
+        is_signature_required: toBoolean(candidate.is_signature_required, false),
+        is_active: toBoolean(candidate.is_active, true),
+        is_label_required: toBoolean(candidate.is_label_required, false),
+        is_invoice_required: toBoolean(candidate.is_invoice_required, false),
+        is_cost_on_invoice: toBoolean(candidate.is_cost_on_invoice, false),
+        is_cost_on_bill_of_lading: toBoolean(candidate.is_cost_on_bill_of_lading, false),
+        is_returns_allowed: toBoolean(candidate.is_returns_allowed, true),
+      };
+    })
+    .filter((row): row is CustomerRow => row !== null)
+    .sort((a, b) => a.sort_path.localeCompare(b.sort_path));
+}
+
+export default async function ManageCustomersPage() {
+  const supabase = createClient();
+
+  let initialMessage: string | null = null;
+  const { data: tenantData, error: tenantError } = await supabase.rpc('get_tenants');
+  console.log('[tenant/customers] get_tenants raw', {
+    hasError: Boolean(tenantError),
+    error: tenantError?.message ?? null,
+    dataType: Array.isArray(tenantData) ? 'array' : typeof tenantData,
+    rowCount: Array.isArray(tenantData) ? tenantData.length : null,
+    sample: Array.isArray(tenantData) ? tenantData.slice(0, 3) : tenantData,
+  });
+  if (tenantError) {
+    initialMessage = tenantError.message;
+  }
+  const tenants = normalizeTenants(tenantData);
+  console.log('[tenant/customers] tenants normalized', {
+    count: tenants.length,
+    tenants: tenants.slice(0, 5),
+  });
+  const initialTenantId = tenants.length === 1 ? tenants[0].tenant_id : null;
+
+  let initialCustomers: CustomerRow[] = [];
+  if (initialTenantId !== null) {
+    const { data: customerData, error: customerError } = await supabase.rpc('get_customers', {
+      p_tenant_id: initialTenantId,
+    });
+    console.log('[tenant/customers] get_customers raw (server init)', {
+      tenantId: initialTenantId,
+      hasError: Boolean(customerError),
+      error: customerError?.message ?? null,
+      dataType: Array.isArray(customerData) ? 'array' : typeof customerData,
+      rowCount: Array.isArray(customerData) ? customerData.length : null,
+      sample: Array.isArray(customerData) ? customerData.slice(0, 3) : customerData,
+    });
+    if (customerError) {
+      initialMessage = customerError.message;
+    }
+    initialCustomers = normalizeCustomers(customerData);
+    console.log('[tenant/customers] customers normalized (server init)', {
+      tenantId: initialTenantId,
+      count: initialCustomers.length,
+      sample: initialCustomers.slice(0, 3),
+    });
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2
-            className="text-2xl font-bold text-foreground"
-            style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
-          >
-            Customer Profiles
-          </h2>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {activeCount} active of {mockCustomers.length} customers
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="gap-1.5">
-            <Download className="h-3.5 w-3.5" />
-            Export
-          </Button>
-          <Button size="sm" className="gap-1.5">
-            <Plus className="h-3.5 w-3.5" />
-            New Customer
-          </Button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <Card className="border-border/60">
-          <CardContent className="p-4">
-            <div
-              className="text-2xl font-bold text-foreground mb-0.5"
-              style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
-            >
-              {activeCount}
-            </div>
-            <div className="text-xs text-muted-foreground font-medium">Active Customers</div>
-          </CardContent>
-        </Card>
-        <Card className="border-border/60">
-          <CardContent className="p-4">
-            <div
-              className="text-2xl font-bold text-foreground mb-0.5"
-              style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
-            >
-              ${totalBalance.toLocaleString('en-US', { minimumFractionDigits: 0 })}
-            </div>
-            <div className="text-xs text-muted-foreground font-medium">Total AR Balance</div>
-          </CardContent>
-        </Card>
-        <Card className="border-border/60">
-          <CardContent className="p-4">
-            <div
-              className="text-2xl font-bold text-foreground mb-0.5"
-              style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
-            >
-              4
-            </div>
-            <div className="text-xs text-muted-foreground font-medium">Delivery Routes</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="border-border/60">
-        <CardHeader className="pb-3 flex flex-row items-center justify-between">
-          <CardTitle
-            className="text-base font-semibold"
-            style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
-          >
-            All Customers
-          </CardTitle>
-          <div className="relative w-48">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-            <Input placeholder="Search..." className="pl-8 h-8 text-xs" />
-          </div>
-        </CardHeader>
-        <CardContent className="p-0 pb-1">
-          <CustomersTable customers={mockCustomers} />
-        </CardContent>
-      </Card>
-    </div>
+    <CustomerManagementPage
+      tenants={tenants}
+      initialTenantId={initialTenantId}
+      initialCustomers={initialCustomers}
+      initialMessage={initialMessage}
+    />
   );
 }
