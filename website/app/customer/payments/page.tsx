@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase/server';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,6 +21,8 @@ const methodLabels: Record<string, string> = {
 };
 
 export default async function CustomerPaymentsPage() {
+  const supabase = createClient();
+
   // const myPayments = mockPayments.filter((p) => p.customerId === 'c2' || p.customerId === 'c3');
 
   // const supabase = createSupabaseClient();
