@@ -1,0 +1,67 @@
+graph LR
+  subgraph L["Legacy Tables"]
+    S["ordr.ordr_no"]
+  end
+  subgraph T["Transformation"]
+    X["trim(ordr_no::BIGINT::TEXT)"]
+  end
+  subgraph G["Target Table"]
+    Y["om_orders.order_number"]
+  end
+  S -->|CAST + TRIM| X -->|direct map| Y
+```
+
+```mermaid
+graph LR
+  subgraph L["Legacy Tables"]
+    S["(no legacy source in seed_om_orders.sql)"]
+  end
+  subgraph T["Transformation"]
+    X["Column omitted in INSERT"]
+  end
+  subgraph G["Target Table"]
+    Y["om_orders.order_source"]
+  end
+  S -->|not mapped| X -->|NULL/default| Y
+```
+
+```mermaid
+graph LR
+  subgraph L["Legacy Tables"]
+    S["ordr.ordr_amt"]
+  end
+  subgraph T["Transformation"]
+    X["COALESCE(ordr_amt, 0)::NUMERIC(14,4)"]
+  end
+  subgraph G["Target Table"]
+    Y["om_orders.amount"]
+  end
+  S -->|COALESCE + CAST| X -->|direct map| Y
+```
+
+```mermaid
+graph LR
+  subgraph L["Legacy Tables"]
+    S["ordr.ordr_discount_amt"]
+  end
+  subgraph T["Transformation"]
+    X["COALESCE(ordr_discount_amt, 0)::NUMERIC(14,4)"]
+  end
+  subgraph G["Target Table"]
+    Y["om_orders.discount_amount"]
+  end
+  S -->|COALESCE + CAST| X -->|direct map| Y
+```
+
+```mermaid
+graph LR
+  subgraph L["Legacy Tables"]
+    S["ordr.ordr_qty_sold"]
+  end
+  subgraph T["Transformation"]
+    X["COALESCE(ordr_qty_sold, 0)::NUMERIC(14,4)"]
+  end
+  subgraph G["Target Table"]
+    Y["om_orders.quantity"]
+  end
+  S -->|COALESCE + CAST| X -->|direct map| Y

@@ -1,0 +1,41 @@
+Generate a two-column lineage output all target tables matching OM_*, AR_*, FND_* 
+by discovering their DDL files first (e.g., in newTables/).
+Do not omit a matching table because it was not pre-opened.
+
+Delivery requirements:
+- Return the result in chat as one self-contained HTML snippet.
+- Include a single "Copy for Excel" button that copies HTML + plain text so Excel paste preserves formatting/colors.
+- Do not create or save any file.
+
+Mapping rules:
+1) Read the target table DDL first and consider all target columns.
+2) Exclude audit and tenant columns:
+   - created_at, created_by, updated_at, updated_by, tenant_id
+3) No transformation text in output:
+   - No formulas, casts, coalesce, join predicates, expressions, or narrative.
+   - Source must be table_name.column_name only.
+4) Row cardinality:
+   - Output one row per target_column. If one target column has multiple legacy sources put it all in one column
+5) Completeness:
+   - Do not skip indirectly inherited columns just because they are not directly selected in a single seed step.
+
+Formatting requirements:
+1) Each table starts with a merged table-name header row (colspan=2):
+   - left justified
+   - bold
+   - 14pt (table-name header row only)
+2) All other text is 12pt:
+   - column headers
+   - data rows
+3) Header background by table prefix:
+   - om_*: soft green
+   - ar_*: soft yellow
+   - fnd_*: soft blue
+   (Only apply colors for tables included in scope.)
+4) Column headers:
+   - Left header: "Column Name" (bold)
+   - Right header: "Source (table.column)" (bold)
+5) Table body:
+   - Left column: target column name
+   - Right column: source table_name.column_name
+   - add a blank row between tables
