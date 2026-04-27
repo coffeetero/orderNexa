@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
+import { EntityComboBox } from '@/components/bps/EntityComboBox';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -77,6 +78,18 @@ type CustomerManagementPageProps = {
 
 const CUSTOMER_TYPES = ['ACCOUNT', 'SITE', 'LOCATION'] as const;
 
+/** Focus first text/select control in the visible tab panel (for post–customer-select navigation). */
+function focusFirstEditableInActiveTabPanel() {
+  requestAnimationFrame(() => {
+    const panel = document.querySelector('[role="tabpanel"][data-state="active"]');
+    if (!panel) return;
+    const el = panel.querySelector<HTMLElement>(
+      'input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), button[role="combobox"]:not([disabled]), select:not([disabled])'
+    );
+    el?.focus();
+  });
+}
+
 function toNumber(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   if (typeof value === 'string' && value.trim() !== '') {
@@ -137,14 +150,6 @@ function toFormState(customer: CustomerRow): CustomerFormState {
   };
 }
 
-function rowMatchesSearch(row: CustomerRow, searchLower: string) {
-  if (!searchLower) return true;
-  return (
-    row.customer_name.toLowerCase().includes(searchLower) ||
-    (row.customer_number ?? '').toLowerCase().includes(searchLower)
-  );
-}
-
 function normalizeCustomerRows(rows: unknown[]): CustomerRow[] {
   return rows
     .map((row) => {
@@ -187,12 +192,9 @@ export function CustomerManagementPage({
   initialMessage = null,
 }: CustomerManagementPageProps) {
   const supabase = useMemo(() => createClient(), []);
-  const searchRef = useRef<HTMLInputElement | null>(null);
 
   const [tenantId, setTenantId] = useState<number | null>(initialTenantId);
   const [customers, setCustomers] = useState<CustomerRow[]>(initialCustomers);
-  const [search, setSearch] = useState('');
-  const [activeIndex, setActiveIndex] = useState(0);
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
   const [selectedOriginal, setSelectedOriginal] = useState<CustomerRow | null>(null);
   const [formState, setFormState] = useState<CustomerFormState>(() =>
@@ -201,61 +203,6 @@ export function CustomerManagementPage({
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(initialMessage);
-
-  const customersById = useMemo(() => {
-    const map = new Map<number, CustomerRow>();
-    customers.forEach((customer) => map.set(customer.customer_id, customer));
-    return map;
-  }, [customers]);
-
-  const childrenByParent = useMemo(() => {
-    const map = new Map<number | null, number[]>();
-    customers.forEach((customer) => {
-      const key = customer.customer_parent_id;
-      const existing = map.get(key) ?? [];
-      existing.push(customer.customer_id);
-      map.set(key, existing);
-    });
-    return map;
-  }, [customers]);
-
-  const visibleCustomers = useMemo(() => {
-    if (!search.trim()) {
-      return customers;
-    }
-
-    const searchLower = search.toLowerCase();
-    const included = new Set<number>();
-
-    const includeAncestors = (customerId: number) => {
-      let current = customersById.get(customerId);
-      while (current) {
-        included.add(current.customer_id);
-        if (current.customer_parent_id === null) break;
-        current = customersById.get(current.customer_parent_id);
-      }
-    };
-
-    const includeDescendants = (customerId: number) => {
-      const queue = [...(childrenByParent.get(customerId) ?? [])];
-      while (queue.length > 0) {
-        const id = queue.shift()!;
-        included.add(id);
-        const nested = childrenByParent.get(id) ?? [];
-        queue.push(...nested);
-      }
-    };
-
-    customers.forEach((customer) => {
-      if (rowMatchesSearch(customer, searchLower)) {
-        includeAncestors(customer.customer_id);
-        includeDescendants(customer.customer_id);
-        included.add(customer.customer_id);
-      }
-    });
-
-    return customers.filter((customer) => included.has(customer.customer_id));
-  }, [childrenByParent, customers, customersById, search]);
 
   const fetchCustomers = useCallback(
     async (nextTenantId: number) => {
@@ -278,7 +225,6 @@ export function CustomerManagementPage({
       setSelectedCustomerId(null);
       setSelectedOriginal(null);
       setFormState(emptyForm(nextTenantId));
-      setActiveIndex(0);
       setIsLoadingCustomers(false);
       return normalized;
     },
@@ -286,26 +232,9 @@ export function CustomerManagementPage({
   );
 
   useEffect(() => {
-    searchRef.current?.focus();
-  }, []);
-
-  useEffect(() => {
     if (!tenantId) return;
     setFormState((prev) => ({ ...prev, tenant_id: tenantId }));
   }, [tenantId]);
-
-  useEffect(() => {
-    if (!search.trim()) {
-      setActiveIndex(0);
-      return;
-    }
-
-    const searchLower = search.toLowerCase();
-    const firstDirectMatch = visibleCustomers.findIndex((customer) =>
-      rowMatchesSearch(customer, searchLower)
-    );
-    setActiveIndex(firstDirectMatch >= 0 ? firstDirectMatch : 0);
-  }, [search, visibleCustomers]);
 
   const handleTenantChange = async (value: string) => {
     const parsed = Number(value);
@@ -327,30 +256,6 @@ export function CustomerManagementPage({
     setSelectedOriginal(null);
     setFormState(emptyForm(tenantId));
     setStatusMessage('Creating a new customer.');
-  };
-
-  const handleSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (visibleCustomers.length === 0) return;
-
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      setActiveIndex((current) => Math.min(current + 1, visibleCustomers.length - 1));
-      return;
-    }
-
-    if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      setActiveIndex((current) => Math.max(current - 1, 0));
-      return;
-    }
-
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      const candidate = visibleCustomers[activeIndex];
-      if (candidate) {
-        handleSelectCustomer(candidate);
-      }
-    }
   };
 
   const toggleField = (field: keyof CustomerFormState, checked: boolean) => {
@@ -448,19 +353,10 @@ export function CustomerManagementPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2
-          className="text-2xl font-bold text-foreground"
-          style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
-        >
-          Customer Management
-        </h2>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
-        <Card className="border-border/60 lg:h-[calc(100vh-12rem)]">
-          <CardContent className="flex h-full flex-col gap-[6px] p-4">
-            {!tenantSelectHidden && (
+      <div className={`grid gap-6 ${tenantSelectHidden ? 'lg:grid-cols-1' : 'lg:grid-cols-[300px_1fr]'}`}>
+        {!tenantSelectHidden ? (
+          <Card className="border-border/60 lg:h-[calc(100vh-12rem)]">
+            <CardContent className="flex h-full flex-col gap-[6px] p-4">
               <div className="space-y-1.5">
                 <Label htmlFor="tenant">Tenant</Label>
                 <Select value={tenantId === null ? '' : String(tenantId)} onValueChange={handleTenantChange}>
@@ -476,94 +372,79 @@ export function CustomerManagementPage({
                   </SelectContent>
                 </Select>
               </div>
-            )}
+            </CardContent>
+          </Card>
+        ) : null}
 
-            <div className="space-y-1.5">
-              <Label htmlFor="customer-search">Search Customer</Label>
-              <Input
-                id="customer-search"
-                ref={searchRef}
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                onKeyDown={handleSearchKeyDown}
+        <div className="flex min-h-0 flex-1 flex-col gap-4">
+          <div className="grid grid-cols-3 gap-3 items-start">
+            <div className="flex min-h-0 flex-col gap-1.5">
+              <Label htmlFor="customer-combobox">Search Customer</Label>
+              <EntityComboBox<CustomerRow>
+                alwaysOpen
+                collapseOnSelect
+                clearSearchOnFocus
+                triggerId="customer-combobox"
+                items={customers}
+                value={selectedCustomerId}
+                onChange={(customer) => {
+                  if (customer) {
+                    handleSelectCustomer(customer);
+                  }
+                }}
+                onAfterSelect={() => {
+                  focusFirstEditableInActiveTabPanel();
+                }}
+                getId={(c) => c.customer_id}
+                getLabel={(c) => `${c.customer_number ?? ''} - ${c.customer_name}`}
+                getSearchText={(c) =>
+                  `${c.customer_number ?? ''} ${c.customer_name}`.trim()
+                }
+                getParentId={(c) => c.customer_parent_id}
+                getSortKey={(c) => c.sort_path}
                 placeholder="Search number or name"
+                disabled={!tenantId}
+                loading={isLoadingCustomers}
+                emptyText={tenantId ? 'No customers found.' : 'Select a tenant first.'}
+                className="w-full"
               />
             </div>
 
-            <div className="flex min-h-0 flex-1 flex-col">
-              <div
-                role="listbox"
-                aria-label="Customers list"
-                className="flex-1 overflow-y-auto rounded-md border border-input bg-background p-1"
-              >
-                {isLoadingCustomers ? (
-                  <div className="px-2 py-2 text-xs text-muted-foreground">Loading customers...</div>
-                ) : visibleCustomers.length === 0 ? (
-                  <div className="px-2 py-2 text-xs text-muted-foreground">No customers found.</div>
-                ) : (
-                  visibleCustomers.map((customer, index) => {
-                    const isSelected = customer.customer_id === selectedCustomerId;
-                    const isActive = index === activeIndex;
-                    const label = `${customer.customer_number ?? ''} - ${customer.customer_name}`;
-                    return (
-                      <button
-                        key={customer.customer_id}
-                        type="button"
-                        role="option"
-                        aria-selected={isSelected}
-                        className={`block w-full rounded-sm px-2 py-[1px] text-left text-sm ${
-                          isSelected
-                            ? 'bg-primary text-primary-foreground'
-                            : isActive
-                              ? 'bg-muted'
-                              : 'hover:bg-muted/70'
-                        }`}
-                        onMouseEnter={() => setActiveIndex(index)}
-                        onClick={() => handleSelectCustomer(customer)}
-                      >
-                        <span className="font-mono text-xs whitespace-pre">
-                          {' '.repeat(customer.level * 2)}
-                          {label}
-                        </span>
-                      </button>
-                    );
-                  })
-                )}
+            <div />
+
+            <div className="flex items-center justify-end gap-2 pt-6">
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCreateClick}
+                  disabled={!tenantId}
+                >
+                  <Plus className="mr-1 h-3.5 w-3.5" />
+                  Customer
+                </Button>
+                <Button type="button" onClick={handleSave} size="sm" disabled={isSaving || !tenantId}>
+                  {isSaving ? 'Saving...' : 'Save'}
+                </Button>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
 
-        <Card className="border-border/60">
-          <CardContent className="pt-6">
-            <Tabs defaultValue="profile" className="space-y-4">
-              <div className="flex items-center justify-between gap-3">
+          <Card className="border-border/60">
+            <Tabs defaultValue="profile" className="space-y-0">
+              <CardHeader className="pb-3 pt-6">
+                <TabsList className="grid w-full grid-cols-4">
+                  <TabsTrigger value="profile">Profile</TabsTrigger>
+                  <TabsTrigger value="contacts">Contacts</TabsTrigger>
+                  <TabsTrigger value="pricing">Pricing</TabsTrigger>
+                  <TabsTrigger value="settings">Settings</TabsTrigger>
+                </TabsList>
+              </CardHeader>
+
+              <CardContent className="pt-0">
                 <h2 className="text-base font-semibold tracking-tight">{formTitle}</h2>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleCreateClick}
-                    disabled={!tenantId}
-                  >
-                    <Plus className="mr-1 h-3.5 w-3.5" />
-                    Customer
-                  </Button>
-                  <Button type="button" onClick={handleSave} size="sm" disabled={isSaving || !tenantId}>
-                    {isSaving ? 'Saving...' : 'Save'}
-                  </Button>
-                </div>
-              </div>
-
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="profile">Profile</TabsTrigger>
-                <TabsTrigger value="contacts">Contacts</TabsTrigger>
-                <TabsTrigger value="pricing">Pricing</TabsTrigger>
-                <TabsTrigger value="settings">Settings</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="profile" className="space-y-6">
+                <TabsContent value="profile" className="space-y-6">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
                     <Label htmlFor="customer_number">Customer Number</Label>
@@ -698,26 +579,27 @@ export function CustomerManagementPage({
                 {statusMessage && <p className="text-xs text-muted-foreground">{statusMessage}</p>}
               </TabsContent>
 
-              <TabsContent value="contacts">
-                <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
-                  Contacts grid will be added here for <span className="font-medium">{selectedCustomerLabel}</span>.
-                </div>
-              </TabsContent>
+                <TabsContent value="contacts">
+                  <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
+                    Contacts grid will be added here for <span className="font-medium">{selectedCustomerLabel}</span>.
+                  </div>
+                </TabsContent>
 
-              <TabsContent value="pricing">
-                <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
-                  Pricing configuration will be added here for <span className="font-medium">{selectedCustomerLabel}</span>.
-                </div>
-              </TabsContent>
+                <TabsContent value="pricing">
+                  <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
+                    Pricing configuration will be added here for <span className="font-medium">{selectedCustomerLabel}</span>.
+                  </div>
+                </TabsContent>
 
-              <TabsContent value="settings">
-                <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
-                  Customer settings will be added here for <span className="font-medium">{selectedCustomerLabel}</span>.
-                </div>
-              </TabsContent>
+                <TabsContent value="settings">
+                  <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
+                    Customer settings will be added here for <span className="font-medium">{selectedCustomerLabel}</span>.
+                  </div>
+                </TabsContent>
+              </CardContent>
             </Tabs>
-          </CardContent>
-        </Card>
+          </Card>
+        </div>
       </div>
     </div>
   );
