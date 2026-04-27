@@ -74,7 +74,7 @@ export function TenantLayoutShell({ children }: TenantLayoutShellProps) {
           userRole="Bakery Admin"
         />
 
-        <main className="flex-1 overflow-y-auto bg-background p-4 sm:p-6 scrollbar-thin">
+        <main className="flex-1 overflow-y-auto bg-background pt-[1px] pb-[1px] px-[10px] scrollbar-thin">
           {children}
         </main>
       </div>

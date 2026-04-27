@@ -101,21 +101,10 @@ export default async function ManageCustomersPage() {
 
   let initialMessage: string | null = null;
   const { data: tenantData, error: tenantError } = await supabase.rpc('get_tenants');
-  console.log('[tenant/customers] get_tenants raw', {
-    hasError: Boolean(tenantError),
-    error: tenantError?.message ?? null,
-    dataType: Array.isArray(tenantData) ? 'array' : typeof tenantData,
-    rowCount: Array.isArray(tenantData) ? tenantData.length : null,
-    sample: Array.isArray(tenantData) ? tenantData.slice(0, 3) : tenantData,
-  });
   if (tenantError) {
     initialMessage = tenantError.message;
   }
   const tenants = normalizeTenants(tenantData);
-  console.log('[tenant/customers] tenants normalized', {
-    count: tenants.length,
-    tenants: tenants.slice(0, 5),
-  });
   const initialTenantId = tenants.length === 1 ? tenants[0].tenant_id : null;
 
   let initialCustomers: CustomerRow[] = [];
@@ -123,23 +112,10 @@ export default async function ManageCustomersPage() {
     const { data: customerData, error: customerError } = await supabase.rpc('get_customers', {
       p_tenant_id: initialTenantId,
     });
-    console.log('[tenant/customers] get_customers raw (server init)', {
-      tenantId: initialTenantId,
-      hasError: Boolean(customerError),
-      error: customerError?.message ?? null,
-      dataType: Array.isArray(customerData) ? 'array' : typeof customerData,
-      rowCount: Array.isArray(customerData) ? customerData.length : null,
-      sample: Array.isArray(customerData) ? customerData.slice(0, 3) : customerData,
-    });
     if (customerError) {
       initialMessage = customerError.message;
     }
     initialCustomers = normalizeCustomers(customerData);
-    console.log('[tenant/customers] customers normalized (server init)', {
-      tenantId: initialTenantId,
-      count: initialCustomers.length,
-      sample: initialCustomers.slice(0, 3),
-    });
   }
 
   return (

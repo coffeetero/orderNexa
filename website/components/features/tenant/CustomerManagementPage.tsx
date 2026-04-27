@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { createClient } from '@/lib/supabase/client';
 
 type TenantOption = {
@@ -263,14 +265,6 @@ export function CustomerManagementPage({
       const { data, error } = await supabase.rpc('get_customers', {
         p_tenant_id: nextTenantId,
       });
-      console.log('[tenant/customers] get_customers raw (client fetch)', {
-        tenantId: nextTenantId,
-        hasError: Boolean(error),
-        error: error?.message ?? null,
-        dataType: Array.isArray(data) ? 'array' : typeof data,
-        rowCount: Array.isArray(data) ? data.length : null,
-        sample: Array.isArray(data) ? data.slice(0, 3) : data,
-      });
 
       if (error) {
         setCustomers([]);
@@ -280,11 +274,6 @@ export function CustomerManagementPage({
       }
 
       const normalized = normalizeCustomerRows(Array.isArray(data) ? data : []);
-      console.log('[tenant/customers] customers normalized (client fetch)', {
-        tenantId: nextTenantId,
-        count: normalized.length,
-        sample: normalized.slice(0, 3),
-      });
       setCustomers(normalized);
       setSelectedCustomerId(null);
       setSelectedOriginal(null);
@@ -299,15 +288,6 @@ export function CustomerManagementPage({
   useEffect(() => {
     searchRef.current?.focus();
   }, []);
-
-  useEffect(() => {
-    console.log('[tenant/customers] initial props', {
-      tenantCount: tenants.length,
-      initialTenantId,
-      initialCustomersCount: initialCustomers.length,
-      initialMessage,
-    });
-  }, [initialCustomers.length, initialMessage, initialTenantId, tenants.length]);
 
   useEffect(() => {
     if (!tenantId) return;
@@ -458,6 +438,13 @@ export function CustomerManagementPage({
   };
 
   const tenantSelectHidden = tenants.length <= 1;
+  const titleNumber = formState.customer_number.trim();
+  const titleName = formState.customer_name.trim();
+  const formTitle =
+    titleNumber || titleName
+      ? `${titleNumber || 'New'} - ${titleName || 'Customer'}`
+      : 'Customer Form';
+  const selectedCustomerLabel = titleNumber || titleName ? formTitle : 'No customer selected';
 
   return (
     <div className="space-y-6">
@@ -468,17 +455,11 @@ export function CustomerManagementPage({
         >
           Customer Management
         </h2>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Manage customer hierarchy and profile settings.
-        </p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
-        <Card className="border-border/60">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold">Customer Lookup</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
+      <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
+        <Card className="border-border/60 lg:h-[calc(100vh-12rem)]">
+          <CardContent className="flex h-full flex-col gap-[6px] p-4">
             {!tenantSelectHidden && (
               <div className="space-y-1.5">
                 <Label htmlFor="tenant">Tenant</Label>
@@ -498,7 +479,7 @@ export function CustomerManagementPage({
             )}
 
             <div className="space-y-1.5">
-              <Label htmlFor="customer-search">Search</Label>
+              <Label htmlFor="customer-search">Search Customer</Label>
               <Input
                 id="customer-search"
                 ref={searchRef}
@@ -509,12 +490,11 @@ export function CustomerManagementPage({
               />
             </div>
 
-            <div className="space-y-1.5">
-              <Label>Customers</Label>
+            <div className="flex min-h-0 flex-1 flex-col">
               <div
                 role="listbox"
                 aria-label="Customers list"
-                className="h-80 overflow-y-auto rounded-md border border-input bg-background p-1"
+                className="flex-1 overflow-y-auto rounded-md border border-input bg-background p-1"
               >
                 {isLoadingCustomers ? (
                   <div className="px-2 py-2 text-xs text-muted-foreground">Loading customers...</div>
@@ -531,7 +511,7 @@ export function CustomerManagementPage({
                         type="button"
                         role="option"
                         aria-selected={isSelected}
-                        className={`block w-full rounded-sm px-2 py-1 text-left text-sm ${
+                        className={`block w-full rounded-sm px-2 py-[1px] text-left text-sm ${
                           isSelected
                             ? 'bg-primary text-primary-foreground'
                             : isActive
@@ -555,152 +535,187 @@ export function CustomerManagementPage({
         </Card>
 
         <Card className="border-border/60">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between gap-2">
-              <CardTitle className="text-base font-semibold">Customer Form</CardTitle>
-              <Button type="button" variant="outline" size="sm" onClick={handleCreateClick} disabled={!tenantId}>
-                Create Customer
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="customer_number">Customer Number</Label>
-                <Input
-                  id="customer_number"
-                  value={formState.customer_number}
-                  onChange={(event) => updateField('customer_number', event.target.value)}
-                />
+          <CardContent className="pt-6">
+            <Tabs defaultValue="profile" className="space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-base font-semibold tracking-tight">{formTitle}</h2>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCreateClick}
+                    disabled={!tenantId}
+                  >
+                    <Plus className="mr-1 h-3.5 w-3.5" />
+                    Customer
+                  </Button>
+                  <Button type="button" onClick={handleSave} size="sm" disabled={isSaving || !tenantId}>
+                    {isSaving ? 'Saving...' : 'Save'}
+                  </Button>
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="customer_name">Customer Name</Label>
-                <Input
-                  id="customer_name"
-                  value={formState.customer_name}
-                  onChange={(event) => updateField('customer_name', event.target.value)}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="customer_type">Customer Type</Label>
-                <Select
-                  value={formState.customer_type}
-                  onValueChange={(value) => updateField('customer_type', value)}
-                >
-                  <SelectTrigger id="customer_type">
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CUSTOMER_TYPES.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="parent_id">Parent Customer ID</Label>
-                <Input
-                  id="parent_id"
-                  type="number"
-                  value={formState.customer_parent_id ?? ''}
-                  onChange={(event) =>
-                    updateField(
-                      'customer_parent_id',
-                      event.target.value === '' ? null : Number(event.target.value)
-                    )
-                  }
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="legacy_id">Legacy ID</Label>
-                <Input
-                  id="legacy_id"
-                  type="number"
-                  value={formState.legacy_id}
-                  onChange={(event) => updateField('legacy_id', event.target.value)}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="invoice_copy_count">Invoice Copy Count</Label>
-                <Input
-                  id="invoice_copy_count"
-                  type="number"
-                  min={1}
-                  value={formState.invoice_copy_count}
-                  onChange={(event) => updateField('invoice_copy_count', event.target.value)}
-                />
-              </div>
-            </div>
 
-            <div className="h-2" />
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="profile">Profile</TabsTrigger>
+                <TabsTrigger value="contacts">Contacts</TabsTrigger>
+                <TabsTrigger value="pricing">Pricing</TabsTrigger>
+                <TabsTrigger value="settings">Settings</TabsTrigger>
+              </TabsList>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="flex items-center gap-2 text-sm">
-                <Checkbox
-                  checked={formState.is_standing_order}
-                  onCheckedChange={(checked) => toggleField('is_standing_order', checked === true)}
-                />
-                Standing Order
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <Checkbox
-                  checked={formState.is_signature_required}
-                  onCheckedChange={(checked) => toggleField('is_signature_required', checked === true)}
-                />
-                Signature Required
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <Checkbox
-                  checked={formState.is_active}
-                  onCheckedChange={(checked) => toggleField('is_active', checked === true)}
-                />
-                Active
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <Checkbox
-                  checked={formState.is_label_required}
-                  onCheckedChange={(checked) => toggleField('is_label_required', checked === true)}
-                />
-                Label Required
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <Checkbox
-                  checked={formState.is_invoice_required}
-                  onCheckedChange={(checked) => toggleField('is_invoice_required', checked === true)}
-                />
-                Invoice Required
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <Checkbox
-                  checked={formState.is_cost_on_invoice}
-                  onCheckedChange={(checked) => toggleField('is_cost_on_invoice', checked === true)}
-                />
-                Cost On Invoice
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <Checkbox
-                  checked={formState.is_cost_on_bill_of_lading}
-                  onCheckedChange={(checked) => toggleField('is_cost_on_bill_of_lading', checked === true)}
-                />
-                Cost On Bill Of Lading
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <Checkbox
-                  checked={formState.is_returns_allowed}
-                  onCheckedChange={(checked) => toggleField('is_returns_allowed', checked === true)}
-                />
-                Returns Allowed
-              </label>
-            </div>
+              <TabsContent value="profile" className="space-y-6">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="customer_number">Customer Number</Label>
+                    <Input
+                      id="customer_number"
+                      value={formState.customer_number}
+                      onChange={(event) => updateField('customer_number', event.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="customer_name">Customer Name</Label>
+                    <Input
+                      id="customer_name"
+                      value={formState.customer_name}
+                      onChange={(event) => updateField('customer_name', event.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="customer_type">Customer Type</Label>
+                    <Select
+                      value={formState.customer_type}
+                      onValueChange={(value) => updateField('customer_type', value)}
+                    >
+                      <SelectTrigger id="customer_type">
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CUSTOMER_TYPES.map((type) => (
+                          <SelectItem key={type} value={type}>
+                            {type}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="parent_id">Parent Customer ID</Label>
+                    <Input
+                      id="parent_id"
+                      type="number"
+                      value={formState.customer_parent_id ?? ''}
+                      onChange={(event) =>
+                        updateField(
+                          'customer_parent_id',
+                          event.target.value === '' ? null : Number(event.target.value)
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="legacy_id">Legacy ID</Label>
+                    <Input
+                      id="legacy_id"
+                      type="number"
+                      value={formState.legacy_id}
+                      onChange={(event) => updateField('legacy_id', event.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="invoice_copy_count">Invoice Copy Count</Label>
+                    <Input
+                      id="invoice_copy_count"
+                      type="number"
+                      min={1}
+                      value={formState.invoice_copy_count}
+                      onChange={(event) => updateField('invoice_copy_count', event.target.value)}
+                    />
+                  </div>
+                </div>
 
-            <div className="flex items-center gap-2">
-              <Button type="button" onClick={handleSave} disabled={isSaving || !tenantId}>
-                {isSaving ? 'Saving...' : 'Save'}
-              </Button>
-              {statusMessage && <p className="text-xs text-muted-foreground">{statusMessage}</p>}
-            </div>
+                <div className="h-2" />
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={formState.is_standing_order}
+                      onCheckedChange={(checked) => toggleField('is_standing_order', checked === true)}
+                    />
+                    Standing Order
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={formState.is_signature_required}
+                      onCheckedChange={(checked) => toggleField('is_signature_required', checked === true)}
+                    />
+                    Signature Required
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={formState.is_active}
+                      onCheckedChange={(checked) => toggleField('is_active', checked === true)}
+                    />
+                    Active
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={formState.is_label_required}
+                      onCheckedChange={(checked) => toggleField('is_label_required', checked === true)}
+                    />
+                    Label Required
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={formState.is_invoice_required}
+                      onCheckedChange={(checked) => toggleField('is_invoice_required', checked === true)}
+                    />
+                    Invoice Required
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={formState.is_cost_on_invoice}
+                      onCheckedChange={(checked) => toggleField('is_cost_on_invoice', checked === true)}
+                    />
+                    Cost On Invoice
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={formState.is_cost_on_bill_of_lading}
+                      onCheckedChange={(checked) => toggleField('is_cost_on_bill_of_lading', checked === true)}
+                    />
+                    Cost On Bill Of Lading
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={formState.is_returns_allowed}
+                      onCheckedChange={(checked) => toggleField('is_returns_allowed', checked === true)}
+                    />
+                    Returns Allowed
+                  </label>
+                </div>
+
+                {statusMessage && <p className="text-xs text-muted-foreground">{statusMessage}</p>}
+              </TabsContent>
+
+              <TabsContent value="contacts">
+                <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
+                  Contacts grid will be added here for <span className="font-medium">{selectedCustomerLabel}</span>.
+                </div>
+              </TabsContent>
+
+              <TabsContent value="pricing">
+                <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
+                  Pricing configuration will be added here for <span className="font-medium">{selectedCustomerLabel}</span>.
+                </div>
+              </TabsContent>
+
+              <TabsContent value="settings">
+                <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
+                  Customer settings will be added here for <span className="font-medium">{selectedCustomerLabel}</span>.
+                </div>
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
       </div>
