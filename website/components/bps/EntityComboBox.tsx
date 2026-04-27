@@ -72,6 +72,15 @@ type RowModel<T> = {
   contextOnly: boolean;
 };
 
+type PreparedItem<T> = {
+  item: T;
+  idStr: string;
+  parentIdStr: string | null;
+  searchTextLower: string;
+  sortKey: string;
+  level: number;
+};
+
 function highlightMatches(text: string, queryLower: string): React.ReactNode {
   if (!queryLower.trim()) return text;
   const q = queryLower.trim();
@@ -97,103 +106,6 @@ function highlightMatches(text: string, queryLower: string): React.ReactNode {
     pos = idx + q.length;
   }
   return out;
-}
-
-function itemLevel<T>(
-  item: T,
-  byId: Map<string, T>,
-  getId: (item: T) => string | number,
-  getParentId: (item: T) => string | number | null
-): number {
-  let depth = 0;
-  let current: T | undefined = item;
-  const visited = new Set<string>();
-  for (;;) {
-    const pid = getParentId(current);
-    if (pid === null) break;
-    const pk = idKey(pid);
-    if (visited.has(pk)) break;
-    visited.add(pk);
-    const parent = byId.get(pk);
-    if (!parent) break;
-    depth++;
-    current = parent;
-  }
-  return depth;
-}
-
-function computeFilter<T>(
-  items: T[],
-  searchRaw: string,
-  getId: (item: T) => string | number,
-  getParentId: (item: T) => string | number | null,
-  getSearchText: (item: T) => string,
-  includeChildren: boolean
-): { included: Set<string>; matched: Set<string> } {
-  const searchLower = searchRaw.trim().toLowerCase();
-  const included = new Set<string>();
-  const matched = new Set<string>();
-  const byId = new Map<string, T>();
-  items.forEach((it) => byId.set(idKey(getId(it)), it));
-
-  const childrenByParent = new Map<string | null, string[]>();
-  items.forEach((item) => {
-    const pid = getParentId(item);
-    const key = pid === null ? null : idKey(pid);
-    const cid = idKey(getId(item));
-    const list = childrenByParent.get(key) ?? [];
-    list.push(cid);
-    childrenByParent.set(key, list);
-  });
-
-  const includeAncestors = (startId: string) => {
-    let currentId: string | null = startId;
-    const seen = new Set<string>();
-    while (currentId !== null) {
-      if (seen.has(currentId)) break;
-      seen.add(currentId);
-      const node = byId.get(currentId);
-      if (!node) break;
-      included.add(currentId);
-      const pid = getParentId(node);
-      if (pid === null) break;
-      currentId = idKey(pid);
-    }
-  };
-
-  const includeDescendants = (startId: string) => {
-    const queue = [...(childrenByParent.get(startId) ?? [])];
-    const seen = new Set<string>();
-    while (queue.length > 0) {
-      const cid = queue.shift()!;
-      if (seen.has(cid)) continue;
-      seen.add(cid);
-      included.add(cid);
-      const next = childrenByParent.get(cid) ?? [];
-      queue.push(...next);
-    }
-  };
-
-  if (!searchLower) {
-    items.forEach((item) => included.add(idKey(getId(item))));
-    included.forEach((id) => matched.add(id));
-    return { included, matched };
-  }
-
-  items.forEach((item) => {
-    const idStr = idKey(getId(item));
-    const hay = getSearchText(item).toLowerCase();
-    if (hay.includes(searchLower)) {
-      matched.add(idStr);
-      includeAncestors(idStr);
-      if (includeChildren) {
-        includeDescendants(idStr);
-      }
-      included.add(idStr);
-    }
-  });
-
-  return { included, matched };
 }
 
 export function EntityComboBox<T>({
@@ -224,10 +136,12 @@ export function EntityComboBox<T>({
 }: EntityComboBoxProps<T>) {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
+  const [filterQuery, setFilterQuery] = React.useState('');
   const [listCollapsed, setListCollapsed] = React.useState(false);
   const searchInputRef = React.useRef<HTMLInputElement | null>(null);
   const prevValueRef = React.useRef(value);
   const blurRestoreTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pointerDownOnListRef = React.useRef(false);
 
   const cancelBlurRestoreTimer = React.useCallback(() => {
     if (blurRestoreTimerRef.current !== null) {
@@ -238,67 +152,152 @@ export function EntityComboBox<T>({
 
   const getSearchText = getSearchTextProp ?? getLabel;
 
-  const selectedItem = React.useMemo(() => {
-    if (value === null || value === undefined) return undefined;
-    const vk = idKey(value);
-    return items.find((item) => idKey(getId(item)) === vk);
-  }, [getId, items, value]);
+  const prepared = React.useMemo(() => {
+    const byId = new Map<string, T>();
+    const parentById = new Map<string, string | null>();
+    const childrenByParent = new Map<string | null, string[]>();
 
-  const byId = React.useMemo(() => {
-    const m = new Map<string, T>();
-    items.forEach((it) => m.set(idKey(getId(it)), it));
-    return m;
-  }, [getId, items]);
+    for (const item of items) {
+      const idStr = idKey(getId(item));
+      byId.set(idStr, item);
+      const parentIdRaw = getParentId(item);
+      const parentIdStr = parentIdRaw === null ? null : idKey(parentIdRaw);
+      parentById.set(idStr, parentIdStr);
+      const children = childrenByParent.get(parentIdStr) ?? [];
+      children.push(idStr);
+      childrenByParent.set(parentIdStr, children);
+    }
 
-  const { rows, truncated } = React.useMemo(() => {
-    const { included, matched } = computeFilter(
-      items,
-      query,
-      getId,
-      getParentId,
-      getSearchText,
-      includeChildren
-    );
-
-    const filtered = items.filter((item) => included.has(idKey(getId(item))));
+    const levelCache = new Map<string, number>();
+    const computeLevel = (startId: string): number => {
+      const cached = levelCache.get(startId);
+      if (cached !== undefined) return cached;
+      const path: string[] = [];
+      const seen = new Set<string>();
+      let currentId: string | null = startId;
+      while (currentId !== null && !seen.has(currentId)) {
+        const existing = levelCache.get(currentId);
+        if (existing !== undefined) {
+          let depth = existing;
+          for (let i = path.length - 1; i >= 0; i -= 1) {
+            depth += 1;
+            levelCache.set(path[i], depth);
+          }
+          return levelCache.get(startId) ?? 0;
+        }
+        seen.add(currentId);
+        path.push(currentId);
+        currentId = parentById.get(currentId) ?? null;
+      }
+      let depth = 0;
+      for (let i = path.length - 1; i >= 0; i -= 1) {
+        levelCache.set(path[i], depth);
+        depth += 1;
+      }
+      return levelCache.get(startId) ?? 0;
+    };
 
     const sortKeyFn = getSortKey ?? ((item: T) => idKey(getId(item)));
-    filtered.sort((a, b) => sortKeyFn(a).localeCompare(sortKeyFn(b)));
-
-    const q = query.trim().toLowerCase();
-    const list: RowModel<T>[] = [];
-    for (const item of filtered) {
+    const preparedItems: PreparedItem<T>[] = items.map((item) => {
       const idStr = idKey(getId(item));
-      const contextOnly = Boolean(q) && !matched.has(idStr);
-      list.push({
+      return {
         item,
         idStr,
-        level: itemLevel(item, byId, getId, getParentId),
-        contextOnly,
+        parentIdStr: parentById.get(idStr) ?? null,
+        searchTextLower: getSearchText(item).toLowerCase(),
+        sortKey: sortKeyFn(item),
+        level: computeLevel(idStr),
+      };
+    });
+
+    preparedItems.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+    return { byId, parentById, childrenByParent, items: preparedItems };
+  }, [getId, getParentId, getSearchText, getSortKey, items]);
+
+  const selectedItem = React.useMemo(() => {
+    if (value === null || value === undefined) return undefined;
+    return prepared.byId.get(idKey(value));
+  }, [prepared.byId, value]);
+
+  const { rows, truncated } = React.useMemo(() => {
+    const queryLower = filterQuery.trim().toLowerCase();
+
+    if (!queryLower) {
+      const list = prepared.items.slice(0, maxResults).map((entry) => ({
+        item: entry.item,
+        idStr: entry.idStr,
+        level: entry.level,
+        contextOnly: false,
+      }));
+      return {
+        rows: list,
+        truncated: prepared.items.length > maxResults,
+      };
+    }
+
+    const included = new Set<string>();
+    const matched = new Set<string>();
+
+    const includeAncestors = (startId: string) => {
+      let currentId: string | null = startId;
+      const seen = new Set<string>();
+      while (currentId !== null) {
+        if (seen.has(currentId)) break;
+        seen.add(currentId);
+        included.add(currentId);
+        currentId = prepared.parentById.get(currentId) ?? null;
+      }
+    };
+
+    const includeDescendants = (startId: string) => {
+      const queue = [...(prepared.childrenByParent.get(startId) ?? [])];
+      const seen = new Set<string>();
+      while (queue.length > 0) {
+        const id = queue.shift()!;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        included.add(id);
+        const next = prepared.childrenByParent.get(id) ?? [];
+        queue.push(...next);
+      }
+    };
+
+    for (const entry of prepared.items) {
+      if (!entry.searchTextLower.includes(queryLower)) continue;
+      matched.add(entry.idStr);
+      included.add(entry.idStr);
+      includeAncestors(entry.idStr);
+      if (includeChildren) includeDescendants(entry.idStr);
+    }
+
+    const list: RowModel<T>[] = [];
+    for (const entry of prepared.items) {
+      if (!included.has(entry.idStr)) continue;
+      list.push({
+        item: entry.item,
+        idStr: entry.idStr,
+        level: entry.level,
+        contextOnly: !matched.has(entry.idStr),
       });
       if (list.length >= maxResults) break;
     }
 
     return {
       rows: list,
-      truncated: filtered.length > maxResults,
+      truncated: included.size > maxResults,
     };
   }, [
-    byId,
-    getId,
-    getParentId,
-    getSearchText,
-    getSortKey,
     includeChildren,
-    items,
     maxResults,
-    query,
+    prepared,
+    filterQuery,
   ]);
 
   React.useEffect(() => {
     if (alwaysOpen) return;
     if (!open) {
       setQuery('');
+      setFilterQuery('');
     }
   }, [alwaysOpen, open]);
 
@@ -309,8 +308,10 @@ export function EntityComboBox<T>({
       prevValueRef.current = value;
       if (selectedItem) {
         setQuery(getLabel(selectedItem));
+        setFilterQuery('');
       } else {
         setQuery('');
+        setFilterQuery('');
       }
     }
   }, [alwaysOpen, getLabel, selectedItem, value]);
@@ -335,12 +336,8 @@ export function EntityComboBox<T>({
     (item: T) => {
       cancelBlurRestoreTimer();
       const label = getLabel(item);
-      // In alwaysOpen + collapse mode, keep query cleared so reopening shows full list.
-      if (alwaysOpen && collapseOnSelect) {
-        setQuery('');
-      } else {
-        setQuery(label);
-      }
+      setQuery(label);
+      setFilterQuery('');
       onChange(item);
       onAfterSelect?.(item);
       if (alwaysOpen && collapseOnSelect) {
@@ -368,6 +365,7 @@ export function EntityComboBox<T>({
     (next: string) => {
       cancelBlurRestoreTimer();
       setQuery(next);
+      setFilterQuery(next);
       if (alwaysOpen && collapseOnSelect && listCollapsed) {
         setListCollapsed(false);
       }
@@ -376,7 +374,19 @@ export function EntityComboBox<T>({
   );
 
   const handleSearchBlur = React.useCallback(() => {
-    if (!alwaysOpen || !clearSearchOnFocus) return;
+    if (!alwaysOpen) return;
+
+    // Let list item click/select finish without pre-emptive collapse.
+    if (pointerDownOnListRef.current) {
+      pointerDownOnListRef.current = false;
+      return;
+    }
+
+    if (collapseOnSelect) {
+      setListCollapsed(true);
+    }
+
+    if (!clearSearchOnFocus) return;
     cancelBlurRestoreTimer();
     blurRestoreTimerRef.current = setTimeout(() => {
       blurRestoreTimerRef.current = null;
@@ -385,11 +395,13 @@ export function EntityComboBox<T>({
         if (selectedItem) return getLabel(selectedItem);
         return q;
       });
+      setFilterQuery('');
     }, 150);
   }, [
     alwaysOpen,
     cancelBlurRestoreTimer,
     clearSearchOnFocus,
+    collapseOnSelect,
     getLabel,
     selectedItem,
   ]);
@@ -397,8 +409,13 @@ export function EntityComboBox<T>({
   const handleSearchFocus = React.useCallback(() => {
     cancelBlurRestoreTimer();
     if (alwaysOpen && clearSearchOnFocus) {
-      setQuery('');
       setListCollapsed(false);
+      if (query !== '') {
+        requestAnimationFrame(() => {
+          setQuery('');
+          setFilterQuery('');
+        });
+      }
       return;
     }
     if (alwaysOpen && collapseOnSelect && listCollapsed) {
@@ -410,6 +427,7 @@ export function EntityComboBox<T>({
     clearSearchOnFocus,
     collapseOnSelect,
     listCollapsed,
+    query,
   ]);
 
   const triggerLabel = selectedItem ? getLabel(selectedItem) : null;
@@ -527,6 +545,9 @@ export function EntityComboBox<T>({
             {/* Always mount CommandList: cmdk keeps listInnerRef on it — unmounting caused Array.from(null) in cmdk. */}
             <CommandList
               hidden={listCollapsed}
+              onMouseDown={() => {
+                pointerDownOnListRef.current = true;
+              }}
               className={cn(
                 'absolute left-0 right-0 top-full z-50 mt-1 max-h-[600px] overflow-y-auto overflow-x-hidden rounded-md border border-input bg-popover shadow-md',
                 listCollapsed && 'pointer-events-none',
