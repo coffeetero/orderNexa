@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { EntityComboBox } from '@/components/bps/EntityComboBox';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -378,7 +378,7 @@ export function CustomerManagementPage({
 
         <div className="flex min-h-0 flex-1 flex-col gap-4">
           <div className="grid grid-cols-3 gap-3 items-start">
-            <div className="flex min-h-0 flex-col gap-1.5">
+            <div className="col-span-2 flex min-h-0 flex-col gap-1.5">
               <Label htmlFor="customer-combobox">Search Customer</Label>
               <EntityComboBox<CustomerRow>
                 alwaysOpen
@@ -410,8 +410,6 @@ export function CustomerManagementPage({
               />
             </div>
 
-            <div />
-
             <div className="flex items-center justify-end gap-2 pt-6">
               <div className="flex items-center gap-2">
                 <Button
@@ -431,18 +429,36 @@ export function CustomerManagementPage({
             </div>
           </div>
 
-          <Card className="border-border/60">
-            <Tabs defaultValue="profile" className="space-y-0">
-              <CardHeader className="pb-3 pt-6">
-                <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="profile">Profile</TabsTrigger>
-                  <TabsTrigger value="contacts">Contacts</TabsTrigger>
-                  <TabsTrigger value="pricing">Pricing</TabsTrigger>
-                  <TabsTrigger value="settings">Settings</TabsTrigger>
-                </TabsList>
-              </CardHeader>
+          <Tabs defaultValue="profile" className="space-y-0">
+            <TabsList className="relative z-0 h-auto w-fit justify-start gap-0.5 rounded-none bg-transparent p-0">
+              <TabsTrigger
+                value="profile"
+                className="relative z-0 -mb-px rounded-b-none rounded-t-lg border border-muted bg-muted/70 px-4 py-1.5 data-[state=active]:z-10 data-[state=active]:translate-y-[1px] data-[state=active]:border-border/60 data-[state=active]:border-b-transparent data-[state=active]:bg-card"
+              >
+                Profile
+              </TabsTrigger>
+              <TabsTrigger
+                value="contacts"
+                className="relative z-0 -mb-px rounded-b-none rounded-t-lg border border-muted bg-muted/70 px-4 py-1.5 data-[state=active]:z-10 data-[state=active]:translate-y-[1px] data-[state=active]:border-border/60 data-[state=active]:border-b-transparent data-[state=active]:bg-card"
+              >
+                Contacts
+              </TabsTrigger>
+              <TabsTrigger
+                value="pricing"
+                className="relative z-0 -mb-px rounded-b-none rounded-t-lg border border-muted bg-muted/70 px-4 py-1.5 data-[state=active]:z-10 data-[state=active]:translate-y-[1px] data-[state=active]:border-border/60 data-[state=active]:border-b-transparent data-[state=active]:bg-card"
+              >
+                Pricing
+              </TabsTrigger>
+              <TabsTrigger
+                value="settings"
+                className="relative z-0 -mb-px rounded-b-none rounded-t-lg border border-muted bg-muted/70 px-4 py-1.5 data-[state=active]:z-10 data-[state=active]:translate-y-[1px] data-[state=active]:border-border/60 data-[state=active]:border-b-transparent data-[state=active]:bg-card"
+              >
+                Settings
+              </TabsTrigger>
+            </TabsList>
 
-              <CardContent className="pt-0">
+            <Card className="rounded-b-lg border border-border/60 border-t-0">
+              <CardContent className="pt-4">
                 <h2 className="text-base font-semibold tracking-tight">{formTitle}</h2>
                 <TabsContent value="profile" className="space-y-6">
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -597,8 +613,8 @@ export function CustomerManagementPage({
                   </div>
                 </TabsContent>
               </CardContent>
-            </Tabs>
-          </Card>
+            </Card>
+          </Tabs>
         </div>
       </div>
     </div>
