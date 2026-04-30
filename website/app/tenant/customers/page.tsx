@@ -109,8 +109,8 @@ export default async function ManageCustomersPage() {
 
   let initialCustomers: CustomerRow[] = [];
   if (initialTenantId !== null) {
-    const { data: customerData, error: customerError } = await supabase.rpc('get_customers', {
-      p_tenant_id: initialTenantId,
+    const { data: customerData, error: customerError } = await supabase.rpc('fnd_get_customer_hier', {
+      tenant_id: initialTenantId,
     });
     if (customerError) {
       initialMessage = customerError.message;

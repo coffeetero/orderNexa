@@ -6,8 +6,9 @@
 -- tenant_id is BIGINT (FK to fnd_tenants, ON DELETE CASCADE). created_by / updated_by are BIGINT (app user id).
 --
 -- Typical run order:
---   1) fnd_entity_id_seq.sql   2) fnd_customers.sql (creates fnd_tenants + fnd_customers + audit)
---   3) fnd_tenants.sql (tenant triggers + RLS only)   4) fnd_items.sql …
+--   1) fnd_entity_id_seq.sql   2) fnd_customers.sql (creates fnd_tenants + fnd_customers)
+--   3) fnd_audit_log.sql (creates fnd_audit_log + fn_audit_log + RLS)
+--   4) fnd_tenants.sql (tenant triggers + RLS only)   5) fnd_items.sql …
 --   • After fnd_pricebooks.sql: fnd_customer_pricebooks.sql links customers to price books.
 -- ============================================================
 
@@ -126,119 +127,7 @@ CREATE INDEX IF NOT EXISTS idx_fnd_customers_active
     WHERE is_active = TRUE;
 
 -- ============================================================
--- 2. AUDIT LOG TABLE
--- ============================================================
-
-CREATE TABLE IF NOT EXISTS fnd_audit_log (
-    id               BIGINT      PRIMARY KEY DEFAULT nextval('fnd_entity_id_seq'::regclass),
-    tenant_id        BIGINT,
-    table_name       TEXT        NOT NULL,
-    record_id        TEXT,
-    operation        TEXT        NOT NULL CHECK (operation IN ('INSERT', 'UPDATE', 'DELETE')),
-    old_data         JSONB,
-    new_data         JSONB,
-    changed_columns  TEXT[],
-    changed_by       UUID,
-    changed_at       TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE INDEX IF NOT EXISTS idx_audit_log_table_record
-    ON fnd_audit_log (table_name, record_id);
-
-CREATE INDEX IF NOT EXISTS idx_audit_log_tenant_time
-    ON fnd_audit_log (tenant_id, changed_at DESC);
-
-DROP INDEX IF EXISTS idx_audit_log_changed_at;
-DROP INDEX IF EXISTS idx_audit_log_operation;
-
-
--- ============================================================
--- 2b. fn_audit_log  (requires fnd_tenants + fnd_audit_log)
--- ============================================================
-
-CREATE OR REPLACE FUNCTION fn_audit_log()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-    v_old_data      JSONB;
-    v_new_data      JSONB;
-    v_record_id     TEXT;
-    v_tenant_id     BIGINT;
-    v_pk_col        TEXT := TG_ARGV[0];
-    v_tenant_col    TEXT := COALESCE(NULLIF(TG_ARGV[1], ''), 'tenant_id');
-    v_actor_text    TEXT;
-    v_audit_enabled BOOLEAN;
-BEGIN
-    IF current_setting('app.audit_enabled', true) = 'false' THEN
-        RETURN NULL;
-    END IF;
-
-    IF TG_OP = 'UPDATE' AND NEW IS NOT DISTINCT FROM OLD THEN
-        RETURN NULL;
-    END IF;
-
-    IF TG_OP = 'INSERT' THEN
-        v_new_data := to_jsonb(NEW);
-        v_record_id := v_new_data ->> v_pk_col;
-        v_tenant_id := (v_new_data ->> v_tenant_col)::BIGINT;
-
-    ELSIF TG_OP = 'UPDATE' THEN
-        v_new_data := to_jsonb(NEW);
-        v_record_id := v_new_data ->> v_pk_col;
-        v_tenant_id := (v_new_data ->> v_tenant_col)::BIGINT;
-
-    ELSIF TG_OP = 'DELETE' THEN
-        v_old_data := to_jsonb(OLD);
-        v_record_id := v_old_data ->> v_pk_col;
-        v_tenant_id := (v_old_data ->> v_tenant_col)::BIGINT;
-    END IF;
-
-    SELECT t.is_audit_log_enabled
-    INTO v_audit_enabled
-    FROM fnd_tenants t
-    WHERE t.tenant_id = v_tenant_id;
-
-    IF COALESCE(v_audit_enabled, FALSE) = FALSE THEN
-        RETURN NULL;
-    END IF;
-
-    v_actor_text := COALESCE(
-        NULLIF(current_setting('app.audit_actor', true), ''),
-        NULLIF(current_setting('request.jwt.claim.sub', true), '')
-    );
-
-    INSERT INTO fnd_audit_log (
-        tenant_id,
-        table_name,
-        record_id,
-        operation,
-        old_data,
-        new_data,
-        changed_columns,
-        changed_by,
-        changed_at
-    )
-    VALUES (
-        v_tenant_id,
-        TG_TABLE_NAME,
-        v_record_id,
-        TG_OP,
-        v_old_data,
-        v_new_data,
-        NULL,
-        CASE WHEN v_actor_text IS NULL THEN NULL ELSE v_actor_text::UUID END,
-        now()
-    );
-
-    RETURN NULL;
-END;
-$$;
-
-
--- ============================================================
--- 3. TRIGGER FUNCTIONS  –  updated_at
+-- 2. TRIGGER FUNCTIONS  –  updated_at
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION fn_set_updated_at()
@@ -266,7 +155,7 @@ CREATE TRIGGER trg_fnd_customers_set_updated
 
 
 -- ============================================================
--- 4. AUDIT TRIGGER
+-- 3. AUDIT TRIGGER (requires fn_audit_log from fnd_audit_log.sql)
 -- ============================================================
 
 DROP TRIGGER IF EXISTS trg_fnd_customers_audit ON fnd_customers;
@@ -276,18 +165,40 @@ CREATE TRIGGER trg_fnd_customers_audit
 
 
 -- ============================================================
--- 5. ROW LEVEL SECURITY
+-- 4. ROW LEVEL SECURITY
 -- ============================================================
 
 ALTER TABLE fnd_customers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE fnd_audit_log ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS pol_fnd_customers_tenant ON fnd_customers;
-CREATE POLICY pol_fnd_customers_tenant ON fnd_customers
-    USING      (tenant_id = (auth.jwt() -> 'app_metadata' ->> 'tenant_id')::BIGINT)
-    WITH CHECK (tenant_id = (auth.jwt() -> 'app_metadata' ->> 'tenant_id')::BIGINT);
 
-DROP POLICY IF EXISTS pol_fnd_audit_log_tenant_read ON fnd_audit_log;
-CREATE POLICY pol_fnd_audit_log_tenant_read ON fnd_audit_log
-    FOR SELECT
-    USING (tenant_id = (auth.jwt() -> 'app_metadata' ->> 'tenant_id')::BIGINT);
+CREATE POLICY pol_fnd_customers_tenant ON fnd_customers
+    USING (
+        -- 1. Use current_setting to grab the JWT claim without calling the auth schema function
+        (tenant_id::text = ANY (
+            ARRAY(
+                SELECT jsonb_array_elements_text(
+                    NULLIF(current_setting('request.jwt.claims', true), '')::jsonb -> 'app_metadata' -> 'allowed_tenant_ids'
+                )
+            )
+        ))
+        AND (
+            -- 2. Check restricted tenants
+            NOT (tenant_id::text = ANY (
+                ARRAY(
+                    SELECT jsonb_array_elements_text(
+                        NULLIF(current_setting('request.jwt.claims', true), '')::jsonb -> 'app_metadata' -> 'restricted_tenant_ids'
+                    )
+                )
+            ))
+            OR 
+            -- 3. Check allowed customers
+            (customer_id::text = ANY (
+                ARRAY(
+                    SELECT jsonb_array_elements_text(
+                        NULLIF(current_setting('request.jwt.claims', true), '')::jsonb -> 'app_metadata' -> 'allowed_customer_ids'
+                    )
+                )
+            ))
+        )
+    );

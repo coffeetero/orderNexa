@@ -209,8 +209,8 @@ export function CustomerManagementPage({
       setIsLoadingCustomers(true);
       setStatusMessage(null);
 
-      const { data, error } = await supabase.rpc('get_customers', {
-        p_tenant_id: nextTenantId,
+      const { data, error } = await supabase.rpc('fnd_get_customer_hier', {
+        tenant_id: nextTenantId,
       });
 
       if (error) {
