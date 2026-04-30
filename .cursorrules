@@ -1,0 +1,9 @@
+# orderNexa Project Guardrails
+
+- **Schema Rules**: NEVER hardcode the `bps.` schema prefix in code. The database schema is handled at the connection level.
+- **Database Architecture**: 
+  - Follow the "Party Model" (fnd_parties).
+  - Use `fnd_` for foundational tables `ar_` for receivables tables, om_ for order related
+  - Use BigInt for primary keys.
+- **Next.js Development**: Keep Supabase client calls schema-agnostic (e.g., use `.from('fnd_customers')`).
+- **UI Focus**: Prioritize high-speed, keyboard-driven data entry (Tab/Enter/Arrows).
