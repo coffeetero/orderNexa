@@ -60,7 +60,7 @@ begin
     );
 
   if v_is_authorized then
-    v_customers := public.fnd_get_customer_hier(p_tenant_id);
+    v_customers := public.fnd_get_customers_hier(p_tenant_id);
   else
     v_customers := '[]'::jsonb;
   end if;

@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS fnd_users (
     deleted_at        TIMESTAMPTZ,
 
     is_active         BOOLEAN     NOT NULL DEFAULT TRUE,
+    can_debug         BOOLEAN     NOT NULL DEFAULT FALSE,
 
     created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
     created_by        BIGINT,
@@ -42,12 +43,16 @@ END $$;
 
 ALTER TABLE fnd_users ADD COLUMN IF NOT EXISTS email TEXT;
 
+ALTER TABLE fnd_users ADD COLUMN IF NOT EXISTS can_debug BOOLEAN NOT NULL DEFAULT FALSE;
+
 COMMENT ON COLUMN fnd_users.tenant_id IS
     'Tenant scope; BIGINT FK to fnd_tenants.tenant_id.';
 COMMENT ON COLUMN fnd_users.auth_user_id IS
     'Maps to auth.users.id.';
 COMMENT ON COLUMN fnd_users.email IS
     'Contact / login email (optional; may mirror auth.users.email).';
+COMMENT ON COLUMN fnd_users.can_debug IS
+    'When true, user may use diagnostic / debug tooling (e.g. elevated RPCs).';
 
 CREATE INDEX IF NOT EXISTS idx_fnd_users_tenant_id
     ON fnd_users (tenant_id);

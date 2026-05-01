@@ -150,6 +150,41 @@ function toFormState(customer: CustomerRow): CustomerFormState {
   };
 }
 
+/** Merge full `fnd_customers` row JSON from `fnd_get_customers` with hierarchy row (level / sort_path). */
+function mergeFullCustomerJson(hier: CustomerRow, full: unknown): CustomerRow {
+  if (!full || typeof full !== 'object' || Array.isArray(full)) {
+    return hier;
+  }
+  const o = full as Record<string, unknown>;
+  if (Object.keys(o).length === 0) {
+    return hier;
+  }
+
+  return {
+    customer_id: toNumber(o.customer_id) ?? hier.customer_id,
+    tenant_id: toNumber(o.tenant_id) ?? hier.tenant_id,
+    customer_parent_id: toNumber(o.customer_parent_id) ?? hier.customer_parent_id,
+    customer_name: String(o.customer_name ?? hier.customer_name),
+    customer_number:
+      o.customer_number === null || o.customer_number === undefined
+        ? null
+        : String(o.customer_number),
+    customer_type: String(o.customer_type ?? hier.customer_type),
+    legacy_id: toNumber(o.legacy_id),
+    level: hier.level,
+    sort_path: hier.sort_path,
+    invoice_copy_count: toNumber(o.invoice_copy_count) ?? 1,
+    is_standing_order: toBoolean(o.is_standing_order, false),
+    is_signature_required: toBoolean(o.is_signature_required, false),
+    is_active: toBoolean(o.is_active, true),
+    is_label_required: toBoolean(o.is_label_required, false),
+    is_invoice_required: toBoolean(o.is_invoice_required, false),
+    is_cost_on_invoice: toBoolean(o.is_cost_on_invoice, false),
+    is_cost_on_bill_of_lading: toBoolean(o.is_cost_on_bill_of_lading, false),
+    is_returns_allowed: toBoolean(o.is_returns_allowed, true),
+  };
+}
+
 function normalizeCustomerRows(rows: unknown[]): CustomerRow[] {
   return rows
     .map((row) => {
@@ -209,7 +244,7 @@ export function CustomerManagementPage({
       setIsLoadingCustomers(true);
       setStatusMessage(null);
 
-      const { data, error } = await supabase.rpc('fnd_get_customer_hier', {
+      const { data, error } = await supabase.rpc('fnd_get_customers_hier', {
         tenant_id: nextTenantId,
       });
 
@@ -243,12 +278,28 @@ export function CustomerManagementPage({
     await fetchCustomers(parsed);
   };
 
-  const handleSelectCustomer = (customer: CustomerRow) => {
-    setSelectedCustomerId(customer.customer_id);
-    setSelectedOriginal(customer);
-    setFormState(toFormState(customer));
-    setStatusMessage(null);
-  };
+  const loadCustomerIntoForm = useCallback(
+    async (hierRow: CustomerRow) => {
+      setSelectedCustomerId(hierRow.customer_id);
+      setStatusMessage(null);
+
+      const { data, error } = await supabase.rpc('fnd_get_customers', {
+        p_customer_id: hierRow.customer_id,
+      });
+
+      if (error) {
+        setStatusMessage(error.message);
+        setSelectedOriginal(hierRow);
+        setFormState(toFormState(hierRow));
+        return;
+      }
+
+      const merged = mergeFullCustomerJson(hierRow, data);
+      setSelectedOriginal(merged);
+      setFormState(toFormState(merged));
+    },
+    [supabase]
+  );
 
   const handleCreateClick = () => {
     if (!tenantId) return;
@@ -334,7 +385,7 @@ export function CustomerManagementPage({
     if (nextSelectedId !== null) {
       const selected = refreshedCustomers.find((customer) => customer.customer_id === nextSelectedId);
       if (selected) {
-        handleSelectCustomer(selected);
+        void loadCustomerIntoForm(selected);
       }
     }
 
@@ -389,7 +440,14 @@ export function CustomerManagementPage({
                 value={selectedCustomerId}
                 onChange={(customer) => {
                   if (customer) {
-                    handleSelectCustomer(customer);
+                    void loadCustomerIntoForm(customer);
+                  } else {
+                    setSelectedCustomerId(null);
+                    setSelectedOriginal(null);
+                    if (tenantId) {
+                      setFormState(emptyForm(tenantId));
+                    }
+                    setStatusMessage(null);
                   }
                 }}
                 onAfterSelect={() => {

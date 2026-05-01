@@ -1,9 +1,45 @@
-# orderNexa Project Guardrails
+# orderNexa Cursor Rules Index
 
-- **Schema Rules**: NEVER hardcode the `bps.` schema prefix in code. The database schema is handled at the connection level.
-- **Database Architecture**: 
-  - Follow the "Party Model" (fnd_parties).
-  - Use `fnd_` for foundational tables `ar_` for receivables tables, om_ for order related
-  - Use BigInt for primary keys.
-- **Next.js Development**: Keep Supabase client calls schema-agnostic (e.g., use `.from('fnd_customers')`).
-- **UI Focus**: Prioritize high-speed, keyboard-driven data entry (Tab/Enter/Arrows).
+Use this file as the top-level pointer. Detailed rules live in the documents below.
+
+## Rule Files To Follow
+
+1. docs/cursorDevelopmentGuidelines.md
+   - Primary architecture, Next.js App Router, Supabase usage, data flow rules.
+
+2. docs/cursorSqlTablesAliases.md
+   - Canonical SQL alias mapping.
+   - Use when generating SQL queries, RPCs, or migrations.
+
+3. docs/cursorFeatureIssueTracker.md
+   - Feature/issue tracking workflow.
+   - Not used for code generation.
+
+4. docs/cursorUiDesignGuidelines.md
+   - Canonical UI/UX look-and-feel rules for pages/components.
+   - Use when generating or modifying UI.
+
+## Usage Rules
+
+- When generating pages/components:
+  → Follow cursorDevelopmentGuidelines.md
+  → Follow cursorUiDesignGuidelines.md
+
+- When generating SQL or RPC calls:
+  → Follow cursorSqlTablesAliases.md
+  → Follow naming rules strictly
+
+- When modifying or planning features:
+  → Reference cursorFeatureIssueTracker.md
+
+## Core Constraints
+
+- Do NOT invent schema objects (tables, columns, functions).
+- Use existing schema exactly as defined.
+- If required schema is missing, create a TODO instead of guessing.
+
+## Precedence
+
+- Most specific rule file wins.
+- cursorDevelopmentGuidelines.md is authoritative for implementation.
+- cursorUiDesignGuidelines.md is authoritative for UI layout/visual/interaction consistency.

@@ -1,4 +1,4 @@
-# SQL Table Aliases
+#cursorSqlTablesAliases
 
 Use this as the default alias reference when writing SQL in this repo.
 

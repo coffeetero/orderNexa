@@ -96,26 +96,44 @@ function normalizeCustomers(data: unknown): CustomerRow[] {
     .sort((a, b) => a.sort_path.localeCompare(b.sort_path));
 }
 
-export default async function ManageCustomersPage() {
+export default async function ManageCustomersPage({
+  searchParams,
+}: {
+  searchParams: { [key: string]: string | string[] | undefined };
+}) {
   const supabase = createClient();
+  
+  // Capture debug flag for the RPC handshake
+  const isDebug = searchParams.debug === 'true';
 
   let initialMessage: string | null = null;
-  const { data: tenantData, error: tenantError } = await supabase.rpc('get_tenants');
+
+  // 1. Fetch Tenants
+  const { data: tenantData, error: tenantError } = await supabase.rpc('fnd_get_tenants');
+  
   if (tenantError) {
     initialMessage = tenantError.message;
   }
+
   const tenants = normalizeTenants(tenantData);
+
+  // 2. Auto-select for Single Tenant (e.g., User moraglen)
+  // If only 1 tenant exists, set it as the initial ID immediately.
   const initialTenantId = tenants.length === 1 ? tenants[0].tenant_id : null;
 
   let initialCustomers: CustomerRow[] = [];
+
+  // 3. Pre-fetch Hierarchy if tenant is known
   if (initialTenantId !== null) {
-    const { data: customerData, error: customerError } = await supabase.rpc('fnd_get_customer_hier', {
-      tenant_id: initialTenantId,
+    const { data: customerData, error: customerError } = await supabase.rpc('fnd_get_customers_hier', {
+      p_tenant_id: initialTenantId,
     });
+
     if (customerError) {
       initialMessage = customerError.message;
+    } else {
+      initialCustomers = normalizeCustomers(customerData);
     }
-    initialCustomers = normalizeCustomers(customerData);
   }
 
   return (
@@ -124,6 +142,7 @@ export default async function ManageCustomersPage() {
       initialTenantId={initialTenantId}
       initialCustomers={initialCustomers}
       initialMessage={initialMessage}
+      isDebugActive={isDebug}
     />
   );
 }
