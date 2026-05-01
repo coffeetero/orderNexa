@@ -29,32 +29,40 @@ type CustomerRow = {
 
 function toNumber(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
+
   if (typeof value === 'string' && value.trim() !== '') {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : null;
   }
+
   return null;
 }
 
 function toBoolean(value: unknown, fallback = false): boolean {
   if (typeof value === 'boolean') return value;
+
   if (typeof value === 'string') {
-    if (value.toLowerCase() === 'true') return true;
-    if (value.toLowerCase() === 'false') return false;
+    const normalized = value.toLowerCase();
+    if (normalized === 'true') return true;
+    if (normalized === 'false') return false;
   }
+
   return fallback;
 }
 
 function normalizeTenants(data: unknown): TenantOption[] {
   if (!Array.isArray(data)) return [];
+
   return data
     .map((tenant) => {
-      const candidate = tenant as Partial<TenantOption>;
-      const tenantId = toNumber(candidate.tenant_id);
+      const row = tenant as Partial<TenantOption>;
+      const tenantId = toNumber(row.tenant_id);
+
       if (tenantId === null) return null;
+
       return {
         tenant_id: tenantId,
-        tenant_name: candidate.tenant_name ?? `Tenant ${tenantId}`,
+        tenant_name: row.tenant_name ?? `Tenant ${tenantId}`,
       };
     })
     .filter((tenant): tenant is TenantOption => tenant !== null);
@@ -62,38 +70,51 @@ function normalizeTenants(data: unknown): TenantOption[] {
 
 function normalizeCustomers(data: unknown): CustomerRow[] {
   if (!Array.isArray(data)) return [];
+
   return data
-    .map((row) => {
-      const candidate = row as Partial<CustomerRow>;
-      const customerId = toNumber(candidate.customer_id);
-      const tenantId = toNumber(candidate.tenant_id);
-      if (customerId === null || tenantId === null) {
-        return null;
-      }
+    .map((customer) => {
+      const row = customer as Partial<CustomerRow>;
+
+      const customerId = toNumber(row.customer_id);
+      const tenantId = toNumber(row.tenant_id);
+
+      if (customerId === null || tenantId === null) return null;
 
       return {
         customer_id: customerId,
         tenant_id: tenantId,
-        customer_parent_id: toNumber(candidate.customer_parent_id),
-        customer_name: candidate.customer_name ?? '',
-        customer_number: candidate.customer_number ?? null,
-        customer_type: candidate.customer_type ?? 'ACCOUNT',
-        legacy_id: toNumber(candidate.legacy_id),
-        level: toNumber(candidate.level) ?? 0,
-        sort_path: candidate.sort_path ?? '',
-        invoice_copy_count: toNumber(candidate.invoice_copy_count) ?? 1,
-        is_standing_order: toBoolean(candidate.is_standing_order, false),
-        is_signature_required: toBoolean(candidate.is_signature_required, false),
-        is_active: toBoolean(candidate.is_active, true),
-        is_label_required: toBoolean(candidate.is_label_required, false),
-        is_invoice_required: toBoolean(candidate.is_invoice_required, false),
-        is_cost_on_invoice: toBoolean(candidate.is_cost_on_invoice, false),
-        is_cost_on_bill_of_lading: toBoolean(candidate.is_cost_on_bill_of_lading, false),
-        is_returns_allowed: toBoolean(candidate.is_returns_allowed, true),
+        customer_parent_id: toNumber(row.customer_parent_id),
+        customer_name: row.customer_name ?? '',
+        customer_number: row.customer_number ?? null,
+        customer_type: row.customer_type ?? 'ACCOUNT',
+        legacy_id: toNumber(row.legacy_id),
+        level: toNumber(row.level) ?? 0,
+        sort_path: row.sort_path ?? '',
+        invoice_copy_count: toNumber(row.invoice_copy_count) ?? 1,
+        is_standing_order: toBoolean(row.is_standing_order),
+        is_signature_required: toBoolean(row.is_signature_required),
+        is_active: toBoolean(row.is_active, true),
+        is_label_required: toBoolean(row.is_label_required),
+        is_invoice_required: toBoolean(row.is_invoice_required),
+        is_cost_on_invoice: toBoolean(row.is_cost_on_invoice),
+        is_cost_on_bill_of_lading: toBoolean(row.is_cost_on_bill_of_lading),
+        is_returns_allowed: toBoolean(row.is_returns_allowed, true),
       };
     })
-    .filter((row): row is CustomerRow => row !== null)
-    .sort((a, b) => a.sort_path.localeCompare(b.sort_path));
+    .filter((customer): customer is CustomerRow => customer !== null)
+    .sort((a, b) => {
+      const sortCompare = a.sort_path.localeCompare(b.sort_path);
+      if (sortCompare !== 0) return sortCompare;
+      return a.customer_name.localeCompare(b.customer_name);
+    });
+}
+
+function getSearchParam(
+  searchParams: { [key: string]: string | string[] | undefined },
+  key: string,
+): string | undefined {
+  const value = searchParams[key];
+  return Array.isArray(value) ? value[0] : value;
 }
 
 export default async function ManageCustomersPage({
@@ -102,39 +123,52 @@ export default async function ManageCustomersPage({
   searchParams: { [key: string]: string | string[] | undefined };
 }) {
   const supabase = createClient();
-  
-  // Capture debug flag for the RPC handshake
-  const isDebug = searchParams.debug === 'true';
+
+  const isDebug = getSearchParam(searchParams, 'debug') === 'true';
+  const requestedTenantId = toNumber(getSearchParam(searchParams, 'tenantId'));
 
   let initialMessage: string | null = null;
 
-  // 1. Fetch Tenants
   const { data: tenantData, error: tenantError } = await supabase.rpc('fnd_get_tenants');
-  
+
   if (tenantError) {
-    initialMessage = tenantError.message;
+    initialMessage = `Tenant RPC error: ${tenantError.message}`;
   }
 
   const tenants = normalizeTenants(tenantData);
 
-  // 2. Auto-select for Single Tenant (e.g., User moraglen)
-  // If only 1 tenant exists, set it as the initial ID immediately.
-  const initialTenantId = tenants.length === 1 ? tenants[0].tenant_id : null;
+  const initialTenantId =
+    requestedTenantId ??
+    (tenants.length > 0 ? tenants[0].tenant_id : null);
 
   let initialCustomers: CustomerRow[] = [];
 
-  // 3. Pre-fetch Hierarchy if tenant is known
   if (initialTenantId !== null) {
-    const { data: customerData, error: customerError } = await supabase.rpc('fnd_get_customers_hier', {
-      p_tenant_id: initialTenantId,
-    });
+    const { data: customerData, error: customerError } = await supabase.rpc(
+      'fnd_get_customers_hier',
+      {
+        p_tenant_id: initialTenantId,
+      },
+    );
 
     if (customerError) {
-      initialMessage = customerError.message;
+      initialMessage = `Customer hierarchy RPC error: ${customerError.message}`;
     } else {
       initialCustomers = normalizeCustomers(customerData);
     }
   }
+
+  // if (isDebug) {
+    console.debug('[tenant/customers/page.tsx] data before return', {
+      tenantCount: tenants.length,
+      tenants,
+      requestedTenantId,
+      initialTenantId,
+      customerCount: initialCustomers.length,
+      initialCustomersSample: initialCustomers.slice(0, 10),
+      initialMessage,
+    });
+  // }
 
   return (
     <CustomerManagementPage

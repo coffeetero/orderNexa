@@ -74,6 +74,7 @@ type CustomerManagementPageProps = {
   initialTenantId: number | null;
   initialCustomers: CustomerRow[];
   initialMessage?: string | null;
+  isDebugActive?: boolean;
 };
 
 const CUSTOMER_TYPES = ['ACCOUNT', 'SITE', 'LOCATION'] as const;
@@ -225,6 +226,7 @@ export function CustomerManagementPage({
   initialTenantId,
   initialCustomers,
   initialMessage = null,
+  isDebugActive = false,
 }: CustomerManagementPageProps) {
   const supabase = useMemo(() => createClient(), []);
 
@@ -238,6 +240,16 @@ export function CustomerManagementPage({
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(initialMessage);
+
+  useEffect(() => {
+    if (!isDebugActive) return;
+    console.debug('[CustomerManagementPage] initial props', {
+      tenantCount: tenants.length,
+      initialTenantId,
+      initialCustomerCount: initialCustomers.length,
+      initialMessage,
+    });
+  }, [initialCustomers.length, initialMessage, initialTenantId, isDebugActive, tenants.length]);
 
   const fetchCustomers = useCallback(
     async (nextTenantId: number) => {
@@ -364,7 +376,7 @@ export function CustomerManagementPage({
     setIsSaving(true);
     setStatusMessage(null);
 
-    const { data, error } = await supabase.rpc('set_customer', {
+    const { data, error } = await supabase.rpc('fnd_save_customers', {
       p_tenant_id: tenantId,
       p_customer_id: selectedCustomerId,
       p_action: isCreate ? 'create' : 'update',

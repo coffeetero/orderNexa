@@ -19,6 +19,10 @@ Use this file as the top-level pointer. Detailed rules live in the documents bel
    - Canonical UI/UX look-and-feel rules for pages/components.
    - Use when generating or modifying UI.
 
+5. docs/cursorDataModel.md
+   - Canonical business data model and table relationship reference.
+   - Use when generating SQL, RPCs, and data-flow-aware app code.
+
 ## Usage Rules
 
 - When generating pages/components:
@@ -27,6 +31,7 @@ Use this file as the top-level pointer. Detailed rules live in the documents bel
 
 - When generating SQL or RPC calls:
   → Follow cursorSqlTablesAliases.md
+  → Follow cursorDataModel.md
   → Follow naming rules strictly
 
 - When modifying or planning features:
@@ -43,3 +48,4 @@ Use this file as the top-level pointer. Detailed rules live in the documents bel
 - Most specific rule file wins.
 - cursorDevelopmentGuidelines.md is authoritative for implementation.
 - cursorUiDesignGuidelines.md is authoritative for UI layout/visual/interaction consistency.
+- cursorDataModel.md is authoritative for domain-table relationships and data flow context.

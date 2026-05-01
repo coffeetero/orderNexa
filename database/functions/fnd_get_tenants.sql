@@ -1,35 +1,34 @@
--- Resolves the current user from JWT GUCs only.
--- Unqualified object names resolve via search_path (bps first).
 CREATE OR REPLACE FUNCTION fnd_get_tenants()
 RETURNS jsonb
 LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
-SET search_path = bps, auth, public
+-- We remove 'auth' from here entirely. No looking at that schema!
+SET search_path = bps, public 
 AS $$
 DECLARE
-  v_ctx    record;
-  v_result jsonb;
+  v_ctx      record;
+  v_result   jsonb;
+  v_jwt_raw  text;
+  v_claims   jsonb;
 BEGIN
-  /*
-   * Context Resolve: Build user record including debug permission and request state.
-   */
-  WITH jwt AS (
-    SELECT NULLIF(current_setting('request.jwt.claims', true), '')::jsonb AS claims
-  ),
-  resolved AS (
+  -- 1. Grab the raw string. This is a GUC, not a schema object.
+  v_jwt_raw := current_setting('request.jwt.claims', true);
+  
+  -- 2. Convert to JSONB.
+  v_claims := COALESCE(NULLIF(v_jwt_raw, ''), '{}')::jsonb;
+
+  -- 3. Resolve the user from the UUID string in the claims
+  WITH resolved AS (
     SELECT 
-      COALESCE(
-        usr.user_id,
-        NULLIF(j.claims -> 'app_metadata' ->> 'app_user_id', '')::bigint
-      ) AS app_user_id,
-      usr.tenant_id AS primary_tenant_id,
-      usr.can_debug AS can_debug,
+      u.user_id,
+      u.tenant_id AS primary_tenant_id,
+      COALESCE(u.can_debug, false) AS can_debug,
       COALESCE(current_setting('request.method.query.debug', true) = 'true', false) AS debug_requested
-    FROM jwt j
-    LEFT JOIN fnd_users usr
-      ON usr.auth_user_id = NULLIF(j.claims ->> 'sub', '')::uuid
-      AND usr.is_active IS TRUE
+    FROM fnd_users u
+    WHERE u.auth_user_id = (v_claims ->> 'sub')::uuid
+      AND u.is_active IS TRUE
+    LIMIT 1
   )
   SELECT 
     *, 
@@ -37,18 +36,17 @@ BEGIN
   INTO v_ctx 
   FROM resolved;
 
-  -- Security Check
-  IF v_ctx.app_user_id IS NULL THEN
-    RAISE EXCEPTION 'Missing app user context (app_metadata.app_user_id or JWT sub)';
+  -- 4. Handshake Guard
+  IF v_ctx.user_id IS NULL THEN
+    RAISE EXCEPTION 'BPS_AUTH_ERROR: User sub % not found in fnd_users', (v_claims ->> 'sub');
   END IF;
 
-  -- Debug Logging
+  -- 5. Debug Logging (The whole point of today!)
   IF v_ctx.is_debug THEN
-    RAISE NOTICE 'BPS_DEBUG: fnd_get_tenants started. User: %, Primary Tenant: %', 
-      v_ctx.app_user_id, v_ctx.primary_tenant_id;
+    RAISE NOTICE 'BPS_DEBUG: Handshake successful for user_id: %', v_ctx.user_id;
   END IF;
 
-  -- Fetch associated tenants
+  -- 6. Fetch Tenants
   SELECT COALESCE(
     jsonb_agg(
       jsonb_build_object(
@@ -59,16 +57,14 @@ BEGIN
       ORDER BY tnt.tenant_name, tnt.tenant_id
     ),
     '[]'::jsonb
-  )
-    INTO v_result
-  FROM fnd_user_tenants usr_tnt
-  JOIN fnd_tenants tnt
-    ON tnt.tenant_id = usr_tnt.tenant_id
-  WHERE usr_tnt.user_id = v_ctx.app_user_id
-    AND usr_tnt.is_active IS TRUE;
+  ) INTO v_result
+  FROM fnd_user_tenants ut
+  JOIN fnd_tenants tnt ON tnt.tenant_id = ut.tenant_id
+  WHERE ut.user_id = v_ctx.user_id
+    AND ut.is_active IS TRUE;
 
   IF v_ctx.is_debug THEN
-    RAISE NOTICE 'BPS_DEBUG: fnd_get_tenants complete. Records found: %', jsonb_array_length(v_result);
+    RAISE NOTICE 'BPS_DEBUG: Found % tenants.', jsonb_array_length(v_result);
   END IF;
 
   RETURN v_result;
