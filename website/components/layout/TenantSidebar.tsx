@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LayoutDashboard, ClipboardList, ChefHat, Users, Package, DollarSign, ChevronRight, ChevronLeft, Wheat, X, FileText, TrendingUp, Receipt, ChartBar as BarChart2, Tags, Boxes, FlaskConical, Trash2, Calculator, Leaf, CreditCard, ArrowLeftRight, Scale, Banknote, ChartPie as PieChart } from 'lucide-react';
@@ -23,70 +23,70 @@ interface NavSection {
 const navSections: NavSection[] = [
   {
     label: 'Dashboard',
-    href: '/tenant',
+    href: '/account',
     icon: LayoutDashboard,
   },
   {
     label: 'Order Management',
     icon: ClipboardList,
     children: [
-      { label: 'Post Standing Orders', href: '/tenant/orders/standing', icon: FileText },
-      { label: 'Call Up List', href: '/tenant/orders/callup', icon: ClipboardList },
-      { label: 'Manage Orders', href: '/tenant/orders', icon: ClipboardList },
-      { label: 'Import Orders', href: '/tenant/orders/import', icon: FileText },
-      { label: 'Returns & Credits', href: '/tenant/orders/returns', icon: ArrowLeftRight },
+      { label: 'Post Standing Orders', href: '/account/orders/standing', icon: FileText },
+      { label: 'Call Up List', href: '/account/orders/callup', icon: ClipboardList },
+      { label: 'Manage Orders', href: '/account/orders', icon: ClipboardList },
+      { label: 'Import Orders', href: '/account/orders/import', icon: FileText },
+      { label: 'Returns & Credits', href: '/account/orders/returns', icon: ArrowLeftRight },
     ],
   },
   {
     label: 'Production',
     icon: ChefHat,
     children: [
-      { label: 'Order Analysis', href: '/tenant/production/analysis', icon: BarChart2 },
-      { label: 'Estimate Production', href: '/tenant/production/estimate', icon: Calculator },
-      { label: "Baker's Report", href: '/tenant/production/report', icon: FileText },
-      { label: 'Packing Labels', href: '/tenant/production/labels', icon: Tags },
-      { label: 'Route Delivery Report', href: '/tenant/production/routes', icon: TrendingUp },
-      { label: 'Mixing Sheets', href: '/tenant/production/mixing', icon: FlaskConical },
+      { label: 'Order Analysis', href: '/account/production/analysis', icon: BarChart2 },
+      { label: 'Estimate Production', href: '/account/production/estimate', icon: Calculator },
+      { label: "Baker's Report", href: '/account/production/report', icon: FileText },
+      { label: 'Packing Labels', href: '/account/production/labels', icon: Tags },
+      { label: 'Route Delivery Report', href: '/account/production/routes', icon: TrendingUp },
+      { label: 'Mixing Sheets', href: '/account/production/mixing', icon: FlaskConical },
     ],
   },
   {
     label: 'Customers',
     icon: Users,
     children: [
-      { label: 'Customer Management', href: '/tenant/customers', icon: Users },
-      { label: 'Pricing Lists', href: '/tenant/customers/pricing', icon: Tags },
-      { label: 'Reports', href: '/tenant/customers/reports', icon: BarChart2 },
-      { label: 'Exports', href: '/tenant/customers/exports', icon: FileText },
+      { label: 'Customer Management', href: '/account/customers', icon: Users },
+      { label: 'Pricing Lists', href: '/account/customers/pricing', icon: Tags },
+      { label: 'Reports', href: '/account/customers/reports', icon: BarChart2 },
+      { label: 'Exports', href: '/account/customers/exports', icon: FileText },
     ],
   },
   {
     label: 'Inventory',
     icon: Package,
     children: [
-      { label: 'Manage Items', href: '/tenant/inventory', icon: Boxes },
-      { label: 'Pricing Lists', href: '/tenant/inventory/pricing', icon: Tags },
-      { label: 'Recipes', href: '/tenant/inventory/recipes', icon: FlaskConical },
-      { label: 'Waste Tracking', href: '/tenant/inventory/waste', icon: Trash2 },
-      { label: 'Reports', href: '/tenant/inventory/reports', icon: BarChart2 },
-      { label: 'Analysis', href: '/tenant/inventory/analysis', icon: PieChart },
-      { label: 'Costing & COGS', href: '/tenant/inventory/costing', icon: Calculator },
-      { label: 'Nutritional Analysis', href: '/tenant/inventory/nutrition', icon: Leaf },
-      { label: 'Nutrition Labels', href: '/tenant/inventory/labels', icon: Tags },
+      { label: 'Manage Items', href: '/account/inventory', icon: Boxes },
+      { label: 'Pricing Lists', href: '/account/inventory/pricing', icon: Tags },
+      { label: 'Recipes', href: '/account/inventory/recipes', icon: FlaskConical },
+      { label: 'Waste Tracking', href: '/account/inventory/waste', icon: Trash2 },
+      { label: 'Reports', href: '/account/inventory/reports', icon: BarChart2 },
+      { label: 'Analysis', href: '/account/inventory/analysis', icon: PieChart },
+      { label: 'Costing & COGS', href: '/account/inventory/costing', icon: Calculator },
+      { label: 'Nutritional Analysis', href: '/account/inventory/nutrition', icon: Leaf },
+      { label: 'Nutrition Labels', href: '/account/inventory/labels', icon: Tags },
     ],
   },
   {
     label: 'Financials',
     icon: DollarSign,
     children: [
-      { label: 'Manage Payments', href: '/tenant/financials/payments', icon: CreditCard },
-      { label: 'Enter Credits', href: '/tenant/financials/credits', icon: ArrowLeftRight },
-      { label: 'Enter Returns', href: '/tenant/financials/returns', icon: ArrowLeftRight },
-      { label: 'Customer Statements', href: '/tenant/financials/statements', icon: FileText },
-      { label: 'AR Open Balances', href: '/tenant/financials/ar', icon: Scale },
-      { label: 'AR Aging Report', href: '/tenant/financials/aging', icon: BarChart2 },
-      { label: 'Cash Reconciliation', href: '/tenant/financials/cash', icon: Banknote },
-      { label: 'Sales Reports', href: '/tenant/financials/sales', icon: TrendingUp },
-      { label: 'Revenue Forecasting', href: '/tenant/financials/forecast', icon: PieChart },
+      { label: 'Manage Payments', href: '/account/financials/payments', icon: CreditCard },
+      { label: 'Enter Credits', href: '/account/financials/credits', icon: ArrowLeftRight },
+      { label: 'Enter Returns', href: '/account/financials/returns', icon: ArrowLeftRight },
+      { label: 'Customer Statements', href: '/account/financials/statements', icon: FileText },
+      { label: 'AR Open Balances', href: '/account/financials/ar', icon: Scale },
+      { label: 'AR Aging Report', href: '/account/financials/aging', icon: BarChart2 },
+      { label: 'Cash Reconciliation', href: '/account/financials/cash', icon: Banknote },
+      { label: 'Sales Reports', href: '/account/financials/sales', icon: TrendingUp },
+      { label: 'Revenue Forecasting', href: '/account/financials/forecast', icon: PieChart },
     ],
   },
 ];
@@ -113,6 +113,10 @@ function NavItem({
 
   const [open, setOpen] = useState(isActive ?? false);
 
+  useEffect(() => {
+    if (isActive) setOpen(true);
+  }, [isActive]);
+
   if (!section.children) {
     return (
       <Link
@@ -136,9 +140,7 @@ function NavItem({
         onClick={() => setOpen(!open)}
         className={cn(
           'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-          isActive
-            ? 'bg-primary/10 text-primary'
-            : 'text-foreground/70 hover:bg-muted hover:text-foreground'
+          'text-foreground/70 hover:bg-muted hover:text-foreground'
         )}
       >
         <section.icon className={cn('h-4 w-4 shrink-0', collapsed && 'mx-auto')} />
@@ -160,7 +162,7 @@ function NavItem({
               className={cn(
                 'flex items-center gap-2.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
                 pathname === child.href
-                  ? 'text-primary bg-primary/8'
+                  ? 'bg-primary/10 text-primary font-semibold'
                   : 'text-foreground/60 hover:text-foreground hover:bg-muted'
               )}
             >

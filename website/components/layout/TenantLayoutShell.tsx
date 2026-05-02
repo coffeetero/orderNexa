@@ -7,9 +7,9 @@ import { DashboardHeader } from '@/components/layout/DashboardHeader';
 import { createClient } from '@/lib/supabase/client';
 
 const breadcrumbMap: Record<string, string> = {
-  '/tenant': 'Dashboard',
-  '/tenant/orders': 'Orders',
-  '/tenant/customers': 'Customers',
+  '/account': 'Dashboard',
+  '/account/orders': 'Orders',
+  '/account/customers': 'Customers',
 };
 
 type TenantLayoutShellProps = {

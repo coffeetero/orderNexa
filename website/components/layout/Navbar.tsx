@@ -40,7 +40,7 @@ export function Navbar() {
     };
   }, []);
 
-  if (pathname.startsWith('/customer') || pathname.startsWith('/tenant')) {
+  if (pathname.startsWith('/customer') || pathname.startsWith('/account')) {
     return null;
   }
 

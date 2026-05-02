@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { Menu, Bell, Search, User, LogOut, Wheat, ChevronRight, Settings, Lock, CircleHelp as HelpCircle } from 'lucide-react';
+import { Menu, Bell, Search, User, LogOut, ChevronRight, Settings, Lock, CircleHelp as HelpCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
@@ -88,18 +87,6 @@ export function DashboardHeader({
             <Menu className="h-4 w-4" />
           </Button>
         )}
-
-        <Link href="/" className="flex items-center gap-2 group shrink-0">
-          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 group-hover:bg-primary/20 transition-colors">
-            <Wheat className="h-3.5 w-3.5 text-primary" />
-          </div>
-          <span
-            className="hidden sm:block text-sm font-semibold text-foreground"
-            style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
-          >
-            Alpine<span className="text-primary"> Bakery</span>
-          </span>
-        </Link>
 
         {breadcrumb && (
           <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground">

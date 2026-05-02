@@ -175,7 +175,7 @@ export default async function ManageCustomersPage({
   }
 
   if (isDebug) {
-    console.debug('[tenant/customers/page.tsx] data before return', {
+    console.debug('[account/customers/page.tsx] data before return', {
       tenantCount: tenants.length,
       tenants,
       requestedTenantId,

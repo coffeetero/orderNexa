@@ -74,7 +74,7 @@ export default function TenantDashboardPage() {
               Recent Orders
             </CardTitle>
             <Button asChild variant="ghost" size="sm" className="text-xs text-primary gap-1">
-              <Link href="/tenant/orders">
+              <Link href="/account/orders">
                 View all <ArrowRight className="h-3 w-3" />
               </Link>
             </Button>
@@ -130,7 +130,7 @@ export default function TenantDashboardPage() {
               Customer Accounts
             </CardTitle>
             <Button asChild variant="ghost" size="sm" className="text-xs text-primary gap-1">
-              <Link href="/tenant/customers">
+              <Link href="/account/customers">
                 View all <ArrowRight className="h-3 w-3" />
               </Link>
             </Button>

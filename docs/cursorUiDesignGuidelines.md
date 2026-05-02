@@ -31,7 +31,7 @@ Use existing components first; avoid creating parallel variants unless required 
 ### Header and Navigation
 
 - Use `DashboardHeader` for authenticated dashboard surfaces.
-- Use `TenantSidebar` for tenant routes (`/tenant/*`) and `CustomerSidebar` for customer routes (`/customer/*`).
+- Use `TenantSidebar` for account routes (`/account/*`) and `CustomerSidebar` for customer routes (`/customer/*`).
 - Keep mobile behavior consistent:
   - sidebar hidden on small screens
   - header menu button opens sidebar overlay
@@ -146,7 +146,7 @@ Use existing components first; avoid creating parallel variants unless required 
   - overlay backdrop + slide-in sidebar
   - close on backdrop tap or close control
 - Keep route group behavior unchanged:
-  - marketing/public navbar hidden for `/tenant/*` and `/customer/*`
+  - marketing/public navbar hidden for `/account/*` and `/customer/*`
 
 ---
 
