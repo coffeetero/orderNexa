@@ -7,6 +7,7 @@ import { DashboardHeader } from '@/components/layout/DashboardHeader';
 import { createClient } from '@/lib/supabase/client';
 
 const breadcrumbMap: Record<string, string> = {
+  '/': 'Home',
   '/account': 'Dashboard',
   '/account/orders': 'Orders',
   '/account/customers': 'Customers',

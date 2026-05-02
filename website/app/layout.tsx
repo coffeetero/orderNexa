@@ -3,13 +3,19 @@ import type { Metadata } from 'next';
 import { ThemeProvider } from '@/lib/theme-provider';
 import { TenantProvider } from '@/lib/tenant-context';
 import { Navbar } from '@/components/layout/Navbar';
+import { createClient } from '@/lib/supabase/server';
 
 export const metadata: Metadata = {
   title: 'Alpine Bakery — Artisan Bread Platform',
   description: 'Premium European artisan bakery management platform for wholesale and retail.',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -23,7 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-screen antialiased">
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
           <TenantProvider>
-            <Navbar />
+            {!user && <Navbar />}
             <main>{children}</main>
           </TenantProvider>
         </ThemeProvider>
