@@ -10,8 +10,18 @@ const breadcrumbMap: Record<string, string> = {
   '/': 'Home',
   '/account': 'Dashboard',
   '/account/orders': 'Orders',
+  '/account/orders/new': 'New Order',
   '/account/customers': 'Customers',
 };
+
+/** Resolves breadcrumb label for dynamic routes not in the static map. */
+function resolveBreadcrumb(pathname: string): string {
+  const staticLabel = breadcrumbMap[pathname];
+  if (staticLabel) return staticLabel;
+  // /account/orders/<id>/edit
+  if (/^\/account\/orders\/\d+\/edit$/.test(pathname)) return 'Edit Order';
+  return '';
+}
 
 type TenantLayoutShellProps = {
   children: React.ReactNode;
@@ -24,7 +34,7 @@ export function TenantLayoutShell({ children }: TenantLayoutShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
 
-  const breadcrumb = breadcrumbMap[pathname] ?? '';
+  const breadcrumb = resolveBreadcrumb(pathname);
 
   useEffect(() => {
     let isMounted = true;

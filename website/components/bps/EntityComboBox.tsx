@@ -63,6 +63,19 @@ export type EntityComboBoxProps<T> = {
   clearSearchOnFocus?: boolean;
   /** Called after `onChange` when a row is chosen (keyboard, click, or Enter). */
   onAfterSelect?: (item: T) => void;
+
+  /**
+   * External ref that will be populated with the internal search <input>.
+   * Works in both popover and alwaysOpen modes.
+   * Use this to imperatively focus the search field from parent components.
+   */
+  inputRef?: React.RefObject<HTMLInputElement>;
+
+  /**
+   * External ref populated with the popover trigger <button>.
+   * Only used in popover mode (alwaysOpen = false).
+   */
+  triggerRef?: React.RefObject<HTMLButtonElement>;
 };
 
 type RowModel<T> = {
@@ -133,6 +146,8 @@ export function EntityComboBox<T>({
   collapseOnSelect = false,
   clearSearchOnFocus = false,
   onAfterSelect,
+  inputRef,
+  triggerRef,
 }: EntityComboBoxProps<T>) {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
@@ -142,6 +157,14 @@ export function EntityComboBox<T>({
   const prevValueRef = React.useRef(value);
   const blurRestoreTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const pointerDownOnListRef = React.useRef(false);
+
+  // Sync external refs on every render so callers always have the current element.
+  React.useEffect(() => {
+    if (inputRef) {
+      (inputRef as React.MutableRefObject<HTMLInputElement | null>).current =
+        searchInputRef.current;
+    }
+  });
 
   const cancelBlurRestoreTimer = React.useCallback(() => {
     if (blurRestoreTimerRef.current !== null) {
@@ -568,6 +591,7 @@ export function EntityComboBox<T>({
         <PopoverTrigger asChild>
           <Button
             id={triggerId}
+            ref={triggerRef}
             type="button"
             variant="outline"
             role="combobox"
