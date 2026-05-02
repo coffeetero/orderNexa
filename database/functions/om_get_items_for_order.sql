@@ -55,12 +55,14 @@ BEGIN
             'is_sliceable',   COALESCE(b.is_sliceable,   FALSE),
             'is_wrappable',   COALESCE(b.is_wrappable,   FALSE),
             'is_coverable',   COALESCE(b.is_coverable,   FALSE),
-            'is_scoreable',   COALESCE(b.is_scoreable,   FALSE),
+            -- is_scoreable / default_scored require add_order_entry_fields.sql to be run first;
+            -- hardcoded to FALSE until that migration is deployed.
+            'is_scoreable',   FALSE,
             -- Prep defaults (applied to new order line on item select)
             'default_sliced', COALESCE(b.default_sliced, FALSE),
             'default_wrapped',COALESCE(b.default_wrapped,FALSE),
             'default_covered',COALESCE(b.default_covered,FALSE),
-            'default_scored', COALESCE(b.default_scored, FALSE),
+            'default_scored', FALSE,
             -- Effective price (NULL when no pricebook resolved)
             'unit_price',     pi.item_price
         ) AS row_data

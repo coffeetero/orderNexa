@@ -58,6 +58,7 @@ export function OrderEntryForm({
   const [items, setItems] = useState<OrderEntryItem[]>([]);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
   const [isLoadingItems, setIsLoadingItems] = useState(false);
+  const [itemsError, setItemsError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
@@ -105,12 +106,17 @@ export function OrderEntryForm({
   useEffect(() => {
     if (tenantId === null) return;
     setIsLoadingItems(true);
+    setItemsError(null);
     const qs = draft.customer_id
       ? `tenant_id=${tenantId}&customer_id=${draft.customer_id}`
       : `tenant_id=${tenantId}`;
     fetch(`/api/items?${qs}`)
       .then((r) => r.json())
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) {
+          setItemsError(error as string);
+          return;
+        }
         if (Array.isArray(data)) setItems(data as OrderEntryItem[]);
       })
       .finally(() => setIsLoadingItems(false));
@@ -397,6 +403,11 @@ export function OrderEntryForm({
           qtyRef={qtyRef}
           onCommit={handleItemCommit}
         />
+        {itemsError && (
+          <p className="px-3 pb-1 text-xs text-destructive">
+            Item search error: {itemsError}
+          </p>
+        )}
       </div>
 
       {/* ── ROW 3: Order Lines Grid ───────────────────────────────────── */}
