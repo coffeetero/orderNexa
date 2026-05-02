@@ -195,5 +195,7 @@ export interface OrderEntryDraft {
   delivery_amount: number;
   /** Calculated: sum of all line extended_amount values */
   total_amount: number;
+  /** Customer's internal order reference / PO number (stored in snapshot_data.order_ref). */
+  order_ref?: string;
   lines: OrderEntryLine[];
 }

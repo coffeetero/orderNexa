@@ -18,24 +18,43 @@ interface OrderEntryFormProps {
   orderId?: number;
   /** Pre-loaded initial draft — can be supplied by a server component to skip the first fetch. */
   initialData?: OrderEntryDraft;
+  /** Tenant id pre-resolved server-side via fnd_get_tenants. */
+  serverTenantId?: number;
+  /** Customer list pre-loaded server-side. When provided the client-side customer fetch is skipped. */
+  serverCustomers?: CustomerOption[];
 }
 
-export function OrderEntryForm({ mode, orderId, initialData }: OrderEntryFormProps) {
+export function OrderEntryForm({
+  mode,
+  orderId,
+  initialData,
+  serverTenantId,
+  serverCustomers,
+}: OrderEntryFormProps) {
   const router = useRouter();
 
   // ── Session / tenant ───────────────────────────────────────────────────
-  const [tenantId, setTenantId] = useState<number | null>(null);
+  // Initialise directly from the server-passed value when available.
+  const [tenantId, setTenantId] = useState<number | null>(serverTenantId ?? null);
 
   useEffect(() => {
+    // Only run the client-side resolution if the server didn't supply a tenantId.
+    if (serverTenantId !== undefined) return;
     const supabase = createClient();
     supabase.auth.getSession().then(({ data }) => {
       const tid = data.session?.user?.app_metadata?.tenant_id;
-      if (typeof tid === 'number') setTenantId(tid);
+      if (typeof tid === 'number') {
+        setTenantId(tid);
+      } else if (typeof tid === 'string') {
+        const parsed = parseInt(tid, 10);
+        if (!isNaN(parsed)) setTenantId(parsed);
+      }
     });
-  }, []);
+  }, [serverTenantId]);
 
   // ── Data loading ───────────────────────────────────────────────────────
-  const [customers, setCustomers] = useState<CustomerOption[]>([]);
+  // Initialise customers directly when pre-loaded by the server.
+  const [customers, setCustomers] = useState<CustomerOption[]>(serverCustomers ?? []);
   const [items, setItems] = useState<OrderEntryItem[]>([]);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
   const [isLoadingItems, setIsLoadingItems] = useState(false);
@@ -56,7 +75,7 @@ export function OrderEntryForm({ mode, orderId, initialData }: OrderEntryFormPro
   } = useOrderEntryState(initialData);
 
   const {
-    customerTriggerRef,
+    customerInputRef,
     itemInputRef,
     qtyRef,
     focusCustomer,
@@ -69,7 +88,9 @@ export function OrderEntryForm({ mode, orderId, initialData }: OrderEntryFormPro
   const [activeLineIndex, setActiveLineIndex] = useState<number | null>(null);
 
   // ── Fetch customers when tenantId is ready ─────────────────────────────
+  // Skip if the server already supplied the customer list.
   useEffect(() => {
+    if (serverCustomers !== undefined) return;
     if (tenantId === null) return;
     setIsLoadingCustomers(true);
     fetch(`/api/customers?tenant_id=${tenantId}&hierarchy=true&active=true`)
@@ -78,7 +99,7 @@ export function OrderEntryForm({ mode, orderId, initialData }: OrderEntryFormPro
         if (Array.isArray(data)) setCustomers(data as CustomerOption[]);
       })
       .finally(() => setIsLoadingCustomers(false));
-  }, [tenantId]);
+  }, [tenantId, serverCustomers]);
 
   // ── Fetch items when customer changes ──────────────────────────────────
   useEffect(() => {
@@ -359,7 +380,7 @@ export function OrderEntryForm({ mode, orderId, initialData }: OrderEntryFormPro
           draft={draft}
           customers={customers}
           isLoadingCustomers={isLoadingCustomers}
-          customerTriggerRef={customerTriggerRef}
+          customerInputRef={customerInputRef}
           onCustomerChange={handleCustomerChange}
           onCustomerAfterSelect={handleCustomerAfterSelect}
           onFieldChange={setField}

@@ -21,14 +21,24 @@ export interface CustomerOption {
   sort_path: string;
 }
 
+/** Slim order option shape used for the Order No. combobox search — wired to real data later. */
+export interface OrderRefOption {
+  order_id: number;
+  order_number: string;
+  customer_name: string;
+}
+
 interface OrderHeaderRowProps {
   draft: OrderEntryDraft;
   customers: CustomerOption[];
   isLoadingCustomers: boolean;
-  /** External ref for the customer trigger <button> (used by useOrderFocus). */
-  customerTriggerRef: React.RefObject<HTMLButtonElement>;
+  /** Items for the Order No. combobox — pass [] until the search-orders API is wired. */
+  orderRefItems?: OrderRefOption[];
+  /** External ref for the customer search <input> (used by useOrderFocus, alwaysOpen mode). */
+  customerInputRef: React.RefObject<HTMLInputElement>;
   onCustomerChange: (customer: CustomerOption | null) => void;
   onCustomerAfterSelect: () => void;
+  onOrderRefChange?: (order: OrderRefOption | null) => void;
   onFieldChange: <K extends keyof OrderEntryDraft>(field: K, value: OrderEntryDraft[K]) => void;
 }
 
@@ -36,18 +46,20 @@ export function OrderHeaderRow({
   draft,
   customers,
   isLoadingCustomers,
-  customerTriggerRef,
+  orderRefItems = [],
+  customerInputRef,
   onCustomerChange,
   onCustomerAfterSelect,
+  onOrderRefChange,
   onFieldChange,
 }: OrderHeaderRowProps) {
   return (
-    <div className="border-b border-border/60 bg-card px-3 py-2 space-y-2">
-      {/* ── Row A: Customer + Dates + Invoice ─────────────────────────────── */}
+    <div className="border-b border-border/60 bg-card px-3 py-2">
+      {/* Single row: Customer + Dates + Invoice + Financial strip */}
       <div className="flex flex-wrap items-end gap-2">
         {/* Customer */}
         <div className="flex flex-col gap-1 flex-1 min-w-[200px]">
-          <Label htmlFor="customer-select" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+          <Label htmlFor="customer-select" className="text-xs font-semibold text-muted-foreground tracking-wide">
             Customer
           </Label>
           <EntityComboBox<CustomerOption>
@@ -66,21 +78,24 @@ export function OrderHeaderRow({
             }
             getParentId={(c) => c.customer_parent_id}
             getSortKey={(c) => c.sort_path}
-            placeholder="Select customer…"
+            placeholder="Search number or name…"
             disabled={isLoadingCustomers}
             loading={isLoadingCustomers}
             emptyText="No customers found."
             clearable
-            triggerRef={customerTriggerRef}
+            alwaysOpen
+            collapseOnSelect
+            clearSearchOnFocus
+            inputRef={customerInputRef}
             triggerId="customer-select"
             contextParentsSelectable={false}
           />
         </div>
 
-        {/* Prdctn Date */}
+        {/* Production Date */}
         <div className="flex flex-col gap-1 w-36 shrink-0">
-          <Label htmlFor="delivery-date" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-            Prdctn Date
+          <Label htmlFor="delivery-date" className="text-xs font-semibold text-muted-foreground tracking-wide">
+            Production Date
           </Label>
           <input
             id="delivery-date"
@@ -95,10 +110,10 @@ export function OrderHeaderRow({
           />
         </div>
 
-        {/* Prdctn Time */}
+        {/* Production Time */}
         <div className="flex flex-col gap-1 w-28 shrink-0">
-          <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-            Prdctn Time
+          <Label className="text-xs font-semibold text-muted-foreground tracking-wide">
+            Production Time
           </Label>
           <Select
             value={draft.delivery_window}
@@ -117,7 +132,7 @@ export function OrderHeaderRow({
 
         {/* Invoice No */}
         <div className="flex flex-col gap-1 w-32 shrink-0">
-          <Label htmlFor="invoice-no" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+          <Label htmlFor="invoice-no" className="text-xs font-semibold text-muted-foreground tracking-wide">
             Invoice No.
           </Label>
           <input
@@ -133,30 +148,53 @@ export function OrderHeaderRow({
             onFocus={(e) => e.target.select()}
           />
         </div>
-      </div>
 
-      {/* ── Row B: Financial totals strip ─────────────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-3">
+        {/* Order No. */}
+        <div className="flex flex-col gap-1 w-36 shrink-0">
+          <Label htmlFor="order-ref" className="text-xs font-semibold text-muted-foreground tracking-wide">
+            Order No.
+          </Label>
+          <EntityComboBox<OrderRefOption>
+            items={orderRefItems}
+            value={draft.order_ref ? Number(draft.order_ref) || null : null}
+            onChange={(order) => {
+              onFieldChange('order_ref', order ? String(order.order_number) : '');
+              onOrderRefChange?.(order);
+            }}
+            getId={(o) => o.order_id}
+            getLabel={(o) => `${o.order_number} — ${o.customer_name}`}
+            getSearchText={(o) => `${o.order_number} ${o.customer_name}`}
+            getParentId={() => null}
+            getSortKey={(o) => o.order_number}
+            placeholder="Search orders…"
+            emptyText="Type to search orders."
+            clearable
+            triggerId="order-ref"
+            triggerClassName="h-9 text-sm font-normal"
+          />
+        </div>
+
+        {/* Divider */}
+        <div className="self-stretch w-px bg-border/60 mx-1" />
+
         {/* Credit (display-only) */}
-        <div className="flex flex-col gap-0.5">
-          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+        <div className="flex flex-col gap-0.5 shrink-0">
+          <span className="text-[10px] font-semibold text-muted-foreground tracking-wide">
             Credit
           </span>
           <span
-            className="tabular-nums text-sm font-medium text-foreground"
+            className="h-9 flex items-center tabular-nums text-sm font-medium text-foreground px-1"
             tabIndex={-1}
           >
             ${draft.customer_credit.toFixed(2)}
           </span>
         </div>
 
-        <div className="h-6 w-px bg-border/60" />
-
         {/* Delivery $ */}
-        <div className="flex flex-col gap-0.5">
+        <div className="flex flex-col gap-1 w-24 shrink-0">
           <label
             htmlFor="delivery-amount"
-            className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide"
+            className="text-[10px] font-semibold text-muted-foreground tracking-wide"
           >
             Dlvry $
           </label>
@@ -164,8 +202,8 @@ export function OrderHeaderRow({
             id="delivery-amount"
             type="number"
             className={cn(
-              'h-7 w-24 rounded border border-input bg-background px-2 text-sm text-right tabular-nums',
-              'focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary',
+              'h-9 w-full rounded-md border border-input bg-background px-2 text-sm text-right tabular-nums',
+              'focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary',
               '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none',
               '[&::-webkit-inner-spin-button]:appearance-none',
             )}
@@ -181,17 +219,15 @@ export function OrderHeaderRow({
           />
         </div>
 
-        <div className="h-6 w-px bg-border/60" />
-
-        {/* Total Order (display-only, highlighted) */}
-        <div className="flex flex-col gap-0.5">
-          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+        {/* Ttl Order (display-only, highlighted) */}
+        <div className="flex flex-col gap-1 shrink-0">
+          <span className="text-[10px] font-semibold text-muted-foreground tracking-wide">
             Ttl Order
           </span>
           <span
             className={cn(
-              'tabular-nums text-base font-bold text-foreground',
-              'rounded bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5',
+              'h-9 flex items-center tabular-nums text-base font-bold px-2',
+              'rounded bg-amber-50 dark:bg-amber-950/40',
               'border border-amber-200 dark:border-amber-800',
               'text-amber-800 dark:text-amber-300',
             )}

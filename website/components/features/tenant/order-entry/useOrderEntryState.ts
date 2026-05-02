@@ -16,6 +16,7 @@ function today(): string {
 function emptyDraft(): OrderEntryDraft {
   return {
     order_number: '',
+    order_ref: '',
     customer_id: null,
     customer_name: '',
     customer_credit: 0,

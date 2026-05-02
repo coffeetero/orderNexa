@@ -8,8 +8,8 @@ import { useCallback, useRef } from 'react';
  * focus flow.
  */
 export function useOrderFocus() {
-  /** Ref attached to the customer EntityComboBox trigger <button> (popover mode). */
-  const customerTriggerRef = useRef<HTMLButtonElement | null>(null);
+  /** Ref attached to the customer EntityComboBox internal <input> (alwaysOpen mode). */
+  const customerInputRef = useRef<HTMLInputElement | null>(null);
 
   /** Ref attached to the item EntityComboBox internal <input> (alwaysOpen mode).
    *  Populated via the EntityComboBox `inputRef` prop. */
@@ -25,7 +25,7 @@ export function useOrderFocus() {
   const gridCellsRef = useRef<Map<string, HTMLInputElement>>(new Map());
 
   const focusCustomer = useCallback(() => {
-    requestAnimationFrame(() => customerTriggerRef.current?.focus());
+    requestAnimationFrame(() => customerInputRef.current?.focus());
   }, []);
 
   const focusItem = useCallback(() => {
@@ -78,7 +78,7 @@ export function useOrderFocus() {
   );
 
   return {
-    customerTriggerRef,
+    customerInputRef,
     itemInputRef,
     qtyRef,
     focusCustomer,
