@@ -1,13 +1,12 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Building2, CircleAlert, Loader2, UserRound } from 'lucide-react';
 import { EntityComboBox } from '@/components/bps/EntityComboBox';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { createClient } from '@/lib/supabase/client';
 
 type TenantOption = {
   tenant_id: number;
@@ -110,7 +109,6 @@ export function Customers2Page({
   initialCustomers,
   initialMessage = null,
 }: Customers2PageProps) {
-  const supabase = useMemo(() => createClient(), []);
   const [tenantId, setTenantId] = useState<number | null>(initialTenantId);
   const [customers, setCustomers] = useState<CustomerHierarchyRow[]>(initialCustomers);
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
@@ -128,21 +126,35 @@ export function Customers2Page({
       setSelectedCustomerId(null);
       setSelectedCustomer(null);
 
-      const { data, error } = await supabase.rpc('fnd_get_customers_hier', {
-        tenant_id: nextTenantId,
-      });
-
-      if (error) {
+      let response: Response;
+      try {
+        response = await fetch(
+          `/api/customers?tenant_id=${nextTenantId}&hierarchy=true&active=true`,
+          { credentials: 'same-origin' }
+        );
+      } catch {
         setCustomers([]);
-        setStatusMessage(error.message);
+        setStatusMessage('Network error while loading customers.');
         setIsLoadingCustomers(false);
         return;
       }
 
-      setCustomers(normalizeCustomerHierarchy(data));
+      const json = (await response.json().catch(() => ({}))) as {
+        data?: unknown;
+        error?: string;
+      };
+
+      if (!response.ok) {
+        setCustomers([]);
+        setStatusMessage(json.error ?? response.statusText);
+        setIsLoadingCustomers(false);
+        return;
+      }
+
+      setCustomers(normalizeCustomerHierarchy(json.data));
       setIsLoadingCustomers(false);
     },
-    [supabase]
+    []
   );
 
   const loadCustomer = useCallback(
@@ -151,21 +163,35 @@ export function Customers2Page({
       setIsLoadingCustomer(true);
       setStatusMessage(null);
 
-      const { data, error } = await supabase.rpc('fnd_get_customers', {
-        p_customer_id: row.customer_id,
-      });
-
-      if (error) {
+      let response: Response;
+      try {
+        response = await fetch(
+          `/api/customers?tenant_id=${row.tenant_id}&customer_id=${row.customer_id}&hierarchy=false&active=false`,
+          { credentials: 'same-origin' }
+        );
+      } catch {
         setSelectedCustomer(null);
-        setStatusMessage(error.message);
+        setStatusMessage('Network error while loading customer.');
         setIsLoadingCustomer(false);
         return;
       }
 
-      setSelectedCustomer(normalizeCustomerDetails(data, row));
+      const json = (await response.json().catch(() => ({}))) as {
+        data?: unknown;
+        error?: string;
+      };
+
+      if (!response.ok) {
+        setSelectedCustomer(null);
+        setStatusMessage(json.error ?? response.statusText);
+        setIsLoadingCustomer(false);
+        return;
+      }
+
+      setSelectedCustomer(normalizeCustomerDetails(json.data, row));
       setIsLoadingCustomer(false);
     },
-    [supabase]
+    []
   );
 
   const handleTenantChange = useCallback(

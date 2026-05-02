@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { EntityComboBox } from '@/components/bps/EntityComboBox';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { createClient } from '@/lib/supabase/client';
 
 type TenantOption = {
   tenant_id: number;
@@ -228,8 +227,6 @@ export function CustomerManagementPage({
   initialMessage = null,
   isDebugActive = false,
 }: CustomerManagementPageProps) {
-  const supabase = useMemo(() => createClient(), []);
-
   const [tenantId, setTenantId] = useState<number | null>(initialTenantId);
   const [customers, setCustomers] = useState<CustomerRow[]>(initialCustomers);
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
@@ -256,18 +253,32 @@ export function CustomerManagementPage({
       setIsLoadingCustomers(true);
       setStatusMessage(null);
 
-      const { data, error } = await supabase.rpc('fnd_get_customers_hier', {
-        tenant_id: nextTenantId,
-      });
-
-      if (error) {
+      let response: Response;
+      try {
+        response = await fetch(
+          `/api/customers?tenant_id=${nextTenantId}&hierarchy=true&active=true`,
+          { credentials: 'same-origin' }
+        );
+      } catch {
         setCustomers([]);
-        setStatusMessage(error.message);
+        setStatusMessage('Network error while loading customers.');
         setIsLoadingCustomers(false);
         return [] as CustomerRow[];
       }
 
-      const normalized = normalizeCustomerRows(Array.isArray(data) ? data : []);
+      const json = (await response.json().catch(() => ({}))) as {
+        data?: unknown;
+        error?: string;
+      };
+
+      if (!response.ok) {
+        setCustomers([]);
+        setStatusMessage(json.error ?? response.statusText);
+        setIsLoadingCustomers(false);
+        return [] as CustomerRow[];
+      }
+
+      const normalized = normalizeCustomerRows(Array.isArray(json.data) ? json.data : []);
       setCustomers(normalized);
       setSelectedCustomerId(null);
       setSelectedOriginal(null);
@@ -275,7 +286,7 @@ export function CustomerManagementPage({
       setIsLoadingCustomers(false);
       return normalized;
     },
-    [supabase]
+    []
   );
 
   useEffect(() => {
@@ -295,22 +306,36 @@ export function CustomerManagementPage({
       setSelectedCustomerId(hierRow.customer_id);
       setStatusMessage(null);
 
-      const { data, error } = await supabase.rpc('fnd_get_customers', {
-        p_customer_id: hierRow.customer_id,
-      });
-
-      if (error) {
-        setStatusMessage(error.message);
+      let response: Response;
+      try {
+        response = await fetch(
+          `/api/customers?tenant_id=${hierRow.tenant_id}&customer_id=${hierRow.customer_id}&hierarchy=false&active=false`,
+          { credentials: 'same-origin' }
+        );
+      } catch {
+        setStatusMessage('Network error while loading customer.');
         setSelectedOriginal(hierRow);
         setFormState(toFormState(hierRow));
         return;
       }
 
-      const merged = mergeFullCustomerJson(hierRow, data);
+      const json = (await response.json().catch(() => ({}))) as {
+        data?: unknown;
+        error?: string;
+      };
+
+      if (!response.ok) {
+        setStatusMessage(json.error ?? response.statusText);
+        setSelectedOriginal(hierRow);
+        setFormState(toFormState(hierRow));
+        return;
+      }
+
+      const merged = mergeFullCustomerJson(hierRow, json.data);
       setSelectedOriginal(merged);
       setFormState(toFormState(merged));
     },
-    [supabase]
+    []
   );
 
   const handleCreateClick = () => {
@@ -376,20 +401,41 @@ export function CustomerManagementPage({
     setIsSaving(true);
     setStatusMessage(null);
 
-    const { data, error } = await supabase.rpc('fnd_save_customers', {
-      p_tenant_id: tenantId,
-      p_customer_id: selectedCustomerId,
-      p_action: isCreate ? 'create' : 'update',
-      p_payload: updatePayload,
-    });
-
-    if (error) {
-      setStatusMessage(error.message);
+    let saveResponse: Response;
+    try {
+      saveResponse = await fetch('/api/customers/save', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          p_tenant_id: tenantId,
+          p_customer_id: selectedCustomerId,
+          p_action: isCreate ? 'create' : 'update',
+          p_payload: updatePayload,
+        }),
+      });
+    } catch {
+      setStatusMessage('Network error while saving.');
       setIsSaving(false);
       return;
     }
 
-    const result = (data ?? {}) as SetCustomerResult;
+    let saveJson: { data?: unknown; error?: string };
+    try {
+      saveJson = (await saveResponse.json()) as { data?: unknown; error?: string };
+    } catch {
+      setStatusMessage('Invalid response from server.');
+      setIsSaving(false);
+      return;
+    }
+
+    if (!saveResponse.ok) {
+      setStatusMessage(saveJson.error ?? saveResponse.statusText);
+      setIsSaving(false);
+      return;
+    }
+
+    const result = (saveJson.data ?? {}) as SetCustomerResult;
     const nextSelectedId = typeof result.customer_id === 'number' ? result.customer_id : null;
 
     const refreshedCustomers = await fetchCustomers(tenantId);

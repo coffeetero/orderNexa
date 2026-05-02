@@ -1,3 +1,4 @@
+import { headers } from 'next/headers';
 import { Customers2Page } from '@/components/features/tenant/Customers2Page';
 import { createClient } from '@/lib/supabase/server';
 
@@ -76,13 +77,30 @@ export default async function Customers2Route() {
 
   let initialCustomers: CustomerHierarchyRow[] = [];
   if (initialTenantId !== null) {
-    const { data: customerData, error: customerError } = await supabase.rpc('fnd_get_customers_hier', {
-      tenant_id: initialTenantId,
-    });
-    if (customerError) {
-      initialMessage = customerError.message;
-    } else {
-      initialCustomers = normalizeCustomerHierarchy(customerData);
+    const h = headers();
+    const host = h.get('host');
+    const proto = h.get('x-forwarded-proto') ?? 'http';
+    const cookie = h.get('cookie') ?? '';
+    const apiUrl = `${proto}://${host}/api/customers?tenant_id=${initialTenantId}&hierarchy=true&active=true`;
+
+    try {
+      const response = await fetch(apiUrl, {
+        headers: { cookie },
+        cache: 'no-store',
+      });
+
+      const json = (await response.json().catch(() => ({}))) as {
+        data?: unknown;
+        error?: string;
+      };
+
+      if (!response.ok) {
+        initialMessage = json.error ?? response.statusText;
+      } else {
+        initialCustomers = normalizeCustomerHierarchy(json.data);
+      }
+    } catch (error) {
+      initialMessage = error instanceof Error ? error.message : 'Customer fetch failed';
     }
   }
 

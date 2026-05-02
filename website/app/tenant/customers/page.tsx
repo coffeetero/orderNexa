@@ -1,3 +1,4 @@
+import { headers } from 'next/headers';
 import { CustomerManagementPage } from '@/components/features/tenant/CustomerManagementPage';
 import { createClient } from '@/lib/supabase/server';
 
@@ -144,21 +145,36 @@ export default async function ManageCustomersPage({
   let initialCustomers: CustomerRow[] = [];
 
   if (initialTenantId !== null) {
-    const { data: customerData, error: customerError } = await supabase.rpc(
-      'fnd_get_customers_hier',
-      {
-        p_tenant_id: initialTenantId,
-      },
-    );
+    const h = headers();
+    const host = h.get('host');
+    const proto = h.get('x-forwarded-proto') ?? 'http';
+    const cookie = h.get('cookie') ?? '';
+    const apiUrl = `${proto}://${host}/api/customers?tenant_id=${initialTenantId}&hierarchy=true&active=true`;
 
-    if (customerError) {
-      initialMessage = `Customer hierarchy RPC error: ${customerError.message}`;
-    } else {
-      initialCustomers = normalizeCustomers(customerData);
+    try {
+      const response = await fetch(apiUrl, {
+        headers: { cookie },
+        cache: 'no-store',
+      });
+
+      const json = (await response.json().catch(() => ({}))) as {
+        data?: unknown;
+        error?: string;
+      };
+
+      if (!response.ok) {
+        initialMessage = `Customer hierarchy API error: ${json.error ?? response.statusText}`;
+      } else {
+        initialCustomers = normalizeCustomers(json.data);
+      }
+    } catch (error) {
+      initialMessage = `Customer hierarchy fetch failed: ${
+        error instanceof Error ? error.message : 'unknown error'
+      }`;
     }
   }
 
-  // if (isDebug) {
+  if (isDebug) {
     console.debug('[tenant/customers/page.tsx] data before return', {
       tenantCount: tenants.length,
       tenants,
@@ -168,7 +184,7 @@ export default async function ManageCustomersPage({
       initialCustomersSample: initialCustomers.slice(0, 10),
       initialMessage,
     });
-  // }
+  }
 
   return (
     <CustomerManagementPage
