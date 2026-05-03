@@ -30,7 +30,7 @@ BEGIN
         order_id,
         order_line_id,
         production_date,
-        production_window,
+        production_code,
         shipment_date,
         shipment_number,
         quantity,
@@ -45,10 +45,10 @@ BEGIN
         v_tenant_id,
         ordr.order_id,
         ordrLn.order_line_id,
-        COALESCE(ordr.delivery_date, ordr.order_date),
-        ordr.delivery_window,
+        COALESCE(ordr.production_date, ordr.order_date),
+        ordr.production_code,
         COALESCE(
-            ordr.delivery_date::TIMESTAMPTZ,
+            ordr.production_date::TIMESTAMPTZ,
             ordr.order_date::TIMESTAMPTZ,
             now()
         ),

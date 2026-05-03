@@ -1,7 +1,7 @@
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
-import { OrderEntryForm } from '@/components/features/tenant/order-entry/OrderEntryForm';
-import type { CustomerOption } from '@/components/features/tenant/order-entry/OrderHeaderRow';
+import { OrderEntryForm } from '@/components/features/account/order-entry/OrderEntryForm';
+import type { CustomerOption } from '@/components/features/account/order-entry/OrderHeaderRow';
 
 export const metadata = {
   title: 'Edit Order — Order Entry',

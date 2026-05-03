@@ -1,5 +1,5 @@
 import { headers } from 'next/headers';
-import { CustomerManagementPage } from '@/components/features/tenant/CustomerManagementPage';
+import { CustomerManagementPage } from '@/components/features/account/CustomerManagementPage';
 import { createClient } from '@/lib/supabase/server';
 
 type TenantOption = {
@@ -175,7 +175,7 @@ export default async function ManageCustomersPage({
   }
 
   if (isDebug) {
-    console.debug('[account/customers/page.tsx] data before return', {
+    console.debug('[tenant/customers/page.tsx] data before return', {
       tenantCount: tenants.length,
       tenants,
       requestedTenantId,

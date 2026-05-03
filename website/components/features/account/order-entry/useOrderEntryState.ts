@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import type { DeliveryWindow, OrderEntryDraft, OrderEntryItem, OrderEntryLine } from '@/lib/types';
+import type { OrderEntryDraft, OrderEntryItem, OrderEntryLine } from '@/lib/types';
 
 function calcExtended(qty: number, price: number, discount: number): number {
   return qty * (price - discount);
@@ -21,8 +21,8 @@ function emptyDraft(): OrderEntryDraft {
     customer_name: '',
     customer_credit: 0,
     order_date: today(),
-    delivery_date: today(),
-    delivery_window: 'AM',
+    production_date: today(),
+    production_code: 'AM',
     delivery_amount: 0,
     total_amount: 0,
     lines: [],

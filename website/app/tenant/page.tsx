@@ -10,9 +10,9 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MetricCard } from '@/components/features/tenant/MetricCard';
-import { OrdersTable } from '@/components/features/tenant/OrdersTable';
-import { CustomersTable } from '@/components/features/tenant/CustomersTable';
+import { MetricCard } from '@/components/features/account/MetricCard';
+import { OrdersTable } from '@/components/features/account/OrdersTable';
+import { CustomersTable } from '@/components/features/account/CustomersTable';
 import {
   mockTenantMetrics,
   mockOrders,
@@ -74,7 +74,7 @@ export default function TenantDashboardPage() {
               Recent Orders
             </CardTitle>
             <Button asChild variant="ghost" size="sm" className="text-xs text-primary gap-1">
-              <Link href="/account/orders">
+              <Link href="/tenant/orders">
                 View all <ArrowRight className="h-3 w-3" />
               </Link>
             </Button>
@@ -130,7 +130,7 @@ export default function TenantDashboardPage() {
               Customer Accounts
             </CardTitle>
             <Button asChild variant="ghost" size="sm" className="text-xs text-primary gap-1">
-              <Link href="/account/customers">
+              <Link href="/tenant/customers">
                 View all <ArrowRight className="h-3 w-3" />
               </Link>
             </Button>

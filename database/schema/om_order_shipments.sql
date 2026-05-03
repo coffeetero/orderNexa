@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS om_order_shipments (
     order_line_id          BIGINT      REFERENCES om_order_lines(order_line_id) ON DELETE CASCADE,
 
     production_date        DATE,
-    production_window      TEXT,
+    production_code        TEXT,
 
     shipment_date          TIMESTAMPTZ,
     shipment_number        BIGINT      NOT NULL DEFAULT 1,
@@ -69,10 +69,10 @@ COMMENT ON COLUMN om_order_shipments.delivery_type IS
     'e.g. SHIP, PICK, DELIVER - app-defined.';
 
 COMMENT ON COLUMN om_order_shipments.production_date IS
-    'Calendar date for production scheduling (may align with order delivery_date).';
+    'Calendar date for production scheduling (may align with om_orders.production_date).';
 
-COMMENT ON COLUMN om_order_shipments.production_window IS
-    'Scheduled production slot or window label (text).';
+COMMENT ON COLUMN om_order_shipments.production_code IS
+    'Production slot code (e.g. AM / PM / SPECIAL); aligns with om_orders.production_code.';
 
 COMMENT ON COLUMN om_order_shipments.snapshot_data IS
     'Optional JSON for legacy or app-specific shipment context.';

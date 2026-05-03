@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import type { DeliveryWindow, OrderEntryDraft } from '@/lib/types';
+import type { OrderEntryDraft, ProductionCode } from '@/lib/types';
 
 /** Slim customer shape used for the customer combobox. */
 export interface CustomerOption {
@@ -37,7 +37,8 @@ interface OrderHeaderRowProps {
   /** External ref for the customer search <input> (used by useOrderFocus, alwaysOpen mode). */
   customerInputRef: React.RefObject<HTMLInputElement>;
   onCustomerChange: (customer: CustomerOption | null) => void;
-  onCustomerAfterSelect: () => void;
+  /** Optional — e.g. focus next control after pick (order entry defers to items-loaded focus). */
+  onCustomerAfterSelect?: () => void;
   onOrderRefChange?: (order: OrderRefOption | null) => void;
   onFieldChange: <K extends keyof OrderEntryDraft>(field: K, value: OrderEntryDraft[K]) => void;
 }
@@ -94,18 +95,18 @@ export function OrderHeaderRow({
 
         {/* Production Date */}
         <div className="flex flex-col gap-1 w-36 shrink-0">
-          <Label htmlFor="delivery-date" className="text-xs font-semibold text-muted-foreground tracking-wide">
+          <Label htmlFor="production-date" className="text-xs font-semibold text-muted-foreground tracking-wide">
             Production Date
           </Label>
           <input
-            id="delivery-date"
+            id="production-date"
             type="date"
             className={cn(
               'h-9 w-full rounded-md border border-input bg-background px-2 text-sm text-foreground',
               'focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary',
             )}
-            value={draft.delivery_date}
-            onChange={(e) => onFieldChange('delivery_date', e.target.value)}
+            value={draft.production_date}
+            onChange={(e) => onFieldChange('production_date', e.target.value)}
             onFocus={(e) => e.target.select()}
           />
         </div>
@@ -116,8 +117,8 @@ export function OrderHeaderRow({
             Production Time
           </Label>
           <Select
-            value={draft.delivery_window}
-            onValueChange={(v) => onFieldChange('delivery_window', v as DeliveryWindow)}
+            value={draft.production_code}
+            onValueChange={(v) => onFieldChange('production_code', v as ProductionCode)}
           >
             <SelectTrigger className="h-9 text-sm">
               <SelectValue />
@@ -162,12 +163,18 @@ export function OrderHeaderRow({
               onOrderRefChange?.(order);
             }}
             getId={(o) => o.order_id}
-            getLabel={(o) => `${o.order_number} — ${o.customer_name}`}
+            getLabel={(o) =>
+              o.order_id === 0
+                ? 'New Order'
+                : o.customer_name
+                ? `${o.order_number} — ${o.customer_name}`
+                : o.order_number
+            }
             getSearchText={(o) => `${o.order_number} ${o.customer_name}`}
             getParentId={() => null}
-            getSortKey={(o) => o.order_number}
+            getSortKey={(o) => (o.order_id === 0 ? '\u0000' : o.order_number)}
             placeholder="Search orders…"
-            emptyText="Type to search orders."
+            emptyText="No orders found."
             clearable
             triggerId="order-ref"
             triggerClassName="h-9 text-sm font-normal"

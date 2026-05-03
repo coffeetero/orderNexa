@@ -1,16 +1,22 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Copy, Save, Trash2, X, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase/client';
-import { OrderHeaderRow, type CustomerOption } from './OrderHeaderRow';
+import { OrderHeaderRow, type CustomerOption, type OrderRefOption } from './OrderHeaderRow';
 import { ItemEntryRow } from './ItemEntryRow';
 import { OrderLineGrid } from './OrderLineGrid';
 import { useOrderEntryState } from './useOrderEntryState';
 import { useOrderFocus } from './useOrderFocus';
-import type { OrderEntryDraft, OrderEntryItem } from '@/lib/types';
+import type { InvoiceLookupResult, OrderEntryDraft, OrderEntryItem } from '@/lib/types';
+
+const NEW_ORDER_SENTINEL: OrderRefOption = {
+  order_id: 0,
+  order_number: 'New Order',
+  customer_name: '',
+};
 
 interface OrderEntryFormProps {
   mode: 'new' | 'edit';
@@ -56,6 +62,7 @@ export function OrderEntryForm({
   // Initialise customers directly when pre-loaded by the server.
   const [customers, setCustomers] = useState<CustomerOption[]>(serverCustomers ?? []);
   const [items, setItems] = useState<OrderEntryItem[]>([]);
+  const [orderRefItems, setOrderRefItems] = useState<OrderRefOption[]>([]);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
   const [isLoadingItems, setIsLoadingItems] = useState(false);
   const [itemsError, setItemsError] = useState<string | null>(null);
@@ -88,6 +95,10 @@ export function OrderEntryForm({
 
   const [activeLineIndex, setActiveLineIndex] = useState<number | null>(null);
 
+  /** Latest draft.customer_id — used to ignore stale item-fetch completion when the user changes customer quickly. */
+  const latestCustomerIdRef = useRef<number | null>(draft.customer_id);
+  latestCustomerIdRef.current = draft.customer_id;
+
   // ── Fetch customers when tenantId is ready ─────────────────────────────
   // Skip if the server already supplied the customer list.
   useEffect(() => {
@@ -105,10 +116,11 @@ export function OrderEntryForm({
   // ── Fetch items when customer changes ──────────────────────────────────
   useEffect(() => {
     if (tenantId === null) return;
+    const customerIdForRequest = draft.customer_id;
     setIsLoadingItems(true);
     setItemsError(null);
-    const qs = draft.customer_id
-      ? `tenant_id=${tenantId}&customer_id=${draft.customer_id}`
+    const qs = customerIdForRequest
+      ? `tenant_id=${tenantId}&customer_id=${customerIdForRequest}`
       : `tenant_id=${tenantId}`;
     fetch(`/api/items?${qs}`)
       .then((r) => r.json())
@@ -119,8 +131,53 @@ export function OrderEntryForm({
         }
         if (Array.isArray(data)) setItems(data as OrderEntryItem[]);
       })
-      .finally(() => setIsLoadingItems(false));
-  }, [tenantId, draft.customer_id]);
+      .finally(() => {
+        setIsLoadingItems(false);
+        if (
+          customerIdForRequest != null &&
+          customerIdForRequest === latestCustomerIdRef.current
+        ) {
+          focusItem();
+        }
+      });
+  }, [tenantId, draft.customer_id, focusItem]);
+
+  // ── Lookup invoice when customer + date + window change ───────────────
+  useEffect(() => {
+    if (!tenantId || !draft.customer_id) {
+      // No customer selected — clear invoice and order ref dropdown
+      setField('order_number', '');
+      setOrderRefItems([]);
+      return;
+    }
+    const qs = new URLSearchParams({
+      tenant_id: String(tenantId),
+      customer_id: String(draft.customer_id),
+      production_date: draft.production_date,
+      production_code: draft.production_code,
+    });
+    fetch(`/api/orders/invoices?${qs}`)
+      .then((r) => r.json())
+      .then(({ data, error }: { data: InvoiceLookupResult | null; error?: string }) => {
+        if (error) return;
+        if (data) {
+          setField('order_number', data.invoice_number);
+          const refs: OrderRefOption[] = data.orders.map((o) => ({
+            order_id: o.order_id,
+            order_number: o.order_number,
+            customer_name: draft.customer_name,
+          }));
+          if (refs.length === 0) refs.push(NEW_ORDER_SENTINEL);
+          setOrderRefItems(refs);
+          setField('order_ref', refs[0].order_number);
+        } else {
+          setField('order_number', '');
+          setOrderRefItems([]);
+          setField('order_ref', '');
+        }
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId, draft.customer_id, draft.production_date, draft.production_code]);
 
   // ── Load existing order in edit mode ──────────────────────────────────
   useEffect(() => {
@@ -160,8 +217,8 @@ export function OrderEntryForm({
           customer_name: (data.customer_name as string) ?? '',
           customer_credit: 0,
           order_date: (data.order_date as string) ?? new Date().toISOString().slice(0, 10),
-          delivery_date: (data.delivery_date as string) ?? new Date().toISOString().slice(0, 10),
-          delivery_window: (data.delivery_window as 'AM' | 'PM' | 'SPECIAL') ?? 'AM',
+          production_date: (data.production_date as string) ?? new Date().toISOString().slice(0, 10),
+          production_code: (data.production_code as 'AM' | 'PM' | 'SPECIAL') ?? 'AM',
           delivery_amount: Number(data.delivery_amount ?? 0),
           total_amount: totalAmount,
           lines,
@@ -187,10 +244,6 @@ export function OrderEntryForm({
     },
     [setCustomer],
   );
-
-  const handleCustomerAfterSelect = useCallback(() => {
-    focusItem();
-  }, [focusItem]);
 
   const handleItemCommit = useCallback(
     (item: OrderEntryItem, quantity: number) => {
@@ -235,8 +288,8 @@ export function OrderEntryForm({
         customer_id: draft.customer_id,
         order_number: draft.order_number,
         order_date: draft.order_date,
-        delivery_date: draft.delivery_date,
-        delivery_window: draft.delivery_window,
+        production_date: draft.production_date,
+        production_code: draft.production_code,
         delivery_amount: draft.delivery_amount,
         lines: draft.lines.map((l) => ({
           item_id: l.item_id,
@@ -300,14 +353,14 @@ export function OrderEntryForm({
         setStatusMessage({ text: json.error ?? 'Delete failed.', type: 'error' });
         return;
       }
-      router.push('/account/orders');
+      router.push('/tenant/orders');
     } finally {
       setIsSaving(false);
     }
   }, [tenantId, draft.order_id, draft.order_number, router]);
 
   const handleClose = useCallback(() => {
-    router.push('/account/orders');
+    router.push('/tenant/orders');
   }, [router]);
 
   // ── Today's date for the footer date display ───────────────────────────
@@ -347,112 +400,8 @@ export function OrderEntryForm({
             {statusMessage.text}
           </span>
         )}
-        {/* Header action buttons: Retrieve (stub), Sample (stub), Clear */}
-        <div className="flex items-center gap-1.5">
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 text-xs"
-            disabled
-            title="Retrieve order by invoice number (coming soon)"
-          >
-            Retrieve
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 text-xs"
-            disabled
-            title="Load a sample order (coming soon)"
-          >
-            Sample
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 text-xs gap-1"
-            onClick={handleClear}
-            title="Clear form"
-          >
-            <RotateCcw className="h-3 w-3" />
-            Clear
-          </Button>
-        </div>
-      </div>
-
-      {/* ── ROW 1: Order Header ───────────────────────────────────────── */}
-      <div className="shrink-0">
-        <OrderHeaderRow
-          draft={draft}
-          customers={customers}
-          isLoadingCustomers={isLoadingCustomers}
-          customerInputRef={customerInputRef}
-          onCustomerChange={handleCustomerChange}
-          onCustomerAfterSelect={handleCustomerAfterSelect}
-          onFieldChange={setField}
-        />
-      </div>
-
-      {/* ── ROW 2: Item Entry Loop ────────────────────────────────────── */}
-      <div className="shrink-0">
-        <ItemEntryRow
-          items={items}
-          isLoadingItems={isLoadingItems}
-          disabled={!draft.customer_id && customers.length > 0}
-          itemInputRef={itemInputRef}
-          qtyRef={qtyRef}
-          onCommit={handleItemCommit}
-        />
-        {itemsError && (
-          <p className="px-3 pb-1 text-xs text-destructive">
-            Item search error: {itemsError}
-          </p>
-        )}
-      </div>
-
-      {/* ── ROW 3: Order Lines Grid ───────────────────────────────────── */}
-      <div className="flex-1 overflow-auto px-2 py-2 min-h-0">
-        <OrderLineGrid
-          lines={draft.lines}
-          activeLineIndex={activeLineIndex}
-          onLineUpdate={updateLine}
-          onLineRemove={removeLine}
-          registerGridCell={registerGridCell}
-          onDiscountEnter={handleDiscountEnter}
-        />
-      </div>
-
-      {/* ── Footer: Action Buttons ────────────────────────────────────── */}
-      <div className="shrink-0 flex items-center justify-between gap-2 px-3 py-2 border-t border-border/60 bg-card">
-        {/* Left: date + Copy From (stub) */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground tabular-nums">{todayLabel}</span>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 text-xs gap-1"
-            disabled
-            title="Copy from another order (coming soon)"
-          >
-            <Copy className="h-3 w-3" />
-            Copy From
-          </Button>
-        </div>
-
-        {/* Right: Delete / Save / Cancel / Close */}
-        <div className="flex items-center gap-1.5">
-          {mode === 'edit' && draft.order_id && (
-            <Button
-              variant="destructive"
-              size="sm"
-              className="h-7 text-xs gap-1"
-              onClick={handleDelete}
-              disabled={isSaving}
-            >
-              <Trash2 className="h-3 w-3" />
-              Delete
-            </Button>
-          )}
+        {/* Header action buttons: Save / Cancel / Close */}
+        <div className="flex items-center gap-1.5 shrink-0">
           <Button
             size="sm"
             className="h-7 text-xs gap-1"
@@ -482,6 +431,111 @@ export function OrderEntryForm({
             Close
           </Button>
         </div>
+      </div>
+
+      {/* ── ROW 1: Order Header ───────────────────────────────────────── */}
+      <div className="shrink-0">
+        <OrderHeaderRow
+          draft={draft}
+          customers={customers}
+          isLoadingCustomers={isLoadingCustomers}
+          orderRefItems={orderRefItems}
+          customerInputRef={customerInputRef}
+          onCustomerChange={handleCustomerChange}
+          onOrderRefChange={(order) => setField('order_ref', order ? order.order_number : '')}
+          onFieldChange={setField}
+        />
+      </div>
+
+      {/* ── ROW 2: Item Entry Loop ────────────────────────────────────── */}
+      <div className="shrink-0">
+        <ItemEntryRow
+          items={items}
+          isLoadingItems={isLoadingItems}
+          disabled={!draft.customer_id && customers.length > 0}
+          itemInputRef={itemInputRef}
+          qtyRef={qtyRef}
+          onCommit={handleItemCommit}
+          entryToolbar={
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs"
+                disabled
+                title="Retrieve order by invoice number (coming soon)"
+              >
+                Retrieve
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs"
+                disabled
+                title="Load a sample order (coming soon)"
+              >
+                Sample
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs gap-1"
+                onClick={handleClear}
+                title="Clear form"
+              >
+                <RotateCcw className="h-3 w-3" />
+                Clear
+              </Button>
+            </>
+          }
+        />
+        {itemsError && (
+          <p className="px-3 pb-1 text-xs text-destructive">
+            Item search error: {itemsError}
+          </p>
+        )}
+      </div>
+
+      {/* ── ROW 3: Order Lines Grid ───────────────────────────────────── */}
+      <div className="flex-1 overflow-auto px-2 py-2 min-h-0">
+        <OrderLineGrid
+          lines={draft.lines}
+          activeLineIndex={activeLineIndex}
+          onLineUpdate={updateLine}
+          onLineRemove={removeLine}
+          registerGridCell={registerGridCell}
+          onDiscountEnter={handleDiscountEnter}
+        />
+      </div>
+
+      {/* ── Footer: date + Copy From + Delete (edit) ───────────────────── */}
+      <div className="shrink-0 flex items-center justify-between gap-2 px-3 py-2 border-t border-border/60 bg-card">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground tabular-nums">{todayLabel}</span>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs gap-1"
+            disabled
+            title="Copy from another order (coming soon)"
+          >
+            <Copy className="h-3 w-3" />
+            Copy From
+          </Button>
+        </div>
+
+        {mode === 'edit' && draft.order_id && (
+          <Button
+            variant="destructive"
+            size="sm"
+            className="h-7 text-xs gap-1"
+            onClick={handleDelete}
+            disabled={isSaving}
+          >
+            <Trash2 className="h-3 w-3" />
+            Delete
+          </Button>
+        )}
       </div>
     </div>
   );

@@ -115,7 +115,7 @@ Important columns:
 - `tenant_id` (FK to `fnd_tenants`).
 - `customer_id` (FK to `fnd_customers`, nullable for some legacy cases).
 - `order_number` (unique per tenant).
-- `order_date`, `delivery_date`, `delivery_window`.
+- `order_date`, `production_date`, `production_code`.
 - Financial rollup fields: `quantity`, `amount`, `discount_amount`.
 - `snapshot_data` (JSONB): captured context from source flow.
 

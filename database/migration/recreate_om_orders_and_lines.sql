@@ -37,8 +37,8 @@ CREATE TABLE IF NOT EXISTS om_orders (
 
     order_date              DATE,                   -- source: ordr.ordr_dt
     order_source            TEXT,                   -- Web, Clerk, Fax, Electronic, SORDER (set by app / later migration)
-    delivery_date           DATE        NOT NULL,   -- source: ordr.ordr_prdctn_dt
-    delivery_window         TEXT,                   -- source: ordr.ordr_prdctn_cd
+    production_date         DATE        NOT NULL,   -- source: ordr.ordr_prdctn_dt
+    production_code         TEXT,                   -- source: ordr.ordr_prdctn_cd
 
     amount                  NUMERIC(14,4) NOT NULL,   -- ordr_amt
     discount_amount         NUMERIC(14,4) NOT NULL,   -- ordr_discount_amt
@@ -63,8 +63,8 @@ CREATE INDEX IF NOT EXISTS idx_om_orders_tenant_id
 CREATE INDEX IF NOT EXISTS idx_om_orders_customer
     ON om_orders (tenant_id, customer_id);
 
-CREATE INDEX IF NOT EXISTS idx_om_orders_delivery_date
-    ON om_orders (tenant_id, delivery_date DESC);
+CREATE INDEX IF NOT EXISTS idx_om_orders_production_date
+    ON om_orders (tenant_id, production_date DESC);
 
 -- TRIGGERS
 DROP TRIGGER IF EXISTS trg_om_orders_set_updated ON om_orders;
@@ -187,8 +187,8 @@ BEGIN
         order_number,
         customer_id,
         order_date,
-        delivery_date,
-        delivery_window,
+        production_date,
+        production_code,
         amount,
         discount_amount,
         quantity,

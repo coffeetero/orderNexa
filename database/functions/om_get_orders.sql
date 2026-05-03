@@ -3,7 +3,7 @@
 -- Fetches order data for the order entry / management screens.
 --
 --   p_order_id = NULL  → list mode: returns array of order headers
---                         (filtered by customer and/or delivery date range)
+--                         (filtered by customer and/or production date range)
 --   p_order_id = <id>  → detail mode: returns single order object with
 --                         lines array (for editing)
 --
@@ -11,11 +11,11 @@
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION bps.om_get_orders(
-    p_tenant_id          BIGINT,
-    p_order_id           BIGINT  DEFAULT NULL,
-    p_customer_id        BIGINT  DEFAULT NULL,
-    p_delivery_date_from DATE    DEFAULT NULL,
-    p_delivery_date_to   DATE    DEFAULT NULL
+    p_tenant_id             BIGINT,
+    p_order_id              BIGINT  DEFAULT NULL,
+    p_customer_id           BIGINT  DEFAULT NULL,
+    p_production_date_from  DATE    DEFAULT NULL,
+    p_production_date_to    DATE    DEFAULT NULL
 )
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -37,8 +37,8 @@ BEGIN
             'order_id',        o.order_id,
             'order_number',    o.order_number,
             'order_date',      o.order_date,
-            'delivery_date',   o.delivery_date,
-            'delivery_window', o.delivery_window,
+            'production_date', o.production_date,
+            'production_code',   o.production_code,
             'delivery_amount', COALESCE(o.delivery_amount, 0),
             'amount',          o.amount,
             'discount_amount', o.discount_amount,
@@ -89,15 +89,15 @@ BEGIN
     END IF;
 
     -- ── List mode: order headers (no lines) ───────────────────────────────
-    SELECT jsonb_agg(row_data ORDER BY o.delivery_date DESC, o.order_id DESC)
+    SELECT jsonb_agg(row_data ORDER BY o.production_date DESC, o.order_id DESC)
       INTO v_result
       FROM (
         SELECT jsonb_build_object(
             'order_id',        o.order_id,
             'order_number',    o.order_number,
             'order_date',      o.order_date,
-            'delivery_date',   o.delivery_date,
-            'delivery_window', o.delivery_window,
+            'production_date', o.production_date,
+            'production_code',   o.production_code,
             'delivery_amount', COALESCE(o.delivery_amount, 0),
             'amount',          o.amount,
             'discount_amount', o.discount_amount,
@@ -111,9 +111,9 @@ BEGIN
                 AND c.tenant_id   = o.tenant_id
          WHERE o.tenant_id = p_tenant_id
            AND (p_customer_id        IS NULL OR o.customer_id   = p_customer_id)
-           AND (p_delivery_date_from IS NULL OR o.delivery_date >= p_delivery_date_from)
-           AND (p_delivery_date_to   IS NULL OR o.delivery_date <= p_delivery_date_to)
-         ORDER BY o.delivery_date DESC, o.order_id DESC
+           AND (p_production_date_from IS NULL OR o.production_date >= p_production_date_from)
+           AND (p_production_date_to   IS NULL OR o.production_date <= p_production_date_to)
+         ORDER BY o.production_date DESC, o.order_id DESC
          LIMIT 500
     ) sub;
 

@@ -27,12 +27,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "cursor.md",
+                "file": "table Relationships/Invoice No to order numbers.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "cursor"
+              "title": "Invoice No to order numbers"
             }
           }
         ],
@@ -197,7 +197,17 @@
   },
   "active": "1ce2a5f2be6e6213",
   "lastOpenFiles": [
-    "cursorDevelopmentGuidelines.md",
-    "cursor.md"
+    "7EF3A300",
+    "table Relationships/Customer to Item Price.md",
+    "table Relationships/Invoice No to order numbers.md",
+    "order_entry_ui_pattern_v2.md",
+    "table Relationships",
+    "D006A100",
+    "D355D000",
+    "~$BPS Tables.xlsx",
+    "cursorOrderEntryUiPattern.md",
+    "Unconfirmed 168966.crdownload",
+    "cursor.md",
+    "cursorDevelopmentGuidelines.md"
   ]
 }

@@ -25,8 +25,8 @@ CREATE TABLE IF NOT EXISTS om_orders (
     discount_amount         NUMERIC(14,4) NOT NULL,   -- ordr_discount_amt
     customer_id             BIGINT      REFERENCES fnd_customers(customer_id),  -- source: ordr.cus_id (nullable: legacy rows without cus_id)
     event_location          TEXT,
-    delivery_date           DATE        NOT NULL,   -- source: ordr.ordr_prdctn_dt
-    delivery_window         TEXT,                   -- source: ordr.ordr_prdctn_cd
+    production_date         DATE        NOT NULL,   -- source: ordr.ordr_prdctn_dt
+    production_code         TEXT,                   -- source: ordr.ordr_prdctn_cd (AM / PM / SPECIAL)
     snapshot_data           JSONB       NOT NULL DEFAULT '{}'::jsonb,
     tenant_id               BIGINT        NOT NULL REFERENCES fnd_tenants(tenant_id) ON DELETE CASCADE,
     created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -43,8 +43,8 @@ CREATE INDEX IF NOT EXISTS idx_om_orders_tenant_id
 CREATE INDEX IF NOT EXISTS idx_om_orders_customer
     ON om_orders (tenant_id, customer_id);
 
-CREATE INDEX IF NOT EXISTS idx_om_orders_delivery_date
-    ON om_orders (tenant_id, delivery_date DESC);
+CREATE INDEX IF NOT EXISTS idx_om_orders_production_date
+    ON om_orders (tenant_id, production_date DESC);
 
 -- TRIGGERS
 DROP TRIGGER IF EXISTS trg_om_orders_set_updated ON om_orders;

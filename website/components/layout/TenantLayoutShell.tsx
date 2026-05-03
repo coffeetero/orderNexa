@@ -8,18 +8,18 @@ import { createClient } from '@/lib/supabase/client';
 
 const breadcrumbMap: Record<string, string> = {
   '/': 'Home',
-  '/account': 'Dashboard',
-  '/account/orders': 'Orders',
-  '/account/orders/new': 'New Order',
-  '/account/customers': 'Customers',
+  '/tenant': 'Dashboard',
+  '/tenant/orders': 'Orders',
+  '/tenant/orders/new': 'New Order',
+  '/tenant/customers': 'Customers',
 };
 
 /** Resolves breadcrumb label for dynamic routes not in the static map. */
 function resolveBreadcrumb(pathname: string): string {
   const staticLabel = breadcrumbMap[pathname];
   if (staticLabel) return staticLabel;
-  // /account/orders/<id>/edit
-  if (/^\/account\/orders\/\d+\/edit$/.test(pathname)) return 'Edit Order';
+  // /tenant/orders/<id>/edit
+  if (/^\/tenant\/orders\/\d+\/edit$/.test(pathname)) return 'Edit Order';
   return '';
 }
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { EntityComboBox } from '@/components/bps/EntityComboBox';
 import { Label } from '@/components/ui/label';
 import type { OrderEntryItem } from '@/lib/types';
@@ -15,6 +15,8 @@ interface ItemEntryRowProps {
   qtyRef: React.RefObject<HTMLInputElement>;
   /** Called when Enter is pressed in the Qty field with a valid quantity. */
   onCommit: (item: OrderEntryItem, quantity: number) => void;
+  /** Placed to the right of Qty in its own column (e.g. Retrieve, Sample, Clear). */
+  entryToolbar?: ReactNode;
 }
 
 export function ItemEntryRow({
@@ -24,6 +26,7 @@ export function ItemEntryRow({
   itemInputRef,
   qtyRef,
   onCommit,
+  entryToolbar,
 }: ItemEntryRowProps) {
   const [selectedItem, setSelectedItem] = useState<OrderEntryItem | null>(null);
   const [qtyValue, setQtyValue] = useState<string>('');
@@ -131,6 +134,15 @@ export function ItemEntryRow({
           aria-label="Quantity"
         />
       </div>
+
+      {entryToolbar != null && (
+        <div className="flex flex-col gap-1 shrink-0">
+          <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide invisible pointer-events-none select-none" aria-hidden>
+            &nbsp;
+          </Label>
+          <div className="flex items-center gap-1.5 h-9">{entryToolbar}</div>
+        </div>
+      )}
     </div>
   );
 }

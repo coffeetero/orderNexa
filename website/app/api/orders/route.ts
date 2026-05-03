@@ -22,8 +22,8 @@ function parseDate(value: string | null): string | null {
  *   ?tenant_id=<n>              — required
  *   &order_id=<n>               — single order + lines
  *   &customer_id=<n>            — filter by customer
- *   &delivery_date_from=<date>  — filter from date
- *   &delivery_date_to=<date>    — filter to date
+ *   &production_date_from=<date>  — filter from date
+ *   &production_date_to=<date>    — filter to date
  *
  * Uses om_get_orders RPC.
  */
@@ -37,8 +37,8 @@ export async function GET(request: Request) {
 
   const p_order_id    = parseInteger(url.searchParams.get('order_id'));
   const p_customer_id = parseInteger(url.searchParams.get('customer_id'));
-  const p_delivery_date_from = parseDate(url.searchParams.get('delivery_date_from'));
-  const p_delivery_date_to   = parseDate(url.searchParams.get('delivery_date_to'));
+  const p_production_date_from = parseDate(url.searchParams.get('production_date_from'));
+  const p_production_date_to   = parseDate(url.searchParams.get('production_date_to'));
 
   const supabase = createClient();
 
@@ -53,8 +53,8 @@ export async function GET(request: Request) {
     p_tenant_id,
     p_order_id,
     p_customer_id,
-    p_delivery_date_from,
-    p_delivery_date_to,
+    p_production_date_from,
+    p_production_date_to,
   });
 
   if (error) {

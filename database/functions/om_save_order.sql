@@ -13,8 +13,8 @@
 --     "customer_id":      <bigint|null>,
 --     "order_number":     <text>,          -- required for create; ignored for update
 --     "order_date":       <date string>,
---     "delivery_date":    <date string>,
---     "delivery_window":  <"AM"|"PM"|"SPECIAL">,
+--     "production_date":    <date string>,
+--     "production_code":    <"AM"|"PM"|"SPECIAL">,
 --     "delivery_amount":  <numeric>,
 --     "lines": [
 --       {
@@ -95,8 +95,8 @@ BEGIN
         INSERT INTO om_orders (
             order_number,
             order_date,
-            delivery_date,
-            delivery_window,
+            production_date,
+            production_code,
             delivery_amount,
             quantity,
             amount,
@@ -108,8 +108,8 @@ BEGIN
         ) VALUES (
             v_order_number,
             NULLIF(TRIM(p_payload->>'order_date'), '')::DATE,
-            NULLIF(TRIM(p_payload->>'delivery_date'), '')::DATE,
-            NULLIF(TRIM(p_payload->>'delivery_window'), ''),
+            NULLIF(TRIM(p_payload->>'production_date'), '')::DATE,
+            NULLIF(TRIM(p_payload->>'production_code'), ''),
             COALESCE((p_payload->>'delivery_amount')::NUMERIC, 0),
             0,   -- updated below after lines
             0,
@@ -130,8 +130,8 @@ BEGIN
 
         UPDATE om_orders SET
             order_date      = NULLIF(TRIM(p_payload->>'order_date'), '')::DATE,
-            delivery_date   = NULLIF(TRIM(p_payload->>'delivery_date'), '')::DATE,
-            delivery_window = NULLIF(TRIM(p_payload->>'delivery_window'), ''),
+            production_date = NULLIF(TRIM(p_payload->>'production_date'), '')::DATE,
+            production_code = NULLIF(TRIM(p_payload->>'production_code'), ''),
             delivery_amount = COALESCE((p_payload->>'delivery_amount')::NUMERIC, 0),
             customer_id     = NULLIF((p_payload->>'customer_id')::TEXT, 'null')::BIGINT
         WHERE order_id  = v_order_id

@@ -1,15 +1,14 @@
+// next.config.js
 /** @type {import('next').NextConfig} */
+
+// const dns = require('dns');
+// dns.setDefaultResultOrder('ipv4first');
+
 const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
   images: { unoptimized: true },
-  async redirects() {
-    return [
-      { source: '/tenant', destination: '/account', permanent: true },
-      { source: '/tenant/:path*', destination: '/account/:path*', permanent: true },
-    ];
-  },
 };
 
 module.exports = nextConfig;

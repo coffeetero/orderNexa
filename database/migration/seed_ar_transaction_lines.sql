@@ -8,7 +8,7 @@
 --   om_order_shipments for Alpine Bakery.
 --
 -- Link to om_orders: same rule as seed_ar_transactions — match tenant, customer,
---   and document_number to COALESCE(invc_no, order_number) via public.ordr + om_orders.
+--   and document_number to COALESCE(invc_no, order_number) via ordr + om_orders.
 --
 -- INVOICE lines: one row per om_order_shipments joined to om_order_lines.
 --   quantity = ordrShpmnt.quantity; unit_price from ol (fallback extended_amount/quantity);
@@ -18,7 +18,7 @@
 --
 -- DISCOUNT lines: amount = -(ordrShpmnt.quantity * ordrLn.unit_discount), unit_price = -ordrLn.unit_discount.
 --
--- Allowance: legacy public.ar (non-zero ar_trn_allowance_amt) when legacy_ar_id is set;
+-- Allowance: legacy ar (non-zero ar_trn_allowance_amt) when legacy_ar_id is set;
 --   otherwise skipped.
 --
 -- Tenant: Alpine Bakery
@@ -214,8 +214,8 @@ BEGIN
           AND COALESCE(ordrLn.unit_discount, 0) <> 0
     ) d;
 
-    -- 4) Allowance from legacy public.ar (only if table exists and legacy_ar_id is populated)
-    IF to_regclass('public.ar') IS NOT NULL THEN
+    -- 4) Allowance from legacy ar (only if table exists and legacy_ar_id is populated)
+    IF to_regclass('ar') IS NOT NULL THEN
         INSERT INTO ar_transaction_lines (
             tenant_id,
             ar_transaction_id,

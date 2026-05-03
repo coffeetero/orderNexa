@@ -133,7 +133,14 @@ export interface NavItem {
 
 // ─── Order Entry ────────────────────────────────────────────────────────────
 
-export type DeliveryWindow = 'AM' | 'PM' | 'SPECIAL';
+/** Returned by om_get_invoices / GET /api/orders/invoices. NULL when no invoice exists. */
+export interface InvoiceLookupResult {
+  invoice_number: string;
+  orders: { order_id: number; order_number: string }[];
+}
+
+/** Production slot code on om_orders.production_code (legacy: ordr_prdctn_cd). */
+export type ProductionCode = 'AM' | 'PM' | 'SPECIAL';
 
 /** An item row returned by om_get_items_for_order, used in the Item combobox. */
 export interface OrderEntryItem {
@@ -190,8 +197,8 @@ export interface OrderEntryDraft {
   /** AR credit balance for display — stub until fnd_get_customer_credit is implemented */
   customer_credit: number;
   order_date: string;
-  delivery_date: string;
-  delivery_window: DeliveryWindow;
+  production_date: string;
+  production_code: ProductionCode;
   delivery_amount: number;
   /** Calculated: sum of all line extended_amount values */
   total_amount: number;

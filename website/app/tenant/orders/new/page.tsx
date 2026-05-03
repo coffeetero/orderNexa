@@ -1,7 +1,7 @@
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
-import { OrderEntryForm } from '@/components/features/tenant/order-entry/OrderEntryForm';
-import type { CustomerOption } from '@/components/features/tenant/order-entry/OrderHeaderRow';
+import { OrderEntryForm } from '@/components/features/account/order-entry/OrderEntryForm';
+import type { CustomerOption } from '@/components/features/account/order-entry/OrderHeaderRow';
 
 export const metadata = {
   title: 'New Order — Order Entry',
@@ -10,7 +10,7 @@ export const metadata = {
 export default async function NewOrderPage() {
   const supabase = createClient();
 
-  // Resolve tenant via RPC (same pattern as /account/customers/page.tsx)
+  // Resolve tenant via RPC (same pattern as /tenant/customers/page.tsx)
   const { data: tenantData } = await supabase.rpc('fnd_get_tenants');
   const tenants = Array.isArray(tenantData) ? tenantData : [];
   const tenantId: number | null = tenants.length > 0 ? tenants[0].tenant_id : null;
