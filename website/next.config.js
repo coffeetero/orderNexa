@@ -9,12 +9,13 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   images: { unoptimized: true },
-  async redirects() {
-    return [
-      { source: '/customer', destination: '/account', permanent: true },
-      { source: '/customer/:path*', destination: '/account/:path*', permanent: true },
-    ];
-  },
+  // async redirects() {
+  //   return [
+  //     { source: '/customer', destination: '/account', permanent: true },
+  //     { source: '/customer/:path*', destination: '/account/:path*', permanent: true },
+  //   ];
+  // },
+
 };
 
 module.exports = nextConfig;

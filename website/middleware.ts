@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { parseTenantSubdomain } from '@/lib/tenant-subdomain';
 
 export async function middleware(request: NextRequest) {
   const url = request.nextUrl.clone();
@@ -17,32 +18,35 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 2. DOMAIN LOGIC
-  const hostname = host.split(':')[0];
-  const parts = hostname.split('.');
-  // Check if we have a subdomain (e.g., alpine.localhost or alpine.ordernexa.com)
-  const subdomain = parts.length > (hostname.includes('localhost') ? 1 : 2) ? parts[0] : null;
+  // 2. DOMAIN LOGIC (e.g., alpine.localhost or alpine.ordernexa.com)
+  const subdomain = parseTenantSubdomain(host);
 
-  // 3. EXIT: If no subdomain or it's 'www', serve the main app normally
-  if (!subdomain || subdomain === 'www' || subdomain === 'localhost') {
+  // 3. EXIT: If no tenant subdomain, serve the main app normally
+  if (!subdomain) {
     console.log(`>>> MAIN DOMAIN: ${pathname}`);
     return NextResponse.next();
   }
 
-  // 4. ROUTE LOGIC: Tenant vs Account
-  const tenantKeywords = ['dashboard', 'orders', 'settings', 'profile', 'inventory', 'reports', 'billing', 'invoicing', 'payments','login'];
-  const pathSegments = pathname.split('/').filter(Boolean);
-  const firstSegment = pathSegments[0] || '';
-
-  // If the URL is just 'alpine.localhost/', send to dashboard
-  if (!firstSegment) {
-     url.pathname = `/tenant/dashboard`;
-     url.searchParams.set('tenant_slug', subdomain);
-     return NextResponse.rewrite(url);
+  // Subdomain root: let `/` through so app/page.tsx handles session + redirects
+  if (pathname === '/') {
+    return NextResponse.next();
   }
 
+  // 4. ROUTE LOGIC: Tenant vs Account
+  const tenantKeywords = [
+    'dashboard',
+    'orders',
+    'settings',
+    'profile',
+    'inventory',
+    'reports',
+    'billing',
+    'invoicing',
+    'payments',
+  ];
+  const firstSegment = pathname.split('/').filter(Boolean)[0] ?? '';
+
   if (tenantKeywords.includes(firstSegment)) {
-    // It's a tenant page (e.g., /orders)
     url.pathname = `/tenant${pathname}`;
     console.log(`>>> TENANT REWRITE: ${subdomain}${pathname} -> ${url.pathname}`);
   } else {
