@@ -46,7 +46,7 @@ export default function CustomerDashboardPage() {
               Recent Orders
             </CardTitle>
             <Button asChild variant="ghost" size="sm" className="text-xs text-primary gap-1">
-              <Link href="/customer/orders">
+              <Link href="/account/orders">
                 View all <ArrowRight className="h-3 w-3" />
               </Link>
             </Button>
@@ -95,7 +95,7 @@ export default function CustomerDashboardPage() {
                 </div>
               ))}
               <Button asChild variant="outline" size="sm" className="w-full text-xs mt-2">
-                <Link href="/customer/invoicing">View Statements</Link>
+                <Link href="/account/invoicing">View Statements</Link>
               </Button>
             </CardContent>
           </Card>
@@ -119,7 +119,7 @@ export default function CustomerDashboardPage() {
                 </div>
               </div>
               <Button asChild size="sm" className="w-full mt-4 text-xs">
-                <Link href="/customer/orders">Manage Order</Link>
+                <Link href="/account/orders">Manage Order</Link>
               </Button>
             </CardContent>
           </Card>

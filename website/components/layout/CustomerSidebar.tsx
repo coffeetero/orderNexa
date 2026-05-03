@@ -17,31 +17,31 @@ import { cn } from '@/lib/utils';
 const navItems = [
   {
     label: 'Dashboard',
-    href: '/customer',
+    href: '/account',
     icon: LayoutDashboard,
   },
   {
     label: 'Orders',
     icon: ClipboardList,
     children: [
-      { label: 'Manage Orders', href: '/customer/orders', icon: ShoppingBag },
-      { label: 'Order History', href: '/customer/orders/history', icon: History },
+      { label: 'Manage Orders', href: '/account/orders', icon: ShoppingBag },
+      { label: 'Order History', href: '/account/orders/history', icon: History },
     ],
   },
   {
     label: 'Invoicing',
     icon: FileText,
     children: [
-      { label: 'Statements', href: '/customer/invoicing', icon: FileText },
-      { label: 'Invoice History', href: '/customer/invoicing/history', icon: History },
+      { label: 'Statements', href: '/account/invoicing', icon: FileText },
+      { label: 'Invoice History', href: '/account/invoicing/history', icon: History },
     ],
   },
   {
     label: 'Payments',
     icon: CreditCard,
     children: [
-      { label: 'Manage Payments', href: '/customer/payments', icon: CreditCard },
-      { label: 'Payment History', href: '/customer/payments/history', icon: History },
+      { label: 'Manage Payments', href: '/account/payments', icon: CreditCard },
+      { label: 'Payment History', href: '/account/payments/history', icon: History },
     ],
   },
 ];

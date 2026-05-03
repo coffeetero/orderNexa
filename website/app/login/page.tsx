@@ -43,7 +43,7 @@ function LoginForm() {
     router.refresh();
 
     // redirect to the app
-    router.replace('/customer');
+    router.replace('/account');
   };
 
   return (

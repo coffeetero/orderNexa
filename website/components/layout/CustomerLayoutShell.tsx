@@ -8,13 +8,13 @@ import { SessionTimeout } from '@/components/auth/SessionTimeout';
 import { createClient } from '@/lib/supabase/client';
 
 const breadcrumbMap: Record<string, string> = {
-  '/customer': 'Dashboard',
-  '/customer/orders': 'Manage Orders',
-  '/customer/orders/history': 'Order History',
-  '/customer/invoicing': 'Statements',
-  '/customer/invoicing/history': 'Invoice History',
-  '/customer/payments': 'Payment Management',
-  '/customer/payments/history': 'Payment History',
+  '/account': 'Dashboard',
+  '/account/orders': 'Manage Orders',
+  '/account/orders/history': 'Order History',
+  '/account/invoicing': 'Statements',
+  '/account/invoicing/history': 'Invoice History',
+  '/account/payments': 'Payment Management',
+  '/account/payments/history': 'Payment History',
 };
 
 type CustomerLayoutShellProps = {
