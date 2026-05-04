@@ -2,6 +2,8 @@
 -- FND_USERS  –  Application users (tenant-scoped, Supabase auth link)
 -- Target: Supabase (PostgreSQL 15+)
 --
+-- Schema: unqualified identifiers — set search_path before apply, e.g. SET search_path = bps, public;
+--
 -- user_id uses the global fnd_entity_id_seq (run fnd_entity_id_seq.sql before this file).
 -- created_by / updated_by are BIGINT app user ids — not auth.uid() (use fn_set_updated_at_ts_only).
 -- Run after: fnd_tenants.sql, fnd_customers.sql (fn_set_updated_at_ts_only, fnd_audit_log, fn_audit_log).
@@ -16,13 +18,12 @@ CREATE TABLE IF NOT EXISTS fnd_users (
     auth_user_id      UUID        NOT NULL UNIQUE,
     user_name         TEXT,
     email             TEXT,
+    can_debug         BOOLEAN     DEFAULT FALSE,
+    user_type         TEXT,
+    is_active         BOOLEAN     NOT NULL DEFAULT TRUE,
 
     last_login_at     TIMESTAMPTZ,
     deleted_at        TIMESTAMPTZ,
-
-    is_active         BOOLEAN     NOT NULL DEFAULT TRUE,
-    can_debug         BOOLEAN     NOT NULL DEFAULT FALSE,
-
     created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
     created_by        BIGINT,
     updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -33,17 +34,13 @@ DO $$ BEGIN
     IF EXISTS (
         SELECT 1
         FROM   information_schema.columns
-        WHERE  table_schema = 'public'
+        WHERE  table_schema = current_schema()
           AND  table_name   = 'fnd_users'
           AND  column_name  = 'login_user_id'
     ) THEN
         ALTER TABLE fnd_users RENAME COLUMN login_user_id TO auth_user_id;
     END IF;
 END $$;
-
-ALTER TABLE fnd_users ADD COLUMN IF NOT EXISTS email TEXT;
-
-ALTER TABLE fnd_users ADD COLUMN IF NOT EXISTS can_debug BOOLEAN NOT NULL DEFAULT FALSE;
 
 COMMENT ON COLUMN fnd_users.tenant_id IS
     'Tenant scope; BIGINT FK to fnd_tenants.tenant_id.';
@@ -53,6 +50,9 @@ COMMENT ON COLUMN fnd_users.email IS
     'Contact / login email (optional; may mirror auth.users.email).';
 COMMENT ON COLUMN fnd_users.can_debug IS
     'When true, user may use diagnostic / debug tooling (e.g. elevated RPCs).';
+
+COMMENT ON COLUMN fnd_users.user_type IS
+    'Application role / classification (e.g. TENANCY_USER, CUSTOMER_USER); aligns with app_metadata.';
 
 CREATE INDEX IF NOT EXISTS idx_fnd_users_tenant_id
     ON fnd_users (tenant_id);

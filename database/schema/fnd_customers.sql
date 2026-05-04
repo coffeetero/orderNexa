@@ -2,39 +2,16 @@
 -- FND SCHEMA  –  Foundation Tables
 -- Target: Supabase (PostgreSQL 15+)
 --
+-- Schema: unqualified identifiers — set search_path before apply, e.g. SET search_path = bps, public;
+--
 -- customer_id uses the global sequence fnd_entity_id_seq (run fnd_entity_id_seq.sql before this file).
 -- tenant_id is BIGINT (FK to fnd_tenants, ON DELETE CASCADE). created_by / updated_by are BIGINT (app user id).
 --
 -- Typical run order:
---   1) fnd_entity_id_seq.sql   2) fnd_customers.sql (creates fnd_tenants + fnd_customers)
---   3) fnd_audit_log.sql (creates fnd_audit_log + fn_audit_log + RLS)
---   4) fnd_tenants.sql (tenant triggers + RLS only)   5) fnd_items.sql …
+--   1) fnd_entity_id_seq.sql   2) fnd_tenants.sql (fnd_tenants table)   3) fnd_customers.sql (this file)
+--   4) fnd_audit_log.sql (creates fnd_audit_log + fn_audit_log + RLS)   5) fnd_items.sql …
 --   • After fnd_pricebooks.sql: fnd_customer_pricebooks.sql links customers to price books.
 -- ============================================================
-
-
--- ============================================================
--- 0. FND_TENANTS  (must exist before fnd_customers.tenant_id FK)
---    Full DDL also documented in fnd_tenants.sql; table is created here for load order.
--- ============================================================
-
-CREATE TABLE IF NOT EXISTS fnd_tenants (
-    tenant_id        BIGINT      PRIMARY KEY DEFAULT nextval('fnd_entity_id_seq'::regclass),
-    tenant_name      TEXT        NOT NULL,
-    plan             TEXT        NOT NULL DEFAULT 'STARTER'
-                                 CHECK (plan IN ('STARTER', 'PRO', 'ENTERPRISE')),
-    is_active        BOOLEAN     NOT NULL DEFAULT TRUE,
-    is_audit_log_enabled BOOLEAN NOT NULL DEFAULT FALSE,
-
-    created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
-    created_by       BIGINT,
-    updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_by       BIGINT
-);
-
-CREATE INDEX IF NOT EXISTS idx_fnd_tenants_active
-    ON fnd_tenants (is_active);
-
 
 -- ============================================================
 -- 1. FND_CUSTOMERS
@@ -42,7 +19,7 @@ CREATE INDEX IF NOT EXISTS idx_fnd_tenants_active
 
 CREATE TABLE IF NOT EXISTS fnd_customers (
     customer_id            BIGINT      PRIMARY KEY DEFAULT nextval('fnd_entity_id_seq'::regclass),
-
+    tenant_id     BIGINT      NOT NULL,
     legacy_id              INT,
     customer_parent_id     BIGINT      REFERENCES fnd_customers(customer_id),
 
@@ -50,10 +27,11 @@ CREATE TABLE IF NOT EXISTS fnd_customers (
     customer_number        TEXT,
 
     customer_type          TEXT        NOT NULL,
-
+    account_slug  TEXT,
     invoice_copy_count         INT     NOT NULL DEFAULT 1  CHECK (invoice_copy_count >= 1),
     is_standing_order          BOOLEAN NOT NULL DEFAULT FALSE,
     is_signature_required      BOOLEAN NOT NULL DEFAULT FALSE,
+
     is_active                  BOOLEAN NOT NULL DEFAULT TRUE,
     is_label_required          BOOLEAN NOT NULL DEFAULT FALSE,
     is_invoice_required        BOOLEAN NOT NULL DEFAULT FALSE,
@@ -61,14 +39,12 @@ CREATE TABLE IF NOT EXISTS fnd_customers (
     is_cost_on_bill_of_lading  BOOLEAN NOT NULL DEFAULT FALSE,
     is_returns_allowed         BOOLEAN NOT NULL DEFAULT TRUE,
 
-    tenant_id     BIGINT      NOT NULL,
-
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
     created_by    BIGINT,
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_by    BIGINT,
-    UNIQUE (tenant_id, customer_number),
-    UNIQUE (tenant_id, legacy_id)
+
+    UNIQUE (tenant_id, customer_number)
 );
 
 -- FK fnd_customers.tenant_id -> fnd_tenants.tenant_id
@@ -84,7 +60,7 @@ DO $$ BEGIN
     IF EXISTS (
         SELECT 1
         FROM   information_schema.columns
-        WHERE  table_schema = 'public'
+        WHERE  table_schema = current_schema()
           AND  table_name   = 'fnd_customers'
           AND  column_name  = 'org_type'
     ) THEN
@@ -97,7 +73,7 @@ DO $$ BEGIN
     IF EXISTS (
         SELECT 1
         FROM   information_schema.columns
-        WHERE  table_schema = 'public'
+        WHERE  table_schema = current_schema()
           AND  table_name   = 'fnd_customers'
           AND  column_name  = 'customer_type'
           AND  udt_name IN ('customer_type_enum', 'org_type_enum')

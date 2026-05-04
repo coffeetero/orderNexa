@@ -4,6 +4,9 @@
 --
 -- tenant_id is BIGINT (global fnd_entity_id_seq). Run fnd_entity_id_seq.sql first.
 --
+-- Schema: unqualified identifiers — set search_path before apply, e.g.
+--   SET search_path = bps, public;
+--
 -- Bootstrap: fnd_customers.sql creates this table (section 0) before fnd_customers rows.
 -- This file re-applies fn_audit_log, triggers, and RLS idempotently (safe after fnd_customers).
 -- ============================================================
@@ -101,6 +104,7 @@ $$;
 CREATE TABLE IF NOT EXISTS fnd_tenants (
     tenant_id        BIGINT      PRIMARY KEY DEFAULT nextval('fnd_entity_id_seq'::regclass),
     tenant_name      TEXT        NOT NULL,
+    tenant_slug      TEXT,
     plan             TEXT        NOT NULL DEFAULT 'STARTER'
                                  CHECK (plan IN ('STARTER', 'PRO', 'ENTERPRISE')),
     is_active        BOOLEAN     NOT NULL DEFAULT TRUE,

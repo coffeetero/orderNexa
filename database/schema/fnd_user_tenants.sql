@@ -2,6 +2,8 @@
 -- FND_USER_TENANTS  –  User membership per tenant (many-to-many)
 -- Target: Supabase (PostgreSQL 15+)
 --
+-- Schema: unqualified identifiers — set search_path before apply, e.g. SET search_path = bps, public;
+--
 -- user_tenant_id uses fnd_entity_id_seq (run fnd_entity_id_seq.sql before this file).
 -- created_by / updated_by are BIGINT app user ids — not auth.uid() (use fn_set_updated_at_ts_only).
 -- Run after: fnd_tenants.sql, fnd_customers.sql, fnd_users.sql
@@ -23,9 +25,6 @@ CREATE TABLE IF NOT EXISTS fnd_user_tenants (
 
     CONSTRAINT uq_fnd_user_tenants_tenant_user UNIQUE (tenant_id, user_id)
 );
-
-ALTER TABLE fnd_user_tenants
-    ADD COLUMN IF NOT EXISTS is_customer_restricted BOOLEAN NOT NULL DEFAULT FALSE;
 
 COMMENT ON COLUMN fnd_user_tenants.is_customer_restricted IS
     'When true, user access to customers is limited to rows in fnd_user_customers for this tenant.';

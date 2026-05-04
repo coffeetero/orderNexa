@@ -2,6 +2,8 @@
 -- FND_USER_CUSTOMERS  –  Which customers a user may access (per tenant)
 -- Target: Supabase (PostgreSQL 15+)
 --
+-- Schema: unqualified identifiers — set search_path before apply, e.g. SET search_path = bps, public;
+--
 -- user_customer_id uses fnd_entity_id_seq (run fnd_entity_id_seq.sql before this file).
 -- created_by / updated_by are BIGINT app user ids — not auth.uid() (use fn_set_updated_at_ts_only).
 --
@@ -19,7 +21,7 @@ BEGIN
         FROM pg_constraint c
         JOIN pg_class t ON t.oid = c.conrelid
         JOIN pg_namespace n ON n.oid = t.relnamespace
-        WHERE n.nspname = 'public'
+        WHERE n.nspname = current_schema()
           AND t.relname = 'fnd_customers'
           AND c.conname = 'uq_fnd_customers_customer_id_tenant'
     ) THEN
