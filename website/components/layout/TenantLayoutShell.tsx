@@ -8,7 +8,13 @@ import { createClient } from '@/lib/supabase/client';
 
 const breadcrumbMap: Record<string, string> = {
   '/': 'Home',
+  '/dashboard': 'Dashboard',
+  '/orders': 'Orders',
+  '/orders/new': 'New Order',
+  '/customers': 'Customers',
+  // Legacy paths (e.g. main host without subdomain)
   '/tenant': 'Dashboard',
+  '/tenant/dashboard': 'Dashboard',
   '/tenant/orders': 'Orders',
   '/tenant/orders/new': 'New Order',
   '/tenant/customers': 'Customers',
@@ -18,16 +24,18 @@ const breadcrumbMap: Record<string, string> = {
 function resolveBreadcrumb(pathname: string): string {
   const staticLabel = breadcrumbMap[pathname];
   if (staticLabel) return staticLabel;
-  // /tenant/orders/<id>/edit
+  if (/^\/orders\/\d+\/edit$/.test(pathname)) return 'Edit Order';
   if (/^\/tenant\/orders\/\d+\/edit$/.test(pathname)) return 'Edit Order';
   return '';
 }
 
 type TenantLayoutShellProps = {
   children: React.ReactNode;
+  /** Logo / home target for tenancy staff vs customer-in-tenant shell */
+  sidebarHomeHref?: string;
 };
 
-export function TenantLayoutShell({ children }: TenantLayoutShellProps) {
+export function TenantLayoutShell({ children, sidebarHomeHref = '/dashboard' }: TenantLayoutShellProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
@@ -74,6 +82,7 @@ export function TenantLayoutShell({ children }: TenantLayoutShellProps) {
         onCollapse={setCollapsed}
         mobileOpen={mobileOpen}
         onMobileClose={() => setMobileOpen(false)}
+        homeHref={sidebarHomeHref}
       />
 
       <div className="flex flex-1 flex-col overflow-hidden">

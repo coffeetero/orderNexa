@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { ThemeProvider } from '@/lib/theme-provider';
 import { TenantProvider } from '@/lib/tenant-context';
 import { Navbar } from '@/components/layout/Navbar';
-import { createClient } from '@/lib/supabase/server';
+import { getSessionUser } from '@/lib/supabase/server';
 
 export const metadata: Metadata = {
   title: 'Alpine Bakery — Artisan Bread Platform',
@@ -11,10 +11,7 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getSessionUser();
 
   return (
     <html lang="en" suppressHydrationWarning>

@@ -45,7 +45,7 @@ export default function ManageOrdersPage() {
             Export
           </Button>
           <Button size="sm" className="gap-1.5" asChild>
-            <Link href="/tenant/orders/new">
+            <Link href="/orders/new">
               <Plus className="h-3.5 w-3.5" />
               New Order
             </Link>
@@ -103,7 +103,7 @@ export default function ManageOrdersPage() {
                     <tr
                       key={order.id}
                       className="border-b border-border/40 hover:bg-muted/20 transition-colors cursor-pointer"
-                      onClick={() => router.push(`/tenant/orders/${order.id}/edit`)}
+                      onClick={() => router.push(`/orders/${order.id}/edit`)}
                       title={`Edit order ${order.orderNumber}`}
                     >
                       <td className="px-3 py-2 font-mono text-xs text-muted-foreground">

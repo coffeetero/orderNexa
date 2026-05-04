@@ -4,7 +4,7 @@ import { OrderHistoryTable } from '@/components/features/customer/OrderHistoryTa
 import { mockOrders } from '@/lib/mock-data';
 import { Plus } from 'lucide-react';
 
-export default function CustomerOrdersPage() {
+export default function AccountOrdersPage() {
   const myOrders = mockOrders.filter((o) => o.customerId === 'c1');
 
   return (

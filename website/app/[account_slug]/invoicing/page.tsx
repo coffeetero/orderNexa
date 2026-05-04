@@ -20,7 +20,7 @@ const statusConfig = {
   overdue: { label: 'Overdue', className: 'bg-red-500/12 text-red-700 dark:text-red-400 border-red-500/25' },
 };
 
-export default function CustomerInvoicingPage() {
+export default function AccountInvoicingPage() {
   const myInvoices = mockInvoices.filter((i) => i.customerId === 'c1');
   const totalBalance = myInvoices.reduce((acc, i) => acc + i.balance, 0);
 
@@ -116,12 +116,20 @@ export default function CustomerInvoicingPage() {
                       </TableCell>
                       <TableCell>
                         <span className="text-xs text-muted-foreground">
-                          {new Date(invoice.issuedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          {new Date(invoice.issuedAt).toLocaleDateString('en-GB', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                          })}
                         </span>
                       </TableCell>
                       <TableCell>
                         <span className="text-xs text-muted-foreground">
-                          {new Date(invoice.dueAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          {new Date(invoice.dueAt).toLocaleDateString('en-GB', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                          })}
                         </span>
                       </TableCell>
                       <TableCell>

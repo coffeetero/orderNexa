@@ -7,22 +7,27 @@ import { DashboardHeader } from '@/components/layout/DashboardHeader';
 import { SessionTimeout } from '@/components/auth/SessionTimeout';
 import { createClient } from '@/lib/supabase/client';
 
-const breadcrumbMap: Record<string, string> = {
-  '/account': 'Dashboard',
-  '/account/orders': 'Manage Orders',
-  '/account/orders/history': 'Order History',
-  '/account/invoicing': 'Statements',
-  '/account/invoicing/history': 'Invoice History',
-  '/account/payments': 'Payment Management',
-  '/account/payments/history': 'Payment History',
-};
+function customerBreadcrumb(pathname: string, basePath: string): string {
+  if (pathname === basePath) return 'Dashboard';
+  const suffix = pathname.startsWith(`${basePath}/`) ? pathname.slice(basePath.length) : '';
+  const map: Record<string, string> = {
+    '/orders': 'Manage Orders',
+    '/orders/history': 'Order History',
+    '/invoicing': 'Statements',
+    '/invoicing/history': 'Invoice History',
+    '/payments': 'Payment Management',
+    '/payments/history': 'Payment History',
+  };
+  return map[suffix] ?? '';
+}
 
 type CustomerLayoutShellProps = {
   children: React.ReactNode;
   timeoutMinutes: number;
+  basePath: string;
 };
 
-export function CustomerLayoutShell({ children, timeoutMinutes }: CustomerLayoutShellProps) {
+export function CustomerLayoutShell({ children, timeoutMinutes, basePath }: CustomerLayoutShellProps) {
   const router = useRouter();
   const pathname = usePathname();
 
@@ -30,7 +35,7 @@ export function CustomerLayoutShell({ children, timeoutMinutes }: CustomerLayout
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
 
-  const breadcrumb = breadcrumbMap[pathname] ?? '';
+  const breadcrumb = customerBreadcrumb(pathname, basePath);
 
   useEffect(() => {
     let isMounted = true;
@@ -81,6 +86,7 @@ export function CustomerLayoutShell({ children, timeoutMinutes }: CustomerLayout
 
       <div className="flex flex-1 overflow-hidden">
         <CustomerSidebar
+          basePath={basePath}
           mobileOpen={mobileOpen}
           onMobileClose={() => setMobileOpen(false)}
           collapsed={sidebarCollapsed}

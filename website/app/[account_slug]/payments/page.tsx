@@ -10,7 +10,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { mockPayments } from '@/lib/mock-data';
 import { Plus } from 'lucide-react';
 
 const methodLabels: Record<string, string> = {
@@ -20,25 +19,17 @@ const methodLabels: Record<string, string> = {
   cheque: 'Cheque',
 };
 
-export default async function CustomerPaymentsPage() {
+export default async function AccountPaymentsPage() {
   const supabase = createClient();
-
-  // const myPayments = mockPayments.filter((p) => p.customerId === 'c2' || p.customerId === 'c3');
-
-  // const supabase = createSupabaseClient();
 
   const { data: myPayments, error } = await supabase
     .from('ar_payments')
     .select('*')
-    .eq('customer_id', 200000000103) // temporary
+    .eq('customer_id', 200000000103)
     .order('payment_date', { ascending: false });
 
-  const { data: sessionData } = await supabase.auth.getSession();
-  console.log('SESSION:', sessionData.session);
-
-  
   if (error) {
-    console.error(error); 
+    console.error(error);
   }
 
   return (
@@ -127,7 +118,7 @@ export default async function CustomerPaymentsPage() {
                     </TableCell>
                     <TableCell>
                       <Badge variant="secondary" className="text-xs">
-                        {methodLabels[payment.payment_method]}
+                        {methodLabels[payment.payment_method] ?? payment.payment_method}
                       </Badge>
                     </TableCell>
                     <TableCell>

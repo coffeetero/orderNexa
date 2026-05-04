@@ -23,70 +23,70 @@ interface NavSection {
 const navSections: NavSection[] = [
   {
     label: 'Dashboard',
-    href: '/tenant',
+    href: '/dashboard',
     icon: LayoutDashboard,
   },
   {
     label: 'Order Management',
     icon: ClipboardList,
     children: [
-      { label: 'Post Standing Orders', href: '/tenant/orders/standing', icon: FileText },
-      { label: 'Call Up List', href: '/tenant/orders/callup', icon: ClipboardList },
-      { label: 'Manage Orders', href: '/tenant/orders', icon: ClipboardList },
-      { label: 'Import Orders', href: '/tenant/orders/import', icon: FileText },
-      { label: 'Returns & Credits', href: '/tenant/orders/returns', icon: ArrowLeftRight },
+      { label: 'Post Standing Orders', href: '/orders/standing', icon: FileText },
+      { label: 'Call Up List', href: '/orders/callup', icon: ClipboardList },
+      { label: 'Manage Orders', href: '/orders', icon: ClipboardList },
+      { label: 'Import Orders', href: '/orders/import', icon: FileText },
+      { label: 'Returns & Credits', href: '/orders/returns', icon: ArrowLeftRight },
     ],
   },
   {
     label: 'Production',
     icon: ChefHat,
     children: [
-      { label: 'Order Analysis', href: '/tenant/production/analysis', icon: BarChart2 },
-      { label: 'Estimate Production', href: '/tenant/production/estimate', icon: Calculator },
-      { label: "Baker's Report", href: '/tenant/production/report', icon: FileText },
-      { label: 'Packing Labels', href: '/tenant/production/labels', icon: Tags },
-      { label: 'Route Delivery Report', href: '/tenant/production/routes', icon: TrendingUp },
-      { label: 'Mixing Sheets', href: '/tenant/production/mixing', icon: FlaskConical },
+      { label: 'Order Analysis', href: '/production/analysis', icon: BarChart2 },
+      { label: 'Estimate Production', href: '/production/estimate', icon: Calculator },
+      { label: "Baker's Report", href: '/production/report', icon: FileText },
+      { label: 'Packing Labels', href: '/production/labels', icon: Tags },
+      { label: 'Route Delivery Report', href: '/production/routes', icon: TrendingUp },
+      { label: 'Mixing Sheets', href: '/production/mixing', icon: FlaskConical },
     ],
   },
   {
     label: 'Customers',
     icon: Users,
     children: [
-      { label: 'Customer Management', href: '/tenant/customers', icon: Users },
-      { label: 'Pricing Lists', href: '/tenant/customers/pricing', icon: Tags },
-      { label: 'Reports', href: '/tenant/customers/reports', icon: BarChart2 },
-      { label: 'Exports', href: '/tenant/customers/exports', icon: FileText },
+      { label: 'Customer Management', href: '/customers', icon: Users },
+      { label: 'Pricing Lists', href: '/customers/pricing', icon: Tags },
+      { label: 'Reports', href: '/customers/reports', icon: BarChart2 },
+      { label: 'Exports', href: '/customers/exports', icon: FileText },
     ],
   },
   {
     label: 'Inventory',
     icon: Package,
     children: [
-      { label: 'Manage Items', href: '/tenant/inventory', icon: Boxes },
-      { label: 'Pricing Lists', href: '/tenant/inventory/pricing', icon: Tags },
-      { label: 'Recipes', href: '/tenant/inventory/recipes', icon: FlaskConical },
-      { label: 'Waste Tracking', href: '/tenant/inventory/waste', icon: Trash2 },
-      { label: 'Reports', href: '/tenant/inventory/reports', icon: BarChart2 },
-      { label: 'Analysis', href: '/tenant/inventory/analysis', icon: PieChart },
-      { label: 'Costing & COGS', href: '/tenant/inventory/costing', icon: Calculator },
-      { label: 'Nutritional Analysis', href: '/tenant/inventory/nutrition', icon: Leaf },
-      { label: 'Nutrition Labels', href: '/tenant/inventory/labels', icon: Tags },
+      { label: 'Manage Items', href: '/inventory', icon: Boxes },
+      { label: 'Pricing Lists', href: '/inventory/pricing', icon: Tags },
+      { label: 'Recipes', href: '/inventory/recipes', icon: FlaskConical },
+      { label: 'Waste Tracking', href: '/inventory/waste', icon: Trash2 },
+      { label: 'Reports', href: '/inventory/reports', icon: BarChart2 },
+      { label: 'Analysis', href: '/inventory/analysis', icon: PieChart },
+      { label: 'Costing & COGS', href: '/inventory/costing', icon: Calculator },
+      { label: 'Nutritional Analysis', href: '/inventory/nutrition', icon: Leaf },
+      { label: 'Nutrition Labels', href: '/inventory/labels', icon: Tags },
     ],
   },
   {
     label: 'Financials',
     icon: DollarSign,
     children: [
-      { label: 'Manage Payments', href: '/tenant/financials/payments', icon: CreditCard },
-      { label: 'Enter Credits', href: '/tenant/financials/credits', icon: ArrowLeftRight },
-      { label: 'Enter Returns', href: '/tenant/financials/returns', icon: ArrowLeftRight },
-      { label: 'Customer Statements', href: '/tenant/financials/statements', icon: FileText },
-      { label: 'AR Open Balances', href: '/tenant/financials/ar', icon: Scale },
-      { label: 'AR Aging Report', href: '/tenant/financials/aging', icon: BarChart2 },
-      { label: 'Cash Reconciliation', href: '/tenant/financials/cash', icon: Banknote },
-      { label: 'Sales Reports', href: '/tenant/financials/sales', icon: TrendingUp },
-      { label: 'Revenue Forecasting', href: '/tenant/financials/forecast', icon: PieChart },
+      { label: 'Manage Payments', href: '/financials/payments', icon: CreditCard },
+      { label: 'Enter Credits', href: '/financials/credits', icon: ArrowLeftRight },
+      { label: 'Enter Returns', href: '/financials/returns', icon: ArrowLeftRight },
+      { label: 'Customer Statements', href: '/financials/statements', icon: FileText },
+      { label: 'AR Open Balances', href: '/financials/ar', icon: Scale },
+      { label: 'AR Aging Report', href: '/financials/aging', icon: BarChart2 },
+      { label: 'Cash Reconciliation', href: '/financials/cash', icon: Banknote },
+      { label: 'Sales Reports', href: '/financials/sales', icon: TrendingUp },
+      { label: 'Revenue Forecasting', href: '/financials/forecast', icon: PieChart },
     ],
   },
 ];
@@ -96,6 +96,13 @@ interface TenantSidebarProps {
   onCollapse: (v: boolean) => void;
   mobileOpen: boolean;
   onMobileClose: () => void;
+  /** Staff home on tenant host (e.g. /dashboard); middleware rewrites to /tenant/dashboard */
+  homeHref?: string;
+}
+
+function pathMatchesStaffDashboard(pathname: string, href?: string) {
+  if (href !== '/dashboard') return false;
+  return pathname === '/dashboard' || pathname === '/tenant' || pathname === '/tenant/dashboard';
 }
 
 function NavItem({
@@ -109,6 +116,7 @@ function NavItem({
 }) {
   const isActive =
     section.href === pathname ||
+    pathMatchesStaffDashboard(pathname, section.href) ||
     section.children?.some((c) => pathname.startsWith(c.href));
 
   const [open, setOpen] = useState(isActive ?? false);
@@ -181,6 +189,7 @@ export function TenantSidebar({
   onCollapse,
   mobileOpen,
   onMobileClose,
+  homeHref = '/dashboard',
 }: TenantSidebarProps) {
   const pathname = usePathname();
 
@@ -188,7 +197,7 @@ export function TenantSidebar({
     <div className="flex h-full flex-col">
       <div className={cn('flex h-14 items-center border-b border-border px-3', collapsed ? 'justify-center' : 'justify-between')}>
         {!collapsed && (
-          <Link href="/" className="flex items-center gap-2">
+          <Link href={homeHref} className="flex items-center gap-2">
             <Wheat className="h-4 w-4 text-primary" />
             <span
               className="text-sm font-semibold text-foreground"

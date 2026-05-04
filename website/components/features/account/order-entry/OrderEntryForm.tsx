@@ -353,14 +353,14 @@ export function OrderEntryForm({
         setStatusMessage({ text: json.error ?? 'Delete failed.', type: 'error' });
         return;
       }
-      router.push('/tenant/orders');
+      router.push('/orders');
     } finally {
       setIsSaving(false);
     }
   }, [tenantId, draft.order_id, draft.order_number, router]);
 
   const handleClose = useCallback(() => {
-    router.push('/tenant/orders');
+    router.push('/orders');
   }, [router]);
 
   // ── Today's date for the footer date display ───────────────────────────

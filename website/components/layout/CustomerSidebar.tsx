@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   LayoutDashboard,
   ClipboardList,
@@ -14,49 +14,58 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const navItems = [
-  {
-    label: 'Dashboard',
-    href: '/account',
-    icon: LayoutDashboard,
-  },
-  {
-    label: 'Orders',
-    icon: ClipboardList,
-    children: [
-      { label: 'Manage Orders', href: '/account/orders', icon: ShoppingBag },
-      { label: 'Order History', href: '/account/orders/history', icon: History },
-    ],
-  },
-  {
-    label: 'Invoicing',
-    icon: FileText,
-    children: [
-      { label: 'Statements', href: '/account/invoicing', icon: FileText },
-      { label: 'Invoice History', href: '/account/invoicing/history', icon: History },
-    ],
-  },
-  {
-    label: 'Payments',
-    icon: CreditCard,
-    children: [
-      { label: 'Manage Payments', href: '/account/payments', icon: CreditCard },
-      { label: 'Payment History', href: '/account/payments/history', icon: History },
-    ],
-  },
-];
-
 interface CustomerSidebarProps {
+  basePath: string;
   mobileOpen: boolean;
   onMobileClose: () => void;
   collapsed?: boolean;
 }
 
-export function CustomerSidebar({ mobileOpen, onMobileClose, collapsed = false }: CustomerSidebarProps) {
+export function CustomerSidebar({
+  basePath,
+  mobileOpen,
+  onMobileClose,
+  collapsed = false,
+}: CustomerSidebarProps) {
   const pathname = usePathname();
   const [ordersOpen, setOrdersOpen] = useState(true);
   const [invoicingOpen, setInvoicingOpen] = useState(true);
   const [paymentsOpen, setPaymentsOpen] = useState(true);
+
+  const navItems = useMemo(
+    () => [
+      {
+        label: 'Dashboard',
+        href: basePath,
+        icon: LayoutDashboard,
+      },
+      {
+        label: 'Orders',
+        icon: ClipboardList,
+        children: [
+          { label: 'Manage Orders', href: `${basePath}/orders`, icon: ShoppingBag },
+          { label: 'Order History', href: `${basePath}/orders/history`, icon: History },
+        ],
+      },
+      {
+        label: 'Invoicing',
+        icon: FileText,
+        children: [
+          { label: 'Statements', href: `${basePath}/invoicing`, icon: FileText },
+          { label: 'Invoice History', href: `${basePath}/invoicing/history`, icon: History },
+        ],
+      },
+      {
+        label: 'Payments',
+        icon: CreditCard,
+        children: [
+          { label: 'Manage Payments', href: `${basePath}/payments`, icon: CreditCard },
+          { label: 'Payment History', href: `${basePath}/payments/history`, icon: History },
+        ],
+      },
+    ],
+    [basePath]
+  );
 
   const sidebarContent = (
     <div className="flex h-full flex-col">

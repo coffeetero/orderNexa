@@ -7,7 +7,12 @@ import { CustomerMetricCard } from '@/components/features/customer/CustomerMetri
 import { OrderHistoryTable } from '@/components/features/customer/OrderHistoryTable';
 import { mockCustomerMetrics, mockOrders, mockInvoices } from '@/lib/mock-data';
 
-export default function CustomerDashboardPage() {
+type Props = { params: { account_slug: string } };
+
+export default function AccountCustomerDashboardPage({ params }: Props) {
+  const { account_slug } = params;
+  const base = `/${account_slug}`;
+
   const myOrders = mockOrders.filter((o) => o.customerId === 'c1');
   const myInvoices = mockInvoices.filter((i) => i.customerId === 'c1');
 
@@ -46,7 +51,7 @@ export default function CustomerDashboardPage() {
               Recent Orders
             </CardTitle>
             <Button asChild variant="ghost" size="sm" className="text-xs text-primary gap-1">
-              <Link href="/account/orders">
+              <Link href={`${base}/orders`}>
                 View all <ArrowRight className="h-3 w-3" />
               </Link>
             </Button>
@@ -70,11 +75,13 @@ export default function CustomerDashboardPage() {
               {myInvoices.map((invoice) => (
                 <div key={invoice.id} className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="text-xs font-medium text-foreground truncate">
-                      {invoice.invoiceNumber}
-                    </p>
+                    <p className="text-xs font-medium text-foreground truncate">{invoice.invoiceNumber}</p>
                     <p className="text-[10px] text-muted-foreground">
-                      Due: {new Date(invoice.dueAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                      Due:{' '}
+                      {new Date(invoice.dueAt).toLocaleDateString('en-GB', {
+                        day: 'numeric',
+                        month: 'short',
+                      })}
                     </p>
                   </div>
                   <div className="text-right shrink-0">
@@ -95,7 +102,7 @@ export default function CustomerDashboardPage() {
                 </div>
               ))}
               <Button asChild variant="outline" size="sm" className="w-full text-xs mt-2">
-                <Link href="/account/invoicing">View Statements</Link>
+                <Link href={`${base}/invoicing`}>View Statements</Link>
               </Button>
             </CardContent>
           </Card>
@@ -119,7 +126,7 @@ export default function CustomerDashboardPage() {
                 </div>
               </div>
               <Button asChild size="sm" className="w-full mt-4 text-xs">
-                <Link href="/account/orders">Manage Order</Link>
+                <Link href={`${base}/orders`}>Manage Order</Link>
               </Button>
             </CardContent>
           </Card>

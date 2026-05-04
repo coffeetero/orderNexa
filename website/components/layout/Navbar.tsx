@@ -7,6 +7,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { createClient } from '@/lib/supabase/client';
+import { parseTenantSubdomain } from '@/lib/tenant-subdomain';
 
 const supabase = createClient();
 
@@ -40,7 +41,18 @@ export function Navbar() {
     };
   }, []);
 
-  if (pathname.startsWith('/account') || pathname.startsWith('/tenant')) {
+  if (pathname.startsWith('/tenant')) {
+    return null;
+  }
+
+  const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+  const tenantSubdomain = parseTenantSubdomain(hostname);
+  if (
+    tenantSubdomain &&
+    pathname !== '/' &&
+    !pathname.startsWith('/login') &&
+    !pathname.startsWith('/auth')
+  ) {
     return null;
   }
 

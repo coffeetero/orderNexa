@@ -1,6 +1,44 @@
-
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import type { User } from '@supabase/supabase-js';
+
+function isStaleSessionAuthError(err: unknown): boolean {
+  if (err === null || typeof err !== 'object') return false;
+  const o = err as { __isAuthError?: boolean; code?: string; message?: string };
+  if (o.__isAuthError !== true) return false;
+  if (o.code === 'refresh_token_not_found') return true;
+  if (
+    typeof o.message === 'string' &&
+    /refresh token/i.test(o.message) &&
+    /invalid|not found/i.test(o.message)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Resolves the current user from Supabase auth cookies. Returns null when there is no
+ * session or the refresh token is no longer valid (instead of throwing AuthApiError).
+ */
+export async function getSessionUser(): Promise<User | null> {
+  try {
+    const supabase = createClient();
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
+    if (error) {
+      if (isStaleSessionAuthError(error)) return null;
+      console.warn('[supabase] getUser:', error.message);
+      return null;
+    }
+    return user;
+  } catch (err) {
+    if (isStaleSessionAuthError(err)) return null;
+    throw err;
+  }
+}
 
 export function createClient() {
   const cookieStore = cookies();
