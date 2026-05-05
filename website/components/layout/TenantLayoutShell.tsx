@@ -9,14 +9,16 @@ import { createClient } from '@/lib/supabase/client';
 const breadcrumbMap: Record<string, string> = {
   '/': 'Home',
   '/dashboard': 'Dashboard',
-  '/orders': 'Orders',
+  '/orders': 'Enter Orders',
   '/orders/new': 'Enter Orders',
+  '/manage-orders': 'Manage Orders',
   '/customers': 'Customers',
   // Legacy paths (e.g. main host without subdomain)
   '/tenant': 'Dashboard',
   '/tenant/dashboard': 'Dashboard',
-  '/tenant/orders': 'Orders',
+  '/tenant/orders': 'Enter Orders',
   '/tenant/orders/new': 'Enter Orders',
+  '/tenant/manage-orders': 'Manage Orders',
   '/tenant/customers': 'Customers',
 };
 

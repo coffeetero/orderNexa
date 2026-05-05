@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Copy, Save, Trash2, X, RotateCcw } from 'lucide-react';
+import { Copy, Save, Trash2, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase/client';
 import { OrderHeaderRow, type CustomerOption, type OrderRefOption } from './OrderHeaderRow';
@@ -353,15 +353,11 @@ export function OrderEntryForm({
         setStatusMessage({ text: json.error ?? 'Delete failed.', type: 'error' });
         return;
       }
-      router.push('/orders');
+      router.push('/manage-orders');
     } finally {
       setIsSaving(false);
     }
   }, [tenantId, draft.order_id, draft.order_number, router]);
-
-  const handleClose = useCallback(() => {
-    router.push('/orders');
-  }, [router]);
 
   // ── Today's date for the footer date display ───────────────────────────
   const todayLabel = new Date().toLocaleDateString('en-US', {
@@ -400,17 +396,8 @@ export function OrderEntryForm({
             {statusMessage.text}
           </span>
         )}
-        {/* Header action buttons: Save / Cancel / Close */}
+        {/* Header action buttons: Cancel then Save */}
         <div className="flex items-center gap-1.5 shrink-0">
-          <Button
-            size="sm"
-            className="h-7 text-xs gap-1"
-            onClick={handleSave}
-            disabled={isSaving || !tenantId}
-          >
-            <Save className="h-3 w-3" />
-            {isSaving ? 'Saving…' : 'Save'}
-          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -421,14 +408,13 @@ export function OrderEntryForm({
             Cancel
           </Button>
           <Button
-            variant="ghost"
             size="sm"
             className="h-7 text-xs gap-1"
-            onClick={handleClose}
-            disabled={isSaving}
+            onClick={handleSave}
+            disabled={isSaving || !tenantId}
           >
-            <X className="h-3 w-3" />
-            Close
+            <Save className="h-3 w-3" />
+            {isSaving ? 'Saving…' : 'Save'}
           </Button>
         </div>
       </div>

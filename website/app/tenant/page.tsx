@@ -74,7 +74,7 @@ export default function TenantDashboardPage() {
               Recent Orders
             </CardTitle>
             <Button asChild variant="ghost" size="sm" className="text-xs text-primary gap-1">
-              <Link href="/orders">
+              <Link href="/manage-orders">
                 View all <ArrowRight className="h-3 w-3" />
               </Link>
             </Button>

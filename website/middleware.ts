@@ -93,6 +93,7 @@ export async function middleware(request: NextRequest) {
   const tenantKeywords = [
     'dashboard',
     'orders',
+    'manage-orders',
     'settings',
     'profile',
     'inventory',

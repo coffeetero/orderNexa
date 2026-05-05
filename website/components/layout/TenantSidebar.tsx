@@ -32,8 +32,8 @@ const navSections: NavSection[] = [
     children: [
       { label: 'Post Standing Orders', href: '/orders/standing', icon: FileText },
       { label: 'Call Up List', href: '/orders/callup', icon: ClipboardList },
-      { label: 'Enter Orders', href: '/orders/new', icon: PlusCircle },
-      { label: 'Manage Orders', href: '/orders', icon: ClipboardList },
+      { label: 'Enter Orders', href: '/orders', icon: PlusCircle },
+      { label: 'Manage Orders', href: '/manage-orders', icon: ClipboardList },
       { label: 'Import Orders', href: '/orders/import', icon: FileText },
       { label: 'Returns & Credits', href: '/orders/returns', icon: ArrowLeftRight },
     ],
