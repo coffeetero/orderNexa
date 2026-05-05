@@ -10,13 +10,13 @@ const breadcrumbMap: Record<string, string> = {
   '/': 'Home',
   '/dashboard': 'Dashboard',
   '/orders': 'Orders',
-  '/orders/new': 'New Order',
+  '/orders/new': 'Enter Orders',
   '/customers': 'Customers',
   // Legacy paths (e.g. main host without subdomain)
   '/tenant': 'Dashboard',
   '/tenant/dashboard': 'Dashboard',
   '/tenant/orders': 'Orders',
-  '/tenant/orders/new': 'New Order',
+  '/tenant/orders/new': 'Enter Orders',
   '/tenant/customers': 'Customers',
 };
 

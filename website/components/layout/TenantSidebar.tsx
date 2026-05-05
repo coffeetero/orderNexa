@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, ClipboardList, ChefHat, Users, Package, DollarSign, ChevronRight, ChevronLeft, Wheat, X, FileText, TrendingUp, Receipt, ChartBar as BarChart2, Tags, Boxes, FlaskConical, Trash2, Calculator, Leaf, CreditCard, ArrowLeftRight, Scale, Banknote, ChartPie as PieChart } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, ChefHat, Users, Package, DollarSign, ChevronRight, ChevronLeft, Wheat, X, FileText, TrendingUp, Receipt, ChartBar as BarChart2, Tags, Boxes, FlaskConical, Trash2, Calculator, Leaf, CreditCard, ArrowLeftRight, Scale, Banknote, ChartPie as PieChart, PlusCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -32,6 +32,7 @@ const navSections: NavSection[] = [
     children: [
       { label: 'Post Standing Orders', href: '/orders/standing', icon: FileText },
       { label: 'Call Up List', href: '/orders/callup', icon: ClipboardList },
+      { label: 'Enter Orders', href: '/orders/new', icon: PlusCircle },
       { label: 'Manage Orders', href: '/orders', icon: ClipboardList },
       { label: 'Import Orders', href: '/orders/import', icon: FileText },
       { label: 'Returns & Credits', href: '/orders/returns', icon: ArrowLeftRight },
