@@ -54,6 +54,10 @@ CREATE TABLE IF NOT EXISTS fnd_items (
     sales_terms_apply   BOOLEAN     NOT NULL DEFAULT TRUE,   -- source: item.item_sales_terms
     is_active           BOOLEAN     NOT NULL DEFAULT TRUE,   -- source: item.item_active
 
+    is_sliced boolean default false,
+    is_covered boolean default false,
+    is_wrapped boolean default false,
+
     -- Audit (BIGINT user ids — not Supabase auth.uid())
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     created_by          BIGINT,

@@ -10,7 +10,13 @@ import { ItemEntryRow } from './ItemEntryRow';
 import { OrderLineGrid } from './OrderLineGrid';
 import { useOrderEntryState } from './useOrderEntryState';
 import { useOrderFocus } from './useOrderFocus';
-import type { InvoiceLookupResult, OrderEntryDraft, OrderEntryItem } from '@/lib/types';
+import type {
+  InvoiceLookupResult,
+  OrderEntryDraft,
+  OrderEntryItem,
+  OrderSavePayload,
+  OrderSaveResult,
+} from '@/lib/types';
 
 const NEW_ORDER_SENTINEL: OrderRefOption = {
   order_id: 0,
@@ -190,6 +196,7 @@ export function OrderEntryForm({
         // Map API response to OrderEntryDraft
         const lines = (data.lines ?? []).map((l: Record<string, unknown>) => ({
           tempId: String(l.order_line_id ?? crypto.randomUUID()),
+          order_id: l.order_id as number,
           order_line_id: l.order_line_id as number,
           item_id: l.item_id as number,
           item_number: (l.item_number as string) ?? '',
@@ -289,7 +296,7 @@ export function OrderEntryForm({
     setIsSaving(true);
     setStatusMessage(null);
     try {
-      const payload = {
+      const payload: OrderSavePayload = {
         customer_id: draft.customer_id,
         order_number: orderNumber,
         order_date: draft.order_date,
@@ -297,6 +304,8 @@ export function OrderEntryForm({
         production_code: draft.production_code,
         delivery_amount: draft.delivery_amount,
         lines: draft.lines.map((l) => ({
+          client_temp_id: l.tempId,
+          order_line_id: l.order_line_id,
           item_id: l.item_id,
           item_description: l.item_description,
           quantity: l.quantity,
@@ -314,18 +323,43 @@ export function OrderEntryForm({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           p_tenant_id: tenantId,
-          p_action: isEdit ? 'update' : 'create',
           p_order_id: isEdit ? draft.order_id : null,
           p_payload: payload,
         }),
       });
 
-      const json = await res.json();
+      const json = (await res.json()) as { data?: OrderSaveResult; error?: string };
       if (!res.ok || json.error) {
         setStatusMessage({ text: json.error ?? 'Save failed.', type: 'error' });
         return;
       }
-      setStatusMessage({ text: json.data?.message ?? 'Order saved.', type: 'success' });
+      const resolvedOrderId = json.data?.order_id;
+      if (!resolvedOrderId) {
+        setStatusMessage({ text: 'Order saved but order id was not returned.', type: 'error' });
+        return;
+      }
+
+      const refs = Array.isArray(json.data?.line_refs) ? json.data?.line_refs : [];
+      if (refs.length > 0) {
+        const refMap = new Map<string, number>();
+        for (const ref of refs) {
+          if (ref.client_temp_id && typeof ref.order_line_id === 'number') {
+            refMap.set(ref.client_temp_id, ref.order_line_id);
+          }
+        }
+        const updatedLines = draft.lines.map((line) => ({
+          ...line,
+          order_id: resolvedOrderId,
+          order_line_id: refMap.get(line.tempId) ?? line.order_line_id,
+          tempId: refMap.get(line.tempId) ? String(refMap.get(line.tempId)) : line.tempId,
+        }));
+        setField('lines', updatedLines);
+      }
+
+      setStatusMessage({
+        text: json.data?.message ?? 'Order saved.',
+        type: 'success',
+      });
       // Update order_id / invoice label after create (DB returns final order_number)
       if (!isEdit && json.data?.order_id) {
         setField('order_id', json.data.order_id as number);

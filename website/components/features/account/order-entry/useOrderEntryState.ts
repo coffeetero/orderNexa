@@ -5,6 +5,15 @@ function calcExtended(qty: number, price: number, discount: number): number {
   return qty * (price - discount);
 }
 
+function resolveItemUnitPrice(item: OrderEntryItem): number {
+  const candidate = (item as OrderEntryItem & { item_price?: unknown; price?: unknown });
+  const raw =
+    item.unit_price ??
+    (typeof candidate.item_price === 'number' ? candidate.item_price : null) ??
+    (typeof candidate.price === 'number' ? candidate.price : null);
+  return typeof raw === 'number' && Number.isFinite(raw) ? raw : 0;
+}
+
 function calcTotal(lines: OrderEntryLine[]): number {
   return lines.reduce((sum, l) => sum + l.extended_amount, 0);
 }
@@ -67,6 +76,7 @@ export function useOrderEntryState(initial?: OrderEntryDraft) {
           // Update quantity on existing line
           const newLines = prev.lines.map((l) => {
             if (l.item_id !== item.item_id) return l;
+            // Keep the line's snapshotted price from when it was first added.
             const extended = calcExtended(quantity, l.unit_price, l.unit_discount);
             affectedTempId = l.tempId;
             return { ...l, quantity, extended_amount: extended };
@@ -77,7 +87,7 @@ export function useOrderEntryState(initial?: OrderEntryDraft) {
         // New line
         const tempId = crypto.randomUUID();
         affectedTempId = tempId;
-        const unitPrice = item.unit_price ?? 0;
+        const unitPrice = resolveItemUnitPrice(item);
         const extended = calcExtended(quantity, unitPrice, 0);
         const newLine: OrderEntryLine = {
           tempId,

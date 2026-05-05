@@ -167,6 +167,7 @@ export interface OrderEntryItem {
 export interface OrderEntryLine {
   /** Client-side unique id (crypto.randomUUID or order_line_id stringified) */
   tempId: string;
+  order_id?: number;
   order_line_id?: number;
   item_id: number;
   item_number: string;
@@ -205,4 +206,41 @@ export interface OrderEntryDraft {
   /** Customer's internal order reference / PO number (stored in snapshot_data.order_ref). */
   order_ref?: string;
   lines: OrderEntryLine[];
+}
+
+export interface OrderSavePayloadLine {
+  client_temp_id?: string;
+  order_line_id?: number;
+  item_id: number;
+  item_description: string;
+  quantity: number;
+  unit_price: number;
+  unit_discount: number;
+  is_sliced: boolean;
+  is_wrapped: boolean;
+  is_covered: boolean;
+  is_scored: boolean;
+}
+
+export interface OrderSavePayload {
+  customer_id: number | null;
+  order_number: string;
+  order_date: string;
+  production_date: string;
+  production_code: ProductionCode;
+  delivery_amount: number;
+  lines: OrderSavePayloadLine[];
+}
+
+export interface OrderSaveResult {
+  success: boolean;
+  order_id: number;
+  order_number: string | null;
+  mode?: 'created' | 'updated';
+  line_refs?: Array<{
+    client_temp_id: string | null;
+    order_line_id: number;
+  }>;
+  deleted_lines?: number;
+  message?: string;
 }

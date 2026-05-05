@@ -56,6 +56,7 @@ BEGIN
           LEFT JOIN LATERAL (
                 SELECT jsonb_agg(
                     jsonb_build_object(
+                        'order_id',        l.order_id,
                         'order_line_id',   l.order_line_id,
                         'item_id',         l.item_id,
                         'item_number',     COALESCE(i.item_number, ''),

@@ -19,6 +19,10 @@ CREATE TABLE IF NOT EXISTS om_order_lines (
     item_id             BIGINT      REFERENCES fnd_items(item_id),
     item_description    TEXT,       -- display text; legacy: ordr_detail.item_desc
 
+    is_sliced boolean default false,
+    is_covered boolean default false,
+    is_wrapped boolean default false,
+
     quantity            NUMERIC(14,4) NOT NULL,
     unit_price          NUMERIC(14,4),
     extended_amount     NUMERIC(14,4),
