@@ -26,7 +26,7 @@ interface OrderEntryFormProps {
   initialData?: OrderEntryDraft;
   /** Tenant id pre-resolved server-side via fnd_get_tenants. */
   serverTenantId?: number;
-  /** Customer list pre-loaded server-side. When provided the client-side customer fetch is skipped. */
+  /** Customer list pre-loaded server-side. When non-empty, the client-side customer fetch is skipped. */
   serverCustomers?: CustomerOption[];
 }
 
@@ -100,9 +100,10 @@ export function OrderEntryForm({
   latestCustomerIdRef.current = draft.customer_id;
 
   // ── Fetch customers when tenantId is ready ─────────────────────────────
-  // Skip if the server already supplied the customer list.
+  // Skip only if the server already returned a non-empty list; an empty array may mean the RSC
+  // fetch failed (e.g. host/cookie) and the browser can still call the same API with session cookies.
   useEffect(() => {
-    if (serverCustomers !== undefined) return;
+    if (serverCustomers !== undefined && serverCustomers.length > 0) return;
     if (tenantId === null) return;
     setIsLoadingCustomers(true);
     fetch(`/api/customers?tenant_id=${tenantId}&hierarchy=true&active=true`)
