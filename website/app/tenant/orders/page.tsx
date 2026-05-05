@@ -11,7 +11,7 @@ export default async function EnterOrdersPage() {
   const supabase = createClient();
 
   // Resolve tenant via RPC (same pattern as customers page)
-  const { data: tenantData } = await supabase.rpc('fnd_get_tenants');
+  const { data: tenantData } = await supabase.rpc('fnd_tenants_get');
   const tenants = Array.isArray(tenantData) ? tenantData : [];
   const tenantId: number | null = tenants.length > 0 ? tenants[0].tenant_id : null;
 

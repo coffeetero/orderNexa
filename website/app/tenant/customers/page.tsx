@@ -130,7 +130,7 @@ export default async function ManageCustomersPage({
 
   let initialMessage: string | null = null;
 
-  const { data: tenantData, error: tenantError } = await supabase.rpc('fnd_get_tenants');
+  const { data: tenantData, error: tenantError } = await supabase.rpc('fnd_tenants_get');
 
   if (tenantError) {
     initialMessage = `Tenant RPC error: ${tenantError.message}`;

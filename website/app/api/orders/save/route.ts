@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
  * Body: { p_tenant_id, p_action, p_order_id?, p_payload? }
  *
  * p_action: 'create' | 'update' | 'delete'
- * Uses om_save_order RPC.
+ * Uses om_orders_save RPC.
  */
 export async function POST(request: Request) {
   let body: unknown;
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
   }
 
   const supabase = createClient();
-  const { data, error } = await supabase.rpc('om_save_order', {
+  const { data, error } = await supabase.rpc('om_orders_save', {
     p_tenant_id,
     p_action,
     p_order_id: p_order_id ?? null,

@@ -150,7 +150,7 @@ function toFormState(customer: CustomerRow): CustomerFormState {
   };
 }
 
-/** Merge full `fnd_customers` row JSON from `fnd_get_customers` with hierarchy row (level / sort_path). */
+/** Merge full `fnd_customers` row JSON from `fnd_customers_get` with hierarchy row (level / sort_path). */
 function mergeFullCustomerJson(hier: CustomerRow, full: unknown): CustomerRow {
   if (!full || typeof full !== 'object' || Array.isArray(full)) {
     return hier;

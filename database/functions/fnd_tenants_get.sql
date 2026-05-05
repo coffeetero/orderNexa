@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION fnd_get_tenants()
+CREATE OR REPLACE FUNCTION fnd_tenants_get()
 RETURNS jsonb
 LANGUAGE plpgsql
 STABLE

@@ -13,7 +13,7 @@ function parseInteger(value: string | null): number | null {
 /**
  * GET /api/items?tenant_id=<n>&customer_id=<n>
  * Returns active items for a tenant with effective pricing for the given customer.
- * Uses om_get_items_for_order RPC.
+ * Uses om_items_get RPC.
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -38,7 +38,7 @@ export async function GET(request: Request) {
   }
 
   const supabase = createClient();
-  const { data, error } = await supabase.rpc('om_get_items_for_order', {
+  const { data, error } = await supabase.rpc('om_items_get', {
     p_tenant_id,
     p_customer_id,
   });

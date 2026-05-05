@@ -133,7 +133,7 @@ export interface NavItem {
 
 // ─── Order Entry ────────────────────────────────────────────────────────────
 
-/** Returned by om_get_invoices / GET /api/orders/invoices. NULL when no invoice exists. */
+/** Returned by om_invoices_get / GET /api/orders/invoices. NULL when no invoice exists. */
 export interface InvoiceLookupResult {
   invoice_number: string;
   orders: { order_id: number; order_number: string }[];
@@ -142,7 +142,7 @@ export interface InvoiceLookupResult {
 /** Production slot code on om_orders.production_code (legacy: ordr_prdctn_cd). */
 export type ProductionCode = 'AM' | 'PM' | 'SPECIAL';
 
-/** An item row returned by om_get_items_for_order, used in the Item combobox. */
+/** An item row returned by om_items_get, used in the Item combobox. */
 export interface OrderEntryItem {
   item_id: number;
   item_number: string;

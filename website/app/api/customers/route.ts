@@ -51,7 +51,7 @@ export async function GET(request: Request) {
   }
 
   const supabase = createClient();
-  const { data, error } = await supabase.rpc('fnd_get_customers', {
+  const { data, error } = await supabase.rpc('fnd_customers_get', {
     p_tenant_id,
     p_customer_id,
     p_hierarchy,

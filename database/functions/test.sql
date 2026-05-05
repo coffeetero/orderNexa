@@ -1,1 +1,1 @@
-select fnd_get_tenants();
+select fnd_tenants_get();

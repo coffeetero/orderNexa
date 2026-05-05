@@ -24,7 +24,7 @@ interface OrderEntryFormProps {
   orderId?: number;
   /** Pre-loaded initial draft — can be supplied by a server component to skip the first fetch. */
   initialData?: OrderEntryDraft;
-  /** Tenant id pre-resolved server-side via fnd_get_tenants. */
+  /** Tenant id pre-resolved server-side via fnd_tenants_get. */
   serverTenantId?: number;
   /** Customer list pre-loaded server-side. When non-empty, the client-side customer fetch is skipped. */
   serverCustomers?: CustomerOption[];
@@ -277,8 +277,12 @@ export function OrderEntryForm({
 
   const handleSave = useCallback(async () => {
     if (!tenantId) return;
-    if (!draft.order_number.trim()) {
-      setStatusMessage({ text: 'Invoice No. is required.', type: 'error' });
+
+    const isEdit = mode === 'edit' && !!draft.order_id;
+    const orderNumber =
+      draft.order_number.trim() || (!isEdit ? `T-${Date.now()}` : '');
+    if (!orderNumber.trim()) {
+      setStatusMessage({ text: 'Invoice No. is missing for this order.', type: 'error' });
       return;
     }
 
@@ -287,7 +291,7 @@ export function OrderEntryForm({
     try {
       const payload = {
         customer_id: draft.customer_id,
-        order_number: draft.order_number,
+        order_number: orderNumber,
         order_date: draft.order_date,
         production_date: draft.production_date,
         production_code: draft.production_code,
@@ -305,7 +309,6 @@ export function OrderEntryForm({
         })),
       };
 
-      const isEdit = mode === 'edit' && !!draft.order_id;
       const res = await fetch('/api/orders/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -323,9 +326,12 @@ export function OrderEntryForm({
         return;
       }
       setStatusMessage({ text: json.data?.message ?? 'Order saved.', type: 'success' });
-      // Update order_id in draft state after create
+      // Update order_id / invoice label after create (DB returns final order_number)
       if (!isEdit && json.data?.order_id) {
         setField('order_id', json.data.order_id as number);
+      }
+      if (json.data?.order_number != null && String(json.data.order_number).length > 0) {
+        setField('order_number', String(json.data.order_number));
       }
     } finally {
       setIsSaving(false);
@@ -431,6 +437,17 @@ export function OrderEntryForm({
           onCustomerChange={handleCustomerChange}
           onOrderRefChange={(order) => setField('order_ref', order ? order.order_number : '')}
           onFieldChange={setField}
+          orderRefToolbar={
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 text-xs"
+              disabled
+              title="Retrieve order by invoice number (coming soon)"
+            >
+              Retrieve
+            </Button>
+          }
         />
       </div>
 
@@ -443,21 +460,13 @@ export function OrderEntryForm({
           itemInputRef={itemInputRef}
           qtyRef={qtyRef}
           onCommit={handleItemCommit}
+          orderTotal={draft.total_amount + draft.delivery_amount}
           entryToolbar={
             <>
               <Button
                 variant="outline"
                 size="sm"
-                className="h-7 text-xs"
-                disabled
-                title="Retrieve order by invoice number (coming soon)"
-              >
-                Retrieve
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 text-xs"
+                className="h-9 px-3 text-xs"
                 disabled
                 title="Load a sample order (coming soon)"
               >
@@ -466,7 +475,7 @@ export function OrderEntryForm({
               <Button
                 variant="outline"
                 size="sm"
-                className="h-7 text-xs gap-1"
+                className="h-9 gap-1 px-3 text-xs"
                 onClick={handleClear}
                 title="Clear form"
               >

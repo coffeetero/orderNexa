@@ -1,5 +1,5 @@
 -- ============================================================
--- om_get_items_for_order
+-- om_items_get
 -- Returns the active item catalogue for a tenant with:
 --   - bps_items preparation capabilities and defaults
 --   - effective unit_price from the customer's active pricebook
@@ -8,7 +8,7 @@
 -- Prerequisites: add_order_entry_fields.sql (is_scoreable, default_scored)
 -- ============================================================
 
-CREATE OR REPLACE FUNCTION bps.om_get_items_for_order(
+CREATE OR REPLACE FUNCTION bps.om_items_get(
     p_tenant_id   BIGINT,
     p_customer_id BIGINT DEFAULT NULL
 )
@@ -77,7 +77,7 @@ BEGIN
                    AND p.tenant_id    = p_tenant_id
                  ORDER BY p.min_quantity ASC
                  LIMIT 1
-               ) pi ON TRUE
+              ) pi ON TRUE
          WHERE i.tenant_id  = p_tenant_id
            AND i.is_active  = TRUE
          LIMIT 2000

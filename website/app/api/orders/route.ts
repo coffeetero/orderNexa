@@ -25,7 +25,7 @@ function parseDate(value: string | null): string | null {
  *   &production_date_from=<date>  — filter from date
  *   &production_date_to=<date>    — filter to date
  *
- * Uses om_get_orders RPC.
+ * Uses om_orders_get RPC.
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -46,7 +46,7 @@ export async function GET(request: Request) {
   }
 
   const supabase = createClient();
-  const { data, error } = await supabase.rpc('om_get_orders', {
+  const { data, error } = await supabase.rpc('om_orders_get', {
     p_tenant_id,
     p_order_id,
     p_customer_id,

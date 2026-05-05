@@ -60,7 +60,7 @@ begin
     );
 
   if v_is_authorized then
-    v_customers := bps.fnd_get_customers(
+    v_customers := bps.fnd_customers_get(
       p_tenant_id,
       null::bigint,
       true,

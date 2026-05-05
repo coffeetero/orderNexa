@@ -1,5 +1,5 @@
 -- ============================================================
--- om_get_invoices
+-- om_invoices_get
 -- Looks up an existing AR invoice (ar_transactions) for a given
 -- customer + production date + production window, and returns
 -- the invoice document number together with the production order
@@ -16,7 +16,7 @@
 -- for filtering in this release.
 -- ============================================================
 
-CREATE OR REPLACE FUNCTION bps.om_get_invoices(
+CREATE OR REPLACE FUNCTION bps.om_invoices_get(
     p_tenant_id        BIGINT,
     p_customer_id      BIGINT,
     p_production_date  DATE,

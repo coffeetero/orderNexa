@@ -2,7 +2,7 @@ SET search_path TO bps, public;
 
 DROP FUNCTION IF EXISTS set_customer(bigint, bigint, text, jsonb);
 
-CREATE OR REPLACE FUNCTION fnd_save_customers(
+CREATE OR REPLACE FUNCTION fnd_customers_save(
   p_tenant_id bigint,
   p_customer_id bigint default null,
   p_action text default 'update',
@@ -23,7 +23,7 @@ DECLARE
   v_action text;
   v_customer_id bigint;
 BEGIN
-  -- Same pattern as fnd_get_tenants: read JWT from GUC so we never call auth.* (no USAGE on schema auth).
+  -- Same pattern as fnd_tenants_get: read JWT from GUC so we never call auth.* (no USAGE on schema auth).
   v_jwt_raw := current_setting('request.jwt.claims', true);
   v_claims := COALESCE(NULLIF(v_jwt_raw, ''), '{}')::jsonb;
 

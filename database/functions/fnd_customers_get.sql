@@ -1,6 +1,6 @@
-DROP FUNCTION IF EXISTS bps.fnd_get_customers(bigint, boolean);
+DROP FUNCTION IF EXISTS bps.fnd_get_customers(bigint, bigint, boolean, boolean);
 
-CREATE OR REPLACE FUNCTION bps.fnd_get_customers(
+CREATE OR REPLACE FUNCTION bps.fnd_customers_get(
     p_tenant_id bigint,
     p_customer_id bigint,
     p_hierarchy boolean,

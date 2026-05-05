@@ -27,12 +27,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Supabase/connections.md",
+                "file": "ideas/Ideas for future products.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "connections"
+              "title": "Ideas for future products"
             }
           }
         ],
@@ -197,23 +197,24 @@
   },
   "active": "1ce2a5f2be6e6213",
   "lastOpenFiles": [
+    "ideas/conversation with Claude chat.md",
+    "ideas/Ideas for future products.md",
+    "Supabase/connections.md",
+    "ideas/New Text Document.txt",
+    "ideas",
+    "New folder",
+    "C823B600",
     "D0225400",
     "Application Design/order_entry_ui_pattern_v2.md",
     "Application Design",
     "Prompts",
     "Cursor/cursor.md",
     "Cursor",
-    "Supabase/connections.md",
     "Supabase",
     "table Relationships/Invoice No to order numbers.md",
     "7EF3A300",
     "table Relationships/Customer to Item Price.md",
-    "table Relationships",
-    "D006A100",
-    "D355D000",
-    "~$BPS Tables.xlsx",
     "Cursor/cursorOrderEntryUiPattern.md",
-    "Unconfirmed 168966.crdownload",
     "Cursor/cursorDevelopmentGuidelines.md"
   ]
 }

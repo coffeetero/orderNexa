@@ -1,0 +1,1 @@
+an IDR application for Fusion/EBS customers which imports all vendors/sites/BU into my vendors/sites table and dumps it back into the interface table

@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { EntityComboBox } from '@/components/bps/EntityComboBox';
 import { Label } from '@/components/ui/label';
 import {
@@ -41,6 +42,8 @@ interface OrderHeaderRowProps {
   onCustomerAfterSelect?: () => void;
   onOrderRefChange?: (order: OrderRefOption | null) => void;
   onFieldChange: <K extends keyof OrderEntryDraft>(field: K, value: OrderEntryDraft[K]) => void;
+  /** Placed to the right of the Order No. control (e.g. Retrieve). */
+  orderRefToolbar?: ReactNode;
 }
 
 export function OrderHeaderRow({
@@ -53,10 +56,11 @@ export function OrderHeaderRow({
   onCustomerAfterSelect,
   onOrderRefChange,
   onFieldChange,
+  orderRefToolbar,
 }: OrderHeaderRowProps) {
   return (
     <div className="border-b border-border/60 bg-card px-3 py-2">
-      {/* Single row: Customer + Dates + Invoice + Financial strip */}
+      {/* Single row: Customer + dates + Order No. (+ optional toolbar) */}
       <div className="flex flex-wrap items-end gap-2">
         {/* Customer */}
         <div className="flex flex-col gap-1 flex-1 min-w-[200px]">
@@ -131,118 +135,48 @@ export function OrderHeaderRow({
           </Select>
         </div>
 
-        {/* Invoice No */}
-        <div className="flex flex-col gap-1 w-32 shrink-0">
-          <Label htmlFor="invoice-no" className="text-xs font-semibold text-muted-foreground tracking-wide">
-            Invoice No.
-          </Label>
-          <input
-            id="invoice-no"
-            type="text"
-            className={cn(
-              'h-9 w-full rounded-md border border-input bg-background px-2 text-sm text-foreground tabular-nums',
-              'focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary',
-            )}
-            value={draft.order_number}
-            placeholder="e.g. 523310"
-            onChange={(e) => onFieldChange('order_number', e.target.value)}
-            onFocus={(e) => e.target.select()}
-          />
-        </div>
-
-        {/* Order No. */}
-        <div className="flex flex-col gap-1 w-36 shrink-0">
-          <Label htmlFor="order-ref" className="text-xs font-semibold text-muted-foreground tracking-wide">
-            Order No.
-          </Label>
-          <EntityComboBox<OrderRefOption>
-            items={orderRefItems}
-            value={draft.order_ref ? Number(draft.order_ref) || null : null}
-            onChange={(order) => {
-              onFieldChange('order_ref', order ? String(order.order_number) : '');
-              onOrderRefChange?.(order);
-            }}
-            getId={(o) => o.order_id}
-            getLabel={(o) =>
-              o.order_id === 0
-                ? 'New Order'
-                : o.customer_name
-                ? `${o.order_number} — ${o.customer_name}`
-                : o.order_number
-            }
-            getSearchText={(o) => `${o.order_number} ${o.customer_name}`}
-            getParentId={() => null}
-            getSortKey={(o) => (o.order_id === 0 ? '\u0000' : o.order_number)}
-            placeholder="Search orders…"
-            emptyText="No orders found."
-            clearable
-            triggerId="order-ref"
-            triggerClassName="h-9 text-sm font-normal"
-          />
-        </div>
-
-        {/* Divider */}
-        <div className="self-stretch w-px bg-border/60 mx-1" />
-
-        {/* Credit (display-only) */}
-        <div className="flex flex-col gap-0.5 shrink-0">
-          <span className="text-[10px] font-semibold text-muted-foreground tracking-wide">
-            Credit
-          </span>
-          <span
-            className="h-9 flex items-center tabular-nums text-sm font-medium text-foreground px-1"
-            tabIndex={-1}
-          >
-            ${draft.customer_credit.toFixed(2)}
-          </span>
-        </div>
-
-        {/* Delivery $ */}
-        <div className="flex flex-col gap-1 w-24 shrink-0">
-          <label
-            htmlFor="delivery-amount"
-            className="text-[10px] font-semibold text-muted-foreground tracking-wide"
-          >
-            Dlvry $
-          </label>
-          <input
-            id="delivery-amount"
-            type="number"
-            className={cn(
-              'h-9 w-full rounded-md border border-input bg-background px-2 text-sm text-right tabular-nums',
-              'focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary',
-              '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none',
-              '[&::-webkit-inner-spin-button]:appearance-none',
-            )}
-            value={draft.delivery_amount === 0 ? '' : draft.delivery_amount}
-            placeholder="0.00"
-            min={0}
-            step={0.01}
-            onFocus={(e) => e.target.select()}
-            onChange={(e) => {
-              const v = parseFloat(e.target.value);
-              onFieldChange('delivery_amount', isNaN(v) ? 0 : v);
-            }}
-          />
-        </div>
-
-        {/* Ttl Order (display-only, highlighted) */}
-        <div className="flex flex-col gap-1 shrink-0">
-          <span className="text-[10px] font-semibold text-muted-foreground tracking-wide">
-            Ttl Order
-          </span>
-          <span
-            className={cn(
-              'h-9 flex items-center tabular-nums text-base font-bold px-2',
-              'rounded bg-amber-50 dark:bg-amber-950/40',
-              'border border-amber-200 dark:border-amber-800',
-              'text-amber-800 dark:text-amber-300',
-            )}
-            tabIndex={-1}
-            aria-label="Total Order"
-          >
-            ${(draft.total_amount + draft.delivery_amount).toFixed(2)}
-          </span>
+        {/* Order No. + toolbar (e.g. Retrieve) */}
+        <div className="flex items-end gap-2 shrink-0">
+          <div className="flex flex-col gap-1 w-36 min-w-0">
+            <Label htmlFor="order-ref" className="text-xs font-semibold text-muted-foreground tracking-wide">
+              Order No.
+            </Label>
+            <EntityComboBox<OrderRefOption>
+              items={orderRefItems}
+              value={draft.order_ref ? Number(draft.order_ref) || null : null}
+              onChange={(order) => {
+                onFieldChange('order_ref', order ? String(order.order_number) : '');
+                onOrderRefChange?.(order);
+              }}
+              getId={(o) => o.order_id}
+              getLabel={(o) =>
+                o.order_id === 0
+                  ? 'New Order'
+                  : o.customer_name
+                  ? `${o.order_number} — ${o.customer_name}`
+                  : o.order_number
+              }
+              getSearchText={(o) => `${o.order_number} ${o.customer_name}`}
+              getParentId={() => null}
+              getSortKey={(o) => (o.order_id === 0 ? '\u0000' : o.order_number)}
+              placeholder="Search orders…"
+              emptyText="No orders found."
+              clearable
+              triggerId="order-ref"
+              triggerClassName="h-9 text-sm font-normal"
+            />
+          </div>
+          {orderRefToolbar != null && (
+            <div className="flex flex-col gap-1 shrink-0 pb-px">
+              <span
+                className="text-[10px] font-semibold text-muted-foreground tracking-wide invisible pointer-events-none select-none"
+                aria-hidden
+              >
+                &nbsp;
+              </span>
+              <div className="h-9 flex items-center">{orderRefToolbar}</div>
+            </div>
+          )}
         </div>
       </div>
     </div>

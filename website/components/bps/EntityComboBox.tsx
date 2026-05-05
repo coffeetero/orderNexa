@@ -532,7 +532,7 @@ export function EntityComboBox<T>({
                 : 'flex min-h-0 flex-1 flex-col overflow-visible rounded-md bg-popover text-popover-foreground'
             )}
           >
-            <div className="flex gap-1 px-1 pt-1 [&_[cmdk-input-wrapper]]:min-h-0 [&_[cmdk-input-wrapper]]:flex-1 [&_[cmdk-input-wrapper]]:border-0 [&_[cmdk-input-wrapper]]:px-2">
+            <div className="flex h-9 shrink-0 items-center gap-1 px-1 [&_[cmdk-input-wrapper]]:h-full [&_[cmdk-input-wrapper]]:min-h-0 [&_[cmdk-input-wrapper]]:flex-1 [&_[cmdk-input-wrapper]]:items-center [&_[cmdk-input-wrapper]]:border-0 [&_[cmdk-input-wrapper]]:px-2 [&_[cmdk-input-wrapper]]:py-0">
               <CommandInput
                 ref={searchInputRef}
                 id={triggerId}
@@ -542,7 +542,7 @@ export function EntityComboBox<T>({
                 onFocus={handleSearchFocus}
                 onBlur={handleSearchBlur}
                 disabled={loading || disabled}
-                className="h-9 py-2"
+                className="h-9 min-h-0 border-0 py-0 text-sm leading-none shadow-none focus-visible:ring-0"
               />
               {clearable && selectedItem ? (
                 <Button

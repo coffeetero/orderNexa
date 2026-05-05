@@ -1,5 +1,5 @@
 -- ============================================================
--- om_save_order
+-- om_orders_save
 -- Atomically creates, updates, or deletes an order with its lines.
 --
 -- p_action:
@@ -15,7 +15,6 @@
 --     "order_date":       <date string>,
 --     "production_date":    <date string>,
 --     "production_code":    <"AM"|"PM"|"SPECIAL">,
---     "delivery_amount":  <numeric>,
 --     "lines": [
 --       {
 --         "item_id":         <bigint|null>,
@@ -34,7 +33,7 @@
 -- Returns: { success, order_id, order_number, message }
 -- ============================================================
 
-CREATE OR REPLACE FUNCTION bps.om_save_order(
+CREATE OR REPLACE FUNCTION bps.om_orders_save(
     p_tenant_id BIGINT,
     p_action    TEXT,
     p_order_id  BIGINT DEFAULT NULL,
@@ -97,7 +96,6 @@ BEGIN
             order_date,
             production_date,
             production_code,
-            delivery_amount,
             quantity,
             amount,
             discount_amount,
@@ -110,7 +108,6 @@ BEGIN
             NULLIF(TRIM(p_payload->>'order_date'), '')::DATE,
             NULLIF(TRIM(p_payload->>'production_date'), '')::DATE,
             NULLIF(TRIM(p_payload->>'production_code'), ''),
-            COALESCE((p_payload->>'delivery_amount')::NUMERIC, 0),
             0,   -- updated below after lines
             0,
             0,
@@ -132,7 +129,6 @@ BEGIN
             order_date      = NULLIF(TRIM(p_payload->>'order_date'), '')::DATE,
             production_date = NULLIF(TRIM(p_payload->>'production_date'), '')::DATE,
             production_code = NULLIF(TRIM(p_payload->>'production_code'), ''),
-            delivery_amount = COALESCE((p_payload->>'delivery_amount')::NUMERIC, 0),
             customer_id     = NULLIF((p_payload->>'customer_id')::TEXT, 'null')::BIGINT
         WHERE order_id  = v_order_id
           AND tenant_id = p_tenant_id;

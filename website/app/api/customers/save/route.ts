@@ -55,7 +55,7 @@ export async function POST(request: Request) {
   }
 
   const supabase = createClient();
-  const { data, error } = await supabase.rpc('fnd_save_customers', {
+  const { data, error } = await supabase.rpc('fnd_customers_save', {
     p_tenant_id,
     p_customer_id,
     p_action,

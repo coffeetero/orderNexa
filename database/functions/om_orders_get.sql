@@ -1,5 +1,5 @@
 -- ============================================================
--- om_get_orders
+-- om_orders_get
 -- Fetches order data for the order entry / management screens.
 --
 --   p_order_id = NULL  → list mode: returns array of order headers
@@ -10,7 +10,7 @@
 -- Prerequisites: add_order_entry_fields.sql
 -- ============================================================
 
-CREATE OR REPLACE FUNCTION bps.om_get_orders(
+CREATE OR REPLACE FUNCTION bps.om_orders_get(
     p_tenant_id             BIGINT,
     p_order_id              BIGINT  DEFAULT NULL,
     p_customer_id           BIGINT  DEFAULT NULL,

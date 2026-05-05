@@ -70,7 +70,7 @@ export default async function AccountSlugLayout({
   let timeoutMinutes = DEFAULT_TIMEOUT_MINUTES;
 
   if (appUserId !== null) {
-    const { data } = await supabase.rpc('fnd_get_session_timeout', {
+    const { data } = await supabase.rpc('fnd_session_get_timeout', {
       p_user_id: appUserId,
     });
     if (typeof data === 'number' && Number.isFinite(data)) {
