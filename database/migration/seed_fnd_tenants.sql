@@ -5,7 +5,7 @@
 -- Run after (schema objects exist):
 --   fnd_entity_id_seq.sql, fnd_tenants.sql, fnd_customers.sql,
 --   fnd_users.sql, fnd_user_tenants.sql,
---   fnd_people.sql, fnd_contact_points.sql
+--   fnd_people.sql, fnd_contacts.sql, fnd_contact_points.sql
 --
 -- Idempotent: safe to re-run.
 --
@@ -65,38 +65,65 @@ WHERE NOT EXISTS (
 );
 
 -- ----------------------------------------------------------------
--- 3. Contact points (entity_id = first customer in tenant, else 0)
+-- 3. Contacts (mirror seeded people for FK from fnd_contact_points.contact_id)
+-- ----------------------------------------------------------------
+
+INSERT INTO fnd_contacts (
+    tenant_id,
+    contact_name,
+    first_name,
+    last_name,
+    is_active
+)
+SELECT
+    prsn.tenant_id,
+    prsn.display_name,
+    prsn.first_name,
+    prsn.last_name,
+    TRUE
+FROM fnd_people prsn
+INNER JOIN fnd_tenants tnt ON tnt.tenant_id = prsn.tenant_id AND tnt.tenant_name = 'Alpine Bakery'
+WHERE prsn.primary_email IN ('moraglen@gmail.com', 'moraglen@yahoo.com')
+  AND NOT EXISTS (
+        SELECT 1
+        FROM fnd_contacts cnt
+        WHERE cnt.tenant_id = prsn.tenant_id
+          AND cnt.first_name = prsn.first_name
+          AND cnt.last_name = prsn.last_name
+    );
+
+-- ----------------------------------------------------------------
+-- 4. Contact points
 -- ----------------------------------------------------------------
 
 INSERT INTO fnd_contact_points (
-    entity_id,
-    person_id,
+    tenant_id,
+    contact_id,
     label,
-    is_primary,
-    tenant_id
+    is_primary
 )
 SELECT
-    COALESCE(
-        (SELECT MIN(cus.customer_id) FROM fnd_customers cus WHERE cus.tenant_id = prsn.tenant_id),
-        0::BIGINT
-    ),
-    prsn.person_id,
+    prsn.tenant_id,
+    cnt.contact_id,
     NULL,
-    TRUE,
-    prsn.tenant_id
+    TRUE
 FROM fnd_people prsn
+INNER JOIN fnd_contacts cnt
+    ON cnt.tenant_id = prsn.tenant_id
+   AND cnt.first_name = prsn.first_name
+   AND cnt.last_name = prsn.last_name
 INNER JOIN fnd_tenants tnt ON tnt.tenant_id = prsn.tenant_id AND tnt.tenant_name = 'Alpine Bakery'
 WHERE prsn.primary_email IN ('moraglen@gmail.com', 'moraglen@yahoo.com')
   AND NOT EXISTS (
         SELECT 1
         FROM fnd_contact_points cntctPnt
         WHERE cntctPnt.tenant_id = prsn.tenant_id
-          AND cntctPnt.person_id = prsn.person_id
+          AND cntctPnt.contact_id = cnt.contact_id
     );
 
 
 -- ----------------------------------------------------------------
--- 4. Seed fnd_users from auth.users for Alpine Bakery tenant
+-- 5. Seed fnd_users from auth.users for Alpine Bakery tenant
 -- ----------------------------------------------------------------
 
 INSERT INTO fnd_users (
@@ -124,7 +151,7 @@ WHERE NOT EXISTS (
 );
 
 -- ----------------------------------------------------------------
--- 5. Seed fnd_user_tenants for all users from fnd_users
+-- 6. Seed fnd_user_tenants for all users from fnd_users
 -- ----------------------------------------------------------------
 
 INSERT INTO fnd_user_tenants (
