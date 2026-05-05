@@ -16,6 +16,7 @@
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS fnd_customer_pricebooks (
+    tenant_id                 BIGINT        NOT NULL REFERENCES fnd_tenants(tenant_id) ON DELETE CASCADE,
     customer_pricebook_id   BIGINT      PRIMARY KEY DEFAULT nextval('fnd_entity_id_seq'::regclass),
 
     customer_id               BIGINT      NOT NULL REFERENCES fnd_customers(customer_id) ON DELETE CASCADE,
@@ -27,8 +28,6 @@ CREATE TABLE IF NOT EXISTS fnd_customer_pricebooks (
     effective_end_date        DATE,
 
     is_active                 BOOLEAN     NOT NULL DEFAULT TRUE,
-
-    tenant_id                 BIGINT        NOT NULL REFERENCES fnd_tenants(tenant_id) ON DELETE CASCADE,
 
     created_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
     created_by                BIGINT,
@@ -73,16 +72,7 @@ CREATE TRIGGER trg_fnd_customer_pricebooks_audit
     FOR EACH ROW EXECUTE FUNCTION fn_audit_log('customer_pricebook_id');
 
 
--- ============================================================
--- 3. ROW LEVEL SECURITY
--- ============================================================
-
-ALTER TABLE fnd_customer_pricebooks ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS pol_fnd_customer_pricebooks_tenant ON fnd_customer_pricebooks;
-CREATE POLICY pol_fnd_customer_pricebooks_tenant ON fnd_customer_pricebooks
-    USING      (tenant_id = (auth.jwt() -> 'app_metadata' ->> 'tenant_id')::BIGINT)
-    WITH CHECK (tenant_id = (auth.jwt() -> 'app_metadata' ->> 'tenant_id')::BIGINT);
+-- RLS policies: fnd_customer_pricebooks_policies.sql
 
 COMMENT ON COLUMN fnd_customer_pricebooks.assignment_type IS
     'How this book applies (e.g. PRIMARY, PROMO, DEFAULT).';
@@ -92,14 +82,14 @@ COMMENT ON COLUMN fnd_customer_pricebooks.is_active IS
 
 
 -- ============================================================
--- 4. MIGRATION — assignment_type was enum in earlier DDL; use text
+-- 3. MIGRATION — assignment_type was enum in earlier DDL; use text
 -- ============================================================
 
 DO $$ BEGIN
     IF EXISTS (
         SELECT 1
         FROM   information_schema.columns
-        WHERE  table_schema = 'public'
+        WHERE  table_schema = current_schema()
           AND  table_name   = 'fnd_customer_pricebooks'
           AND  column_name  = 'assignment_type'
           AND  udt_name     = 'pricebook_assignment_type_enum'
@@ -112,7 +102,7 @@ END $$;
 
 
 -- ============================================================
--- 5. MIGRATION — remove legacy pricebook columns from fnd_customers
+-- 4. MIGRATION — remove legacy pricebook columns from fnd_customers
 -- ============================================================
 
 ALTER TABLE fnd_customers DROP CONSTRAINT IF EXISTS fk_fnd_customers_promo_pricebook;

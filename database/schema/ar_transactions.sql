@@ -8,9 +8,8 @@
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS ar_transactions (
-    ar_transaction_id       BIGINT      PRIMARY KEY DEFAULT nextval('fnd_entity_id_seq'::regclass),
-
     tenant_id               BIGINT        NOT NULL REFERENCES fnd_tenants(tenant_id) ON DELETE CASCADE,
+    ar_transaction_id       BIGINT      PRIMARY KEY DEFAULT nextval('fnd_entity_id_seq'::regclass),
 
     customer_id             BIGINT      NOT NULL REFERENCES fnd_customers(customer_id) ON DELETE RESTRICT,
 
@@ -57,13 +56,7 @@ CREATE TRIGGER trg_ar_transactions_audit
     AFTER INSERT OR UPDATE OR DELETE ON ar_transactions
     FOR EACH ROW EXECUTE FUNCTION fn_audit_log('ar_transaction_id');
 
-
-ALTER TABLE ar_transactions ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS pol_ar_transactions_tenant ON ar_transactions;
-CREATE POLICY pol_ar_transactions_tenant ON ar_transactions
-    USING      (tenant_id = (auth.jwt() -> 'app_metadata' ->> 'tenant_id')::BIGINT)
-    WITH CHECK (tenant_id = (auth.jwt() -> 'app_metadata' ->> 'tenant_id')::BIGINT);
+-- RLS policies: ar_transactions_policies.sql
 
 COMMENT ON TABLE ar_transactions IS
     'AR document header; balance = amount − sum(applications) for INVOICE type (subject to sign rules).';

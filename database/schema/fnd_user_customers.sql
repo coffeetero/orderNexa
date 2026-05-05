@@ -31,11 +31,11 @@ BEGIN
 END $$;
 
 CREATE TABLE IF NOT EXISTS fnd_user_customers (
+    tenant_id          BIGINT      NOT NULL REFERENCES fnd_tenants(tenant_id) ON DELETE CASCADE,
     user_customer_id   BIGINT      PRIMARY KEY DEFAULT nextval('fnd_entity_id_seq'::regclass),
 
     user_id            BIGINT      NOT NULL REFERENCES fnd_users(user_id) ON DELETE CASCADE,
     customer_id        BIGINT      NOT NULL,
-    tenant_id          BIGINT      NOT NULL REFERENCES fnd_tenants(tenant_id) ON DELETE CASCADE,
 
     is_active          BOOLEAN     NOT NULL DEFAULT TRUE,
 
@@ -75,10 +75,4 @@ CREATE TRIGGER trg_fnd_user_customers_audit
     AFTER INSERT OR UPDATE OR DELETE ON fnd_user_customers
     FOR EACH ROW EXECUTE FUNCTION fn_audit_log('user_customer_id');
 
-ALTER TABLE fnd_user_customers ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS pol_fnd_user_customers_tenant ON fnd_user_customers;
-CREATE POLICY pol_fnd_user_customers_tenant ON fnd_user_customers
-    FOR ALL
-    USING      (tenant_id = (auth.jwt() -> 'app_metadata' ->> 'tenant_id')::BIGINT)
-    WITH CHECK (tenant_id = (auth.jwt() -> 'app_metadata' ->> 'tenant_id')::BIGINT);
+-- RLS policies: fnd_user_customers_policies.sql

@@ -1,2 +1,6 @@
 # Microsoft Office temporary lock files (created while a workbook is open)
 **/~$*
+
+# Local secrets (do not commit)
+.env
+database/migration/.env

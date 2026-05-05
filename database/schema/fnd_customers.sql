@@ -18,8 +18,9 @@
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS fnd_customers (
+    tenant_id                  BIGINT      NOT NULL,
     customer_id            BIGINT      PRIMARY KEY DEFAULT nextval('fnd_entity_id_seq'::regclass),
-    tenant_id     BIGINT      NOT NULL,
+
     legacy_id              INT,
     customer_parent_id     BIGINT      REFERENCES fnd_customers(customer_id),
 
@@ -27,7 +28,7 @@ CREATE TABLE IF NOT EXISTS fnd_customers (
     customer_number        TEXT,
 
     customer_type          TEXT        NOT NULL,
-    account_slug  TEXT,
+
     invoice_copy_count         INT     NOT NULL DEFAULT 1  CHECK (invoice_copy_count >= 1),
     is_standing_order          BOOLEAN NOT NULL DEFAULT FALSE,
     is_signature_required      BOOLEAN NOT NULL DEFAULT FALSE,
@@ -39,10 +40,12 @@ CREATE TABLE IF NOT EXISTS fnd_customers (
     is_cost_on_bill_of_lading  BOOLEAN NOT NULL DEFAULT FALSE,
     is_returns_allowed         BOOLEAN NOT NULL DEFAULT TRUE,
 
-    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-    created_by    BIGINT,
-    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_by    BIGINT,
+    created_at                 TIMESTAMPTZ NOT NULL DEFAULT now(),
+    created_by                 BIGINT,
+    updated_at                 TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_by                 BIGINT,
+
+    account_slug               TEXT,
 
     UNIQUE (tenant_id, customer_number)
 );
@@ -139,42 +142,4 @@ CREATE TRIGGER trg_fnd_customers_audit
     AFTER INSERT OR UPDATE OR DELETE ON fnd_customers
     FOR EACH ROW EXECUTE FUNCTION fn_audit_log('customer_id');
 
-
--- ============================================================
--- 4. ROW LEVEL SECURITY
--- ============================================================
-
-ALTER TABLE fnd_customers ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS pol_fnd_customers_tenant ON fnd_customers;
-
-CREATE POLICY pol_fnd_customers_tenant ON fnd_customers
-    USING (
-        -- 1. Use current_setting to grab the JWT claim without calling the auth schema function
-        (tenant_id::text = ANY (
-            ARRAY(
-                SELECT jsonb_array_elements_text(
-                    NULLIF(current_setting('request.jwt.claims', true), '')::jsonb -> 'app_metadata' -> 'allowed_tenant_ids'
-                )
-            )
-        ))
-        AND (
-            -- 2. Check restricted tenants
-            NOT (tenant_id::text = ANY (
-                ARRAY(
-                    SELECT jsonb_array_elements_text(
-                        NULLIF(current_setting('request.jwt.claims', true), '')::jsonb -> 'app_metadata' -> 'restricted_tenant_ids'
-                    )
-                )
-            ))
-            OR 
-            -- 3. Check allowed customers
-            (customer_id::text = ANY (
-                ARRAY(
-                    SELECT jsonb_array_elements_text(
-                        NULLIF(current_setting('request.jwt.claims', true), '')::jsonb -> 'app_metadata' -> 'allowed_customer_ids'
-                    )
-                )
-            ))
-        )
-    );
+-- RLS policies: fnd_customers_policies.sql

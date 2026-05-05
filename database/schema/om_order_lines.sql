@@ -11,6 +11,7 @@
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS om_order_lines (
+    tenant_id           BIGINT        NOT NULL REFERENCES fnd_tenants(tenant_id) ON DELETE CASCADE,
     order_line_id       BIGINT      PRIMARY KEY DEFAULT nextval('fnd_entity_id_seq'::regclass),
 
     order_id            BIGINT      NOT NULL REFERENCES om_orders(order_id) ON DELETE CASCADE,
@@ -24,8 +25,6 @@ CREATE TABLE IF NOT EXISTS om_order_lines (
     unit_discount       NUMERIC(14,4) NOT NULL DEFAULT 0,
 
     fulfilled_quantity  NUMERIC(14,4) NOT NULL DEFAULT 0,
-
-    tenant_id           BIGINT        NOT NULL REFERENCES fnd_tenants(tenant_id) ON DELETE CASCADE,
 
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     created_by          BIGINT,
@@ -61,10 +60,4 @@ CREATE TRIGGER trg_om_order_lines_audit
     FOR EACH ROW EXECUTE FUNCTION fn_audit_log('order_line_id');
 
 
--- RLS
-ALTER TABLE om_order_lines ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS pol_om_order_lines_tenant ON om_order_lines;
-CREATE POLICY pol_om_order_lines_tenant ON om_order_lines
-    USING      (tenant_id = (auth.jwt() -> 'app_metadata' ->> 'tenant_id')::BIGINT)
-    WITH CHECK (tenant_id = (auth.jwt() -> 'app_metadata' ->> 'tenant_id')::BIGINT);
+-- RLS policies: om_order_lines_policies.sql

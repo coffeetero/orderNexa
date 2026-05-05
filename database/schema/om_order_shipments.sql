@@ -9,6 +9,7 @@
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS om_order_shipments (
+    tenant_id              BIGINT        NOT NULL REFERENCES fnd_tenants(tenant_id) ON DELETE CASCADE,
     order_shipment_id      BIGINT      PRIMARY KEY DEFAULT nextval('fnd_entity_id_seq'::regclass),
     order_id               BIGINT      NOT NULL REFERENCES om_orders(order_id) ON DELETE CASCADE,
     order_line_id          BIGINT      REFERENCES om_order_lines(order_line_id) ON DELETE CASCADE,
@@ -27,8 +28,6 @@ CREATE TABLE IF NOT EXISTS om_order_shipments (
     ship_from_location_id  BIGINT,
     ship_to_location_id    BIGINT,
     snapshot_data          JSONB       NOT NULL DEFAULT '{}'::jsonb,
-
-    tenant_id              BIGINT        NOT NULL REFERENCES fnd_tenants(tenant_id) ON DELETE CASCADE,
 
     created_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
     created_by             BIGINT,
@@ -54,13 +53,7 @@ CREATE TRIGGER trg_om_order_shipments_audit
     AFTER INSERT OR UPDATE OR DELETE ON om_order_shipments
     FOR EACH ROW EXECUTE FUNCTION fn_audit_log('order_shipment_id');
 
-
-ALTER TABLE om_order_shipments ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS pol_om_order_shipments_tenant ON om_order_shipments;
-CREATE POLICY pol_om_order_shipments_tenant ON om_order_shipments
-    USING      (tenant_id = (auth.jwt() -> 'app_metadata' ->> 'tenant_id')::BIGINT)
-    WITH CHECK (tenant_id = (auth.jwt() -> 'app_metadata' ->> 'tenant_id')::BIGINT);
+-- RLS policies: om_order_shipments_policies.sql
 
 COMMENT ON TABLE om_order_shipments IS
     'Append-only shipment events; sum(quantity) by order_line gives shipped qty for reporting.';

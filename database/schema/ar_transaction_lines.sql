@@ -6,9 +6,8 @@
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS ar_transaction_lines (
-    ar_transaction_line_id  BIGINT      PRIMARY KEY DEFAULT nextval('fnd_entity_id_seq'::regclass),
-
     tenant_id               BIGINT        NOT NULL REFERENCES fnd_tenants(tenant_id) ON DELETE CASCADE,
+    ar_transaction_line_id  BIGINT      PRIMARY KEY DEFAULT nextval('fnd_entity_id_seq'::regclass),
 
     ar_transaction_id       BIGINT      NOT NULL REFERENCES ar_transactions(ar_transaction_id) ON DELETE CASCADE,
 
@@ -59,13 +58,7 @@ CREATE TRIGGER trg_ar_transaction_lines_audit
     AFTER INSERT OR UPDATE OR DELETE ON ar_transaction_lines
     FOR EACH ROW EXECUTE FUNCTION fn_audit_log('ar_transaction_line_id');
 
-
-ALTER TABLE ar_transaction_lines ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS pol_ar_transaction_lines_tenant ON ar_transaction_lines;
-CREATE POLICY pol_ar_transaction_lines_tenant ON ar_transaction_lines
-    USING      (tenant_id = (auth.jwt() -> 'app_metadata' ->> 'tenant_id')::BIGINT)
-    WITH CHECK (tenant_id = (auth.jwt() -> 'app_metadata' ->> 'tenant_id')::BIGINT);
+-- RLS policies: ar_transaction_lines_policies.sql
 
 COMMENT ON TABLE ar_transaction_lines IS
     'Commercial / tax lines; optional at go-live if header-only AR is enough.';

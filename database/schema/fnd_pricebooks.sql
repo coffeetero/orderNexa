@@ -13,6 +13,7 @@
 
 
 CREATE TABLE IF NOT EXISTS fnd_pricebooks (
+    tenant_id             BIGINT        NOT NULL REFERENCES fnd_tenants(tenant_id) ON DELETE CASCADE,
     pricebook_id          BIGINT      PRIMARY KEY DEFAULT nextval('fnd_entity_id_seq'::regclass),
 
     pricebook_name        TEXT        NOT NULL,
@@ -21,8 +22,6 @@ CREATE TABLE IF NOT EXISTS fnd_pricebooks (
     currency_id           BIGINT      NOT NULL REFERENCES fnd_currencies(currency_id),
 
     is_active             BOOLEAN     NOT NULL DEFAULT TRUE,
-
-    tenant_id             BIGINT        NOT NULL REFERENCES fnd_tenants(tenant_id) ON DELETE CASCADE,
 
     created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
     created_by            BIGINT,
@@ -55,15 +54,7 @@ CREATE TRIGGER trg_fnd_pricebooks_audit
     FOR EACH ROW EXECUTE FUNCTION fn_audit_log('pricebook_id');
 
 
--- ROW LEVEL SECURITY
--- ============================================================
-
-ALTER TABLE fnd_pricebooks ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS pol_fnd_pricebooks_tenant ON fnd_pricebooks;
-CREATE POLICY pol_fnd_pricebooks_tenant ON fnd_pricebooks
-    USING      (tenant_id = (auth.jwt() -> 'app_metadata' ->> 'tenant_id')::BIGINT)
-    WITH CHECK (tenant_id = (auth.jwt() -> 'app_metadata' ->> 'tenant_id')::BIGINT);
+-- RLS policies: fnd_pricebooks_policies.sql
 
 -- Existing DBs created before description existed
 ALTER TABLE fnd_pricebooks ADD COLUMN IF NOT EXISTS description TEXT;

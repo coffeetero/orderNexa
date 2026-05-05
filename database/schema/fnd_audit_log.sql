@@ -11,8 +11,8 @@
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS fnd_audit_log (
-    id               BIGINT      PRIMARY KEY DEFAULT nextval('fnd_entity_id_seq'::regclass),
     tenant_id        BIGINT,
+    id               BIGINT      PRIMARY KEY DEFAULT nextval('fnd_entity_id_seq'::regclass),
     table_name       TEXT        NOT NULL,
     record_id        TEXT,
     operation        TEXT        NOT NULL CHECK (operation IN ('INSERT', 'UPDATE', 'DELETE')),
@@ -117,23 +117,4 @@ BEGIN
 END;
 $$;
 
-
--- ============================================================
--- 3. ROW LEVEL SECURITY
--- ============================================================
-
-ALTER TABLE fnd_audit_log ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS pol_fnd_audit_log_tenant_read ON fnd_audit_log;
-
-CREATE POLICY pol_fnd_audit_log_tenant_read ON fnd_audit_log
-    FOR SELECT
-    USING (
-        tenant_id::text = ANY (
-            ARRAY(
-                SELECT jsonb_array_elements_text(
-                    auth.jwt() -> 'app_metadata' -> 'allowed_tenant_ids'
-                )
-            )
-        )
-    );
+-- RLS policies: fnd_audit_log_policies.sql

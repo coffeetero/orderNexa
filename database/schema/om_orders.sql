@@ -16,6 +16,7 @@
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS om_orders (
+    tenant_id               BIGINT        NOT NULL REFERENCES fnd_tenants(tenant_id) ON DELETE CASCADE,
     order_id                BIGINT      PRIMARY KEY DEFAULT nextval('fnd_entity_id_seq'::regclass),
     order_number            TEXT        NOT NULL,   -- app-facing, source: ordr.ordr_no
     order_date              DATE,                   -- source: ordr.ordr_dt
@@ -28,7 +29,6 @@ CREATE TABLE IF NOT EXISTS om_orders (
     production_date         DATE        NOT NULL,   -- source: ordr.ordr_prdctn_dt
     production_code         TEXT,                   -- source: ordr.ordr_prdctn_cd (AM / PM / SPECIAL)
     snapshot_data           JSONB       NOT NULL DEFAULT '{}'::jsonb,
-    tenant_id               BIGINT        NOT NULL REFERENCES fnd_tenants(tenant_id) ON DELETE CASCADE,
     created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
     created_by              BIGINT,
     updated_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -57,10 +57,4 @@ CREATE TRIGGER trg_om_orders_audit
     AFTER INSERT OR UPDATE OR DELETE ON om_orders
     FOR EACH ROW EXECUTE FUNCTION fn_audit_log('order_id');
 
--- RLS
-ALTER TABLE om_orders ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS pol_om_orders_tenant ON om_orders;
-CREATE POLICY pol_om_orders_tenant ON om_orders
-    USING      (tenant_id = (auth.jwt() -> 'app_metadata' ->> 'tenant_id')::BIGINT)
-    WITH CHECK (tenant_id = (auth.jwt() -> 'app_metadata' ->> 'tenant_id')::BIGINT);
+-- RLS policies: om_orders_policies.sql

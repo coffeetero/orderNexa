@@ -104,7 +104,6 @@ $$;
 CREATE TABLE IF NOT EXISTS fnd_tenants (
     tenant_id        BIGINT      PRIMARY KEY DEFAULT nextval('fnd_entity_id_seq'::regclass),
     tenant_name      TEXT        NOT NULL,
-    tenant_slug      TEXT,
     plan             TEXT        NOT NULL DEFAULT 'STARTER'
                                  CHECK (plan IN ('STARTER', 'PRO', 'ENTERPRISE')),
     is_active        BOOLEAN     NOT NULL DEFAULT TRUE,
@@ -113,7 +112,9 @@ CREATE TABLE IF NOT EXISTS fnd_tenants (
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
     created_by       BIGINT,
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_by       BIGINT
+    updated_by       BIGINT,
+
+    tenant_slug      TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_fnd_tenants_active
@@ -121,7 +122,7 @@ CREATE INDEX IF NOT EXISTS idx_fnd_tenants_active
 
 
 -- ============================================================
--- 3–5. Triggers + RLS (requires fn_set_updated_at_ts_only from fnd_customers.sql)
+-- 3–5. Triggers (requires fn_set_updated_at_ts_only from fnd_customers.sql); RLS: fnd_tenants_policies.sql
 -- ============================================================
 
 DROP TRIGGER IF EXISTS trg_fnd_tenants_set_updated ON fnd_tenants;
@@ -134,10 +135,4 @@ CREATE TRIGGER trg_fnd_tenants_audit
     AFTER INSERT OR UPDATE OR DELETE ON fnd_tenants
     FOR EACH ROW EXECUTE FUNCTION fn_audit_log('tenant_id');
 
-ALTER TABLE fnd_tenants ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS pol_fnd_tenants_self ON fnd_tenants;
-CREATE POLICY pol_fnd_tenants_self ON fnd_tenants
-    FOR ALL
-    USING      (tenant_id = (auth.jwt() -> 'app_metadata' ->> 'tenant_id')::BIGINT)
-    WITH CHECK (tenant_id = (auth.jwt() -> 'app_metadata' ->> 'tenant_id')::BIGINT);
+-- RLS policies: fnd_tenants_policies.sql

@@ -7,6 +7,7 @@
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS fnd_people (
+    tenant_id         BIGINT        NOT NULL REFERENCES fnd_tenants(tenant_id) ON DELETE CASCADE,
     person_id         BIGINT      PRIMARY KEY DEFAULT nextval('fnd_entity_id_seq'::regclass),
     first_name        TEXT        NOT NULL,
     last_name         TEXT        NOT NULL,
@@ -15,8 +16,6 @@ CREATE TABLE IF NOT EXISTS fnd_people (
     primary_email     TEXT,
     is_active         BOOLEAN     NOT NULL DEFAULT TRUE,
     contact_details   JSONB       NOT NULL DEFAULT '{}'::jsonb,
-
-    tenant_id         BIGINT        NOT NULL REFERENCES fnd_tenants(tenant_id) ON DELETE CASCADE,
 
     created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
     created_by        BIGINT,
@@ -45,10 +44,4 @@ CREATE TRIGGER trg_fnd_people_audit
     AFTER INSERT OR UPDATE OR DELETE ON fnd_people
     FOR EACH ROW EXECUTE FUNCTION fn_audit_log('person_id');
 
-ALTER TABLE fnd_people ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS pol_fnd_people_tenant ON fnd_people;
-CREATE POLICY pol_fnd_people_tenant ON fnd_people
-    FOR ALL
-    USING      (tenant_id = (auth.jwt() -> 'app_metadata' ->> 'tenant_id')::BIGINT)
-    WITH CHECK (tenant_id = (auth.jwt() -> 'app_metadata' ->> 'tenant_id')::BIGINT);
+-- RLS policies: fnd_people_policies.sql

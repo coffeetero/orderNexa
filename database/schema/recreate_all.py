@@ -31,6 +31,7 @@ DDL_SCRIPTS: list[str] = [
     "fnd_entity_id_seq.sql",
     "fnd_customers.sql",
     "fnd_tenants.sql",
+    "fnd_slug_registry.sql",
     "fnd_users.sql",
     "fnd_user_tenants.sql",
     "fnd_people.sql",

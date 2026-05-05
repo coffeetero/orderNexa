@@ -13,11 +13,11 @@
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS fnd_item_bom (
+    tenant_id       BIGINT        NOT NULL REFERENCES fnd_tenants(tenant_id) ON DELETE CASCADE,
     item_bom_id     BIGINT      PRIMARY KEY DEFAULT nextval('fnd_entity_id_seq'::regclass),
     parent_item_id  BIGINT      NOT NULL REFERENCES fnd_items(item_id),   -- source: citem.citem_id (parent SKU)
     item_id         BIGINT      NOT NULL REFERENCES fnd_items(item_id),   -- source: citem.item_id (component SKU)
     quantity        NUMERIC(10,4) NOT NULL DEFAULT 1 CHECK (quantity > 0), -- source: citem.citem_qty
-    tenant_id       BIGINT        NOT NULL REFERENCES fnd_tenants(tenant_id) ON DELETE CASCADE,
     -- Audit (BIGINT user ids — not Supabase auth.uid())
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     created_by      BIGINT,
@@ -56,13 +56,4 @@ CREATE TRIGGER trg_fnd_item_bom_audit
     FOR EACH ROW EXECUTE FUNCTION fn_audit_log('item_bom_id');
 
 
--- ============================================================
--- ROW LEVEL SECURITY
--- ============================================================
-
-ALTER TABLE fnd_item_bom ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS pol_fnd_item_bom_tenant ON fnd_item_bom;
-CREATE POLICY pol_fnd_item_bom_tenant ON fnd_item_bom
-    USING      (tenant_id = (auth.jwt() -> 'app_metadata' ->> 'tenant_id')::BIGINT)
-    WITH CHECK (tenant_id = (auth.jwt() -> 'app_metadata' ->> 'tenant_id')::BIGINT);
+-- RLS policies: fnd_item_bom_policies.sql

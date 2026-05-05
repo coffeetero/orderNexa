@@ -12,6 +12,7 @@
 
 
 CREATE TABLE IF NOT EXISTS fnd_pricebook_items (
+    tenant_id             BIGINT        NOT NULL REFERENCES fnd_tenants(tenant_id) ON DELETE CASCADE,
     pricebook_item_id     BIGINT      PRIMARY KEY DEFAULT nextval('fnd_entity_id_seq'::regclass),
 
     pricebook_id          BIGINT      NOT NULL REFERENCES fnd_pricebooks(pricebook_id) ON DELETE CASCADE,
@@ -26,8 +27,6 @@ CREATE TABLE IF NOT EXISTS fnd_pricebook_items (
     min_quantity          NUMERIC(14,4) NOT NULL DEFAULT 1 CHECK (min_quantity > 0),
 
     is_active             BOOLEAN     NOT NULL DEFAULT TRUE,
-
-    tenant_id             BIGINT        NOT NULL REFERENCES fnd_tenants(tenant_id) ON DELETE CASCADE,
 
     created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
     created_by            BIGINT,
@@ -63,15 +62,7 @@ CREATE TRIGGER trg_fnd_pricebook_items_audit
     FOR EACH ROW EXECUTE FUNCTION fn_audit_log('pricebook_item_id');
 
 
--- ROW LEVEL SECURITY
--- ============================================================
-
-ALTER TABLE fnd_pricebook_items ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS pol_fnd_pricebook_items_tenant ON fnd_pricebook_items;
-CREATE POLICY pol_fnd_pricebook_items_tenant ON fnd_pricebook_items
-    USING      (tenant_id = (auth.jwt() -> 'app_metadata' ->> 'tenant_id')::BIGINT)
-    WITH CHECK (tenant_id = (auth.jwt() -> 'app_metadata' ->> 'tenant_id')::BIGINT);
+-- RLS policies: fnd_pricebook_items_policies.sql
 
 COMMENT ON TABLE fnd_pricebook_items IS
     'Per-item prices for a price book; item_price is in the book''s currency.';

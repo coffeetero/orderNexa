@@ -7,14 +7,13 @@
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS fnd_contact_points (
+    tenant_id         BIGINT        NOT NULL REFERENCES fnd_tenants(tenant_id) ON DELETE CASCADE,
     contact_point_id  BIGINT      PRIMARY KEY DEFAULT nextval('fnd_entity_id_seq'::regclass),
 
     entity_id         BIGINT      NOT NULL,
     person_id         BIGINT      NOT NULL REFERENCES fnd_people(person_id),
     label             TEXT,
     is_primary        BOOLEAN     NOT NULL DEFAULT FALSE,
-
-    tenant_id         BIGINT        NOT NULL REFERENCES fnd_tenants(tenant_id) ON DELETE CASCADE,
 
     created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
     created_by        BIGINT,
@@ -32,7 +31,7 @@ BEGIN
     FROM pg_constraint c
     JOIN pg_class t ON t.oid = c.conrelid
     JOIN pg_namespace n ON n.oid = t.relnamespace
-    WHERE n.nspname = 'public'
+    WHERE n.nspname = current_schema()
       AND t.relname = 'fnd_contact_points'
       AND c.contype = 'c'
       AND pg_get_constraintdef(c.oid) ILIKE '%label%'
@@ -41,7 +40,12 @@ BEGIN
     LIMIT 1;
 
     IF v_constraint_name IS NOT NULL THEN
-        EXECUTE format('ALTER TABLE public.fnd_contact_points DROP CONSTRAINT %I', v_constraint_name);
+        EXECUTE format(
+            'ALTER TABLE %I.%I DROP CONSTRAINT %I',
+            current_schema(),
+            'fnd_contact_points',
+            v_constraint_name
+        );
     END IF;
 END $$;
 
@@ -68,10 +72,4 @@ CREATE TRIGGER trg_fnd_contact_points_audit
     AFTER INSERT OR UPDATE OR DELETE ON fnd_contact_points
     FOR EACH ROW EXECUTE FUNCTION fn_audit_log('contact_point_id');
 
-ALTER TABLE fnd_contact_points ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS pol_fnd_contact_points_tenant ON fnd_contact_points;
-CREATE POLICY pol_fnd_contact_points_tenant ON fnd_contact_points
-    FOR ALL
-    USING      (tenant_id = (auth.jwt() -> 'app_metadata' ->> 'tenant_id')::BIGINT)
-    WITH CHECK (tenant_id = (auth.jwt() -> 'app_metadata' ->> 'tenant_id')::BIGINT);
+-- RLS policies: fnd_contact_points_policies.sql

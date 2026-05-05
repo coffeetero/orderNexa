@@ -20,6 +20,7 @@
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS bps_items (
+    tenant_id           BIGINT        NOT NULL REFERENCES fnd_tenants(tenant_id) ON DELETE CASCADE,
 
     -- 1:1 link to fnd_items — item_id is both PK and FK
     item_id             BIGINT      PRIMARY KEY
@@ -69,8 +70,6 @@ CREATE TABLE IF NOT EXISTS bps_items (
     CONSTRAINT chk_covered_requires_coverable
         CHECK (NOT default_covered OR is_coverable),
 
-    tenant_id           BIGINT        NOT NULL REFERENCES fnd_tenants(tenant_id) ON DELETE CASCADE,
-
     -- Audit (BIGINT user ids — not Supabase auth.uid())
     created_at          TIMESTAMPTZ     NOT NULL DEFAULT now(),
     created_by          BIGINT,
@@ -102,21 +101,10 @@ CREATE TRIGGER trg_bps_items_audit
     AFTER INSERT OR UPDATE OR DELETE ON bps_items
     FOR EACH ROW EXECUTE FUNCTION fn_audit_log('item_id');
 
+-- RLS policies: bps_items_policies.sql
 
 -- ============================================================
--- 3. ROW LEVEL SECURITY
--- ============================================================
-
-ALTER TABLE bps_items ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS pol_bps_items_tenant ON bps_items;
-CREATE POLICY pol_bps_items_tenant ON bps_items
-    USING      (tenant_id = (auth.jwt() -> 'app_metadata' ->> 'tenant_id')::BIGINT)
-    WITH CHECK (tenant_id = (auth.jwt() -> 'app_metadata' ->> 'tenant_id')::BIGINT);
-
-
--- ============================================================
--- 4. Drop bakery-specific columns from fnd_items
+-- 3. Drop bakery-specific columns from fnd_items
 --    (moved here permanently — this migration is idempotent)
 -- ============================================================
 

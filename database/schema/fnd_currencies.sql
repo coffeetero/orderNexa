@@ -52,12 +52,7 @@ CREATE TRIGGER trg_fnd_currencies_audit
     AFTER INSERT OR UPDATE OR DELETE ON fnd_currencies
     FOR EACH ROW EXECUTE FUNCTION fn_audit_log('currency_id');
 
-ALTER TABLE fnd_currencies ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS pol_fnd_currencies_select ON fnd_currencies;
-CREATE POLICY pol_fnd_currencies_select ON fnd_currencies
-    FOR SELECT
-    USING (TRUE);
+-- RLS policies: fnd_currencies_policies.sql
 
 -- Bootstrap: USD required for default price books (idempotent)
 INSERT INTO fnd_currencies (iso_code, currency_name, decimal_places)
