@@ -11,12 +11,34 @@ import { OrderLineGrid } from './OrderLineGrid';
 import { useOrderEntryState } from './useOrderEntryState';
 import { useOrderFocus } from './useOrderFocus';
 import type {
-  InvoiceLookupResult,
   OrderEntryDraft,
   OrderEntryItem,
+  OrderHeaderListRow,
   OrderSavePayload,
   OrderSaveResult,
 } from '@/lib/types';
+import { OrderPickSheet } from './OrderPickSheet';
+
+function normalizeOrderHeaderRow(raw: Record<string, unknown>): OrderHeaderListRow | null {
+  const order_id = Number(raw.order_id);
+  if (!Number.isFinite(order_id)) return null;
+  return {
+    order_id,
+    order_number: String(raw.order_number ?? ''),
+    production_date: String(raw.production_date ?? ''),
+    production_code: String(raw.production_code ?? ''),
+    amount: Number(raw.amount ?? 0),
+    customer_id: Number(raw.customer_id ?? 0),
+    customer_name:
+      raw.customer_name !== undefined && raw.customer_name !== null
+        ? String(raw.customer_name)
+        : undefined,
+    order_date:
+      raw.order_date !== undefined && raw.order_date !== null
+        ? String(raw.order_date)
+        : undefined,
+  };
+}
 
 const NEW_ORDER_SENTINEL: OrderRefOption = {
   order_id: 0,
@@ -69,6 +91,8 @@ export function OrderEntryForm({
   const [customers, setCustomers] = useState<CustomerOption[]>(serverCustomers ?? []);
   const [items, setItems] = useState<OrderEntryItem[]>([]);
   const [orderRefItems, setOrderRefItems] = useState<OrderRefOption[]>([]);
+  const [orderPickOpen, setOrderPickOpen] = useState(false);
+  const [orderPickCandidates, setOrderPickCandidates] = useState<OrderHeaderListRow[]>([]);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
   const [isLoadingItems, setIsLoadingItems] = useState(false);
   const [itemsError, setItemsError] = useState<string | null>(null);
@@ -100,6 +124,66 @@ export function OrderEntryForm({
   } = useOrderFocus();
 
   const [activeLineIndex, setActiveLineIndex] = useState<number | null>(null);
+
+  const mapOrderToDraft = useCallback((data: Record<string, unknown>): OrderEntryDraft => {
+    const lines = (Array.isArray(data.lines) ? data.lines : []).map((l: Record<string, unknown>) => ({
+      tempId: String(l.order_line_id ?? crypto.randomUUID()),
+      order_id: l.order_id as number,
+      order_line_id: l.order_line_id as number,
+      item_id: l.item_id as number,
+      item_number: (l.item_number as string) ?? '',
+      item_description: (l.item_description as string) ?? '',
+      is_sliced: Boolean(l.is_sliced),
+      is_wrapped: Boolean(l.is_wrapped),
+      is_covered: Boolean(l.is_covered),
+      is_scored: Boolean(l.is_scored),
+      can_slice: Boolean(l.can_slice),
+      can_wrap: Boolean(l.can_wrap),
+      can_cover: Boolean(l.can_cover),
+      can_score: Boolean(l.can_score),
+      quantity: Number(l.quantity ?? 0),
+      unit_price: Number(l.unit_price ?? 0),
+      unit_discount: Number(l.unit_discount ?? 0),
+      extended_amount: Number(l.extended_amount ?? 0),
+    }));
+    const totalAmount = lines.reduce(
+      (s: number, l: { extended_amount: number }) => s + l.extended_amount,
+      0,
+    );
+    return {
+      order_id: data.order_id as number,
+      order_number: (data.order_number as string) ?? '',
+      customer_id: (data.customer_id as number) ?? null,
+      customer_name: (data.customer_name as string) ?? '',
+      customer_credit: 0,
+      order_date: (data.order_date as string) ?? new Date().toISOString().slice(0, 10),
+      production_date: (data.production_date as string) ?? new Date().toISOString().slice(0, 10),
+      production_code: (data.production_code as 'AM' | 'PM' | 'SPECIAL') ?? 'AM',
+      delivery_amount: Number(data.delivery_amount ?? 0),
+      total_amount: totalAmount,
+      lines,
+    };
+  }, []);
+
+  /** Serializes slot lookups so rapid header changes don't apply stale results. */
+  const slotLookupGenerationRef = useRef(0);
+
+  const loadOrderById = useCallback(
+    async (targetOrderId: number, opts?: { generation?: number }) => {
+      if (!tenantId || !targetOrderId) return;
+      const gen = opts?.generation;
+      const response = await fetch(
+        `/api/orders?tenant_id=${tenantId}&order_id=${targetOrderId}&headers_only=false`,
+      );
+      const { data } = (await response.json()) as { data?: Record<string, unknown> };
+      if (!response.ok || !data) return;
+      if (gen !== undefined && gen !== slotLookupGenerationRef.current) return;
+      loadOrder(mapOrderToDraft(data));
+      setActiveLineIndex(null);
+      requestAnimationFrame(() => focusItem());
+    },
+    [tenantId, loadOrder, mapOrderToDraft, focusItem],
+  );
 
   /** Latest draft.customer_id — used to ignore stale item-fetch completion when the user changes customer quickly. */
   const latestCustomerIdRef = useRef<number | null>(draft.customer_id);
@@ -149,90 +233,116 @@ export function OrderEntryForm({
       });
   }, [tenantId, draft.customer_id, focusItem]);
 
-  // ── Lookup invoice when customer + date + window change ───────────────
+  // ── Existing orders: headers-only list for slot, then detail fetch with lines ─
   useEffect(() => {
     if (!tenantId || !draft.customer_id) {
-      // No customer selected — clear invoice and order ref dropdown
       setField('order_number', '');
       setOrderRefItems([]);
+      setOrderPickCandidates([]);
+      setOrderPickOpen(false);
       return;
     }
-    const qs = new URLSearchParams({
+    if (!draft.production_date) return;
+    if (mode === 'edit' && orderId != null) return;
+
+    const generation = ++slotLookupGenerationRef.current;
+
+    const slotQs = new URLSearchParams({
       tenant_id: String(tenantId),
       customer_id: String(draft.customer_id),
       production_date: draft.production_date,
       production_code: draft.production_code,
+      headers_only: 'true',
     });
-    fetch(`/api/orders/invoices?${qs}`)
+
+    const applyOrderHeaders = (rows: OrderHeaderListRow[]) => {
+      if (generation !== slotLookupGenerationRef.current) return;
+
+      const matching = [...rows].sort((a, b) => b.order_id - a.order_id);
+
+      const refs: OrderRefOption[] = [
+        NEW_ORDER_SENTINEL,
+        ...matching.map((o) => ({
+          order_id: o.order_id,
+          order_number: o.order_number,
+          customer_name: draft.customer_name,
+        })),
+      ];
+      setOrderRefItems(refs);
+
+      if (matching.length === 0) {
+        setField('order_number', '');
+        setField('order_ref', '');
+        setField('order_id', undefined);
+        setField('lines', []);
+        setField('total_amount', 0);
+        setOrderPickCandidates([]);
+        setOrderPickOpen(false);
+        requestAnimationFrame(() => focusItem());
+        return;
+      }
+
+      if (matching.length === 1) {
+        const pick = matching[0];
+        setOrderPickCandidates([]);
+        setOrderPickOpen(false);
+        setField('order_number', String(pick.order_number ?? ''));
+        setField('order_ref', pick.order_number);
+        void loadOrderById(pick.order_id, { generation });
+        return;
+      }
+
+      setField('order_number', '');
+      setField('order_ref', '');
+      setField('order_id', undefined);
+      setField('lines', []);
+      setField('total_amount', 0);
+      setOrderPickCandidates(matching);
+      setOrderPickOpen(true);
+    };
+
+    fetch(`/api/orders?${slotQs}`)
       .then((r) => r.json())
-      .then(({ data, error }: { data: InvoiceLookupResult | null; error?: string }) => {
-        if (error) return;
-        if (data) {
-          setField('order_number', data.invoice_number);
-          const refs: OrderRefOption[] = data.orders.map((o) => ({
-            order_id: o.order_id,
-            order_number: o.order_number,
-            customer_name: draft.customer_name,
-          }));
-          if (refs.length === 0) refs.push(NEW_ORDER_SENTINEL);
-          setOrderRefItems(refs);
-          setField('order_ref', refs[0].order_number);
-        } else {
-          setField('order_number', '');
-          setOrderRefItems([]);
-          setField('order_ref', '');
+      .then((ordJson: { data: unknown; error?: string }) => {
+        if (generation !== slotLookupGenerationRef.current) return;
+        if (ordJson.error) return;
+
+        const rawRows = Array.isArray(ordJson.data) ? ordJson.data : [];
+        const slotRows: OrderHeaderListRow[] = [];
+        for (const item of rawRows) {
+          if (item && typeof item === 'object') {
+            const row = normalizeOrderHeaderRow(item as Record<string, unknown>);
+            if (row) slotRows.push(row);
+          }
         }
+        applyOrderHeaders(slotRows);
+      })
+      .catch(() => {
+        /* network — leave UI unchanged */
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantId, draft.customer_id, draft.production_date, draft.production_code]);
+  }, [
+    tenantId,
+    draft.customer_id,
+    draft.customer_name,
+    draft.production_date,
+    draft.production_code,
+    mode,
+    orderId,
+    loadOrderById,
+    focusItem,
+  ]);
 
   // ── Load existing order in edit mode ──────────────────────────────────
   useEffect(() => {
     if (mode !== 'edit' || !orderId || !tenantId || initialData) return;
-    fetch(`/api/orders?tenant_id=${tenantId}&order_id=${orderId}`)
+    fetch(`/api/orders?tenant_id=${tenantId}&order_id=${orderId}&headers_only=false`)
       .then((r) => r.json())
       .then(({ data }) => {
         if (!data) return;
-        // Map API response to OrderEntryDraft
-        const lines = (data.lines ?? []).map((l: Record<string, unknown>) => ({
-          tempId: String(l.order_line_id ?? crypto.randomUUID()),
-          order_id: l.order_id as number,
-          order_line_id: l.order_line_id as number,
-          item_id: l.item_id as number,
-          item_number: (l.item_number as string) ?? '',
-          item_description: (l.item_description as string) ?? '',
-          is_sliced: Boolean(l.is_sliced),
-          is_wrapped: Boolean(l.is_wrapped),
-          is_covered: Boolean(l.is_covered),
-          is_scored: Boolean(l.is_scored),
-          can_slice: Boolean(l.can_slice),
-          can_wrap: Boolean(l.can_wrap),
-          can_cover: Boolean(l.can_cover),
-          can_score: Boolean(l.can_score),
-          quantity: Number(l.quantity ?? 0),
-          unit_price: Number(l.unit_price ?? 0),
-          unit_discount: Number(l.unit_discount ?? 0),
-          extended_amount: Number(l.extended_amount ?? 0),
-        }));
-        const totalAmount = lines.reduce(
-          (s: number, l: { extended_amount: number }) => s + l.extended_amount,
-          0,
-        );
-        loadOrder({
-          order_id: data.order_id as number,
-          order_number: (data.order_number as string) ?? '',
-          customer_id: (data.customer_id as number) ?? null,
-          customer_name: (data.customer_name as string) ?? '',
-          customer_credit: 0,
-          order_date: (data.order_date as string) ?? new Date().toISOString().slice(0, 10),
-          production_date: (data.production_date as string) ?? new Date().toISOString().slice(0, 10),
-          production_code: (data.production_code as 'AM' | 'PM' | 'SPECIAL') ?? 'AM',
-          delivery_amount: Number(data.delivery_amount ?? 0),
-          total_amount: totalAmount,
-          lines,
-        });
+        loadOrder(mapOrderToDraft(data as Record<string, unknown>));
       });
-  }, [mode, orderId, tenantId, initialData, loadOrder]);
+  }, [mode, orderId, tenantId, initialData, loadOrder, mapOrderToDraft]);
 
   // ── Focus on initial load ──────────────────────────────────────────────
   useEffect(() => {
@@ -280,6 +390,16 @@ export function OrderEntryForm({
     focusCustomer();
   }, [reset, focusCustomer]);
 
+  const handleOrderPickSelect = useCallback(
+    (row: OrderHeaderListRow) => {
+      setOrderPickOpen(false);
+      setField('order_number', row.order_number);
+      setField('order_ref', row.order_number);
+      void loadOrderById(row.order_id);
+    },
+    [loadOrderById, setField],
+  );
+
   // ── Save ───────────────────────────────────────────────────────────────
 
   const handleSave = useCallback(async () => {
@@ -289,7 +409,7 @@ export function OrderEntryForm({
     const orderNumber =
       draft.order_number.trim() || (!isEdit ? `T-${Date.now()}` : '');
     if (!orderNumber.trim()) {
-      setStatusMessage({ text: 'Invoice No. is missing for this order.', type: 'error' });
+      setStatusMessage({ text: 'Order number is missing for this order.', type: 'error' });
       return;
     }
 
@@ -339,7 +459,8 @@ export function OrderEntryForm({
         return;
       }
 
-      const refs = Array.isArray(json.data?.line_refs) ? json.data?.line_refs : [];
+      const refs =
+        json.data && Array.isArray(json.data.line_refs) ? json.data.line_refs : [];
       if (refs.length > 0) {
         const refMap = new Map<string, number>();
         for (const ref of refs) {
@@ -360,7 +481,7 @@ export function OrderEntryForm({
         text: json.data?.message ?? 'Order saved.',
         type: 'success',
       });
-      // Update order_id / invoice label after create (DB returns final order_number)
+      // Update order_id / order number after create (DB returns final order_number)
       if (!isEdit && json.data?.order_id) {
         setField('order_id', json.data.order_id as number);
       }
@@ -420,7 +541,7 @@ export function OrderEntryForm({
           </h2>
           {draft.order_number && (
             <p className="text-xs text-muted-foreground">
-              Invoice {draft.order_number}
+              Order {draft.order_number}
               {draft.customer_name ? ` · ${draft.customer_name}` : ''}
             </p>
           )}
@@ -469,7 +590,20 @@ export function OrderEntryForm({
           orderRefItems={orderRefItems}
           customerInputRef={customerInputRef}
           onCustomerChange={handleCustomerChange}
-          onOrderRefChange={(order) => setField('order_ref', order ? order.order_number : '')}
+          onOrderRefChange={(order) => {
+            if (!order || order.order_id === 0) {
+              setOrderPickOpen(false);
+              setField('order_ref', order ? order.order_number : '');
+              setField('order_id', undefined);
+              setField('lines', []);
+              setField('total_amount', 0);
+              requestAnimationFrame(() => focusItem());
+              return;
+            }
+            setOrderPickOpen(false);
+            setField('order_ref', order.order_number);
+            void loadOrderById(order.order_id);
+          }}
           onFieldChange={setField}
           orderRefToolbar={
             <Button
@@ -477,7 +611,7 @@ export function OrderEntryForm({
               size="sm"
               className="h-9 text-xs"
               disabled
-              title="Retrieve order by invoice number (coming soon)"
+              title="Retrieve order by order number (coming soon)"
             >
               Retrieve
             </Button>
@@ -567,6 +701,13 @@ export function OrderEntryForm({
           </Button>
         )}
       </div>
+
+      <OrderPickSheet
+        open={orderPickOpen}
+        onOpenChange={setOrderPickOpen}
+        candidates={orderPickCandidates}
+        onSelect={handleOrderPickSelect}
+      />
     </div>
   );
 }

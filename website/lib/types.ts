@@ -142,6 +142,18 @@ export interface InvoiceLookupResult {
 /** Production slot code on om_orders.production_code (legacy: ordr_prdctn_cd). */
 export type ProductionCode = 'AM' | 'PM' | 'SPECIAL';
 
+/** Header row from om_orders_get list mode — Enter Orders slot lookup + multi-order picker. */
+export interface OrderHeaderListRow {
+  order_id: number;
+  order_number: string;
+  order_date?: string;
+  production_date: string;
+  production_code: string;
+  amount: number;
+  customer_id: number;
+  customer_name?: string;
+}
+
 /** An item row returned by om_items_get, used in the Item combobox. */
 export interface OrderEntryItem {
   item_id: number;
