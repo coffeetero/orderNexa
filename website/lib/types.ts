@@ -149,6 +149,7 @@ export interface OrderHeaderListRow {
   order_date?: string;
   production_date: string;
   production_code: string;
+  location_event?: string;
   amount: number;
   customer_id: number;
   customer_name?: string;
@@ -207,6 +208,7 @@ export interface OrderEntryDraft {
   order_number: string;
   customer_id: number | null;
   customer_name: string;
+  location_event: string;
   /** AR credit balance for display — stub until fnd_get_customer_credit is implemented */
   customer_credit: number;
   order_date: string;
@@ -240,6 +242,7 @@ export interface OrderSavePayload {
   order_date: string;
   production_date: string;
   production_code: ProductionCode;
+  location_event: string;
   delivery_amount: number;
   lines: OrderSavePayloadLine[];
 }

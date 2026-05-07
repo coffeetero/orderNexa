@@ -14,6 +14,7 @@
 --     "order_date":       <date string>,
 --     "production_date":  <date string>,
 --     "production_code":  <"AM"|"PM"|"SPECIAL">,
+--     "location_event":   <text|null>,
 --     "delivery_amount":  <numeric>,
 --     "lines": [
 --       {
@@ -105,6 +106,7 @@ BEGIN
             amount,
             discount_amount,
             customer_id,
+            event_location,
             order_source,
             tenant_id,
             snapshot_data
@@ -117,6 +119,7 @@ BEGIN
             0,
             0,
             NULLIF((p_payload->>'customer_id')::TEXT, 'null')::BIGINT,
+            NULLIF(TRIM(p_payload->>'location_event'), ''),
             'Clerk',
             p_tenant_id,
             COALESCE(p_payload->'snapshot_data', '{}'::JSONB)
@@ -132,7 +135,10 @@ BEGIN
             production_date = NULLIF(TRIM(p_payload->>'production_date'), '')::DATE,
             production_code = NULLIF(TRIM(p_payload->>'production_code'), ''),
             customer_id     = NULLIF((p_payload->>'customer_id')::TEXT, 'null')::BIGINT,
-            delivery_amount = COALESCE((p_payload->>'delivery_amount')::NUMERIC, delivery_amount)
+            event_location  = CASE
+                WHEN p_payload ? 'location_event' THEN NULLIF(TRIM(p_payload->>'location_event'), '')
+                ELSE event_location
+            END
         WHERE order_id  = v_order_id
           AND tenant_id = p_tenant_id;
 

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Copy, Save, Trash2, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase/client';
-import { OrderHeaderRow, type CustomerOption, type OrderRefOption } from './OrderHeaderRow';
+import { OrderHeaderRow, type CustomerOption } from './OrderHeaderRow';
 import { ItemEntryRow } from './ItemEntryRow';
 import { OrderLineGrid } from './OrderLineGrid';
 import { useOrderEntryState } from './useOrderEntryState';
@@ -27,6 +27,10 @@ function normalizeOrderHeaderRow(raw: Record<string, unknown>): OrderHeaderListR
     order_number: String(raw.order_number ?? ''),
     production_date: String(raw.production_date ?? ''),
     production_code: String(raw.production_code ?? ''),
+    location_event:
+      raw.location_event !== undefined && raw.location_event !== null
+        ? String(raw.location_event)
+        : undefined,
     amount: Number(raw.amount ?? 0),
     customer_id: Number(raw.customer_id ?? 0),
     customer_name:
@@ -40,11 +44,14 @@ function normalizeOrderHeaderRow(raw: Record<string, unknown>): OrderHeaderListR
   };
 }
 
-const NEW_ORDER_SENTINEL: OrderRefOption = {
-  order_id: 0,
-  order_number: 'New Order',
-  customer_name: '',
-};
+function getErrorMessage(error: unknown, fallback: string): string {
+  return typeof error === 'string' && error.trim().length > 0 ? error : fallback;
+}
+
+function isLocationEventCustomer(customer: CustomerOption): boolean {
+  const type = customer.customer_type?.trim().toUpperCase();
+  return type === 'LOCATION' || type === 'EVENT';
+}
 
 interface OrderEntryFormProps {
   mode: 'new' | 'edit';
@@ -90,7 +97,6 @@ export function OrderEntryForm({
   // Initialise customers directly when pre-loaded by the server.
   const [customers, setCustomers] = useState<CustomerOption[]>(serverCustomers ?? []);
   const [items, setItems] = useState<OrderEntryItem[]>([]);
-  const [orderRefItems, setOrderRefItems] = useState<OrderRefOption[]>([]);
   const [orderPickOpen, setOrderPickOpen] = useState(false);
   const [orderPickCandidates, setOrderPickCandidates] = useState<OrderHeaderListRow[]>([]);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
@@ -98,6 +104,7 @@ export function OrderEntryForm({
   const [itemsError, setItemsError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [shouldFocusItemWhenReady, setShouldFocusItemWhenReady] = useState(false);
 
   // ── State & focus ──────────────────────────────────────────────────────
   const {
@@ -155,6 +162,7 @@ export function OrderEntryForm({
       order_number: (data.order_number as string) ?? '',
       customer_id: (data.customer_id as number) ?? null,
       customer_name: (data.customer_name as string) ?? '',
+      location_event: (data.location_event as string) ?? '',
       customer_credit: 0,
       order_date: (data.order_date as string) ?? new Date().toISOString().slice(0, 10),
       production_date: (data.production_date as string) ?? new Date().toISOString().slice(0, 10),
@@ -168,26 +176,59 @@ export function OrderEntryForm({
   /** Serializes slot lookups so rapid header changes don't apply stale results. */
   const slotLookupGenerationRef = useRef(0);
 
+  const getDefaultLocationEvent = useCallback(
+    (customerId: number | null): string => {
+      if (customerId == null) return '';
+      const customer = customers.find((candidate) => candidate.customer_id === customerId);
+      if (!customer) return draft.customer_name;
+
+      const parent = customer.customer_parent_id
+        ? customers.find((candidate) => candidate.customer_id === customer.customer_parent_id)
+        : undefined;
+      return isLocationEventCustomer(customer) && parent
+        ? `${parent.customer_name} - ${customer.customer_name}`
+        : customer.customer_name;
+    },
+    [customers, draft.customer_name],
+  );
+
   const loadOrderById = useCallback(
     async (targetOrderId: number, opts?: { generation?: number }) => {
       if (!tenantId || !targetOrderId) return;
       const gen = opts?.generation;
-      const response = await fetch(
-        `/api/orders?tenant_id=${tenantId}&order_id=${targetOrderId}&headers_only=false`,
-      );
-      const { data } = (await response.json()) as { data?: Record<string, unknown> };
-      if (!response.ok || !data) return;
-      if (gen !== undefined && gen !== slotLookupGenerationRef.current) return;
-      loadOrder(mapOrderToDraft(data));
-      setActiveLineIndex(null);
-      requestAnimationFrame(() => focusItem());
-    },
-    [tenantId, loadOrder, mapOrderToDraft, focusItem],
-  );
+      setStatusMessage(null);
+      let response: Response;
+      try {
+        response = await fetch(
+          `/api/orders?tenant_id=${tenantId}&order_id=${targetOrderId}&headers_only=false`,
+        );
+      } catch {
+        setStatusMessage({ text: 'Could not load order lines. Network request failed.', type: 'error' });
+        return;
+      }
 
-  /** Latest draft.customer_id — used to ignore stale item-fetch completion when the user changes customer quickly. */
-  const latestCustomerIdRef = useRef<number | null>(draft.customer_id);
-  latestCustomerIdRef.current = draft.customer_id;
+      const json = (await response.json().catch(() => ({}))) as {
+        data?: Record<string, unknown> | null;
+        error?: unknown;
+      };
+      if (!response.ok || json.error) {
+        setStatusMessage({
+          text: getErrorMessage(json.error, 'Could not load order lines.'),
+          type: 'error',
+        });
+        return;
+      }
+      if (!json.data || typeof json.data !== 'object') {
+        setStatusMessage({ text: 'Order detail was empty; no lines were loaded.', type: 'error' });
+        return;
+      }
+      if (gen !== undefined && gen !== slotLookupGenerationRef.current) return;
+      loadOrder(mapOrderToDraft(json.data));
+      setActiveLineIndex(null);
+      setShouldFocusItemWhenReady(true);
+    },
+    [tenantId, loadOrder, mapOrderToDraft],
+  );
 
   // ── Fetch customers when tenantId is ready ─────────────────────────────
   // Skip only if the server already returned a non-empty list; an empty array may mean the RSC
@@ -224,20 +265,27 @@ export function OrderEntryForm({
       })
       .finally(() => {
         setIsLoadingItems(false);
-        if (
-          customerIdForRequest != null &&
-          customerIdForRequest === latestCustomerIdRef.current
-        ) {
-          focusItem();
-        }
       });
-  }, [tenantId, draft.customer_id, focusItem]);
+  }, [tenantId, draft.customer_id]);
+
+  useEffect(() => {
+    if (!shouldFocusItemWhenReady || isLoadingItems || orderPickOpen) return;
+    if (draft.customer_id == null || !draft.order_number) return;
+    setShouldFocusItemWhenReady(false);
+    requestAnimationFrame(() => focusItem());
+  }, [
+    shouldFocusItemWhenReady,
+    isLoadingItems,
+    orderPickOpen,
+    draft.customer_id,
+    draft.order_number,
+    focusItem,
+  ]);
 
   // ── Existing orders: headers-only list for slot, then detail fetch with lines ─
   useEffect(() => {
     if (!tenantId || !draft.customer_id) {
       setField('order_number', '');
-      setOrderRefItems([]);
       setOrderPickCandidates([]);
       setOrderPickOpen(false);
       return;
@@ -260,41 +308,23 @@ export function OrderEntryForm({
 
       const matching = [...rows].sort((a, b) => b.order_id - a.order_id);
 
-      const refs: OrderRefOption[] = [
-        NEW_ORDER_SENTINEL,
-        ...matching.map((o) => ({
-          order_id: o.order_id,
-          order_number: o.order_number,
-          customer_name: draft.customer_name,
-        })),
-      ];
-      setOrderRefItems(refs);
-
       if (matching.length === 0) {
-        setField('order_number', '');
-        setField('order_ref', '');
+        setField('order_number', 'New Order');
+        setField('order_ref', 'New Order');
         setField('order_id', undefined);
+        setField('location_event', getDefaultLocationEvent(draft.customer_id));
         setField('lines', []);
         setField('total_amount', 0);
         setOrderPickCandidates([]);
         setOrderPickOpen(false);
-        requestAnimationFrame(() => focusItem());
+        setShouldFocusItemWhenReady(true);
         return;
       }
 
-      if (matching.length === 1) {
-        const pick = matching[0];
-        setOrderPickCandidates([]);
-        setOrderPickOpen(false);
-        setField('order_number', String(pick.order_number ?? ''));
-        setField('order_ref', pick.order_number);
-        void loadOrderById(pick.order_id, { generation });
-        return;
-      }
-
-      setField('order_number', '');
-      setField('order_ref', '');
+      setField('order_number', 'New Order');
+      setField('order_ref', 'New Order');
       setField('order_id', undefined);
+      setField('location_event', '');
       setField('lines', []);
       setField('total_amount', 0);
       setOrderPickCandidates(matching);
@@ -305,7 +335,13 @@ export function OrderEntryForm({
       .then((r) => r.json())
       .then((ordJson: { data: unknown; error?: string }) => {
         if (generation !== slotLookupGenerationRef.current) return;
-        if (ordJson.error) return;
+        if (ordJson.error) {
+          setStatusMessage({
+            text: getErrorMessage(ordJson.error, 'Could not find existing orders.'),
+            type: 'error',
+          });
+          return;
+        }
 
         const rawRows = Array.isArray(ordJson.data) ? ordJson.data : [];
         const slotRows: OrderHeaderListRow[] = [];
@@ -318,7 +354,10 @@ export function OrderEntryForm({
         applyOrderHeaders(slotRows);
       })
       .catch(() => {
-        /* network — leave UI unchanged */
+        setStatusMessage({
+          text: 'Could not find existing orders. Network request failed.',
+          type: 'error',
+        });
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -327,10 +366,10 @@ export function OrderEntryForm({
     draft.customer_name,
     draft.production_date,
     draft.production_code,
+    getDefaultLocationEvent,
     mode,
     orderId,
     loadOrderById,
-    focusItem,
   ]);
 
   // ── Load existing order in edit mode ──────────────────────────────────
@@ -338,9 +377,22 @@ export function OrderEntryForm({
     if (mode !== 'edit' || !orderId || !tenantId || initialData) return;
     fetch(`/api/orders?tenant_id=${tenantId}&order_id=${orderId}&headers_only=false`)
       .then((r) => r.json())
-      .then(({ data }) => {
-        if (!data) return;
+      .then(({ data, error }) => {
+        if (error) {
+          setStatusMessage({
+            text: getErrorMessage(error, 'Could not load order lines.'),
+            type: 'error',
+          });
+          return;
+        }
+        if (!data || typeof data !== 'object') {
+          setStatusMessage({ text: 'Order detail was empty; no lines were loaded.', type: 'error' });
+          return;
+        }
         loadOrder(mapOrderToDraft(data as Record<string, unknown>));
+      })
+      .catch(() => {
+        setStatusMessage({ text: 'Could not load order lines. Network request failed.', type: 'error' });
       });
   }, [mode, orderId, tenantId, initialData, loadOrder, mapOrderToDraft]);
 
@@ -358,9 +410,16 @@ export function OrderEntryForm({
 
   const handleCustomerChange = useCallback(
     (customer: CustomerOption | null) => {
+      setShouldFocusItemWhenReady(false);
       setCustomer(customer?.customer_id ?? null, customer?.customer_name ?? '');
+      setField('location_event', '');
+      setField('order_number', '');
+      setField('order_ref', '');
+      setField('order_id', undefined);
+      setField('lines', []);
+      setField('total_amount', 0);
     },
-    [setCustomer],
+    [setCustomer, setField],
   );
 
   const handleItemCommit = useCallback(
@@ -390,9 +449,21 @@ export function OrderEntryForm({
     focusCustomer();
   }, [reset, focusCustomer]);
 
+  const handleOrderPickNew = useCallback(() => {
+    setOrderPickOpen(false);
+    setField('order_id', undefined);
+    setField('order_number', 'New Order');
+    setField('order_ref', 'New Order');
+    setField('location_event', getDefaultLocationEvent(draft.customer_id));
+    setField('lines', []);
+    setField('total_amount', 0);
+    setShouldFocusItemWhenReady(true);
+  }, [draft.customer_id, getDefaultLocationEvent, setField]);
+
   const handleOrderPickSelect = useCallback(
     (row: OrderHeaderListRow) => {
       setOrderPickOpen(false);
+      setField('order_id', row.order_id);
       setField('order_number', row.order_number);
       setField('order_ref', row.order_number);
       void loadOrderById(row.order_id);
@@ -406,8 +477,11 @@ export function OrderEntryForm({
     if (!tenantId) return;
 
     const isEdit = mode === 'edit' && !!draft.order_id;
+    const visibleOrderNumber = draft.order_number.trim();
     const orderNumber =
-      draft.order_number.trim() || (!isEdit ? `T-${Date.now()}` : '');
+      visibleOrderNumber === 'New Order'
+        ? (!isEdit ? `T-${Date.now()}` : '')
+        : visibleOrderNumber || (!isEdit ? `T-${Date.now()}` : '');
     if (!orderNumber.trim()) {
       setStatusMessage({ text: 'Order number is missing for this order.', type: 'error' });
       return;
@@ -422,6 +496,7 @@ export function OrderEntryForm({
         order_date: draft.order_date,
         production_date: draft.production_date,
         production_code: draft.production_code,
+        location_event: draft.location_event,
         delivery_amount: draft.delivery_amount,
         lines: draft.lines.map((l) => ({
           client_temp_id: l.tempId,
@@ -481,17 +556,12 @@ export function OrderEntryForm({
         text: json.data?.message ?? 'Order saved.',
         type: 'success',
       });
-      // Update order_id / order number after create (DB returns final order_number)
-      if (!isEdit && json.data?.order_id) {
-        setField('order_id', json.data.order_id as number);
-      }
-      if (json.data?.order_number != null && String(json.data.order_number).length > 0) {
-        setField('order_number', String(json.data.order_number));
-      }
+      reset();
+      requestAnimationFrame(() => focusCustomer());
     } finally {
       setIsSaving(false);
     }
-  }, [tenantId, draft, mode, setField]);
+  }, [tenantId, draft, mode, reset, setField, focusCustomer]);
 
   // ── Delete ─────────────────────────────────────────────────────────────
 
@@ -533,18 +603,11 @@ export function OrderEntryForm({
       {/* ── Title bar ─────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-border/60 bg-card shrink-0">
         <div>
-          <h2
-            className="text-base font-semibold text-foreground"
-            style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
-          >
-            {mode === 'edit' ? 'Edit Order' : 'New Order'} — Order Entry
+          <h2 className="text-base font-semibold text-foreground">
+            {mode === 'edit'
+              ? 'Edit Order'
+              : `Enter Orders - ${draft.customer_name || ''}`}
           </h2>
-          {draft.order_number && (
-            <p className="text-xs text-muted-foreground">
-              Order {draft.order_number}
-              {draft.customer_name ? ` · ${draft.customer_name}` : ''}
-            </p>
-          )}
         </div>
         {/* Status message inline */}
         {statusMessage && (
@@ -587,35 +650,9 @@ export function OrderEntryForm({
           draft={draft}
           customers={customers}
           isLoadingCustomers={isLoadingCustomers}
-          orderRefItems={orderRefItems}
           customerInputRef={customerInputRef}
           onCustomerChange={handleCustomerChange}
-          onOrderRefChange={(order) => {
-            if (!order || order.order_id === 0) {
-              setOrderPickOpen(false);
-              setField('order_ref', order ? order.order_number : '');
-              setField('order_id', undefined);
-              setField('lines', []);
-              setField('total_amount', 0);
-              requestAnimationFrame(() => focusItem());
-              return;
-            }
-            setOrderPickOpen(false);
-            setField('order_ref', order.order_number);
-            void loadOrderById(order.order_id);
-          }}
           onFieldChange={setField}
-          orderRefToolbar={
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 text-xs"
-              disabled
-              title="Retrieve order by order number (coming soon)"
-            >
-              Retrieve
-            </Button>
-          }
         />
       </div>
 
@@ -624,7 +661,7 @@ export function OrderEntryForm({
         <ItemEntryRow
           items={items}
           isLoadingItems={isLoadingItems}
-          disabled={!draft.customer_id && customers.length > 0}
+          disabled={(!draft.customer_id && customers.length > 0) || orderPickOpen || !draft.order_number}
           itemInputRef={itemInputRef}
           qtyRef={qtyRef}
           onCommit={handleItemCommit}
@@ -706,6 +743,7 @@ export function OrderEntryForm({
         open={orderPickOpen}
         onOpenChange={setOrderPickOpen}
         candidates={orderPickCandidates}
+        onNewOrder={handleOrderPickNew}
         onSelect={handleOrderPickSelect}
       />
     </div>

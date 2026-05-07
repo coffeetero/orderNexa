@@ -12,7 +12,8 @@
 --                         and line aggregation is skipped. When FALSE, lines are
 --                         populated as today.
 --
--- Prerequisites: add_order_entry_fields.sql
+-- Scoring fields are intentionally returned as FALSE until the item/order-line
+-- scoring columns are added to the deployed schema.
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION bps.om_orders_get(
@@ -47,7 +48,8 @@ BEGIN
                 'order_date',      o.order_date,
                 'production_date', o.production_date,
                 'production_code', o.production_code,
-                'delivery_amount', COALESCE(o.delivery_amount, 0),
+                'delivery_amount', 0,
+                'location_event',  o.event_location,
                 'amount',          o.amount,
                 'discount_amount', o.discount_amount,
                 'customer_id',     o.customer_id,
@@ -70,7 +72,8 @@ BEGIN
                 'order_date',      o.order_date,
                 'production_date', o.production_date,
                 'production_code', o.production_code,
-                'delivery_amount', COALESCE(o.delivery_amount, 0),
+                'delivery_amount', 0,
+                'location_event',  o.event_location,
                 'amount',          o.amount,
                 'discount_amount', o.discount_amount,
                 'customer_id',     o.customer_id,
@@ -99,12 +102,12 @@ BEGIN
                             'is_sliced',       COALESCE(l.is_sliced,  FALSE),
                             'is_wrapped',      COALESCE(l.is_wrapped, FALSE),
                             'is_covered',      COALESCE(l.is_covered, FALSE),
-                            'is_scored',       COALESCE(l.is_scored,  FALSE),
+                            'is_scored',       FALSE,
                             -- Capabilities from bps_items for UI checkbox enabling
                             'can_slice',       COALESCE(b.is_sliceable, FALSE),
                             'can_wrap',        COALESCE(b.is_wrappable,  FALSE),
                             'can_cover',       COALESCE(b.is_coverable,  FALSE),
-                            'can_score',       COALESCE(b.is_scoreable,  FALSE)
+                            'can_score',       FALSE
                         )
                         ORDER BY l.order_line_id
                     ) AS lines
@@ -122,7 +125,7 @@ BEGIN
     END IF;
 
     -- ── List mode: order headers (no lines) ───────────────────────────────
-    SELECT jsonb_agg(row_data ORDER BY o.production_date DESC, o.order_id DESC)
+    SELECT jsonb_agg(row_data ORDER BY production_date_sort DESC, order_id_sort DESC)
       INTO v_result
       FROM (
         SELECT jsonb_build_object(
@@ -131,13 +134,16 @@ BEGIN
             'order_date',      o.order_date,
             'production_date', o.production_date,
             'production_code',   o.production_code,
-            'delivery_amount', COALESCE(o.delivery_amount, 0),
+            'delivery_amount', 0,
+            'location_event',  o.event_location,
             'amount',          o.amount,
             'discount_amount', o.discount_amount,
             'customer_id',     o.customer_id,
             'customer_name',   COALESCE(c.customer_name,
                                         o.snapshot_data->>'cus_name', '')
-        ) AS row_data
+        ) AS row_data,
+        o.production_date AS production_date_sort,
+        o.order_id AS order_id_sort
           FROM om_orders o
           LEFT JOIN fnd_customers c
                  ON c.customer_id = o.customer_id

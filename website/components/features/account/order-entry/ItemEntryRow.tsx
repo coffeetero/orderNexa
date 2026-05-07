@@ -85,7 +85,7 @@ export function ItemEntryRow({
   return (
     <div className="flex flex-wrap items-start gap-x-2 gap-y-1.5 px-3 py-2 border-b border-border/60 bg-muted/20">
       {/* Item Search */}
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1">
+      <div className="flex min-h-0 w-[346px] min-w-[346px] max-w-[346px] shrink-0 flex-col gap-1">
         <Label htmlFor="item-search" className={cn(CONTROL_LABEL, 'uppercase')}>
           Item
         </Label>
@@ -110,7 +110,7 @@ export function ItemEntryRow({
           inputRef={itemInputRef}
           triggerId="item-search"
           className="!flex-none min-h-0 w-full min-w-0 self-start"
-          contentClassName="z-50"
+          contentClassName="z-50 [&_[cmdk-group]]:!p-0 [&_[cmdk-group-items]]:!space-y-0 [&_[cmdk-item]]:!h-[20px] [&_[cmdk-item]]:!min-h-0 [&_[cmdk-item]]:!py-0 [&_[cmdk-item]]:!my-0 [&_[cmdk-item]]:!text-xs [&_[cmdk-item]]:!leading-none [&_[cmdk-item]_span]:!leading-none [&_[cmdk-item]_svg]:!h-3 [&_[cmdk-item]_svg]:!w-3"
         />
       </div>
 

@@ -1,6 +1,5 @@
 'use client';
 
-import type { ReactNode } from 'react';
 import { EntityComboBox } from '@/components/bps/EntityComboBox';
 import { Label } from '@/components/ui/label';
 import {
@@ -19,51 +18,38 @@ export interface CustomerOption {
   customer_parent_id: number | null;
   customer_name: string;
   customer_number: string | null;
+  customer_type?: string | null;
+  level?: number;
   sort_path: string;
-}
-
-/** Slim order option shape used for the Order No. combobox search — wired to real data later. */
-export interface OrderRefOption {
-  order_id: number;
-  order_number: string;
-  customer_name: string;
 }
 
 interface OrderHeaderRowProps {
   draft: OrderEntryDraft;
   customers: CustomerOption[];
   isLoadingCustomers: boolean;
-  /** Items for the Order No. combobox — pass [] until the search-orders API is wired. */
-  orderRefItems?: OrderRefOption[];
   /** External ref for the customer search <input> (used by useOrderFocus, alwaysOpen mode). */
   customerInputRef: React.RefObject<HTMLInputElement>;
   onCustomerChange: (customer: CustomerOption | null) => void;
   /** Optional — e.g. focus next control after pick (order entry defers to items-loaded focus). */
   onCustomerAfterSelect?: () => void;
-  onOrderRefChange?: (order: OrderRefOption | null) => void;
   onFieldChange: <K extends keyof OrderEntryDraft>(field: K, value: OrderEntryDraft[K]) => void;
-  /** Placed to the right of the Order No. control (e.g. Retrieve). */
-  orderRefToolbar?: ReactNode;
 }
 
 export function OrderHeaderRow({
   draft,
   customers,
   isLoadingCustomers,
-  orderRefItems = [],
   customerInputRef,
   onCustomerChange,
   onCustomerAfterSelect,
-  onOrderRefChange,
   onFieldChange,
-  orderRefToolbar,
 }: OrderHeaderRowProps) {
   return (
     <div className="border-b border-border/60 bg-card px-3 py-2">
       {/* Single row: Customer + dates + Order No. (+ optional toolbar) */}
-      <div className="flex flex-wrap items-end gap-2">
+        <div className="flex flex-wrap items-end gap-2">
         {/* Customer */}
-        <div className="flex flex-col gap-1 flex-1 min-w-[200px]">
+        <div className="flex flex-col gap-1 w-[346px] min-w-[346px] max-w-[346px] shrink-0">
           <Label htmlFor="customer-select" className="text-xs font-semibold text-muted-foreground tracking-wide">
             Customer
           </Label>
@@ -93,7 +79,25 @@ export function OrderHeaderRow({
             clearSearchOnFocus
             inputRef={customerInputRef}
             triggerId="customer-select"
+            contentClassName="[&_[cmdk-group]]:!p-0 [&_[cmdk-group-items]]:!space-y-0 [&_[cmdk-item]]:!h-[20px] [&_[cmdk-item]]:!min-h-0 [&_[cmdk-item]]:!py-0 [&_[cmdk-item]]:!my-0 [&_[cmdk-item]]:!text-xs [&_[cmdk-item]]:!leading-none [&_[cmdk-item]_span]:!leading-none [&_[cmdk-item]_svg]:!h-3 [&_[cmdk-item]_svg]:!w-3"
             contextParentsSelectable={false}
+          />
+        </div>
+
+        {/* Location/Event */}
+        <div className="flex flex-col gap-1 flex-1 min-w-[220px]">
+          <Label htmlFor="location-event" className="text-xs font-semibold text-muted-foreground tracking-wide">
+            Location/Event
+          </Label>
+          <input
+            id="location-event"
+            type="text"
+            className={cn(
+              'h-9 w-full rounded-md border border-input bg-background px-2 text-sm text-foreground',
+              'focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary',
+            )}
+            value={draft.location_event}
+            onChange={(e) => onFieldChange('location_event', e.target.value)}
           />
         </div>
 
@@ -135,48 +139,21 @@ export function OrderHeaderRow({
           </Select>
         </div>
 
-        {/* Order No. + toolbar (e.g. Retrieve) */}
-        <div className="flex items-end gap-2 shrink-0">
-          <div className="flex flex-col gap-1 w-36 min-w-0">
-            <Label htmlFor="order-ref" className="text-xs font-semibold text-muted-foreground tracking-wide">
-              Order No.
-            </Label>
-            <EntityComboBox<OrderRefOption>
-              items={orderRefItems}
-              value={draft.order_ref ? Number(draft.order_ref) || null : null}
-              onChange={(order) => {
-                onFieldChange('order_ref', order ? String(order.order_number) : '');
-                onOrderRefChange?.(order);
-              }}
-              getId={(o) => o.order_id}
-              getLabel={(o) =>
-                o.order_id === 0
-                  ? 'New Order'
-                  : o.customer_name
-                  ? `${o.order_number} — ${o.customer_name}`
-                  : o.order_number
-              }
-              getSearchText={(o) => `${o.order_number} ${o.customer_name}`}
-              getParentId={() => null}
-              getSortKey={(o) => (o.order_id === 0 ? '\u0000' : o.order_number)}
-              placeholder="Search orders…"
-              emptyText="No orders found."
-              clearable
-              triggerId="order-ref"
-              triggerClassName="h-9 text-sm font-normal"
-            />
+        {/* Order Number */}
+        <div className="flex flex-col gap-1 w-[173px] min-w-0 shrink-0">
+          <Label htmlFor="order-number-display" className="text-center text-xs font-semibold text-muted-foreground tracking-wide">
+            Order Number
+          </Label>
+          <div
+            id="order-number-display"
+            className={cn(
+              'flex h-9 w-full items-center rounded-md border border-input bg-muted/30 px-3 text-sm text-foreground',
+              !draft.order_number && 'text-muted-foreground',
+            )}
+            aria-label="Order number"
+          >
+            <span className="truncate">{draft.order_number || 'No order'}</span>
           </div>
-          {orderRefToolbar != null && (
-            <div className="flex flex-col gap-1 shrink-0 pb-px">
-              <span
-                className="text-[10px] font-semibold text-muted-foreground tracking-wide invisible pointer-events-none select-none"
-                aria-hidden
-              >
-                &nbsp;
-              </span>
-              <div className="h-9 flex items-center">{orderRefToolbar}</div>
-            </div>
-          )}
         </div>
       </div>
     </div>

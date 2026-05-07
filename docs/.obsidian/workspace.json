@@ -27,12 +27,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "ideas/Ideas for future products.md",
+                "file": "Architecture/order-entry-blueprint.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Ideas for future products"
+              "title": "order-entry-blueprint"
             }
           }
         ],
@@ -197,9 +197,12 @@
   },
   "active": "1ce2a5f2be6e6213",
   "lastOpenFiles": [
+    "Architecture/project-blueprint.md",
+    "Architecture/order-entry-blueprint.md",
+    "ideas/Ideas for future products.md",
+    "Architecture",
     "~$BPS Tables.xlsx",
     "ideas/conversation with Claude chat.md",
-    "ideas/Ideas for future products.md",
     "Supabase/connections.md",
     "ideas/New Text Document.txt",
     "ideas",
@@ -211,9 +214,7 @@
     "Prompts",
     "Cursor/cursor.md",
     "Cursor",
-    "Supabase",
     "table Relationships/Invoice No to order numbers.md",
-    "7EF3A300",
     "table Relationships/Customer to Item Price.md",
     "Cursor/cursorOrderEntryUiPattern.md",
     "Cursor/cursorDevelopmentGuidelines.md"

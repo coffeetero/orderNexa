@@ -27,7 +27,7 @@ BEGIN
      *   p_hierarchy = true
      *     - Returns a jsonb array of slim hierarchy rows ordered by sort_path:
      *       tenant_id, customer_id, customer_parent_id, customer_number,
-     *       customer_name, level, sort_path
+     *       customer_name, customer_type, level, sort_path
      *     - p_customer_id IS NULL  -> anchor is top-level customers for tenant.
      *     - p_customer_id NOT NULL -> anchor is exactly that customer (subtree).
      *     - p_active = true filters both the anchor and recursive members
@@ -60,6 +60,7 @@ BEGIN
             cus.customer_parent_id,
             cus.customer_number,
             cus.customer_name,
+            cus.customer_type,
             0 AS level,
             LPAD(COALESCE(cus.customer_number, cus.customer_id::text), 20, '0') AS sort_path,
             ARRAY[cus.customer_id]::bigint[] AS path_ids
@@ -90,6 +91,7 @@ BEGIN
             ch.customer_parent_id,
             ch.customer_number,
             ch.customer_name,
+            ch.customer_type,
             ct.level + 1,
             ct.sort_path || '.' || LPAD(COALESCE(ch.customer_number, ch.customer_id::text), 20, '0'),
             ct.path_ids || ch.customer_id
@@ -108,6 +110,7 @@ BEGIN
                 'customer_parent_id', customer_parent_id,
                 'customer_number', customer_number,
                 'customer_name', customer_name,
+                'customer_type', customer_type,
                 'level', level,
                 'sort_path', sort_path
             )
