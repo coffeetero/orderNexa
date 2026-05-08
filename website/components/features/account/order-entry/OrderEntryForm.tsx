@@ -4,6 +4,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Save, Trash2, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { createClient } from '@/lib/supabase/client';
 import { OrderHeaderRow, type CustomerOption } from './OrderHeaderRow';
 import { ItemEntryRow } from './ItemEntryRow';
@@ -81,7 +90,7 @@ function daysAfterToday(dateValue: string): number | null {
 
 function isDepartmentEventCustomer(customer: CustomerOption): boolean {
   const type = customer.customer_type?.trim().toUpperCase();
-  return type === 'LOCATION' || type === 'EVENT';
+  return type === 'LOCATION';
 }
 
 interface OrderEntryFormProps {
@@ -136,6 +145,7 @@ export function OrderEntryForm({
   const [itemsError, setItemsError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [productionDateBlockedOpen, setProductionDateBlockedOpen] = useState(false);
   const [shouldFocusItemWhenReady, setShouldFocusItemWhenReady] = useState(false);
 
   // ── State & focus ──────────────────────────────────────────────────────
@@ -163,6 +173,10 @@ export function OrderEntryForm({
   } = useOrderFocus();
 
   const [activeLineIndex, setActiveLineIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    focusCustomer();
+  }, [focusCustomer]);
 
   const mapOrderToDraft = useCallback((data: Record<string, unknown>): OrderEntryDraft => {
     const lines = (Array.isArray(data.lines) ? data.lines : []).map((l: Record<string, unknown>) => ({
@@ -213,11 +227,11 @@ export function OrderEntryForm({
     (customerId: number | null): string => {
       if (customerId == null) return '';
       const customer = customers.find((candidate) => candidate.customer_id === customerId);
-      if (!customer) return draft.customer_name;
+      if (!customer) return '';
 
-      return isDepartmentEventCustomer(customer) ? customer.customer_name : customer.customer_name;
+      return isDepartmentEventCustomer(customer) ? customer.customer_name : '';
     },
-    [customers, draft.customer_name],
+    [customers],
   );
 
   const loadOrderById = useCallback(
@@ -484,7 +498,7 @@ export function OrderEntryForm({
       const previousCustomerId = draft.customer_id;
       setShouldFocusItemWhenReady(false);
       setCustomer(customer?.customer_id ?? null, customer?.customer_name ?? '');
-      setField('department_event', '');
+      setField('department_event', getDefaultDepartmentEvent(customer?.customer_id ?? null));
       setField('order_number', '');
       setField('order_ref', '');
       setField('order_id', undefined);
@@ -494,17 +508,14 @@ export function OrderEntryForm({
         void handleSearchExistingOrders();
       }
     },
-    [draft.customer_id, handleSearchExistingOrders, setCustomer, setField],
+    [draft.customer_id, getDefaultDepartmentEvent, handleSearchExistingOrders, setCustomer, setField],
   );
 
   const handleProductionDateChange = useCallback(
     (value: string) => {
       const daysAhead = daysAfterToday(value);
-      if (
-        daysAhead !== null &&
-        daysAhead > 5 &&
-        !window.confirm('This production date is more than 5 days in the future. Continue?')
-      ) {
+      if (daysAhead !== null && daysAhead > 7) {
+        setProductionDateBlockedOpen(true);
         return;
       }
       setField('production_date', value);
@@ -822,6 +833,19 @@ export function OrderEntryForm({
         onNewOrder={handleOrderPickNew}
         onSelect={handleOrderPickSelect}
       />
+      <AlertDialog open={productionDateBlockedOpen} onOpenChange={setProductionDateBlockedOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Production Date</AlertDialogTitle>
+            <AlertDialogDescription>
+              Future orders are limited to a 7-day window
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction>OK</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

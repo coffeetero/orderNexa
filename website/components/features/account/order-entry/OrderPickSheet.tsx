@@ -30,12 +30,13 @@ export function OrderPickSheet({
   const [activeIndex, setActiveIndex] = useState(0);
   const [customerSearch, setCustomerSearch] = useState('');
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setActiveIndex(0);
     setCustomerSearch('');
-    requestAnimationFrame(() => containerRef.current?.focus());
+    requestAnimationFrame(() => searchInputRef.current?.focus());
   }, [open, candidates.length]);
 
   const rowsWithOption = useMemo(() => {
@@ -144,13 +145,20 @@ export function OrderPickSheet({
 
         <div className="px-5 pb-3">
           <Input
+            ref={searchInputRef}
             value={customerSearch}
             onChange={(event) => {
               setCustomerSearch(event.target.value);
               setActiveIndex(0);
             }}
-            placeholder="Search customer, location, or order..."
+            placeholder="Search Customer, Department/Event or Order.."
             className="h-8 text-sm"
+            onKeyDown={(event) => {
+              if (['ArrowDown', 'ArrowUp', 'Home', 'End', 'Enter'].includes(event.key)) {
+                event.stopPropagation();
+              }
+              handleKeyDown(event);
+            }}
           />
         </div>
 

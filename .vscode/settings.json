@@ -1,26 +1,27 @@
 {
-    "sqltools.connections": [
-        {
-            "ssh": "Disabled",
-            "previewLimit": 50,
-            "server": "db.dizsenktyfnprxbxujpf.supabase.co",
-            "port": 5432,
-            "driver": "PostgreSQL",
-            "name": "supabase",
-            "database": "postgres",
-            "username": "postgres",
-            "password": "Pumpkin22$se01"
-        },
-        {
-            "ssh": "Disabled",
-            "previewLimit": 50,
-            "server": "aws-1-us-east-2.pooler.supabase.com",
-            "port": 6543,
-            "driver": "PostgreSQL",
-            "name": "orderNexaPoolConn",
-            "username": "bps_dev.dizsenktyfnprxbxujpf",
-            "password": "Pumpkin22$",
-            "database": "postgres"
-        }
-    ]
+  "sqltools.connections": [
+    {
+      "ssh": "Disabled",
+      "previewLimit": 50,
+      "server": "db.dizsenktyfnprxbxujpf.supabase.co",
+      "port": 5432,
+      "driver": "PostgreSQL",
+      "name": "supabase",
+      "database": "postgres",
+      "username": "postgres",
+      "password": "REDACTED"
+    },
+    {
+      "ssh": "Disabled",
+      "previewLimit": 50,
+      "server": "aws-1-us-east-2.pooler.supabase.com",
+      "port": 6543,
+      "driver": "PostgreSQL",
+      "name": "orderNexaPoolConn",
+      "username": "bps_dev.dizsenktyfnprxbxujpf",
+      "password": "REDACTED",
+      "database": "postgres"
+    }
+  ],
+  "python.defaultInterpreterPath": "${workspaceFolder}\\.venv\\Scripts\\python.exe"
 }

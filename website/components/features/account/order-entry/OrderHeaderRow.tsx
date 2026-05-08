@@ -1,9 +1,10 @@
 'use client';
 
+import { useMemo } from 'react';
 import { EntityComboBox } from '@/components/bps/EntityComboBox';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Search } from 'lucide-react';
+import { Copy, Search } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -40,6 +41,16 @@ interface OrderHeaderRowProps {
   onFieldChange: <K extends keyof OrderEntryDraft>(field: K, value: OrderEntryDraft[K]) => void;
 }
 
+function addDays(dateValue: string, days: number): string {
+  const [year, month, day] = dateValue.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  date.setDate(date.getDate() + days);
+  const nextYear = date.getFullYear();
+  const nextMonth = String(date.getMonth() + 1).padStart(2, '0');
+  const nextDay = String(date.getDate()).padStart(2, '0');
+  return `${nextYear}-${nextMonth}-${nextDay}`;
+}
+
 export function OrderHeaderRow({
   draft,
   customers,
@@ -51,6 +62,27 @@ export function OrderHeaderRow({
   onProductionDateChange,
   onFieldChange,
 }: OrderHeaderRowProps) {
+  const maxProductionDate = addDays(draft.order_date || draft.production_date, 7);
+
+  const customerById = useMemo(() => {
+    return new Map(customers.map((customer) => [customer.customer_id, customer]));
+  }, [customers]);
+
+  const getCustomerLabel = (customer: CustomerOption) =>
+    customer.customer_number
+      ? `${customer.customer_number} - ${customer.customer_name}`
+      : customer.customer_name;
+
+  const getCustomerInputLabel = (customer: CustomerOption) => {
+    if (customer.customer_type?.trim().toUpperCase() === 'LOCATION') {
+      const parent = customer.customer_parent_id
+        ? customerById.get(customer.customer_parent_id)
+        : undefined;
+      return parent ? getCustomerLabel(parent) : getCustomerLabel(customer);
+    }
+    return getCustomerLabel(customer);
+  };
+
   return (
     <div className="border-b border-border/60 bg-card px-3 py-2">
       {/* Single row: Customer + dates + Order No. (+ optional toolbar) */}
@@ -66,11 +98,8 @@ export function OrderHeaderRow({
             onChange={onCustomerChange}
             onAfterSelect={onCustomerAfterSelect}
             getId={(c) => c.customer_id}
-            getLabel={(c) =>
-              c.customer_number
-                ? `${c.customer_number} — ${c.customer_name}`
-                : c.customer_name
-            }
+            getLabel={getCustomerLabel}
+            getInputLabel={getCustomerInputLabel}
             getSearchText={(c) =>
               `${c.customer_number ?? ''} ${c.customer_name}`
             }
@@ -121,6 +150,7 @@ export function OrderHeaderRow({
               'focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary',
             )}
             value={draft.production_date}
+            max={maxProductionDate}
             onChange={(e) => onProductionDateChange(e.target.value)}
             onFocus={(e) => e.target.select()}
           />
@@ -158,6 +188,17 @@ export function OrderHeaderRow({
           <Search className="h-4 w-4" />
         </Button>
 
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="mb-0 h-9 w-9 shrink-0"
+          aria-label="Copy order"
+          title="Copy order"
+        >
+          <Copy className="h-4 w-4" />
+        </Button>
+
         {/* Order Number */}
         <div className="flex flex-col gap-1 w-[173px] min-w-0 shrink-0">
           <Label htmlFor="order-number-display" className="text-center text-xs font-semibold text-muted-foreground tracking-wide">
@@ -166,12 +207,12 @@ export function OrderHeaderRow({
           <div
             id="order-number-display"
             className={cn(
-              'flex h-9 w-full items-center rounded-md border border-input bg-muted/30 px-3 text-sm text-foreground',
+              'flex h-9 w-full items-center justify-center rounded-md border border-input bg-muted/30 px-3 text-center text-sm text-foreground',
               !draft.order_number && 'text-muted-foreground',
             )}
             aria-label="Order number"
           >
-            <span className="truncate">{draft.order_number || 'No order'}</span>
+            <span className="truncate">{draft.order_number || 'New Order'}</span>
           </div>
         </div>
       </div>

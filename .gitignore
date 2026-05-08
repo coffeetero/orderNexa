@@ -4,3 +4,6 @@
 # Local secrets (do not commit)
 .env
 database/migration/.env
+
+# Local Python environment
+.venv/
