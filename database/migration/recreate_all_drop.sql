@@ -27,6 +27,7 @@ DROP TABLE IF EXISTS om_orders CASCADE;
 
 -- --- Slug registry (no dependents) ---
 DROP TABLE IF EXISTS fnd_slug_registry CASCADE;
+DROP TABLE IF EXISTS fnd_tenant_sequences CASCADE;
 
 -- --- App users & people (FK to tenants / customers) ---
 DROP TABLE IF EXISTS fnd_user_customers CASCADE;

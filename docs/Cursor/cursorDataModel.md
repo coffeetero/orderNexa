@@ -15,6 +15,7 @@ Purpose: explain the `bps` data model in plain English so developers can underst
 - `fnd_user_tenants`: user-to-tenant membership bridge (many-to-many), including whether customer access is restricted.
 - `fnd_user_customers`: optional user-to-customer access bridge for restricted users.
 - `fnd_customers`: customer master per tenant, including hierarchical parent-child customer structure.
+- `fnd_tenant_sequences`: tenant-scoped reusable number sequences for orders, invoices, customers, and future document numbers.
 - `fnd_audit_log`: centralized change history table populated by audit triggers.
 - `fnd_currencies`: global ISO currency catalog used by price books.
 
@@ -102,6 +103,43 @@ Important columns:
 How it is used:
 - Customer selection, order ownership, AR ownership.
 - Hierarchical UIs (parent-child display/selection).
+- `top_customer_id` is intended to support faster authorization and RLS checks when access is granted at the top account level.
+
+---
+
+## `fnd_tenant_sequences`
+
+What it represents:
+- Tenant-specific sequence definitions for document and business numbers.
+
+Important columns:
+- `tenant_id` (PK part): tenant that owns the sequence.
+- `sequence_name` (PK part): logical sequence, for example `order_number`.
+- `start_value`: configured starting value.
+- `next_value`: next numeric value to allocate.
+- `increment_by`: numeric increment, currently normally `1`.
+- `mask`: optional display mask applied to the numeric value.
+- `reset_period`: `NEVER`, `DAILY`, `MONTHLY`, or `YEARLY`.
+- `requires_gapless`: marks sequences where assigned numbers must not later be deleted.
+
+How it is used:
+- New orders call `fnd_tenant_sequence_next(tenant_id, 'order_number', context_date)` during save.
+- The sequence row is locked during allocation so concurrent saves do not receive the same value.
+- Alpine Bakery seeds `order_number` from legacy `ordr.ordr_no`: `start_value = max(ordr_no)` and `next_value = max(ordr_no) + 1`.
+
+Mask rules:
+- Date tokens include `[YY]`, `[YYYY]`, `[YYYYMM]`, `[YYYYMMDD]`, `[YYYY-MM]`, and `[YYYY-MM-DD]`.
+- `#` placeholders fill from right to left across all groups.
+- Values shorter than the total number of `#` placeholders are zero-filled.
+- Values longer than the total number of `#` placeholders overflow into the leftmost group.
+
+Examples:
+
+```text
+####-#### + 1151044     -> 0115-1044
+#-#### + 1151044        -> 115-1044
+[YY]####-#### + 1151044 -> 260115-1044
+```
 
 ---
 
@@ -114,14 +152,18 @@ Important columns:
 - `order_id` (PK).
 - `tenant_id` (FK to `fnd_tenants`).
 - `customer_id` (FK to `fnd_customers`, nullable for some legacy cases).
+- `customer_name`: order-time customer name snapshot.
 - `order_number` (unique per tenant).
 - `order_date`, `production_date`, `production_code`.
+- `location_event`: editable order context for site/location/event or walk-in separation.
 - Financial rollup fields: `quantity`, `amount`, `discount_amount`.
 - `snapshot_data` (JSONB): captured context from source flow.
 
 How it is used:
 - Parent record for order lines and shipment events.
 - Main operational record for order lifecycle.
+- Existing orders are retrieved and updated by `order_id`, not by display `order_number`.
+- New order saves allocate `order_number` from `fnd_tenant_sequences`.
 
 ---
 

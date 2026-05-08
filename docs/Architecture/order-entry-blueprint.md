@@ -1,6 +1,6 @@
 # Order Entry Blueprint
 
-Last updated: May 6, 2026
+Last updated: May 8, 2026
 
 ## Purpose
 
@@ -33,6 +33,10 @@ After the user selects a customer by pressing Enter or clicking:
 The order lines grid must be updated from the selected order detail response, not from the header-only order lookup response.
 
 The Order Number field is display-only on the header. Existing-order selection is handled by the popup, using the internal `order_id` for retrieval. Order numbers are display values and may be non-numeric, generated, or tenant-specific.
+
+When a customer has already been selected, choosing an existing order must not replace that selected customer with the customer stored on the order. This matters for location/event workflows: a location selection can find parent-customer orders, but the user's selected customer remains the workflow context. The loaded order should provide the persisted Location/Event text and order lines.
+
+When no customer is selected and the user searches existing orders by production date/code, selecting an existing order can populate Customer from the selected order because there is no customer context to preserve.
 
 The popup is part of the keyboard flow:
 
@@ -128,11 +132,11 @@ Cafeteria
   French Bread   6
 ```
 
-When entering an order for a location or event, the location/event customer name is appended to the parent customer name and can be overridden. The parent customer ID is recorded on the order, while a `location_event` field is unique within that order.
+When entering an order for a location or event, the location/event customer is used to default the editable Location/Event text. The parent customer ID is recorded on the order, while a `location_event` field is unique within that order.
 
 The order-entry screen has an editable `Location/Event` text field in the header row. The field should not default immediately when the customer is selected if existing orders may need to be resolved first.
 
-After the existing-order decision is resolved, Location/Event defaults from the selected customer. For a location/event customer, it should default from the parent customer name plus the selected location/event name, for example `Hilton Luxury - Kitchen`. The user may override this text before saving.
+After the existing-order decision is resolved, Location/Event defaults from the selected customer. For a location/event customer, it should default from the selected location/event name for active entry, while the save function records the immediate parent's customer name as the order's customer snapshot. The user may override Location/Event before saving.
 
 ## Walk-In And On-The-Fly Orders
 
@@ -204,6 +208,8 @@ Order Entry currently depends on these API/function contracts:
 - Existing order detail is retrieved by `order_id` with `headers_only=false`.
 - Order save sends `location_event` and line details through the API to the PostgreSQL save function.
 - The save result returns the resolved order id, generated/final order number, and line references.
+- New orders send a visible `New Order` state from the UI. The database assigns the real tenant order number during save.
+- `om_orders_save` updates an existing order when `order_id` is provided. If `order_id` is null, the save path creates a new order and allocates an order number.
 
 Recent database/function fixes:
 
@@ -211,11 +217,46 @@ Recent database/function fixes:
 - Stale references to removed item/order fields were removed from the active function path.
 - `om_orders_save` was corrected to save `location_event`.
 - `fnd_customers_get` was updated to include `customer_type` in hierarchy payloads.
+- `om_orders_get` now treats a selected location customer as a lookup against its parent customer, so parent-level existing orders can be found from a location selection.
+- `om_orders_save` records the appropriate parent customer for location-type selections and preserves a customer name snapshot on the order.
+
+## Tenant Order Numbering
+
+Order numbers are tenant-scoped and come from `fnd_tenant_sequences`.
+
+Important rules:
+
+- Numbers are allocated only when a new order is saved.
+- Existing orders update by `order_id` and do not allocate a new number.
+- `sequence_name = 'order_number'` is the sequence used by Order Entry.
+- The sequence row is locked with `FOR UPDATE` during allocation so two order saves cannot receive the same number.
+- Non-gap requirements are modeled through `requires_gapless`; tenants requiring non-gap order numbers should not be allowed to physically delete orders after assignment.
+
+Mask interpretation:
+
+- Date tokens include `[YY]`, `[YYYY]`, `[YYYYMM]`, `[YYYYMMDD]`, `[YYYY-MM]`, and `[YYYY-MM-DD]`.
+- All `#` placeholders across the mask are treated as one grouped numeric field.
+- The numeric value fills `#` positions from right to left.
+- If the value has fewer digits than the total number of `#` characters, it is left-padded with zeroes.
+- If the value has more digits than the total number of `#` characters, overflow expands the leftmost `#` group.
+
+Examples:
+
+```text
+####-#### + 1151044     -> 0115-1044
+#-#### + 1151044        -> 115-1044
+[YY]####-#### + 1151044 -> 260115-1044
+O## + 321               -> O321
+```
+
+Alpine Bakery currently uses `####-####`, seeded from the legacy maximum `ordr.ordr_no`. The sequence `start_value` preserves the legacy maximum and `next_value` advances one past it.
 
 ## Open Follow-Ups
 
-- Existing-order lookup should eventually use the effective parent order customer for location/event customers, not only the exact selected customer id.
-- Location/Event defaults for location/event customers may need sequencing, for example `Hilton Luxury - Kitchen 001`.
+- Add the no-customer Search button beside Production Code. It should pass production date, production code, and optional customer id into the existing-order lookup.
+- Existing Orders popup should include customer search and group/sort results by account customer name, with existing orders listed under each account.
+- Existing Orders popup should show customer number/name, Location/Event context, order number, and amount in the final compact layout.
+- RLS for `fnd_tenant_sequences` needs a dev/admin access decision. `bps_dev` has grants, but direct SQL sessions may not see rows when the RLS policy depends on Supabase JWT `app_metadata.tenant_id`.
 - Walk-in and sample order flows need a clean pattern for default customer, generated Location/Event, and price handling.
 - Debugging flags should be added later so workflow/API checkpoints can be enabled without noisy production logs.
 - Item property modeling needs future design beyond the current booleans such as sliced, wrapped, and covered.

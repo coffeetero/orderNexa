@@ -64,6 +64,8 @@ DECLARE
     v_payload_customer_id BIGINT;
     v_order_customer_id   BIGINT;
     v_order_customer_name TEXT;
+    v_production_date DATE;
+    v_requires_gapless BOOLEAN;
 BEGIN
     IF p_tenant_id IS NULL THEN
         RAISE EXCEPTION 'p_tenant_id is required';
@@ -74,6 +76,19 @@ BEGIN
         IF p_order_id IS NULL THEN
             RAISE EXCEPTION 'p_order_id is required for delete';
         END IF;
+
+        v_requires_gapless := FALSE;
+
+        SELECT COALESCE(seq.requires_gapless, FALSE)
+          INTO v_requires_gapless
+          FROM fnd_tenant_sequences seq
+         WHERE seq.tenant_id = p_tenant_id
+           AND seq.sequence_name = 'order_number';
+
+        IF COALESCE(v_requires_gapless, FALSE) THEN
+            RAISE EXCEPTION 'Order % cannot be deleted because this tenant requires gapless order numbers. Cancel or void the order instead.', p_order_id;
+        END IF;
+
         DELETE FROM om_orders
          WHERE order_id  = p_order_id
            AND tenant_id = p_tenant_id;
@@ -92,6 +107,8 @@ BEGIN
     IF p_payload IS NULL THEN
         RAISE EXCEPTION 'p_payload is required';
     END IF;
+
+    v_production_date := NULLIF(TRIM(p_payload->>'production_date'), '')::DATE;
 
     v_payload_customer_id := NULLIF((p_payload->>'customer_id')::TEXT, 'null')::BIGINT;
     v_order_customer_id := v_payload_customer_id;
@@ -122,8 +139,12 @@ BEGIN
     -- ── HEADER UPSERT (id-driven, with order-number fallback) ───────────
     IF p_order_id IS NULL THEN
         v_order_number := TRIM(p_payload->>'order_number');
-        IF v_order_number IS NULL OR v_order_number = '' THEN
-            RAISE EXCEPTION 'order_number is required when creating a new order';
+        IF v_order_number IS NULL OR v_order_number = '' OR v_order_number = 'New Order' THEN
+            v_order_number := fnd_tenant_sequence_next(
+                p_tenant_id,
+                'order_number',
+                COALESCE(v_production_date, CURRENT_DATE)
+            );
         END IF;
 
         SELECT order_id INTO v_order_id
@@ -135,7 +156,7 @@ BEGIN
         IF FOUND THEN
             UPDATE om_orders SET
                 order_date      = NULLIF(TRIM(p_payload->>'order_date'), '')::DATE,
-                production_date = NULLIF(TRIM(p_payload->>'production_date'), '')::DATE,
+                production_date = v_production_date,
                 production_code = NULLIF(TRIM(p_payload->>'production_code'), ''),
                 customer_id     = v_order_customer_id,
                 customer_name   = v_order_customer_name,
@@ -165,7 +186,7 @@ BEGIN
             ) VALUES (
                 v_order_number,
                 NULLIF(TRIM(p_payload->>'order_date'), '')::DATE,
-                NULLIF(TRIM(p_payload->>'production_date'), '')::DATE,
+                v_production_date,
                 NULLIF(TRIM(p_payload->>'production_code'), ''),
                 0,   -- updated below after lines
                 0,
@@ -186,7 +207,7 @@ BEGIN
         UPDATE om_orders SET
             order_number    = COALESCE(NULLIF(TRIM(p_payload->>'order_number'), ''), order_number),
             order_date      = NULLIF(TRIM(p_payload->>'order_date'), '')::DATE,
-            production_date = NULLIF(TRIM(p_payload->>'production_date'), '')::DATE,
+            production_date = v_production_date,
             production_code = NULLIF(TRIM(p_payload->>'production_code'), ''),
             customer_id     = v_order_customer_id,
             customer_name   = v_order_customer_name,

@@ -15,12 +15,13 @@ Order:
   6. seed_fnd_item_bom
   7. seed_fnd_pricebook_items       — item_price rows -> fnd_pricebook_items
   8. seed_om_orders
-  9. seed_om_order_lines           — ordr_detail -> om_order_lines (after orders)
-  10. seed_om_order_shipments      — optional qty events from ordr_detail
-  11. seed_ar_transactions          — om_orders + legacy ordr -> ar_transactions (INVOICE)
-  12. seed_ar_transaction_lines     — INVOICE/DISCOUNT from shipments + legacy allowance
-  13. seed_ar_payments              — legacy public.ar (PMT) -> ar_payments
-  14. seed_ar_payment_applications  — pmt_detail -> ar_payment_applications (payment + invoice links)
+  9. seed_fnd_tenant_sequences     — Alpine order_number sequence from max(ordr_no)
+  10. seed_om_order_lines          — ordr_detail -> om_order_lines (after orders)
+  11. seed_om_order_shipments      — optional qty events from ordr_detail
+  12. seed_ar_transactions         — om_orders + legacy ordr -> ar_transactions (INVOICE)
+  13. seed_ar_transaction_lines    — INVOICE/DISCOUNT from shipments + legacy allowance
+  14. seed_ar_payments             — legacy public.ar (PMT) -> ar_payments
+  15. seed_ar_payment_applications — pmt_detail -> ar_payment_applications (payment + invoice links)
 
 Usage (from repo root):
   python dataMigration/seed_all.py
@@ -54,6 +55,7 @@ SEEDS: list[str] = [
     "seed_fnd_item_bom.sql",
     "seed_fnd_pricebook_items.sql",
     "seed_om_orders.sql",
+    "seed_fnd_tenant_sequences.sql",
     "seed_om_order_lines.sql",
     "seed_om_order_shipments.sql",
     "seed_ar_transactions.sql",

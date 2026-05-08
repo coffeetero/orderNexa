@@ -1,6 +1,6 @@
 # orderNexa Project Blueprint
 
-Last updated: May 6, 2026
+Last updated: May 8, 2026
 
 ## Purpose
 
@@ -218,3 +218,27 @@ Technical fixes completed:
 - Location/Event is saved through the order save flow.
 - Customer hierarchy rows include customer type so the UI can distinguish account/site/location/event behavior.
 - Order Entry layout was tightened for dense data entry: Customer and Item search widths aligned, dropdown rows compacted, Retrieve removed, and Order Number simplified.
+
+## May 8, 2026 Session Notes
+
+Today's work moved Order Entry closer to real Alpine parallel testing and added tenant-scoped document numbering.
+
+Key decisions:
+
+- Existing-order retrieval must use internal `order_id` for updates and reloads. Display order numbers are not stable enough to be the edit identity.
+- Selecting an existing order from the popup should not automatically replace the currently selected customer when the user already selected a customer. The selected customer remains the workflow context; the loaded order supplies Location/Event and line details.
+- If the Customer field is blank and a future search action is used, selecting an order may populate Customer from the selected order because there was no customer context to preserve.
+- Location customers are order-entry helpers. When selected, they default Location/Event, but the saved order belongs to the immediate parent customer; the order stores a customer name snapshot.
+- Tenant document numbers should be allocated only at save time, not when a new order form is opened.
+- Tenant sequences belong in `fnd_tenant_sequences`, not as columns on `fnd_tenants`, so order, invoice, customer, and other number sequences can lock independently.
+- Sequence masks support date tokens and grouped `#` placeholders. Grouped placeholders fill from right to left, with overflow expanding the leftmost group.
+- Alpine Bakery uses the order number mask `####-####` for readability. Legacy max `ordr_no` seeds the sequence, and the next generated value advances one past the legacy max.
+
+Technical fixes completed:
+
+- Added `fnd_tenant_sequences` schema, policies, seed support, and tenant settings UI surface.
+- Updated `om_orders_save` so new orders allocate `order_number` through `fnd_tenant_sequence_next`.
+- Added Alpine sequence seed from legacy `ordr.ordr_no`.
+- Added `top_customer_id` direction for customer hierarchy/security performance and updated customer seed support.
+- Added user preference fields direction for time zone, language, number/date/currency formats.
+- Fixed `bps_dev` grants for `fnd_tenant_sequences`. Remaining visibility issue appears to be RLS because direct SQL sessions do not have Supabase JWT app metadata.

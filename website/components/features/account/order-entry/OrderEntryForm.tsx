@@ -573,8 +573,8 @@ export function OrderEntryForm({
     const visibleOrderNumber = draft.order_number.trim();
     const orderNumber =
       visibleOrderNumber === 'New Order'
-        ? (!isExistingOrder ? `T-${Date.now()}` : '')
-        : visibleOrderNumber || (!isExistingOrder ? `T-${Date.now()}` : '');
+        ? (!isExistingOrder ? 'New Order' : '')
+        : visibleOrderNumber || (!isExistingOrder ? 'New Order' : '');
     if (!orderNumber.trim()) {
       setStatusMessage({ text: 'Order number is missing for this order.', type: 'error' });
       return;
