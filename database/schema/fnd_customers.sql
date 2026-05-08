@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS fnd_customers (
 
     legacy_id              INT,
     customer_parent_id     BIGINT      REFERENCES fnd_customers(customer_id),
+    top_customer_id        BIGINT      REFERENCES fnd_customers(customer_id),
 
     customer_name          TEXT        NOT NULL,
     customer_number        TEXT,
@@ -101,9 +102,51 @@ CREATE INDEX IF NOT EXISTS idx_fnd_customers_legacy_id
 CREATE INDEX IF NOT EXISTS idx_fnd_customers_parent
     ON fnd_customers (customer_parent_id);
 
+ALTER TABLE fnd_customers
+    ADD COLUMN IF NOT EXISTS top_customer_id BIGINT REFERENCES fnd_customers(customer_id);
+
+CREATE INDEX IF NOT EXISTS idx_fnd_customers_top_customer
+    ON fnd_customers (tenant_id, top_customer_id);
+
 CREATE INDEX IF NOT EXISTS idx_fnd_customers_active
     ON fnd_customers (tenant_id)
     WHERE is_active = TRUE;
+
+WITH RECURSIVE customer_tree AS (
+    SELECT
+        cus.tenant_id,
+        cus.customer_id,
+        cus.customer_id AS resolved_top_customer_id,
+        ARRAY[cus.customer_id]::BIGINT[] AS path_ids
+    FROM fnd_customers cus
+    WHERE cus.customer_parent_id IS NULL
+
+    UNION ALL
+
+    SELECT
+        child.tenant_id,
+        child.customer_id,
+        parent.resolved_top_customer_id,
+        parent.path_ids || child.customer_id
+    FROM fnd_customers child
+    JOIN customer_tree parent
+      ON parent.tenant_id = child.tenant_id
+     AND parent.customer_id = child.customer_parent_id
+    WHERE NOT child.customer_id = ANY(parent.path_ids)
+)
+UPDATE fnd_customers cus
+   SET top_customer_id = tree.resolved_top_customer_id
+  FROM customer_tree tree
+ WHERE tree.tenant_id = cus.tenant_id
+   AND tree.customer_id = cus.customer_id
+   AND cus.top_customer_id IS DISTINCT FROM tree.resolved_top_customer_id;
+
+UPDATE fnd_customers
+   SET top_customer_id = customer_id
+ WHERE top_customer_id IS NULL;
+
+COMMENT ON COLUMN fnd_customers.top_customer_id IS
+    'Top account customer for hierarchy access checks and grouping; equals customer_id for top-level accounts.';
 
 -- ============================================================
 -- 2. TRIGGER FUNCTIONS  –  updated_at

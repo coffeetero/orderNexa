@@ -2,6 +2,8 @@
 
 import { EntityComboBox } from '@/components/bps/EntityComboBox';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { Search } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -16,6 +18,7 @@ import type { OrderEntryDraft, ProductionCode } from '@/lib/types';
 export interface CustomerOption {
   customer_id: number;
   customer_parent_id: number | null;
+  top_customer_id?: number | null;
   customer_name: string;
   customer_number: string | null;
   customer_type?: string | null;
@@ -32,6 +35,8 @@ interface OrderHeaderRowProps {
   onCustomerChange: (customer: CustomerOption | null) => void;
   /** Optional — e.g. focus next control after pick (order entry defers to items-loaded focus). */
   onCustomerAfterSelect?: () => void;
+  onSearchExistingOrders: () => void;
+  onProductionDateChange: (value: string) => void;
   onFieldChange: <K extends keyof OrderEntryDraft>(field: K, value: OrderEntryDraft[K]) => void;
 }
 
@@ -42,6 +47,8 @@ export function OrderHeaderRow({
   customerInputRef,
   onCustomerChange,
   onCustomerAfterSelect,
+  onSearchExistingOrders,
+  onProductionDateChange,
   onFieldChange,
 }: OrderHeaderRowProps) {
   return (
@@ -114,7 +121,7 @@ export function OrderHeaderRow({
               'focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary',
             )}
             value={draft.production_date}
-            onChange={(e) => onFieldChange('production_date', e.target.value)}
+            onChange={(e) => onProductionDateChange(e.target.value)}
             onFocus={(e) => e.target.select()}
           />
         </div>
@@ -138,6 +145,18 @@ export function OrderHeaderRow({
             </SelectContent>
           </Select>
         </div>
+
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="mb-0 h-9 w-9 shrink-0"
+          onClick={onSearchExistingOrders}
+          aria-label="Search existing orders"
+          title="Search existing orders"
+        >
+          <Search className="h-4 w-4" />
+        </Button>
 
         {/* Order Number */}
         <div className="flex flex-col gap-1 w-[173px] min-w-0 shrink-0">

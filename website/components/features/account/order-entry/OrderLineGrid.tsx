@@ -98,7 +98,7 @@ export function OrderLineGrid({
             <th className="px-1.5 py-1.5 text-center font-semibold text-muted-foreground w-7">W</th>
             <th className="px-1.5 py-1.5 text-center font-semibold text-muted-foreground w-7">CV</th>
             <th className="px-1.5 py-1.5 text-center font-semibold text-muted-foreground w-7">CS</th>
-            <th className="px-2 py-1.5 text-right font-semibold text-muted-foreground w-16">Qty</th>
+            <th className="px-2 py-1.5 text-right font-semibold text-muted-foreground w-20">Quantity</th>
             <th className="px-2 py-1.5 text-right font-semibold text-muted-foreground w-20">Price</th>
             <th className="px-2 py-1.5 text-right font-semibold text-muted-foreground w-20">Discnt</th>
             <th className="px-2 py-1.5 text-right font-semibold text-muted-foreground w-24">Total</th>

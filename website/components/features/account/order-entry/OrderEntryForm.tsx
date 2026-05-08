@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Copy, Save, Trash2, RotateCcw } from 'lucide-react';
+import { Save, Trash2, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase/client';
 import { OrderHeaderRow, type CustomerOption } from './OrderHeaderRow';
@@ -33,9 +33,21 @@ function normalizeOrderHeaderRow(raw: Record<string, unknown>): OrderHeaderListR
         : undefined,
     amount: Number(raw.amount ?? 0),
     customer_id: Number(raw.customer_id ?? 0),
+    customer_number:
+      raw.customer_number !== undefined && raw.customer_number !== null
+        ? String(raw.customer_number)
+        : undefined,
     customer_name:
       raw.customer_name !== undefined && raw.customer_name !== null
         ? String(raw.customer_name)
+        : undefined,
+    top_customer_id:
+      raw.top_customer_id !== undefined && raw.top_customer_id !== null
+        ? Number(raw.top_customer_id)
+        : undefined,
+    top_customer_name:
+      raw.top_customer_name !== undefined && raw.top_customer_name !== null
+        ? String(raw.top_customer_name)
         : undefined,
     order_date:
       raw.order_date !== undefined && raw.order_date !== null
@@ -46,6 +58,25 @@ function normalizeOrderHeaderRow(raw: Record<string, unknown>): OrderHeaderListR
 
 function getErrorMessage(error: unknown, fallback: string): string {
   return typeof error === 'string' && error.trim().length > 0 ? error : fallback;
+}
+
+type OrderPickMode = 'customer-scoped' | 'global-search';
+
+function localToday(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function daysAfterToday(dateValue: string): number | null {
+  const [year, month, day] = dateValue.split('-').map(Number);
+  if (!year || !month || !day) return null;
+  const today = localToday().split('-').map(Number);
+  const targetDate = new Date(year, month - 1, day);
+  const todayDate = new Date(today[0], today[1] - 1, today[2]);
+  return Math.round((targetDate.getTime() - todayDate.getTime()) / 86_400_000);
 }
 
 function isLocationEventCustomer(customer: CustomerOption): boolean {
@@ -98,6 +129,7 @@ export function OrderEntryForm({
   const [customers, setCustomers] = useState<CustomerOption[]>(serverCustomers ?? []);
   const [items, setItems] = useState<OrderEntryItem[]>([]);
   const [orderPickOpen, setOrderPickOpen] = useState(false);
+  const [orderPickMode, setOrderPickMode] = useState<OrderPickMode>('customer-scoped');
   const [orderPickCandidates, setOrderPickCandidates] = useState<OrderHeaderListRow[]>([]);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
   const [isLoadingItems, setIsLoadingItems] = useState(false);
@@ -175,6 +207,7 @@ export function OrderEntryForm({
 
   /** Serializes slot lookups so rapid header changes don't apply stale results. */
   const slotLookupGenerationRef = useRef(0);
+  const suppressNextSlotLookupRef = useRef(false);
 
   const getDefaultLocationEvent = useCallback(
     (customerId: number | null): string => {
@@ -182,20 +215,20 @@ export function OrderEntryForm({
       const customer = customers.find((candidate) => candidate.customer_id === customerId);
       if (!customer) return draft.customer_name;
 
-      const parent = customer.customer_parent_id
-        ? customers.find((candidate) => candidate.customer_id === customer.customer_parent_id)
-        : undefined;
-      return isLocationEventCustomer(customer) && parent
-        ? `${parent.customer_name} - ${customer.customer_name}`
-        : customer.customer_name;
+      return isLocationEventCustomer(customer) ? customer.customer_name : customer.customer_name;
     },
     [customers, draft.customer_name],
   );
 
   const loadOrderById = useCallback(
-    async (targetOrderId: number, opts?: { generation?: number }) => {
+    async (
+      targetOrderId: number,
+      opts?: { generation?: number; preserveSelectedCustomer?: boolean },
+    ) => {
       if (!tenantId || !targetOrderId) return;
       const gen = opts?.generation;
+      const selectedCustomerId = draft.customer_id;
+      const selectedCustomerName = draft.customer_name;
       setStatusMessage(null);
       let response: Response;
       try {
@@ -223,11 +256,16 @@ export function OrderEntryForm({
         return;
       }
       if (gen !== undefined && gen !== slotLookupGenerationRef.current) return;
-      loadOrder(mapOrderToDraft(json.data));
+      const loadedDraft = mapOrderToDraft(json.data);
+      if (opts?.preserveSelectedCustomer && selectedCustomerId !== null) {
+        loadedDraft.customer_id = selectedCustomerId;
+        loadedDraft.customer_name = selectedCustomerName;
+      }
+      loadOrder(loadedDraft);
       setActiveLineIndex(null);
       setShouldFocusItemWhenReady(true);
     },
-    [tenantId, loadOrder, mapOrderToDraft],
+    [tenantId, draft.customer_id, draft.customer_name, loadOrder, mapOrderToDraft],
   );
 
   // ── Fetch customers when tenantId is ready ─────────────────────────────
@@ -282,6 +320,39 @@ export function OrderEntryForm({
     focusItem,
   ]);
 
+  const fetchOrderHeaders = useCallback(
+    async (customerId: number | null): Promise<OrderHeaderListRow[]> => {
+      if (!tenantId || !draft.production_date) return [];
+
+      const qs = new URLSearchParams({
+        tenant_id: String(tenantId),
+        production_date: draft.production_date,
+        production_code: draft.production_code,
+        headers_only: 'true',
+      });
+      if (customerId !== null) {
+        qs.set('customer_id', String(customerId));
+      }
+
+      const response = await fetch(`/api/orders?${qs}`);
+      const ordJson = (await response.json()) as { data: unknown; error?: string };
+      if (!response.ok || ordJson.error) {
+        throw new Error(getErrorMessage(ordJson.error, 'Could not find existing orders.'));
+      }
+
+      const rawRows = Array.isArray(ordJson.data) ? ordJson.data : [];
+      const rows: OrderHeaderListRow[] = [];
+      for (const item of rawRows) {
+        if (item && typeof item === 'object') {
+          const row = normalizeOrderHeaderRow(item as Record<string, unknown>);
+          if (row) rows.push(row);
+        }
+      }
+      return rows;
+    },
+    [tenantId, draft.production_date, draft.production_code],
+  );
+
   // ── Existing orders: headers-only list for slot, then detail fetch with lines ─
   useEffect(() => {
     if (!tenantId || !draft.customer_id) {
@@ -292,16 +363,12 @@ export function OrderEntryForm({
     }
     if (!draft.production_date) return;
     if (mode === 'edit' && orderId != null) return;
+    if (suppressNextSlotLookupRef.current) {
+      suppressNextSlotLookupRef.current = false;
+      return;
+    }
 
     const generation = ++slotLookupGenerationRef.current;
-
-    const slotQs = new URLSearchParams({
-      tenant_id: String(tenantId),
-      customer_id: String(draft.customer_id),
-      production_date: draft.production_date,
-      production_code: draft.production_code,
-      headers_only: 'true',
-    });
 
     const applyOrderHeaders = (rows: OrderHeaderListRow[]) => {
       if (generation !== slotLookupGenerationRef.current) return;
@@ -327,32 +394,13 @@ export function OrderEntryForm({
       setField('location_event', '');
       setField('lines', []);
       setField('total_amount', 0);
+      setOrderPickMode('customer-scoped');
       setOrderPickCandidates(matching);
       setOrderPickOpen(true);
     };
 
-    fetch(`/api/orders?${slotQs}`)
-      .then((r) => r.json())
-      .then((ordJson: { data: unknown; error?: string }) => {
-        if (generation !== slotLookupGenerationRef.current) return;
-        if (ordJson.error) {
-          setStatusMessage({
-            text: getErrorMessage(ordJson.error, 'Could not find existing orders.'),
-            type: 'error',
-          });
-          return;
-        }
-
-        const rawRows = Array.isArray(ordJson.data) ? ordJson.data : [];
-        const slotRows: OrderHeaderListRow[] = [];
-        for (const item of rawRows) {
-          if (item && typeof item === 'object') {
-            const row = normalizeOrderHeaderRow(item as Record<string, unknown>);
-            if (row) slotRows.push(row);
-          }
-        }
-        applyOrderHeaders(slotRows);
-      })
+    fetchOrderHeaders(draft.customer_id)
+      .then(applyOrderHeaders)
       .catch(() => {
         setStatusMessage({
           text: 'Could not find existing orders. Network request failed.',
@@ -367,9 +415,9 @@ export function OrderEntryForm({
     draft.production_date,
     draft.production_code,
     getDefaultLocationEvent,
+    fetchOrderHeaders,
     mode,
     orderId,
-    loadOrderById,
   ]);
 
   // ── Load existing order in edit mode ──────────────────────────────────
@@ -408,8 +456,32 @@ export function OrderEntryForm({
 
   // ── Event handlers ─────────────────────────────────────────────────────
 
+  const handleSearchExistingOrders = useCallback(async () => {
+    if (!tenantId || !draft.production_date) return;
+    setStatusMessage(null);
+    try {
+      const rows = await fetchOrderHeaders(draft.customer_id);
+      if (rows.length === 0) {
+        setOrderPickCandidates([]);
+        setOrderPickOpen(false);
+        setStatusMessage({ text: 'No existing orders found for this production slot.', type: 'error' });
+        return;
+      }
+
+      setOrderPickMode(draft.customer_id === null ? 'global-search' : 'customer-scoped');
+      setOrderPickCandidates(rows);
+      setOrderPickOpen(true);
+    } catch (error) {
+      setStatusMessage({
+        text: error instanceof Error ? error.message : 'Could not find existing orders.',
+        type: 'error',
+      });
+    }
+  }, [tenantId, draft.production_date, draft.customer_id, fetchOrderHeaders]);
+
   const handleCustomerChange = useCallback(
     (customer: CustomerOption | null) => {
+      const previousCustomerId = draft.customer_id;
       setShouldFocusItemWhenReady(false);
       setCustomer(customer?.customer_id ?? null, customer?.customer_name ?? '');
       setField('location_event', '');
@@ -418,8 +490,26 @@ export function OrderEntryForm({
       setField('order_id', undefined);
       setField('lines', []);
       setField('total_amount', 0);
+      if (customer && customer.customer_id === previousCustomerId) {
+        void handleSearchExistingOrders();
+      }
     },
-    [setCustomer, setField],
+    [draft.customer_id, handleSearchExistingOrders, setCustomer, setField],
+  );
+
+  const handleProductionDateChange = useCallback(
+    (value: string) => {
+      const daysAhead = daysAfterToday(value);
+      if (
+        daysAhead !== null &&
+        daysAhead > 5 &&
+        !window.confirm('This production date is more than 5 days in the future. Continue?')
+      ) {
+        return;
+      }
+      setField('production_date', value);
+    },
+    [setField],
   );
 
   const handleItemCommit = useCallback(
@@ -463,12 +553,15 @@ export function OrderEntryForm({
   const handleOrderPickSelect = useCallback(
     (row: OrderHeaderListRow) => {
       setOrderPickOpen(false);
+      suppressNextSlotLookupRef.current = true;
       setField('order_id', row.order_id);
       setField('order_number', row.order_number);
       setField('order_ref', row.order_number);
-      void loadOrderById(row.order_id);
+      void loadOrderById(row.order_id, {
+        preserveSelectedCustomer: orderPickMode === 'customer-scoped',
+      });
     },
-    [loadOrderById, setField],
+    [loadOrderById, orderPickMode, setField],
   );
 
   // ── Save ───────────────────────────────────────────────────────────────
@@ -476,12 +569,12 @@ export function OrderEntryForm({
   const handleSave = useCallback(async () => {
     if (!tenantId) return;
 
-    const isEdit = mode === 'edit' && !!draft.order_id;
+    const isExistingOrder = !!draft.order_id;
     const visibleOrderNumber = draft.order_number.trim();
     const orderNumber =
       visibleOrderNumber === 'New Order'
-        ? (!isEdit ? `T-${Date.now()}` : '')
-        : visibleOrderNumber || (!isEdit ? `T-${Date.now()}` : '');
+        ? (!isExistingOrder ? `T-${Date.now()}` : '')
+        : visibleOrderNumber || (!isExistingOrder ? `T-${Date.now()}` : '');
     if (!orderNumber.trim()) {
       setStatusMessage({ text: 'Order number is missing for this order.', type: 'error' });
       return;
@@ -518,7 +611,7 @@ export function OrderEntryForm({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           p_tenant_id: tenantId,
-          p_order_id: isEdit ? draft.order_id : null,
+          p_order_id: draft.order_id ?? null,
           p_payload: payload,
         }),
       });
@@ -591,13 +684,6 @@ export function OrderEntryForm({
     }
   }, [tenantId, draft.order_id, draft.order_number, router]);
 
-  // ── Today's date for the footer date display ───────────────────────────
-  const todayLabel = new Date().toLocaleDateString('en-US', {
-    month: '2-digit',
-    day: '2-digit',
-    year: '2-digit',
-  });
-
   return (
     <div className="flex flex-col h-full bg-background overflow-hidden">
       {/* ── Title bar ─────────────────────────────────────────────────── */}
@@ -652,6 +738,8 @@ export function OrderEntryForm({
           isLoadingCustomers={isLoadingCustomers}
           customerInputRef={customerInputRef}
           onCustomerChange={handleCustomerChange}
+          onSearchExistingOrders={handleSearchExistingOrders}
+          onProductionDateChange={handleProductionDateChange}
           onFieldChange={setField}
         />
       </div>
@@ -709,21 +797,9 @@ export function OrderEntryForm({
         />
       </div>
 
-      {/* ── Footer: date + Copy From + Delete (edit) ───────────────────── */}
+      {/* ── Footer: Delete (edit) ──────────────────────────────────────── */}
       <div className="shrink-0 flex items-center justify-between gap-2 px-3 py-2 border-t border-border/60 bg-card">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground tabular-nums">{todayLabel}</span>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 text-xs gap-1"
-            disabled
-            title="Copy from another order (coming soon)"
-          >
-            <Copy className="h-3 w-3" />
-            Copy From
-          </Button>
-        </div>
+        <div />
 
         {mode === 'edit' && draft.order_id && (
           <Button

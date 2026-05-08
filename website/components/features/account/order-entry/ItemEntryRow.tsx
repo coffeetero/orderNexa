@@ -86,7 +86,7 @@ export function ItemEntryRow({
     <div className="flex flex-wrap items-start gap-x-2 gap-y-1.5 px-3 py-2 border-b border-border/60 bg-muted/20">
       {/* Item Search */}
       <div className="flex min-h-0 w-[346px] min-w-[346px] max-w-[346px] shrink-0 flex-col gap-1">
-        <Label htmlFor="item-search" className={cn(CONTROL_LABEL, 'uppercase')}>
+        <Label htmlFor="item-search" className={CONTROL_LABEL}>
           Item
         </Label>
         <EntityComboBox<OrderEntryItem>
@@ -120,11 +120,10 @@ export function ItemEntryRow({
           htmlFor="item-qty"
           className={cn(
             CONTROL_LABEL,
-            'uppercase',
             'w-full justify-center text-center !items-center',
           )}
         >
-          Qty
+          Quantity
         </Label>
         <input
           id="item-qty"
@@ -151,7 +150,7 @@ export function ItemEntryRow({
       </div>
 
       {/* Total Order */}
-      <div className="flex w-20 shrink-0 flex-col gap-1">
+      <div className="flex w-24 shrink-0 flex-col gap-1">
         <span
           className={cn(
             CONTROL_LABEL,

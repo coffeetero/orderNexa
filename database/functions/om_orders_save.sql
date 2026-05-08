@@ -61,6 +61,9 @@ DECLARE
     v_total_qty    NUMERIC(14,4) := 0;
     v_total_amt    NUMERIC(14,4) := 0;
     v_total_disc   NUMERIC(14,4) := 0;
+    v_payload_customer_id BIGINT;
+    v_order_customer_id   BIGINT;
+    v_order_customer_name TEXT;
 BEGIN
     IF p_tenant_id IS NULL THEN
         RAISE EXCEPTION 'p_tenant_id is required';
@@ -90,42 +93,93 @@ BEGIN
         RAISE EXCEPTION 'p_payload is required';
     END IF;
 
-    -- ── HEADER UPSERT (id-driven) ───────────────────────────────────────
+    v_payload_customer_id := NULLIF((p_payload->>'customer_id')::TEXT, 'null')::BIGINT;
+    v_order_customer_id := v_payload_customer_id;
+
+    IF v_payload_customer_id IS NOT NULL THEN
+        SELECT
+            CASE
+                WHEN UPPER(TRIM(selected.customer_type)) = 'LOCATION'
+                 AND selected.customer_parent_id IS NOT NULL
+                THEN parent.customer_id
+                ELSE selected.customer_id
+            END,
+            CASE
+                WHEN UPPER(TRIM(selected.customer_type)) = 'LOCATION'
+                 AND selected.customer_parent_id IS NOT NULL
+                THEN parent.customer_name
+                ELSE selected.customer_name
+            END
+          INTO v_order_customer_id, v_order_customer_name
+          FROM fnd_customers selected
+          LEFT JOIN fnd_customers parent
+                 ON parent.tenant_id = selected.tenant_id
+                AND parent.customer_id = selected.customer_parent_id
+         WHERE selected.tenant_id = p_tenant_id
+           AND selected.customer_id = v_payload_customer_id;
+    END IF;
+
+    -- ── HEADER UPSERT (id-driven, with order-number fallback) ───────────
     IF p_order_id IS NULL THEN
         v_order_number := TRIM(p_payload->>'order_number');
         IF v_order_number IS NULL OR v_order_number = '' THEN
             RAISE EXCEPTION 'order_number is required when creating a new order';
         END IF;
 
-        INSERT INTO om_orders (
-            order_number,
-            order_date,
-            production_date,
-            production_code,
-            quantity,
-            amount,
-            discount_amount,
-            customer_id,
-            event_location,
-            order_source,
-            tenant_id,
-            snapshot_data
-        ) VALUES (
-            v_order_number,
-            NULLIF(TRIM(p_payload->>'order_date'), '')::DATE,
-            NULLIF(TRIM(p_payload->>'production_date'), '')::DATE,
-            NULLIF(TRIM(p_payload->>'production_code'), ''),
-            0,   -- updated below after lines
-            0,
-            0,
-            NULLIF((p_payload->>'customer_id')::TEXT, 'null')::BIGINT,
-            NULLIF(TRIM(p_payload->>'location_event'), ''),
-            'Clerk',
-            p_tenant_id,
-            COALESCE(p_payload->'snapshot_data', '{}'::JSONB)
-        )
-        RETURNING order_id INTO v_order_id;
-        v_mode := 'created';
+        SELECT order_id INTO v_order_id
+          FROM om_orders
+         WHERE tenant_id = p_tenant_id
+           AND order_number = v_order_number
+         LIMIT 1;
+
+        IF FOUND THEN
+            UPDATE om_orders SET
+                order_date      = NULLIF(TRIM(p_payload->>'order_date'), '')::DATE,
+                production_date = NULLIF(TRIM(p_payload->>'production_date'), '')::DATE,
+                production_code = NULLIF(TRIM(p_payload->>'production_code'), ''),
+                customer_id     = v_order_customer_id,
+                customer_name   = v_order_customer_name,
+                event_location  = CASE
+                    WHEN p_payload ? 'location_event' THEN NULLIF(TRIM(p_payload->>'location_event'), '')
+                    ELSE event_location
+                END,
+                snapshot_data   = COALESCE(p_payload->'snapshot_data', snapshot_data)
+            WHERE order_id  = v_order_id
+              AND tenant_id = p_tenant_id;
+            v_mode := 'updated';
+        ELSE
+            INSERT INTO om_orders (
+                order_number,
+                order_date,
+                production_date,
+                production_code,
+                quantity,
+                amount,
+                discount_amount,
+                customer_id,
+                customer_name,
+                event_location,
+                order_source,
+                tenant_id,
+                snapshot_data
+            ) VALUES (
+                v_order_number,
+                NULLIF(TRIM(p_payload->>'order_date'), '')::DATE,
+                NULLIF(TRIM(p_payload->>'production_date'), '')::DATE,
+                NULLIF(TRIM(p_payload->>'production_code'), ''),
+                0,   -- updated below after lines
+                0,
+                0,
+                v_order_customer_id,
+                v_order_customer_name,
+                NULLIF(TRIM(p_payload->>'location_event'), ''),
+                'Clerk',
+                p_tenant_id,
+                COALESCE(p_payload->'snapshot_data', '{}'::JSONB)
+            )
+            RETURNING order_id INTO v_order_id;
+            v_mode := 'created';
+        END IF;
     ELSE
         v_order_id := p_order_id;
 
@@ -134,7 +188,8 @@ BEGIN
             order_date      = NULLIF(TRIM(p_payload->>'order_date'), '')::DATE,
             production_date = NULLIF(TRIM(p_payload->>'production_date'), '')::DATE,
             production_code = NULLIF(TRIM(p_payload->>'production_code'), ''),
-            customer_id     = NULLIF((p_payload->>'customer_id')::TEXT, 'null')::BIGINT,
+            customer_id     = v_order_customer_id,
+            customer_name   = v_order_customer_name,
             event_location  = CASE
                 WHEN p_payload ? 'location_event' THEN NULLIF(TRIM(p_payload->>'location_event'), '')
                 ELSE event_location

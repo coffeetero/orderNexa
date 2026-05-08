@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import type { OrderHeaderListRow } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -27,21 +28,64 @@ export function OrderPickSheet({
   onSelect,
 }: OrderPickSheetProps) {
   const [activeIndex, setActiveIndex] = useState(0);
+  const [customerSearch, setCustomerSearch] = useState('');
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const optionCount = candidates.length + 1;
 
   useEffect(() => {
     if (!open) return;
     setActiveIndex(0);
+    setCustomerSearch('');
     requestAnimationFrame(() => containerRef.current?.focus());
   }, [open, candidates.length]);
+
+  const rowsWithOption = useMemo(() => {
+    const q = customerSearch.trim().toLowerCase();
+    const filtered = q
+      ? candidates.filter((row) =>
+          [
+            row.top_customer_name,
+            row.customer_number,
+            row.customer_name,
+            row.location_event,
+            row.order_number,
+          ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase()
+            .includes(q),
+        )
+      : candidates;
+
+    return filtered.map((row, index) => ({ row, optionIndex: index + 1 }));
+  }, [candidates, customerSearch]);
+
+  const groupedRows = useMemo(() => {
+    const groups: Array<{ groupName: string; rows: typeof rowsWithOption }> = [];
+    for (const row of rowsWithOption) {
+      const groupName = row.row.top_customer_name || row.row.customer_name || 'Other';
+      const existing = groups.find((group) => group.groupName === groupName);
+      if (existing) {
+        existing.rows.push(row);
+      } else {
+        groups.push({ groupName, rows: [row] });
+      }
+    }
+    return groups;
+  }, [rowsWithOption]);
+
+  const getCustomerDisplay = useCallback((row: OrderHeaderListRow) => {
+    const customerLabel = [row.customer_number, row.customer_name].filter(Boolean).join(' - ');
+    return [customerLabel, row.location_event].filter(Boolean).join(' - ');
+  }, []);
+
+  const optionCount = rowsWithOption.length + 1;
 
   const choices = useMemo(
     () => [
       { kind: 'new' as const },
-      ...candidates.map((row) => ({ kind: 'existing' as const, row })),
+      ...rowsWithOption.map(({ row }) => ({ kind: 'existing' as const, row })),
     ],
-    [candidates],
+    [rowsWithOption],
   );
 
   const selectActiveChoice = useCallback(() => {
@@ -92,11 +136,23 @@ export function OrderPickSheet({
         )}
       >
         <DialogHeader className="space-y-1 px-5 pb-3 pt-5">
-          <DialogTitle className="text-base">Choose an order</DialogTitle>
+          <DialogTitle className="text-base">Existing Orders</DialogTitle>
           <DialogDescription>
-            Existing orders match this customer and production slot.
+            Select New Order to enter a new order, or select an existing order.
           </DialogDescription>
         </DialogHeader>
+
+        <div className="px-5 pb-3">
+          <Input
+            value={customerSearch}
+            onChange={(event) => {
+              setCustomerSearch(event.target.value);
+              setActiveIndex(0);
+            }}
+            placeholder="Search customer, location, or order..."
+            className="h-8 text-sm"
+          />
+        </div>
 
         <div className="flex-1 overflow-auto px-5 pb-5">
           <div
@@ -114,7 +170,7 @@ export function OrderPickSheet({
               role="option"
               aria-selected={activeIndex === 0}
               className={cn(
-                'w-full px-3 py-2 text-left text-sm transition-colors',
+                'w-full px-3 py-0.5 text-left text-sm transition-colors',
                 activeIndex === 0
                   ? 'bg-primary text-primary-foreground'
                   : 'bg-amber-50/70 hover:bg-amber-100/80 dark:bg-amber-950/30 dark:hover:bg-amber-950/50',
@@ -124,7 +180,7 @@ export function OrderPickSheet({
               onMouseEnter={() => setActiveIndex(0)}
               onClick={onNewOrder}
             >
-              <div className="grid grid-cols-[minmax(8rem,1fr)_minmax(12rem,2fr)_6rem] items-center gap-3">
+              <div className="grid grid-cols-[minmax(7rem,1fr)_minmax(14rem,2fr)_6rem] items-center gap-3">
                 <span className="font-semibold">New Order</span>
                 <span className={cn('truncate text-xs', activeIndex === 0 ? 'text-primary-foreground/80' : 'text-muted-foreground')}>
                   Start a new order for this slot
@@ -132,43 +188,49 @@ export function OrderPickSheet({
                 <span className="text-right text-sm font-semibold tabular-nums">$0.00</span>
               </div>
             </button>
-            {candidates.map((row, index) => {
-              const optionIndex = index + 1;
-              const active = activeIndex === optionIndex;
-              return (
-              <button
-                key={row.order_id}
-                id={`order-pick-${optionIndex}`}
-                type="button"
-                role="option"
-                aria-selected={active}
-                className={cn(
-                  'w-full text-left px-3 py-2 text-sm transition-colors',
-                  active ? 'bg-primary text-primary-foreground' : 'hover:bg-accent/80',
-                  'focus:outline-none',
-                )}
-                tabIndex={-1}
-                onMouseEnter={() => setActiveIndex(optionIndex)}
-                onClick={() => onSelect(row)}
-              >
-                <div className="grid grid-cols-[minmax(8rem,1fr)_minmax(12rem,2fr)_6rem] items-center gap-3">
-                  <span className="truncate font-medium">
-                    {row.order_number || `Order #${row.order_id}`}
-                  </span>
-                  <span className={cn('truncate text-xs', active ? 'text-primary-foreground/80' : 'text-muted-foreground')}>
-                    {row.location_event || row.customer_name || `Customer ${row.customer_id}`}
-                  </span>
-                  <span className="text-right text-sm font-semibold tabular-nums">
-                    $
-                    {Number(row.amount ?? 0).toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </span>
+            {groupedRows.map((group) => (
+              <div key={group.groupName}>
+                <div className="bg-muted/40 px-3 py-0.5 text-xs font-semibold text-muted-foreground">
+                  {group.groupName}
                 </div>
-              </button>
-              );
-            })}
+                {group.rows.map(({ row, optionIndex }) => {
+                  const active = activeIndex === optionIndex;
+                  return (
+                    <button
+                      key={row.order_id}
+                      id={`order-pick-${optionIndex}`}
+                      type="button"
+                      role="option"
+                      aria-selected={active}
+                      className={cn(
+                        'w-full text-left px-3 py-0.5 text-sm transition-colors',
+                        active ? 'bg-primary text-primary-foreground' : 'hover:bg-accent/80',
+                        'focus:outline-none',
+                      )}
+                      tabIndex={-1}
+                      onMouseEnter={() => setActiveIndex(optionIndex)}
+                      onClick={() => onSelect(row)}
+                    >
+                      <div className="grid grid-cols-[minmax(7rem,1fr)_minmax(14rem,2fr)_6rem] items-center gap-3">
+                        <span className="truncate font-medium">
+                          {row.order_number || `Order #${row.order_id}`}
+                        </span>
+                        <span className={cn('truncate text-xs tabular-nums', active ? 'text-primary-foreground/80' : 'text-muted-foreground')}>
+                          {getCustomerDisplay(row) || `Customer ${row.customer_id}`}
+                        </span>
+                        <span className="text-right text-sm font-semibold tabular-nums">
+                          $
+                          {Number(row.amount ?? 0).toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
           </div>
         </div>
       </DialogContent>

@@ -29,8 +29,23 @@ CREATE TABLE IF NOT EXISTS fnd_users (
     updated_by        BIGINT,
 
     can_debug         BOOLEAN     DEFAULT FALSE,
-    user_type         TEXT
+    user_type         TEXT,
+
+    time_zone         TEXT,
+    language          TEXT,
+    number_format     TEXT,
+    currency_format   TEXT,
+    date_format       TEXT,
+    time_format       TEXT
 );
+
+ALTER TABLE fnd_users
+    ADD COLUMN IF NOT EXISTS time_zone TEXT,
+    ADD COLUMN IF NOT EXISTS language TEXT,
+    ADD COLUMN IF NOT EXISTS number_format TEXT,
+    ADD COLUMN IF NOT EXISTS currency_format TEXT,
+    ADD COLUMN IF NOT EXISTS date_format TEXT,
+    ADD COLUMN IF NOT EXISTS time_format TEXT;
 
 DO $$ BEGIN
     IF EXISTS (
@@ -55,6 +70,18 @@ COMMENT ON COLUMN fnd_users.can_debug IS
 
 COMMENT ON COLUMN fnd_users.user_type IS
     'Application role / classification (e.g. TENANCY_USER, CUSTOMER_USER); aligns with app_metadata.';
+COMMENT ON COLUMN fnd_users.time_zone IS
+    'Preferred IANA time zone; initially derived from browser/system when captured.';
+COMMENT ON COLUMN fnd_users.language IS
+    'Preferred BCP 47 language tag; initially derived from browser/system when captured.';
+COMMENT ON COLUMN fnd_users.number_format IS
+    'Preferred number formatting locale/pattern.';
+COMMENT ON COLUMN fnd_users.currency_format IS
+    'Preferred currency code or formatting preference.';
+COMMENT ON COLUMN fnd_users.date_format IS
+    'Preferred date display format.';
+COMMENT ON COLUMN fnd_users.time_format IS
+    'Preferred time display format.';
 
 CREATE INDEX IF NOT EXISTS idx_fnd_users_tenant_id
     ON fnd_users (tenant_id);

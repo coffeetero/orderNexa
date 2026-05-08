@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS om_orders (
     amount                  NUMERIC(14,4) NOT NULL,   -- ordr_amt
     discount_amount         NUMERIC(14,4) NOT NULL,   -- ordr_discount_amt
     customer_id             BIGINT      REFERENCES fnd_customers(customer_id),  -- source: ordr.cus_id (nullable: legacy rows without cus_id)
+    customer_name           TEXT,
     event_location          TEXT,
     production_date         DATE        NOT NULL,   -- source: ordr.ordr_prdctn_dt
     production_code         TEXT,                   -- source: ordr.ordr_prdctn_cd (AM / PM / SPECIAL)
@@ -42,6 +43,21 @@ CREATE INDEX IF NOT EXISTS idx_om_orders_tenant_id
 
 CREATE INDEX IF NOT EXISTS idx_om_orders_customer
     ON om_orders (tenant_id, customer_id);
+
+ALTER TABLE om_orders
+    ADD COLUMN IF NOT EXISTS customer_name TEXT;
+
+UPDATE om_orders o
+   SET customer_name = COALESCE(c.customer_name, o.snapshot_data->>'cus_name')
+  FROM fnd_customers c
+ WHERE c.tenant_id = o.tenant_id
+   AND c.customer_id = o.customer_id
+   AND o.customer_name IS NULL;
+
+UPDATE om_orders
+   SET customer_name = snapshot_data->>'cus_name'
+ WHERE customer_name IS NULL
+   AND snapshot_data ? 'cus_name';
 
 CREATE INDEX IF NOT EXISTS idx_om_orders_production_date
     ON om_orders (tenant_id, production_date DESC);

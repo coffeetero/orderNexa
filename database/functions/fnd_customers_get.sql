@@ -26,7 +26,7 @@ BEGIN
      *
      *   p_hierarchy = true
      *     - Returns a jsonb array of slim hierarchy rows ordered by sort_path:
-     *       tenant_id, customer_id, customer_parent_id, customer_number,
+     *       tenant_id, customer_id, customer_parent_id, top_customer_id, customer_number,
      *       customer_name, customer_type, level, sort_path
      *     - p_customer_id IS NULL  -> anchor is top-level customers for tenant.
      *     - p_customer_id NOT NULL -> anchor is exactly that customer (subtree).
@@ -58,6 +58,7 @@ BEGIN
         SELECT
             cus.customer_id,
             cus.customer_parent_id,
+            COALESCE(cus.top_customer_id, cus.customer_id) AS top_customer_id,
             cus.customer_number,
             cus.customer_name,
             cus.customer_type,
@@ -89,6 +90,7 @@ BEGIN
         SELECT
             ch.customer_id,
             ch.customer_parent_id,
+            COALESCE(ch.top_customer_id, ct.top_customer_id) AS top_customer_id,
             ch.customer_number,
             ch.customer_name,
             ch.customer_type,
@@ -108,6 +110,7 @@ BEGIN
                 'tenant_id', p_tenant_id,
                 'customer_id', customer_id,
                 'customer_parent_id', customer_parent_id,
+                'top_customer_id', top_customer_id,
                 'customer_number', customer_number,
                 'customer_name', customer_name,
                 'customer_type', customer_type,

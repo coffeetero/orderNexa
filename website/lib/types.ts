@@ -152,7 +152,10 @@ export interface OrderHeaderListRow {
   location_event?: string;
   amount: number;
   customer_id: number;
+  customer_number?: string;
   customer_name?: string;
+  top_customer_id?: number;
+  top_customer_name?: string;
 }
 
 /** An item row returned by om_items_get, used in the Item combobox. */

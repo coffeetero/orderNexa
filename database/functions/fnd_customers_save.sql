@@ -102,6 +102,37 @@ BEGIN
     )
     RETURNING customer_id INTO v_customer_id;
 
+    WITH RECURSIVE customer_tree AS (
+      SELECT
+        cus.tenant_id,
+        cus.customer_id,
+        cus.customer_id AS resolved_top_customer_id,
+        ARRAY[cus.customer_id]::bigint[] AS path_ids
+      FROM fnd_customers cus
+      WHERE cus.tenant_id = p_tenant_id
+        AND cus.customer_parent_id IS NULL
+
+      UNION ALL
+
+      SELECT
+        child.tenant_id,
+        child.customer_id,
+        parent.resolved_top_customer_id,
+        parent.path_ids || child.customer_id
+      FROM fnd_customers child
+      JOIN customer_tree parent
+        ON parent.tenant_id = child.tenant_id
+       AND parent.customer_id = child.customer_parent_id
+      WHERE child.tenant_id = p_tenant_id
+        AND NOT child.customer_id = ANY(parent.path_ids)
+    )
+    UPDATE fnd_customers cus
+       SET top_customer_id = tree.resolved_top_customer_id
+      FROM customer_tree tree
+     WHERE tree.tenant_id = cus.tenant_id
+       AND tree.customer_id = cus.customer_id
+       AND cus.top_customer_id IS DISTINCT FROM tree.resolved_top_customer_id;
+
     RETURN jsonb_build_object(
       'success', true,
       'action', 'create',
@@ -137,6 +168,37 @@ BEGIN
     IF v_customer_id IS NULL THEN
       RAISE EXCEPTION 'Customer % not found for tenant %', p_customer_id, p_tenant_id;
     END IF;
+
+    WITH RECURSIVE customer_tree AS (
+      SELECT
+        cus.tenant_id,
+        cus.customer_id,
+        cus.customer_id AS resolved_top_customer_id,
+        ARRAY[cus.customer_id]::bigint[] AS path_ids
+      FROM fnd_customers cus
+      WHERE cus.tenant_id = p_tenant_id
+        AND cus.customer_parent_id IS NULL
+
+      UNION ALL
+
+      SELECT
+        child.tenant_id,
+        child.customer_id,
+        parent.resolved_top_customer_id,
+        parent.path_ids || child.customer_id
+      FROM fnd_customers child
+      JOIN customer_tree parent
+        ON parent.tenant_id = child.tenant_id
+       AND parent.customer_id = child.customer_parent_id
+      WHERE child.tenant_id = p_tenant_id
+        AND NOT child.customer_id = ANY(parent.path_ids)
+    )
+    UPDATE fnd_customers cus
+       SET top_customer_id = tree.resolved_top_customer_id
+      FROM customer_tree tree
+     WHERE tree.tenant_id = cus.tenant_id
+       AND tree.customer_id = cus.customer_id
+       AND cus.top_customer_id IS DISTINCT FROM tree.resolved_top_customer_id;
 
     RETURN jsonb_build_object(
       'success', true,

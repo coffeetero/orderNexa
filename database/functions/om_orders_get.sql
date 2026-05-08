@@ -33,6 +33,7 @@ SET search_path = bps, public
 AS $$
 DECLARE
     v_result JSONB;
+    v_lookup_customer_id BIGINT;
 BEGIN
     IF p_tenant_id IS NULL THEN
         RAISE EXCEPTION 'p_tenant_id is required';
@@ -53,7 +54,7 @@ BEGIN
                 'amount',          o.amount,
                 'discount_amount', o.discount_amount,
                 'customer_id',     o.customer_id,
-                'customer_name',   COALESCE(c.customer_name,
+                'customer_name',   COALESCE(o.customer_name, c.customer_name,
                                             o.snapshot_data->>'cus_name', ''),
                 'snapshot_data',   o.snapshot_data,
                 'lines',           '[]'::JSONB
@@ -77,7 +78,7 @@ BEGIN
                 'amount',          o.amount,
                 'discount_amount', o.discount_amount,
                 'customer_id',     o.customer_id,
-                'customer_name',   COALESCE(c.customer_name,
+                'customer_name',   COALESCE(o.customer_name, c.customer_name,
                                             o.snapshot_data->>'cus_name', ''),
                 'snapshot_data',   o.snapshot_data,
                 'lines',           COALESCE(lines_agg.lines, '[]'::JSONB)
@@ -125,7 +126,22 @@ BEGIN
     END IF;
 
     -- ── List mode: order headers (no lines) ───────────────────────────────
-    SELECT jsonb_agg(row_data ORDER BY production_date_sort DESC, order_id_sort DESC)
+    v_lookup_customer_id := p_customer_id;
+
+    IF p_customer_id IS NOT NULL THEN
+        SELECT CASE
+                   WHEN UPPER(TRIM(customer_type)) = 'LOCATION'
+                    AND customer_parent_id IS NOT NULL
+                   THEN customer_parent_id
+                   ELSE customer_id
+               END
+          INTO v_lookup_customer_id
+          FROM fnd_customers
+         WHERE tenant_id = p_tenant_id
+           AND customer_id = p_customer_id;
+    END IF;
+
+    SELECT jsonb_agg(row_data ORDER BY top_customer_name_sort ASC, location_event_sort ASC, order_id_sort DESC)
       INTO v_result
       FROM (
         SELECT jsonb_build_object(
@@ -139,21 +155,29 @@ BEGIN
             'amount',          o.amount,
             'discount_amount', o.discount_amount,
             'customer_id',     o.customer_id,
-            'customer_name',   COALESCE(c.customer_name,
-                                        o.snapshot_data->>'cus_name', '')
+            'customer_number', c.customer_number,
+            'customer_name',   COALESCE(o.customer_name, c.customer_name,
+                                        o.snapshot_data->>'cus_name', ''),
+            'top_customer_id', COALESCE(c.top_customer_id, c.customer_id),
+            'top_customer_name', COALESCE(top_c.customer_name, c.customer_name, o.snapshot_data->>'cus_name', '')
         ) AS row_data,
         o.production_date AS production_date_sort,
-        o.order_id AS order_id_sort
+        o.order_id AS order_id_sort,
+        COALESCE(top_c.customer_name, o.customer_name, c.customer_name, o.snapshot_data->>'cus_name', '') AS top_customer_name_sort,
+        COALESCE(o.customer_name, c.customer_name, o.snapshot_data->>'cus_name', '') || ' - ' || COALESCE(o.event_location, '') AS location_event_sort
           FROM om_orders o
           LEFT JOIN fnd_customers c
                  ON c.customer_id = o.customer_id
                 AND c.tenant_id   = o.tenant_id
+          LEFT JOIN fnd_customers top_c
+                 ON top_c.customer_id = COALESCE(c.top_customer_id, c.customer_id)
+                AND top_c.tenant_id   = o.tenant_id
          WHERE o.tenant_id = p_tenant_id
-           AND (p_customer_id        IS NULL OR o.customer_id   = p_customer_id)
+           AND (v_lookup_customer_id IS NULL OR o.customer_id = v_lookup_customer_id)
            AND (p_production_date_from IS NULL OR o.production_date >= p_production_date_from)
            AND (p_production_date_to   IS NULL OR o.production_date <= p_production_date_to)
            AND (p_production_code IS NULL OR TRIM(o.production_code) = TRIM(p_production_code))
-         ORDER BY o.production_date DESC, o.order_id DESC
+         ORDER BY top_customer_name_sort ASC, location_event_sort ASC, o.order_id DESC
          LIMIT 500
     ) sub;
 
