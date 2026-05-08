@@ -133,7 +133,7 @@ export function OrderHeaderRow({
               'focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary',
             )}
             value={draft.department_event}
-            onChange={(e) => onFieldChange('department_event', e.target.value)}
+            onChange={(e) => onFieldChange('department_event', e.target.value.toUpperCase())}
           />
         </div>
 

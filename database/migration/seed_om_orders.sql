@@ -46,6 +46,8 @@ BEGIN
     INSERT INTO om_orders (
         order_number,
         customer_id,
+        customer_name,
+        department_event,
         order_date,
         production_date,
         production_code,
@@ -57,10 +59,26 @@ BEGIN
     )
     SELECT
         trim(o.ordr_no::BIGINT::TEXT),
-        cus.customer_id,
+        CASE
+            WHEN UPPER(TRIM(cus.customer_type)) = 'LOCATION'
+             AND cus.customer_parent_id IS NOT NULL
+            THEN parent.customer_id
+            ELSE cus.customer_id
+        END,
+        CASE
+            WHEN UPPER(TRIM(cus.customer_type)) = 'LOCATION'
+             AND cus.customer_parent_id IS NOT NULL
+            THEN parent.customer_name
+            ELSE cus.customer_name
+        END,
+        CASE
+            WHEN UPPER(TRIM(cus.customer_type)) = 'LOCATION'
+            THEN UPPER(TRIM(cus.customer_name))
+            ELSE ''
+        END,
         o.ordr_prdctn_dt::DATE,
         COALESCE(o.ordr_prdctn_dt::DATE, o.ordr_dt::DATE, DATE '2000-01-01'),
-        NULLIF(trim(o.ordr_prdctn_cd), ''),
+        NULLIF(UPPER(trim(o.ordr_prdctn_cd)), ''),
         (COALESCE(o.ordr_amt, 0) + COALESCE(o.ordr_discount_amt, 0))::NUMERIC(14,4) as amount,
         COALESCE(o.ordr_discount_amt, 0)::NUMERIC(14,4) as discount_amount,
         COALESCE(o.ordr_qty_sold, 0)::NUMERIC(14,4) as quantity,
@@ -116,6 +134,9 @@ BEGIN
     LEFT JOIN fnd_customers cus
         ON cus.tenant_id = v_tenant_id
        AND cus.legacy_id = o.cus_id::INT
+    LEFT JOIN fnd_customers parent
+        ON parent.tenant_id = cus.tenant_id
+       AND parent.customer_id = cus.customer_parent_id
     LEFT JOIN customer cu
         ON cu.cus_id::NUMERIC = o.cus_id;
 

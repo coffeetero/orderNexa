@@ -65,7 +65,10 @@ DECLARE
     v_order_customer_id   BIGINT;
     v_order_customer_name TEXT;
     v_production_date DATE;
+    v_production_code TEXT;
+    v_department_event TEXT;
     v_requires_gapless BOOLEAN;
+    v_existing_order_found BOOLEAN := FALSE;
 BEGIN
     IF p_tenant_id IS NULL THEN
         RAISE EXCEPTION 'p_tenant_id is required';
@@ -109,6 +112,8 @@ BEGIN
     END IF;
 
     v_production_date := NULLIF(TRIM(p_payload->>'production_date'), '')::DATE;
+    v_production_code := NULLIF(UPPER(TRIM(p_payload->>'production_code')), '');
+    v_department_event := NULLIF(UPPER(TRIM(p_payload->>'department_event')), '');
 
     v_payload_customer_id := NULLIF((p_payload->>'customer_id')::TEXT, 'null')::BIGINT;
     v_order_customer_id := v_payload_customer_id;
@@ -138,8 +143,26 @@ BEGIN
 
     -- ── HEADER UPSERT (id-driven, with order-number fallback) ───────────
     IF p_order_id IS NULL THEN
+        SELECT order_id, order_number
+          INTO v_order_id, v_order_number
+          FROM om_orders
+         WHERE tenant_id = p_tenant_id
+           AND customer_id IS NOT DISTINCT FROM v_order_customer_id
+           AND production_date = v_production_date
+           AND production_code IS NOT DISTINCT FROM v_production_code
+           AND department_event = COALESCE(v_department_event, '')
+         ORDER BY order_id DESC
+         LIMIT 1;
+
+        v_existing_order_found := FOUND;
+
         v_order_number := TRIM(p_payload->>'order_number');
-        IF v_order_number IS NULL OR v_order_number = '' OR v_order_number = 'New Order' THEN
+        IF v_existing_order_found THEN
+            SELECT order_number INTO v_order_number
+              FROM om_orders
+             WHERE order_id = v_order_id
+               AND tenant_id = p_tenant_id;
+        ELSIF v_order_number IS NULL OR v_order_number = '' OR v_order_number = 'New Order' THEN
             v_order_number := fnd_tenant_sequence_next(
                 p_tenant_id,
                 'order_number',
@@ -147,21 +170,23 @@ BEGIN
             );
         END IF;
 
-        SELECT order_id INTO v_order_id
-          FROM om_orders
-         WHERE tenant_id = p_tenant_id
-           AND order_number = v_order_number
-         LIMIT 1;
+        IF NOT v_existing_order_found THEN
+            SELECT order_id INTO v_order_id
+              FROM om_orders
+             WHERE tenant_id = p_tenant_id
+               AND order_number = v_order_number
+             LIMIT 1;
+        END IF;
 
-        IF FOUND THEN
+        IF FOUND OR v_existing_order_found THEN
             UPDATE om_orders SET
                 order_date      = NULLIF(TRIM(p_payload->>'order_date'), '')::DATE,
                 production_date = v_production_date,
-                production_code = NULLIF(TRIM(p_payload->>'production_code'), ''),
+                production_code = v_production_code,
                 customer_id     = v_order_customer_id,
                 customer_name   = v_order_customer_name,
                 department_event  = CASE
-                    WHEN p_payload ? 'department_event' THEN NULLIF(TRIM(p_payload->>'department_event'), '')
+                    WHEN p_payload ? 'department_event' THEN COALESCE(v_department_event, '')
                     ELSE department_event
                 END,
                 snapshot_data   = COALESCE(p_payload->'snapshot_data', snapshot_data)
@@ -187,13 +212,13 @@ BEGIN
                 v_order_number,
                 NULLIF(TRIM(p_payload->>'order_date'), '')::DATE,
                 v_production_date,
-                NULLIF(TRIM(p_payload->>'production_code'), ''),
+                v_production_code,
                 0,   -- updated below after lines
                 0,
                 0,
                 v_order_customer_id,
                 v_order_customer_name,
-                NULLIF(TRIM(p_payload->>'department_event'), ''),
+                COALESCE(v_department_event, ''),
                 'Clerk',
                 p_tenant_id,
                 COALESCE(p_payload->'snapshot_data', '{}'::JSONB)
@@ -208,11 +233,11 @@ BEGIN
             order_number    = COALESCE(NULLIF(TRIM(p_payload->>'order_number'), ''), order_number),
             order_date      = NULLIF(TRIM(p_payload->>'order_date'), '')::DATE,
             production_date = v_production_date,
-            production_code = NULLIF(TRIM(p_payload->>'production_code'), ''),
+            production_code = v_production_code,
             customer_id     = v_order_customer_id,
             customer_name   = v_order_customer_name,
             department_event  = CASE
-                WHEN p_payload ? 'department_event' THEN NULLIF(TRIM(p_payload->>'department_event'), '')
+                WHEN p_payload ? 'department_event' THEN COALESCE(v_department_event, '')
                 ELSE department_event
             END
         WHERE order_id  = v_order_id

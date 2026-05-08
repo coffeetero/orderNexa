@@ -34,6 +34,7 @@ AS $$
 DECLARE
     v_result JSONB;
     v_lookup_customer_id BIGINT;
+    v_production_code TEXT;
 BEGIN
     IF p_tenant_id IS NULL THEN
         RAISE EXCEPTION 'p_tenant_id is required';
@@ -127,6 +128,7 @@ BEGIN
 
     -- ── List mode: order headers (no lines) ───────────────────────────────
     v_lookup_customer_id := p_customer_id;
+    v_production_code := NULLIF(UPPER(TRIM(p_production_code)), '');
 
     IF p_customer_id IS NOT NULL THEN
         SELECT CASE
@@ -176,7 +178,7 @@ BEGIN
            AND (v_lookup_customer_id IS NULL OR o.customer_id = v_lookup_customer_id)
            AND (p_production_date_from IS NULL OR o.production_date >= p_production_date_from)
            AND (p_production_date_to   IS NULL OR o.production_date <= p_production_date_to)
-           AND (p_production_code IS NULL OR TRIM(o.production_code) = TRIM(p_production_code))
+           AND (v_production_code IS NULL OR o.production_code = v_production_code)
          ORDER BY top_customer_name_sort ASC, department_event_sort ASC, o.order_id DESC
          LIMIT 500
     ) sub;

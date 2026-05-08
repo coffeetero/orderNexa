@@ -229,7 +229,7 @@ export function OrderEntryForm({
       const customer = customers.find((candidate) => candidate.customer_id === customerId);
       if (!customer) return '';
 
-      return isDepartmentEventCustomer(customer) ? customer.customer_name : '';
+      return isDepartmentEventCustomer(customer) ? customer.customer_name.toUpperCase() : '';
     },
     [customers],
   );

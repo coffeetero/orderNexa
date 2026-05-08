@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS om_orders (
     discount_amount         NUMERIC(14,4) NOT NULL,   -- ordr_discount_amt
     customer_id             BIGINT      REFERENCES fnd_customers(customer_id),  -- source: ordr.cus_id (nullable: legacy rows without cus_id)
     customer_name           TEXT,
-    department_event          TEXT,
+    department_event          TEXT        NOT NULL DEFAULT '',
     production_date         DATE        NOT NULL,   -- source: ordr.ordr_prdctn_dt
     production_code         TEXT,                   -- source: ordr.ordr_prdctn_cd (AM / PM / SPECIAL)
     snapshot_data           JSONB       NOT NULL DEFAULT '{}'::jsonb,
@@ -59,8 +59,33 @@ UPDATE om_orders
  WHERE customer_name IS NULL
    AND snapshot_data ? 'cus_name';
 
+UPDATE om_orders o
+   SET customer_id = parent.customer_id,
+       customer_name = parent.customer_name,
+       department_event = COALESCE(NULLIF(UPPER(TRIM(o.department_event)), ''), UPPER(TRIM(location.customer_name)), '')
+  FROM fnd_customers location
+  JOIN fnd_customers parent
+    ON parent.tenant_id = location.tenant_id
+   AND parent.customer_id = location.customer_parent_id
+ WHERE location.tenant_id = o.tenant_id
+   AND location.customer_id = o.customer_id
+   AND UPPER(TRIM(location.customer_type)) = 'LOCATION'
+   AND location.customer_parent_id IS NOT NULL;
+
+UPDATE om_orders
+   SET production_code = NULLIF(UPPER(TRIM(production_code)), ''),
+       department_event = COALESCE(NULLIF(UPPER(TRIM(department_event)), ''), '')
+ WHERE production_code IS DISTINCT FROM NULLIF(UPPER(TRIM(production_code)), '')
+    OR department_event IS DISTINCT FROM COALESCE(NULLIF(UPPER(TRIM(department_event)), ''), '');
+
 CREATE INDEX IF NOT EXISTS idx_om_orders_production_date
     ON om_orders (tenant_id, production_date DESC);
+
+CREATE INDEX IF NOT EXISTS idx_om_orders_existing_customer_slot
+    ON om_orders (tenant_id, customer_id, production_date, production_code);
+
+CREATE INDEX IF NOT EXISTS idx_om_orders_existing_slot
+    ON om_orders (tenant_id, production_date, production_code);
 
 -- TRIGGERS
 DROP TRIGGER IF EXISTS trg_om_orders_set_updated ON om_orders;
