@@ -206,17 +206,17 @@ Today's main focus was the tenant Order Entry screen.
 Key decisions:
 
 - Order Entry is a keyboard-first workflow surface, not a generic form.
-- Existing-order selection should happen before defaulting Location/Event or moving focus to Item.
+- Existing-order selection should happen before defaulting Department/Event or moving focus to Item.
 - The Order Number field is display-only; selection happens through a popup that uses internal `order_id`.
 - `New Order` is a visible workflow state, not a generated database order number.
 - After save, the form clears and focus returns to Customer for the next heads-down entry.
-- Location/Event is central to supporting site/location/event orders and future walk-in orders.
+- Department/Event is central to supporting site/department/event orders and future walk-in orders.
 
 Technical fixes completed:
 
 - Live order detail retrieval now returns order lines after selecting/loading an existing order.
-- Location/Event is saved through the order save flow.
-- Customer hierarchy rows include customer type so the UI can distinguish account/site/location/event behavior.
+- Department/Event is saved through the order save flow.
+- Customer hierarchy rows include customer type so the UI can distinguish account/site/department/event behavior.
 - Order Entry layout was tightened for dense data entry: Customer and Item search widths aligned, dropdown rows compacted, Retrieve removed, and Order Number simplified.
 
 ## May 8, 2026 Session Notes
@@ -226,9 +226,9 @@ Today's work moved Order Entry closer to real Alpine parallel testing and added 
 Key decisions:
 
 - Existing-order retrieval must use internal `order_id` for updates and reloads. Display order numbers are not stable enough to be the edit identity.
-- Selecting an existing order from the popup should not automatically replace the currently selected customer when the user already selected a customer. The selected customer remains the workflow context; the loaded order supplies Location/Event and line details.
+- Selecting an existing order from the popup should not automatically replace the currently selected customer when the user already selected a customer. The selected customer remains the workflow context; the loaded order supplies Department/Event and line details.
 - If the Customer field is blank and a future search action is used, selecting an order may populate Customer from the selected order because there was no customer context to preserve.
-- Location customers are order-entry helpers. When selected, they default Location/Event, but the saved order belongs to the immediate parent customer; the order stores a customer name snapshot.
+- Location customers are order-entry helpers. When selected, they default Department/Event, but the saved order belongs to the immediate parent customer; the order stores a customer name snapshot.
 - Tenant document numbers should be allocated only at save time, not when a new order form is opened.
 - Tenant sequences belong in `fnd_tenant_sequences`, not as columns on `fnd_tenants`, so order, invoice, customer, and other number sequences can lock independently.
 - Sequence masks support date tokens and grouped `#` placeholders. Grouped placeholders fill from right to left, with overflow expanding the leftmost group.

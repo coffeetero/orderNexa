@@ -155,7 +155,7 @@ Important columns:
 - `customer_name`: order-time customer name snapshot.
 - `order_number` (unique per tenant).
 - `order_date`, `production_date`, `production_code`.
-- `location_event`: editable order context for site/location/event or walk-in separation.
+- `department_event`: editable order context for site/department/event or walk-in separation.
 - Financial rollup fields: `quantity`, `amount`, `discount_amount`.
 - `snapshot_data` (JSONB): captured context from source flow.
 

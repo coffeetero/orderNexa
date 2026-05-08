@@ -43,15 +43,15 @@ Complete the existing-orders search workflow for both customer-selected and no-c
 - Add a Search button to the right of Production Code.
 - Search should pass production date, production code, and optional customer id.
 - If Customer is blank, selecting an existing order should populate Customer from the selected order.
-- If Customer is already selected, selecting an existing order should preserve the selected customer and only load Location/Event plus lines from the order.
+- If Customer is already selected, selecting an existing order should preserve the selected customer and only load Department/Event plus lines from the order.
 - Existing Orders popup should include Customer search.
 - Results should group/sort by account customer name, with existing orders listed under the account.
-- Popup rows should show customer number/name, Location/Event context, order number, and amount.
+- Popup rows should show customer number/name, Department/Event context, order number, and amount.
 - Popup line spacing should remain compact for keyboard scanning.
 
 #### Notes
 
-Location customers should search existing orders through the parent order customer. The location is used to default Location/Event, not as the persisted order customer.
+Location customers should search existing orders through the parent order customer. The location is used to default Department/Event, not as the persisted order customer.
 
 ---
 

@@ -50,7 +50,7 @@ BEGIN
                 'production_date', o.production_date,
                 'production_code', o.production_code,
                 'delivery_amount', 0,
-                'location_event',  o.event_location,
+                'department_event',  o.department_event,
                 'amount',          o.amount,
                 'discount_amount', o.discount_amount,
                 'customer_id',     o.customer_id,
@@ -74,7 +74,7 @@ BEGIN
                 'production_date', o.production_date,
                 'production_code', o.production_code,
                 'delivery_amount', 0,
-                'location_event',  o.event_location,
+                'department_event',  o.department_event,
                 'amount',          o.amount,
                 'discount_amount', o.discount_amount,
                 'customer_id',     o.customer_id,
@@ -141,7 +141,7 @@ BEGIN
            AND customer_id = p_customer_id;
     END IF;
 
-    SELECT jsonb_agg(row_data ORDER BY top_customer_name_sort ASC, location_event_sort ASC, order_id_sort DESC)
+    SELECT jsonb_agg(row_data ORDER BY top_customer_name_sort ASC, department_event_sort ASC, order_id_sort DESC)
       INTO v_result
       FROM (
         SELECT jsonb_build_object(
@@ -151,7 +151,7 @@ BEGIN
             'production_date', o.production_date,
             'production_code',   o.production_code,
             'delivery_amount', 0,
-            'location_event',  o.event_location,
+            'department_event',  o.department_event,
             'amount',          o.amount,
             'discount_amount', o.discount_amount,
             'customer_id',     o.customer_id,
@@ -164,7 +164,7 @@ BEGIN
         o.production_date AS production_date_sort,
         o.order_id AS order_id_sort,
         COALESCE(top_c.customer_name, o.customer_name, c.customer_name, o.snapshot_data->>'cus_name', '') AS top_customer_name_sort,
-        COALESCE(o.customer_name, c.customer_name, o.snapshot_data->>'cus_name', '') || ' - ' || COALESCE(o.event_location, '') AS location_event_sort
+        COALESCE(o.customer_name, c.customer_name, o.snapshot_data->>'cus_name', '') || ' - ' || COALESCE(o.department_event, '') AS department_event_sort
           FROM om_orders o
           LEFT JOIN fnd_customers c
                  ON c.customer_id = o.customer_id
@@ -177,7 +177,7 @@ BEGIN
            AND (p_production_date_from IS NULL OR o.production_date >= p_production_date_from)
            AND (p_production_date_to   IS NULL OR o.production_date <= p_production_date_to)
            AND (p_production_code IS NULL OR TRIM(o.production_code) = TRIM(p_production_code))
-         ORDER BY top_customer_name_sort ASC, location_event_sort ASC, o.order_id DESC
+         ORDER BY top_customer_name_sort ASC, department_event_sort ASC, o.order_id DESC
          LIMIT 500
     ) sub;
 

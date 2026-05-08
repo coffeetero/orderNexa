@@ -13,7 +13,7 @@ This screen should preserve the speed and workflow intent of the legacy PowerBui
 The tenant order-entry screen starts with four key header fields:
 
 - Customer.
-- Location/Event.
+- Department/Event.
 - Production date.
 - Production code.
 - Order number.
@@ -23,18 +23,18 @@ On page load, the app retrieves the customer hierarchy as JSON. The customer con
 After the user selects a customer by pressing Enter or clicking:
 
 1. Retrieve existing orders for the selected customer, production date, and production code.
-2. Do not fill Location/Event or move focus to Item until the existing-order decision is resolved.
-3. If no orders exist, prepare a new order, default Location/Event from the selected customer, show `New Order` in the Order Number field, and move focus to Item.
+2. Do not fill Department/Event or move focus to Item until the existing-order decision is resolved.
+3. If no orders exist, prepare a new order, default Department/Event from the selected customer, show `New Order` in the Order Number field, and move focus to Item.
 4. If one or more orders exist, show an order-selection popup immediately after customer selection instead of auto-loading any order.
-5. The popup shows `New Order` first, followed by existing orders with order number, Location/Event context, and amount.
-6. If the user selects `New Order`, default Location/Event from the selected customer, keep the grid empty, show `New Order` in the Order Number field, and move focus to Item.
-7. If the user selects an existing order, set the Order Number display from that order, retrieve the order detail by `order_id`, populate Location/Event and the grid from the loaded order, and then move focus to Item.
+5. The popup shows `New Order` first, followed by existing orders with order number, Department/Event context, and amount.
+6. If the user selects `New Order`, default Department/Event from the selected customer, keep the grid empty, show `New Order` in the Order Number field, and move focus to Item.
+7. If the user selects an existing order, set the Order Number display from that order, retrieve the order detail by `order_id`, populate Department/Event and the grid from the loaded order, and then move focus to Item.
 
 The order lines grid must be updated from the selected order detail response, not from the header-only order lookup response.
 
 The Order Number field is display-only on the header. Existing-order selection is handled by the popup, using the internal `order_id` for retrieval. Order numbers are display values and may be non-numeric, generated, or tenant-specific.
 
-When a customer has already been selected, choosing an existing order must not replace that selected customer with the customer stored on the order. This matters for location/event workflows: a location selection can find parent-customer orders, but the user's selected customer remains the workflow context. The loaded order should provide the persisted Location/Event text and order lines.
+When a customer has already been selected, choosing an existing order must not replace that selected customer with the customer stored on the order. This matters for department/event workflows: a location selection can find parent-customer orders, but the user's selected customer remains the workflow context. The loaded order should provide the persisted Department/Event text and order lines.
 
 When no customer is selected and the user searches existing orders by production date/code, selecting an existing order can populate Customer from the selected order because there is no customer context to preserve.
 
@@ -44,7 +44,7 @@ The popup is part of the keyboard flow:
 - `New Order` is the first/default selection.
 - Up and Down move the active selection.
 - Enter chooses the active row.
-- Only after the user chooses `New Order` or an existing order should the workflow continue to Location/Event and Item entry.
+- Only after the user chooses `New Order` or an existing order should the workflow continue to Department/Event and Item entry.
 
 ## Current UI Contract
 
@@ -52,8 +52,8 @@ The current tenant Order Entry screen uses a compact, single-workflow layout:
 
 - Title: `Enter Orders - {selected customer}` after customer selection.
 - Customer search: fixed width aligned with Item search.
-- Location/Event: editable text field on the header row.
-- Production Date and Production Time: header fields to the right of Location/Event.
+- Department/Event: editable text field on the header row.
+- Production Date and Production Time: header fields to the right of Department/Event.
 - Order Number: display-only field centered under the `Order Number` label.
 - Item search: fixed width aligned with Customer search.
 - Item and Customer dropdown rows use compact spacing for high-density keyboard scanning.
@@ -69,7 +69,7 @@ BPS customers can be one of several business types:
 - Aggregator.
 - Account.
 - Site.
-- Location or event.
+- Department or event.
 
 The hierarchy is not just visual. It affects order entry, billing, invoicing, pricing, and future integration behavior.
 
@@ -132,28 +132,28 @@ Cafeteria
   French Bread   6
 ```
 
-When entering an order for a location or event, the location/event customer is used to default the editable Location/Event text. The parent customer ID is recorded on the order, while a `location_event` field is unique within that order.
+When entering an order for a department or event, the department/event customer is used to default the editable Department/Event text. The parent customer ID is recorded on the order, while a `department_event` field is unique within that order.
 
-The order-entry screen has an editable `Location/Event` text field in the header row. The field should not default immediately when the customer is selected if existing orders may need to be resolved first.
+The order-entry screen has an editable `Department/Event` text field in the header row. The field should not default immediately when the customer is selected if existing orders may need to be resolved first.
 
-After the existing-order decision is resolved, Location/Event defaults from the selected customer. For a location/event customer, it should default from the selected location/event name for active entry, while the save function records the immediate parent's customer name as the order's customer snapshot. The user may override Location/Event before saving.
+After the existing-order decision is resolved, Department/Event defaults from the selected customer. For a department/event customer, it should default from the selected department/event name for active entry, while the save function records the immediate parent's customer name as the order's customer snapshot. The user may override Department/Event before saving.
 
 ## Walk-In And On-The-Fly Orders
 
-The location/event pattern also supports walk-in or on-the-fly orders where the tenant should not have to create a full customer and price list first.
+The department/event pattern also supports walk-in or on-the-fly orders where the tenant should not have to create a full customer and price list first.
 
 Example future pattern:
 
 - Define a general customer such as `Alpine`.
 - Use `Alpine` as the order customer.
-- Default the order's `location_event` field to an auto-numbered value such as `001`.
-- Allow the user to append to or replace the generated `location_event` value.
+- Default the order's `department_event` field to an auto-numbered value such as `001`.
+- Allow the user to append to or replace the generated `department_event` value.
 
 This still needs implementation.
 
 ## Proposed Existing-Order Selection Flow
 
-For account/site/location ordering, existing orders should be searched by the effective parent order customer rather than only the exact selected location/event customer. A location may be a child of a site or account, but the persisted order can still belong to the parent customer while using `event_location` to distinguish where the order applies.
+For account/site/location ordering, existing orders should be searched by the effective parent order customer rather than only the exact selected department/event customer. A location may be a child of a site or account, but the persisted order can still belong to the parent customer while using `department_event` to distinguish where the order applies.
 
 Example:
 
@@ -174,16 +174,16 @@ Proposed interaction:
 
 - When prior orders exist for the effective parent customer/date/code, open the order picker popup.
 - Include `New Order` as the first/default selection.
-- Show existing orders below it, including order number, Location/Event context, and amount.
-- Pressing Enter on the default `New Order` keeps the grid empty and derives a default `event_location`.
+- Show existing orders below it, including order number, Department/Event context, and amount.
+- Pressing Enter on the default `New Order` keeps the grid empty and derives a default `department_event`.
 - Selecting an existing order loads that order's lines for review or change.
 
 This supports both intentions without forcing a mouse-dependent correction path:
 
-- Create a new location/event order.
+- Create a new department/event order.
 - Retrieve and edit an existing parent/site/location order.
 
-For a selected location/event customer, the initial `event_location` default should be derived from the selected hierarchy path and a sequence when needed, for example `Hilton Luxury - Kitchen 001`. The user can replace it with a meaningful value such as `Hilton Luxury - Kitchen Noon`.
+For a selected department/event customer, the initial `department_event` default should be derived from the selected hierarchy path and a sequence when needed, for example `Hilton Luxury - Kitchen 001`. The user can replace it with a meaningful value such as `Hilton Luxury - Kitchen Noon`.
 
 ## Resolved Issue: Existing Order Lines
 
@@ -203,10 +203,10 @@ The detail lookup must use `order_id`, not the display order number.
 
 Order Entry currently depends on these API/function contracts:
 
-- Customer hierarchy is loaded as JSON and includes customer type so the UI can distinguish account/site/location/event behavior.
+- Customer hierarchy is loaded as JSON and includes customer type so the UI can distinguish account/site/department/event behavior.
 - Existing orders are retrieved through a header-only order lookup for tenant, customer, production date, and production code.
 - Existing order detail is retrieved by `order_id` with `headers_only=false`.
-- Order save sends `location_event` and line details through the API to the PostgreSQL save function.
+- Order save sends `department_event` and line details through the API to the PostgreSQL save function.
 - The save result returns the resolved order id, generated/final order number, and line references.
 - New orders send a visible `New Order` state from the UI. The database assigns the real tenant order number during save.
 - `om_orders_save` updates an existing order when `order_id` is provided. If `order_id` is null, the save path creates a new order and allocates an order number.
@@ -215,7 +215,7 @@ Recent database/function fixes:
 
 - `om_orders_get` was corrected to match the current schema and return order detail lines.
 - Stale references to removed item/order fields were removed from the active function path.
-- `om_orders_save` was corrected to save `location_event`.
+- `om_orders_save` was corrected to save `department_event`.
 - `fnd_customers_get` was updated to include `customer_type` in hierarchy payloads.
 - `om_orders_get` now treats a selected location customer as a lookup against its parent customer, so parent-level existing orders can be found from a location selection.
 - `om_orders_save` records the appropriate parent customer for location-type selections and preserves a customer name snapshot on the order.
@@ -255,9 +255,9 @@ Alpine Bakery currently uses `####-####`, seeded from the legacy maximum `ordr.o
 
 - Add the no-customer Search button beside Production Code. It should pass production date, production code, and optional customer id into the existing-order lookup.
 - Existing Orders popup should include customer search and group/sort results by account customer name, with existing orders listed under each account.
-- Existing Orders popup should show customer number/name, Location/Event context, order number, and amount in the final compact layout.
+- Existing Orders popup should show customer number/name, Department/Event context, order number, and amount in the final compact layout.
 - RLS for `fnd_tenant_sequences` needs a dev/admin access decision. `bps_dev` has grants, but direct SQL sessions may not see rows when the RLS policy depends on Supabase JWT `app_metadata.tenant_id`.
-- Walk-in and sample order flows need a clean pattern for default customer, generated Location/Event, and price handling.
+- Walk-in and sample order flows need a clean pattern for default customer, generated Department/Event, and price handling.
 - Debugging flags should be added later so workflow/API checkpoints can be enabled without noisy production logs.
 - Item property modeling needs future design beyond the current booleans such as sliced, wrapped, and covered.
 

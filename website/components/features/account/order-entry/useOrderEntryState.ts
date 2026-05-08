@@ -32,7 +32,7 @@ function emptyDraft(): OrderEntryDraft {
     order_ref: '',
     customer_id: null,
     customer_name: '',
-    location_event: '',
+    department_event: '',
     customer_credit: 0,
     order_date: today(),
     production_date: today(),

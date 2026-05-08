@@ -46,7 +46,7 @@ export function OrderPickSheet({
             row.top_customer_name,
             row.customer_number,
             row.customer_name,
-            row.location_event,
+            row.department_event,
             row.order_number,
           ]
             .filter(Boolean)
@@ -75,7 +75,7 @@ export function OrderPickSheet({
 
   const getCustomerDisplay = useCallback((row: OrderHeaderListRow) => {
     const customerLabel = [row.customer_number, row.customer_name].filter(Boolean).join(' - ');
-    return [customerLabel, row.location_event].filter(Boolean).join(' - ');
+    return [customerLabel, row.department_event].filter(Boolean).join(' - ');
   }, []);
 
   const optionCount = rowsWithOption.length + 1;

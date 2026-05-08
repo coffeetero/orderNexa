@@ -27,9 +27,9 @@ function normalizeOrderHeaderRow(raw: Record<string, unknown>): OrderHeaderListR
     order_number: String(raw.order_number ?? ''),
     production_date: String(raw.production_date ?? ''),
     production_code: String(raw.production_code ?? ''),
-    location_event:
-      raw.location_event !== undefined && raw.location_event !== null
-        ? String(raw.location_event)
+    department_event:
+      raw.department_event !== undefined && raw.department_event !== null
+        ? String(raw.department_event)
         : undefined,
     amount: Number(raw.amount ?? 0),
     customer_id: Number(raw.customer_id ?? 0),
@@ -79,7 +79,7 @@ function daysAfterToday(dateValue: string): number | null {
   return Math.round((targetDate.getTime() - todayDate.getTime()) / 86_400_000);
 }
 
-function isLocationEventCustomer(customer: CustomerOption): boolean {
+function isDepartmentEventCustomer(customer: CustomerOption): boolean {
   const type = customer.customer_type?.trim().toUpperCase();
   return type === 'LOCATION' || type === 'EVENT';
 }
@@ -194,7 +194,7 @@ export function OrderEntryForm({
       order_number: (data.order_number as string) ?? '',
       customer_id: (data.customer_id as number) ?? null,
       customer_name: (data.customer_name as string) ?? '',
-      location_event: (data.location_event as string) ?? '',
+      department_event: (data.department_event as string) ?? '',
       customer_credit: 0,
       order_date: (data.order_date as string) ?? new Date().toISOString().slice(0, 10),
       production_date: (data.production_date as string) ?? new Date().toISOString().slice(0, 10),
@@ -209,13 +209,13 @@ export function OrderEntryForm({
   const slotLookupGenerationRef = useRef(0);
   const suppressNextSlotLookupRef = useRef(false);
 
-  const getDefaultLocationEvent = useCallback(
+  const getDefaultDepartmentEvent = useCallback(
     (customerId: number | null): string => {
       if (customerId == null) return '';
       const customer = customers.find((candidate) => candidate.customer_id === customerId);
       if (!customer) return draft.customer_name;
 
-      return isLocationEventCustomer(customer) ? customer.customer_name : customer.customer_name;
+      return isDepartmentEventCustomer(customer) ? customer.customer_name : customer.customer_name;
     },
     [customers, draft.customer_name],
   );
@@ -379,7 +379,7 @@ export function OrderEntryForm({
         setField('order_number', 'New Order');
         setField('order_ref', 'New Order');
         setField('order_id', undefined);
-        setField('location_event', getDefaultLocationEvent(draft.customer_id));
+        setField('department_event', getDefaultDepartmentEvent(draft.customer_id));
         setField('lines', []);
         setField('total_amount', 0);
         setOrderPickCandidates([]);
@@ -391,7 +391,7 @@ export function OrderEntryForm({
       setField('order_number', 'New Order');
       setField('order_ref', 'New Order');
       setField('order_id', undefined);
-      setField('location_event', '');
+      setField('department_event', '');
       setField('lines', []);
       setField('total_amount', 0);
       setOrderPickMode('customer-scoped');
@@ -414,7 +414,7 @@ export function OrderEntryForm({
     draft.customer_name,
     draft.production_date,
     draft.production_code,
-    getDefaultLocationEvent,
+    getDefaultDepartmentEvent,
     fetchOrderHeaders,
     mode,
     orderId,
@@ -484,7 +484,7 @@ export function OrderEntryForm({
       const previousCustomerId = draft.customer_id;
       setShouldFocusItemWhenReady(false);
       setCustomer(customer?.customer_id ?? null, customer?.customer_name ?? '');
-      setField('location_event', '');
+      setField('department_event', '');
       setField('order_number', '');
       setField('order_ref', '');
       setField('order_id', undefined);
@@ -544,11 +544,11 @@ export function OrderEntryForm({
     setField('order_id', undefined);
     setField('order_number', 'New Order');
     setField('order_ref', 'New Order');
-    setField('location_event', getDefaultLocationEvent(draft.customer_id));
+    setField('department_event', getDefaultDepartmentEvent(draft.customer_id));
     setField('lines', []);
     setField('total_amount', 0);
     setShouldFocusItemWhenReady(true);
-  }, [draft.customer_id, getDefaultLocationEvent, setField]);
+  }, [draft.customer_id, getDefaultDepartmentEvent, setField]);
 
   const handleOrderPickSelect = useCallback(
     (row: OrderHeaderListRow) => {
@@ -589,7 +589,7 @@ export function OrderEntryForm({
         order_date: draft.order_date,
         production_date: draft.production_date,
         production_code: draft.production_code,
-        location_event: draft.location_event,
+        department_event: draft.department_event,
         delivery_amount: draft.delivery_amount,
         lines: draft.lines.map((l) => ({
           client_temp_id: l.tempId,

@@ -14,7 +14,7 @@
 --     "order_date":       <date string>,
 --     "production_date":  <date string>,
 --     "production_code":  <"AM"|"PM"|"SPECIAL">,
---     "location_event":   <text|null>,
+--     "department_event":   <text|null>,
 --     "delivery_amount":  <numeric>,
 --     "lines": [
 --       {
@@ -160,9 +160,9 @@ BEGIN
                 production_code = NULLIF(TRIM(p_payload->>'production_code'), ''),
                 customer_id     = v_order_customer_id,
                 customer_name   = v_order_customer_name,
-                event_location  = CASE
-                    WHEN p_payload ? 'location_event' THEN NULLIF(TRIM(p_payload->>'location_event'), '')
-                    ELSE event_location
+                department_event  = CASE
+                    WHEN p_payload ? 'department_event' THEN NULLIF(TRIM(p_payload->>'department_event'), '')
+                    ELSE department_event
                 END,
                 snapshot_data   = COALESCE(p_payload->'snapshot_data', snapshot_data)
             WHERE order_id  = v_order_id
@@ -179,7 +179,7 @@ BEGIN
                 discount_amount,
                 customer_id,
                 customer_name,
-                event_location,
+                department_event,
                 order_source,
                 tenant_id,
                 snapshot_data
@@ -193,7 +193,7 @@ BEGIN
                 0,
                 v_order_customer_id,
                 v_order_customer_name,
-                NULLIF(TRIM(p_payload->>'location_event'), ''),
+                NULLIF(TRIM(p_payload->>'department_event'), ''),
                 'Clerk',
                 p_tenant_id,
                 COALESCE(p_payload->'snapshot_data', '{}'::JSONB)
@@ -211,9 +211,9 @@ BEGIN
             production_code = NULLIF(TRIM(p_payload->>'production_code'), ''),
             customer_id     = v_order_customer_id,
             customer_name   = v_order_customer_name,
-            event_location  = CASE
-                WHEN p_payload ? 'location_event' THEN NULLIF(TRIM(p_payload->>'location_event'), '')
-                ELSE event_location
+            department_event  = CASE
+                WHEN p_payload ? 'department_event' THEN NULLIF(TRIM(p_payload->>'department_event'), '')
+                ELSE department_event
             END
         WHERE order_id  = v_order_id
           AND tenant_id = p_tenant_id;

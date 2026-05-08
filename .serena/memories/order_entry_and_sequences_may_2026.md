@@ -3,9 +3,9 @@
 Durable decisions from the May 8, 2026 work session:
 
 - Existing order retrieval and updates use internal `order_id`. Display `order_number` is tenant-formatted and should not be used as the edit identity.
-- If a customer is already selected, selecting an existing order from the popup preserves the selected customer. The loaded order supplies Location/Event and order lines.
+- If a customer is already selected, selecting an existing order from the popup preserves the selected customer. The loaded order supplies Department/Event and order lines.
 - If customer is blank and a future search button is used, selecting an existing order may populate customer from that order.
-- Location customers are order-entry helpers. They default Location/Event, while saved orders belong to the immediate parent customer and preserve a customer-name snapshot.
+- Location customers are order-entry helpers. They default Department/Event, while saved orders belong to the immediate parent customer and preserve a customer-name snapshot.
 - New orders show `New Order` in the UI; the database allocates the real order number only during save.
 - Tenant document numbers are stored in `fnd_tenant_sequences` by `(tenant_id, sequence_name)`, allowing independent row locks for order, invoice, customer, and future sequences.
 - `fnd_tenant_sequence_next` locks the sequence row and returns the formatted next value.

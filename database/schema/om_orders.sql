@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS om_orders (
     discount_amount         NUMERIC(14,4) NOT NULL,   -- ordr_discount_amt
     customer_id             BIGINT      REFERENCES fnd_customers(customer_id),  -- source: ordr.cus_id (nullable: legacy rows without cus_id)
     customer_name           TEXT,
-    event_location          TEXT,
+    department_event          TEXT,
     production_date         DATE        NOT NULL,   -- source: ordr.ordr_prdctn_dt
     production_code         TEXT,                   -- source: ordr.ordr_prdctn_cd (AM / PM / SPECIAL)
     snapshot_data           JSONB       NOT NULL DEFAULT '{}'::jsonb,

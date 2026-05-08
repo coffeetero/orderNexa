@@ -91,20 +91,20 @@ export function OrderHeaderRow({
           />
         </div>
 
-        {/* Location/Event */}
+        {/* Department/Event */}
         <div className="flex flex-col gap-1 flex-1 min-w-[220px]">
-          <Label htmlFor="location-event" className="text-xs font-semibold text-muted-foreground tracking-wide">
-            Location/Event
+          <Label htmlFor="department-event" className="text-xs font-semibold text-muted-foreground tracking-wide">
+            Department/Event
           </Label>
           <input
-            id="location-event"
+            id="department-event"
             type="text"
             className={cn(
               'h-9 w-full rounded-md border border-input bg-background px-2 text-sm text-foreground',
               'focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary',
             )}
-            value={draft.location_event}
-            onChange={(e) => onFieldChange('location_event', e.target.value)}
+            value={draft.department_event}
+            onChange={(e) => onFieldChange('department_event', e.target.value)}
           />
         </div>
 
