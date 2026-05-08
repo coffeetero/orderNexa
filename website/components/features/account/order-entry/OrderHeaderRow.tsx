@@ -115,7 +115,6 @@ export function OrderHeaderRow({
             clearSearchOnFocus
             inputRef={customerInputRef}
             triggerId="customer-select"
-            contentClassName="[&_[cmdk-group]]:!p-0 [&_[cmdk-group-items]]:!space-y-0 [&_[cmdk-item]]:!h-[20px] [&_[cmdk-item]]:!min-h-0 [&_[cmdk-item]]:!py-0 [&_[cmdk-item]]:!my-0 [&_[cmdk-item]]:!text-xs [&_[cmdk-item]]:!leading-none [&_[cmdk-item]_span]:!leading-none [&_[cmdk-item]_svg]:!h-3 [&_[cmdk-item]_svg]:!w-3"
             contextParentsSelectable={false}
           />
         </div>

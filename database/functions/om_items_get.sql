@@ -1,16 +1,21 @@
 -- ============================================================
 -- om_items_get
--- Returns the active item catalogue for a tenant with:
+-- Returns the item catalogue for a tenant with:
 --   - bps_items preparation capabilities and defaults
 --   - effective unit_price from the customer's active pricebook
 --     (lowest min_quantity tier; NULL when no pricebook is found)
+--   - active-only filtering by default, with an opt-out parameter
 --
 -- Prerequisites: add_order_entry_fields.sql (is_scoreable, default_scored)
 -- ============================================================
 
+DROP FUNCTION IF EXISTS bps.om_items_get(BIGINT, BIGINT);
+DROP FUNCTION IF EXISTS bps.om_items_get(BIGINT, BIGINT, BOOLEAN);
+
 CREATE OR REPLACE FUNCTION bps.om_items_get(
     p_tenant_id   BIGINT,
-    p_customer_id BIGINT DEFAULT NULL
+    p_customer_id BIGINT DEFAULT NULL,
+    p_return_actives_only BOOLEAN DEFAULT TRUE
 )
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -79,7 +84,7 @@ BEGIN
                  LIMIT 1
               ) pi ON TRUE
          WHERE i.tenant_id  = p_tenant_id
-           AND i.is_active  = TRUE
+           AND (NOT p_return_actives_only OR i.is_active = TRUE)
          LIMIT 2000
     ) sub;
 

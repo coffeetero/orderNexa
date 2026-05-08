@@ -58,6 +58,8 @@ export type EntityComboBoxProps<T> = {
   alwaysOpen?: boolean;
   /** When `alwaysOpen`, hide the list after selection until the user focuses search or types again. */
   collapseOnSelect?: boolean;
+  /** Initial collapsed state for `alwaysOpen`; defaults to `collapseOnSelect`. */
+  initialListCollapsed?: boolean;
   /**
    * When `alwaysOpen`, focusing the search field clears it and expands the list.
    * On blur, if the field is still empty and there is a selection, the label is restored.
@@ -147,6 +149,7 @@ export function EntityComboBox<T>({
   triggerId,
   alwaysOpen = false,
   collapseOnSelect = false,
+  initialListCollapsed,
   clearSearchOnFocus = false,
   onAfterSelect,
   inputRef,
@@ -155,7 +158,9 @@ export function EntityComboBox<T>({
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
   const [filterQuery, setFilterQuery] = React.useState('');
-  const [listCollapsed, setListCollapsed] = React.useState(collapseOnSelect);
+  const [listCollapsed, setListCollapsed] = React.useState(
+    initialListCollapsed ?? collapseOnSelect
+  );
   const searchInputRef = React.useRef<HTMLInputElement | null>(null);
   const listRef = React.useRef<HTMLDivElement | null>(null);
   const prevValueRef = React.useRef(value);
@@ -404,7 +409,9 @@ export function EntityComboBox<T>({
       return;
     }
 
-    setListCollapsed(true);
+    if (collapseOnSelect) {
+      setListCollapsed(true);
+    }
 
     if (!clearSearchOnFocus) return;
     cancelBlurRestoreTimer();
@@ -438,10 +445,15 @@ export function EntityComboBox<T>({
       }
       return;
     }
+    if (alwaysOpen && !collapseOnSelect && listCollapsed) {
+      setListCollapsed(false);
+    }
   }, [
     alwaysOpen,
     cancelBlurRestoreTimer,
     clearSearchOnFocus,
+    collapseOnSelect,
+    listCollapsed,
     query,
   ]);
 
@@ -502,7 +514,7 @@ export function EntityComboBox<T>({
     ) : rows.length === 0 ? (
       <CommandEmpty>{emptyText}</CommandEmpty>
     ) : (
-      <CommandGroup>
+      <CommandGroup className="p-0 [&_[cmdk-group-items]]:space-y-0">
         {rows.map(({ item, idStr, level, contextOnly }) => {
           const selected = value !== null && idKey(value) === idStr;
           const rowDisabled = rowIsDisabled(contextOnly);
@@ -518,16 +530,16 @@ export function EntityComboBox<T>({
                 if (rowDisabled) return;
                 commitSelection(item);
               }}
-              className="cursor-pointer data-[disabled=true]:cursor-not-allowed"
+              className="my-0 h-5 min-h-0 cursor-pointer py-0 text-xs leading-none data-[disabled=true]:cursor-not-allowed"
             >
               <Check
                 className={cn(
-                  'mr-2 h-4 w-4 shrink-0',
+                  'mr-2 h-3 w-3 shrink-0',
                   selected ? 'opacity-100' : 'opacity-0'
                 )}
               />
               <span
-                className="min-w-0 flex-1 truncate font-mono text-xs leading-snug"
+                className="min-w-0 flex-1 truncate font-mono text-xs leading-none"
                 style={{ paddingLeft: level * 10 }}
               >
                 {display}

@@ -5,13 +5,9 @@
 -- - department_event is stored uppercase and non-null.
 -- - orders saved against LOCATION customers are moved to the
 --   immediate parent customer, with the LOCATION name preserved in
---   department_event when department_event is blank.
+--   department_event and suffixed with legacy order_number.
 -- - Adds lookup indexes for existing-orders retrieval.
---
--- The proposed unique slot constraint:
---   (tenant_id, customer_id, production_date, production_code, department_event)
--- is intentionally not added here. Current legacy data contains duplicate
--- slot keys and needs a separate dedupe/legacy-retention decision first.
+-- - Adds unique slot index for one order per customer/date/code/Department-Event.
 -- ============================================================
 
 SET search_path = bps, public;
@@ -19,7 +15,9 @@ SET search_path = bps, public;
 UPDATE om_orders o
    SET customer_id = parent.customer_id,
        customer_name = parent.customer_name,
-       department_event = COALESCE(NULLIF(UPPER(TRIM(o.department_event)), ''), UPPER(TRIM(location.customer_name)), '')
+       department_event =
+           COALESCE(NULLIF(UPPER(TRIM(o.department_event)), ''), UPPER(TRIM(location.customer_name)), '')
+           || '-' || o.order_number
   FROM fnd_customers location
   JOIN fnd_customers parent
     ON parent.tenant_id = location.tenant_id
@@ -44,3 +42,7 @@ CREATE INDEX IF NOT EXISTS idx_om_orders_existing_customer_slot
 
 CREATE INDEX IF NOT EXISTS idx_om_orders_existing_slot
     ON om_orders (tenant_id, production_date, production_code);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_om_orders_slot_department_event
+    ON om_orders (tenant_id, customer_id, production_date, production_code, department_event)
+    NULLS NOT DISTINCT;

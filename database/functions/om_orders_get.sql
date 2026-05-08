@@ -16,6 +16,10 @@
 -- scoring columns are added to the deployed schema.
 -- ============================================================
 
+DROP FUNCTION IF EXISTS bps.om_orders_get(BIGINT, BIGINT, BIGINT, DATE, DATE, TEXT, BOOLEAN);
+DROP FUNCTION IF EXISTS bps.om_orders_get(BIGINT, BIGINT, BIGINT, DATE, DATE, TEXT, BOOLEAN, BOOLEAN);
+DROP FUNCTION IF EXISTS bps.om_orders_get(BIGINT, BIGINT, BIGINT, DATE, DATE);
+
 CREATE OR REPLACE FUNCTION bps.om_orders_get(
     p_tenant_id               BIGINT,
     p_order_id                BIGINT   DEFAULT NULL,
@@ -23,7 +27,8 @@ CREATE OR REPLACE FUNCTION bps.om_orders_get(
     p_production_date_from    DATE     DEFAULT NULL,
     p_production_date_to      DATE     DEFAULT NULL,
     p_production_code         TEXT     DEFAULT NULL,
-    p_return_headers_only     BOOLEAN  DEFAULT TRUE
+    p_return_headers_only     BOOLEAN  DEFAULT TRUE,
+    p_return_actives_only     BOOLEAN  DEFAULT TRUE
 )
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -65,8 +70,16 @@ BEGIN
               LEFT JOIN fnd_customers c
                      ON c.customer_id = o.customer_id
                     AND c.tenant_id   = o.tenant_id
+              LEFT JOIN fnd_customers top_c
+                     ON top_c.customer_id = COALESCE(c.top_customer_id, c.customer_id)
+                    AND top_c.tenant_id   = o.tenant_id
              WHERE o.order_id  = p_order_id
-               AND o.tenant_id = p_tenant_id;
+               AND o.tenant_id = p_tenant_id
+               AND (
+                   NOT p_return_actives_only
+                   OR o.customer_id IS NULL
+                   OR (COALESCE(c.is_active, FALSE) AND COALESCE(top_c.is_active, c.is_active, FALSE))
+               );
         ELSE
             SELECT jsonb_build_object(
                 'order_id',        o.order_id,
@@ -89,6 +102,9 @@ BEGIN
               LEFT JOIN fnd_customers c
                      ON c.customer_id = o.customer_id
                     AND c.tenant_id   = o.tenant_id
+              LEFT JOIN fnd_customers top_c
+                     ON top_c.customer_id = COALESCE(c.top_customer_id, c.customer_id)
+                    AND top_c.tenant_id   = o.tenant_id
               LEFT JOIN LATERAL (
                     SELECT jsonb_agg(
                         jsonb_build_object(
@@ -120,7 +136,12 @@ BEGIN
                        AND l.tenant_id = o.tenant_id
                    ) lines_agg ON TRUE
              WHERE o.order_id  = p_order_id
-               AND o.tenant_id = p_tenant_id;
+               AND o.tenant_id = p_tenant_id
+               AND (
+                   NOT p_return_actives_only
+                   OR o.customer_id IS NULL
+                   OR (COALESCE(c.is_active, FALSE) AND COALESCE(top_c.is_active, c.is_active, FALSE))
+               );
         END IF;
 
         RETURN COALESCE(v_result, 'null'::JSONB);
@@ -179,6 +200,11 @@ BEGIN
            AND (p_production_date_from IS NULL OR o.production_date >= p_production_date_from)
            AND (p_production_date_to   IS NULL OR o.production_date <= p_production_date_to)
            AND (v_production_code IS NULL OR o.production_code = v_production_code)
+           AND (
+               NOT p_return_actives_only
+               OR o.customer_id IS NULL
+               OR (COALESCE(c.is_active, FALSE) AND COALESCE(top_c.is_active, c.is_active, FALSE))
+           )
          ORDER BY top_customer_name_sort ASC, department_event_sort ASC, o.order_id DESC
          LIMIT 500
     ) sub;

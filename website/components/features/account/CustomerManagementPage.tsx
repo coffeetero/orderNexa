@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { EntityComboBox } from '@/components/bps/EntityComboBox';
 import { Button } from '@/components/ui/button';
@@ -80,14 +80,16 @@ const CUSTOMER_TYPES = ['ACCOUNT', 'SITE', 'LOCATION'] as const;
 
 /** Focus first text/select control in the visible tab panel (for post–customer-select navigation). */
 function focusFirstEditableInActiveTabPanel() {
-  requestAnimationFrame(() => {
-    const panel = document.querySelector('[role="tabpanel"][data-state="active"]');
-    if (!panel) return;
-    const el = panel.querySelector<HTMLElement>(
-      'input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), button[role="combobox"]:not([disabled]), select:not([disabled])'
-    );
-    el?.focus();
-  });
+  window.setTimeout(() => {
+    requestAnimationFrame(() => {
+      const panel = document.querySelector('[role="tabpanel"][data-state="active"]');
+      if (!panel) return;
+      const el = panel.querySelector<HTMLElement>(
+        'input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), button[role="combobox"]:not([disabled]), select:not([disabled])'
+      );
+      el?.focus();
+    });
+  }, 0);
 }
 
 function toNumber(value: unknown): number | null {
@@ -237,6 +239,7 @@ export function CustomerManagementPage({
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(initialMessage);
+  const didRetryInitialCustomersRef = useRef(false);
 
   useEffect(() => {
     if (!isDebugActive) return;
@@ -300,6 +303,14 @@ export function CustomerManagementPage({
     setTenantId(parsed);
     await fetchCustomers(parsed);
   };
+
+  useEffect(() => {
+    if (didRetryInitialCustomersRef.current) return;
+    if (!tenantId || initialCustomers.length > 0 || customers.length > 0) return;
+
+    didRetryInitialCustomersRef.current = true;
+    void fetchCustomers(tenantId);
+  }, [customers.length, fetchCustomers, initialCustomers.length, tenantId]);
 
   const loadCustomerIntoForm = useCallback(
     async (hierRow: CustomerRow) => {
@@ -492,7 +503,7 @@ export function CustomerManagementPage({
               <EntityComboBox<CustomerRow>
                 alwaysOpen
                 collapseOnSelect
-                clearSearchOnFocus
+                initialListCollapsed={false}
                 triggerId="customer-combobox"
                 items={customers}
                 value={selectedCustomerId}

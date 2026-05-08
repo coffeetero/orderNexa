@@ -69,6 +69,7 @@ DECLARE
     v_department_event TEXT;
     v_requires_gapless BOOLEAN;
     v_existing_order_found BOOLEAN := FALSE;
+    v_constraint_name TEXT;
 BEGIN
     IF p_tenant_id IS NULL THEN
         RAISE EXCEPTION 'p_tenant_id is required';
@@ -360,6 +361,12 @@ BEGIN
     );
 
 EXCEPTION WHEN unique_violation THEN
+    GET STACKED DIAGNOSTICS v_constraint_name = CONSTRAINT_NAME;
+
+    IF v_constraint_name = 'uq_om_orders_slot_department_event' THEN
+        RAISE EXCEPTION 'An order already exists for this customer, production date, production code, and Department/Event.';
+    END IF;
+
     RAISE EXCEPTION 'Order number % already exists for this tenant.', v_order_number;
 END;
 $$;

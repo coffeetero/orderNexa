@@ -110,7 +110,6 @@ export function ItemEntryRow({
           inputRef={itemInputRef}
           triggerId="item-search"
           className="!flex-none min-h-0 w-full min-w-0 self-start"
-          contentClassName="z-50 [&_[cmdk-group]]:!p-0 [&_[cmdk-group-items]]:!space-y-0 [&_[cmdk-item]]:!h-[20px] [&_[cmdk-item]]:!min-h-0 [&_[cmdk-item]]:!py-0 [&_[cmdk-item]]:!my-0 [&_[cmdk-item]]:!text-xs [&_[cmdk-item]]:!leading-none [&_[cmdk-item]_span]:!leading-none [&_[cmdk-item]_svg]:!h-3 [&_[cmdk-item]_svg]:!w-3"
         />
       </div>
 

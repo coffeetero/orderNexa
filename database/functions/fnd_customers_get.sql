@@ -1,4 +1,6 @@
 DROP FUNCTION IF EXISTS bps.fnd_get_customers(bigint, bigint, boolean, boolean);
+DROP FUNCTION IF EXISTS bps.fnd_customers_get(bigint);
+DROP FUNCTION IF EXISTS bps.fnd_customers_get(bigint, bigint, boolean, boolean);
 
 CREATE OR REPLACE FUNCTION bps.fnd_customers_get(
     p_tenant_id bigint,

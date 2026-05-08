@@ -73,7 +73,7 @@ BEGIN
         END,
         CASE
             WHEN UPPER(TRIM(cus.customer_type)) = 'LOCATION'
-            THEN UPPER(TRIM(cus.customer_name))
+            THEN UPPER(TRIM(cus.customer_name)) || '-' || trim(o.ordr_no::BIGINT::TEXT)
             ELSE ''
         END,
         o.ordr_prdctn_dt::DATE,

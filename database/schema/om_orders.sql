@@ -62,7 +62,9 @@ UPDATE om_orders
 UPDATE om_orders o
    SET customer_id = parent.customer_id,
        customer_name = parent.customer_name,
-       department_event = COALESCE(NULLIF(UPPER(TRIM(o.department_event)), ''), UPPER(TRIM(location.customer_name)), '')
+       department_event =
+           COALESCE(NULLIF(UPPER(TRIM(o.department_event)), ''), UPPER(TRIM(location.customer_name)), '')
+           || '-' || o.order_number
   FROM fnd_customers location
   JOIN fnd_customers parent
     ON parent.tenant_id = location.tenant_id
@@ -86,6 +88,10 @@ CREATE INDEX IF NOT EXISTS idx_om_orders_existing_customer_slot
 
 CREATE INDEX IF NOT EXISTS idx_om_orders_existing_slot
     ON om_orders (tenant_id, production_date, production_code);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_om_orders_slot_department_event
+    ON om_orders (tenant_id, customer_id, production_date, production_code, department_event)
+    NULLS NOT DISTINCT;
 
 -- TRIGGERS
 DROP TRIGGER IF EXISTS trg_om_orders_set_updated ON om_orders;
