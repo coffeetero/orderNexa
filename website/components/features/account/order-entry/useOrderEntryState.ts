@@ -26,6 +26,15 @@ function today(): string {
   return `${year}-${month}-${day}`;
 }
 
+function tomorrow(): string {
+  const now = new Date();
+  now.setDate(now.getDate() + 1);
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function emptyDraft(): OrderEntryDraft {
   return {
     order_number: '',
@@ -35,7 +44,7 @@ function emptyDraft(): OrderEntryDraft {
     department_event: '',
     customer_credit: 0,
     order_date: today(),
-    production_date: today(),
+    production_date: tomorrow(),
     production_code: 'AM',
     delivery_amount: 0,
     total_amount: 0,

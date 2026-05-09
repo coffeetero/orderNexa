@@ -11,6 +11,9 @@ export function useOrderFocus() {
   /** Ref attached to the customer EntityComboBox internal <input> (alwaysOpen mode). */
   const customerInputRef = useRef<HTMLInputElement | null>(null);
 
+  /** Ref attached to the Department/Event EntityComboBox internal <input>. */
+  const departmentEventInputRef = useRef<HTMLInputElement | null>(null);
+
   /** Ref attached to the item EntityComboBox internal <input> (alwaysOpen mode).
    *  Populated via the EntityComboBox `inputRef` prop. */
   const itemInputRef = useRef<HTMLInputElement | null>(null);
@@ -34,6 +37,15 @@ export function useOrderFocus() {
       if (!el) return;
       el.focus();
       // clear text so the user can type a new search immediately
+      el.select?.();
+    });
+  }, []);
+
+  const focusDepartmentEvent = useCallback(() => {
+    requestAnimationFrame(() => {
+      const el = departmentEventInputRef.current;
+      if (!el) return;
+      el.focus();
       el.select?.();
     });
   }, []);
@@ -79,9 +91,11 @@ export function useOrderFocus() {
 
   return {
     customerInputRef,
+    departmentEventInputRef,
     itemInputRef,
     qtyRef,
     focusCustomer,
+    focusDepartmentEvent,
     focusItem,
     focusQty,
     focusGridCell,

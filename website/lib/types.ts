@@ -151,6 +151,7 @@ export interface OrderHeaderListRow {
   production_code: string;
   department_event?: string;
   amount: number;
+  total_quantity?: number;
   customer_id: number;
   customer_number?: string;
   customer_name?: string;
@@ -254,6 +255,7 @@ export interface OrderSaveResult {
   success: boolean;
   order_id: number;
   order_number: string | null;
+  department_event?: string | null;
   mode?: 'created' | 'updated';
   line_refs?: Array<{
     client_temp_id: string | null;

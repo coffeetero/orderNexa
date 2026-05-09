@@ -36,6 +36,12 @@ export type EntityComboBoxProps<T> = {
   getParentId: (item: T) => string | number | null;
   /** Text used for substring search; defaults to getLabel. */
   getSearchText?: (item: T) => string;
+  /** Controlled text for alwaysOpen input. */
+  inputValue?: string;
+  /** Called when the alwaysOpen input text changes. */
+  onInputValueChange?: (value: string) => void;
+  /** Called when Enter is pressed while no selectable row is available. */
+  onInputCommit?: (value: string) => void;
   /** Sort visible rows; defaults to stable order by getId. */
   getSortKey?: (item: T) => string;
   placeholder?: string;
@@ -134,6 +140,9 @@ export function EntityComboBox<T>({
   getInputLabel,
   getParentId,
   getSearchText: getSearchTextProp,
+  inputValue,
+  onInputValueChange,
+  onInputCommit,
   getSortKey,
   placeholder = 'Select…',
   disabled,
@@ -166,6 +175,13 @@ export function EntityComboBox<T>({
   const prevValueRef = React.useRef(value);
   const blurRestoreTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const pointerDownOnListRef = React.useRef(false);
+  const isInputControlled = inputValue !== undefined;
+  const currentInputValue = isInputControlled ? inputValue : query;
+
+  React.useEffect(() => {
+    if (!alwaysOpen) return;
+    setListCollapsed(initialListCollapsed ?? collapseOnSelect);
+  }, [alwaysOpen, collapseOnSelect, initialListCollapsed]);
 
   // Sync external refs on every render so callers always have the current element.
   React.useEffect(() => {
@@ -330,10 +346,10 @@ export function EntityComboBox<T>({
   React.useEffect(() => {
     if (alwaysOpen) return;
     if (!open) {
-      setQuery('');
+      if (!isInputControlled) setQuery('');
       setFilterQuery('');
     }
-  }, [alwaysOpen, open]);
+  }, [alwaysOpen, isInputControlled, open]);
 
   /** Keep search text aligned with `value` when it changes externally (not while the user is typing). */
   React.useEffect(() => {
@@ -341,14 +357,29 @@ export function EntityComboBox<T>({
     if (prevValueRef.current !== value) {
       prevValueRef.current = value;
       if (selectedItem) {
-        setQuery((getInputLabel ?? getLabel)(selectedItem));
+        const label = (getInputLabel ?? getLabel)(selectedItem);
+        if (isInputControlled) {
+          onInputValueChange?.(label);
+        } else {
+          setQuery(label);
+        }
         setFilterQuery('');
       } else {
-        setQuery('');
+        if (!isInputControlled) {
+          setQuery('');
+        }
         setFilterQuery('');
       }
     }
-  }, [alwaysOpen, getInputLabel, getLabel, selectedItem, value]);
+  }, [
+    alwaysOpen,
+    getInputLabel,
+    getLabel,
+    isInputControlled,
+    onInputValueChange,
+    selectedItem,
+    value,
+  ]);
 
   React.useEffect(() => {
     return () => {
@@ -362,7 +393,11 @@ export function EntityComboBox<T>({
     (item: T) => {
       cancelBlurRestoreTimer();
       const label = (getInputLabel ?? getLabel)(item);
-      setQuery(label);
+      if (isInputControlled) {
+        onInputValueChange?.(label);
+      } else {
+        setQuery(label);
+      }
       setFilterQuery('');
       onChange(item);
       onAfterSelect?.(item);
@@ -383,21 +418,27 @@ export function EntityComboBox<T>({
       collapseOnSelect,
       getInputLabel,
       getLabel,
+      isInputControlled,
       onAfterSelect,
       onChange,
+      onInputValueChange,
     ]
   );
 
   const handleQueryChange = React.useCallback(
     (next: string) => {
       cancelBlurRestoreTimer();
-      setQuery(next);
+      if (isInputControlled) {
+        onInputValueChange?.(next);
+      } else {
+        setQuery(next);
+      }
       setFilterQuery(next);
       if (alwaysOpen && listCollapsed) {
         setListCollapsed(false);
       }
     },
-    [alwaysOpen, cancelBlurRestoreTimer, listCollapsed]
+    [alwaysOpen, cancelBlurRestoreTimer, isInputControlled, listCollapsed, onInputValueChange]
   );
 
   const handleSearchBlur = React.useCallback(() => {
@@ -417,11 +458,17 @@ export function EntityComboBox<T>({
     cancelBlurRestoreTimer();
     blurRestoreTimerRef.current = setTimeout(() => {
       blurRestoreTimerRef.current = null;
-      setQuery((q) => {
-        if (q.trim() !== '') return q;
-        if (selectedItem) return (getInputLabel ?? getLabel)(selectedItem);
-        return q;
-      });
+      if (isInputControlled) {
+        if (currentInputValue.trim() === '' && selectedItem) {
+          onInputValueChange?.((getInputLabel ?? getLabel)(selectedItem));
+        }
+      } else {
+        setQuery((q) => {
+          if (q.trim() !== '') return q;
+          if (selectedItem) return (getInputLabel ?? getLabel)(selectedItem);
+          return q;
+        });
+      }
       setFilterQuery('');
     }, 150);
   }, [
@@ -431,15 +478,22 @@ export function EntityComboBox<T>({
     collapseOnSelect,
     getInputLabel,
     getLabel,
+    currentInputValue,
+    isInputControlled,
+    onInputValueChange,
     selectedItem,
   ]);
 
   const handleSearchFocus = React.useCallback(() => {
     cancelBlurRestoreTimer();
     if (alwaysOpen && clearSearchOnFocus) {
-      if (query !== '') {
+      if (currentInputValue !== '') {
         requestAnimationFrame(() => {
-          setQuery('');
+          if (isInputControlled) {
+            onInputValueChange?.('');
+          } else {
+            setQuery('');
+          }
           setFilterQuery('');
         });
       }
@@ -453,8 +507,10 @@ export function EntityComboBox<T>({
     cancelBlurRestoreTimer,
     clearSearchOnFocus,
     collapseOnSelect,
+    currentInputValue,
+    isInputControlled,
     listCollapsed,
-    query,
+    onInputValueChange,
   ]);
 
   const handleAlwaysOpenKeyDown = React.useCallback(
@@ -463,9 +519,19 @@ export function EntityComboBox<T>({
 
       if (event.key === 'Escape') {
         event.preventDefault();
-        setQuery('');
+        if (isInputControlled) {
+          onInputValueChange?.('');
+        } else {
+          setQuery('');
+        }
         setFilterQuery('');
         setListCollapsed(true);
+        return;
+      }
+
+      if (event.key === 'Enter' && rows.length === 0) {
+        event.preventDefault();
+        onInputCommit?.(currentInputValue);
         return;
       }
 
@@ -484,7 +550,7 @@ export function EntityComboBox<T>({
         }
       }
     },
-    [alwaysOpen, listCollapsed],
+    [alwaysOpen, currentInputValue, isInputControlled, listCollapsed, onInputCommit, onInputValueChange, rows.length],
   );
 
   const handleAlwaysOpenToggle = React.useCallback(
@@ -492,12 +558,14 @@ export function EntityComboBox<T>({
       event.preventDefault();
       event.stopPropagation();
       cancelBlurRestoreTimer();
-      setQuery('');
-      setFilterQuery('');
+      if (!isInputControlled) {
+        setQuery('');
+        setFilterQuery('');
+      }
       setListCollapsed((current) => !current);
       requestAnimationFrame(() => searchInputRef.current?.focus());
     },
-    [cancelBlurRestoreTimer],
+    [cancelBlurRestoreTimer, isInputControlled, onInputValueChange],
   );
 
   const triggerLabel = selectedItem ? getLabel(selectedItem) : null;
@@ -519,7 +587,7 @@ export function EntityComboBox<T>({
           const selected = value !== null && idKey(value) === idStr;
           const rowDisabled = rowIsDisabled(contextOnly);
           const label = getLabel(item);
-          const display = highlightMatches(label, query.trim().toLowerCase());
+          const display = highlightMatches(label, currentInputValue.trim().toLowerCase());
 
           return (
             <CommandItem
@@ -584,7 +652,7 @@ export function EntityComboBox<T>({
                 ref={searchInputRef}
                 id={triggerId}
                 placeholder={placeholder}
-                value={query}
+                value={currentInputValue}
                 onValueChange={handleQueryChange}
                 onFocus={handleSearchFocus}
                 onBlur={handleSearchBlur}
@@ -604,7 +672,11 @@ export function EntityComboBox<T>({
                     event.stopPropagation();
                     cancelBlurRestoreTimer();
                     onChange(null);
-                    setQuery('');
+                    if (isInputControlled) {
+                      onInputValueChange?.('');
+                    } else {
+                      setQuery('');
+                    }
                     setFilterQuery('');
                     setListCollapsed(true);
                     requestAnimationFrame(() => searchInputRef.current?.focus());
@@ -715,7 +787,7 @@ export function EntityComboBox<T>({
           <CommandInput
             ref={searchInputRef}
             placeholder="Search…"
-            value={query}
+            value={currentInputValue}
             onValueChange={setQuery}
             disabled={loading}
           />

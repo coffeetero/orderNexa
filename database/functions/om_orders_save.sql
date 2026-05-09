@@ -67,8 +67,9 @@ DECLARE
     v_production_date DATE;
     v_production_code TEXT;
     v_department_event TEXT;
+    v_base_department_event TEXT;
+    v_next_department_event_suffix INTEGER;
     v_requires_gapless BOOLEAN;
-    v_existing_order_found BOOLEAN := FALSE;
     v_constraint_name TEXT;
 BEGIN
     IF p_tenant_id IS NULL THEN
@@ -144,26 +145,10 @@ BEGIN
 
     -- ── HEADER UPSERT (id-driven, with order-number fallback) ───────────
     IF p_order_id IS NULL THEN
-        SELECT order_id, order_number
-          INTO v_order_id, v_order_number
-          FROM om_orders
-         WHERE tenant_id = p_tenant_id
-           AND customer_id IS NOT DISTINCT FROM v_order_customer_id
-           AND production_date = v_production_date
-           AND production_code IS NOT DISTINCT FROM v_production_code
-           AND department_event = COALESCE(v_department_event, '')
-         ORDER BY order_id DESC
-         LIMIT 1;
-
-        v_existing_order_found := FOUND;
+        v_base_department_event := COALESCE(v_department_event, '');
 
         v_order_number := TRIM(p_payload->>'order_number');
-        IF v_existing_order_found THEN
-            SELECT order_number INTO v_order_number
-              FROM om_orders
-             WHERE order_id = v_order_id
-               AND tenant_id = p_tenant_id;
-        ELSIF v_order_number IS NULL OR v_order_number = '' OR v_order_number = 'New Order' THEN
+        IF v_order_number IS NULL OR v_order_number = '' OR v_order_number = 'New Order' THEN
             v_order_number := fnd_tenant_sequence_next(
                 p_tenant_id,
                 'order_number',
@@ -171,62 +156,106 @@ BEGIN
             );
         END IF;
 
-        IF NOT v_existing_order_found THEN
-            SELECT order_id INTO v_order_id
-              FROM om_orders
-             WHERE tenant_id = p_tenant_id
-               AND order_number = v_order_number
-             LIMIT 1;
+        IF EXISTS (
+            SELECT 1
+              FROM om_orders existing
+             WHERE existing.tenant_id = p_tenant_id
+               AND existing.customer_id IS NOT DISTINCT FROM v_order_customer_id
+               AND existing.production_date = v_production_date
+               AND existing.production_code IS NOT DISTINCT FROM v_production_code
+               AND existing.department_event = v_base_department_event
+        ) THEN
+            SELECT COALESCE(
+                MAX(
+                    CASE
+                        WHEN existing.department_event = v_base_department_event THEN 0
+                        WHEN substring(existing.department_event FROM length(v_base_department_event) + 2) ~ '^[0-9]+$'
+                        THEN substring(existing.department_event FROM length(v_base_department_event) + 2)::INTEGER
+                        ELSE NULL
+                    END
+                ),
+                0
+            ) + 1
+              INTO v_next_department_event_suffix
+              FROM om_orders existing
+             WHERE existing.tenant_id = p_tenant_id
+               AND existing.customer_id IS NOT DISTINCT FROM v_order_customer_id
+               AND existing.production_date = v_production_date
+               AND existing.production_code IS NOT DISTINCT FROM v_production_code
+               AND (
+                    existing.department_event = v_base_department_event
+                    OR existing.department_event LIKE v_base_department_event || '-%'
+               );
+
+            v_department_event := v_base_department_event || '-' || LPAD(v_next_department_event_suffix::TEXT, 2, '0');
         END IF;
 
-        IF FOUND OR v_existing_order_found THEN
-            UPDATE om_orders SET
-                order_date      = NULLIF(TRIM(p_payload->>'order_date'), '')::DATE,
-                production_date = v_production_date,
-                production_code = v_production_code,
-                customer_id     = v_order_customer_id,
-                customer_name   = v_order_customer_name,
-                department_event  = CASE
-                    WHEN p_payload ? 'department_event' THEN COALESCE(v_department_event, '')
-                    ELSE department_event
-                END,
-                snapshot_data   = COALESCE(p_payload->'snapshot_data', snapshot_data)
-            WHERE order_id  = v_order_id
-              AND tenant_id = p_tenant_id;
-            v_mode := 'updated';
-        ELSE
-            INSERT INTO om_orders (
-                order_number,
-                order_date,
-                production_date,
-                production_code,
-                quantity,
-                amount,
-                discount_amount,
-                customer_id,
-                customer_name,
-                department_event,
-                order_source,
-                tenant_id,
-                snapshot_data
-            ) VALUES (
-                v_order_number,
-                NULLIF(TRIM(p_payload->>'order_date'), '')::DATE,
-                v_production_date,
-                v_production_code,
-                0,   -- updated below after lines
-                0,
-                0,
-                v_order_customer_id,
-                v_order_customer_name,
-                COALESCE(v_department_event, ''),
-                'Clerk',
-                p_tenant_id,
-                COALESCE(p_payload->'snapshot_data', '{}'::JSONB)
-            )
-            RETURNING order_id INTO v_order_id;
-            v_mode := 'created';
-        END IF;
+        LOOP
+            BEGIN
+                INSERT INTO om_orders (
+                    order_number,
+                    order_date,
+                    production_date,
+                    production_code,
+                    quantity,
+                    amount,
+                    discount_amount,
+                    customer_id,
+                    customer_name,
+                    department_event,
+                    order_source,
+                    tenant_id,
+                    snapshot_data
+                ) VALUES (
+                    v_order_number,
+                    NULLIF(TRIM(p_payload->>'order_date'), '')::DATE,
+                    v_production_date,
+                    v_production_code,
+                    0,   -- updated below after lines
+                    0,
+                    0,
+                    v_order_customer_id,
+                    v_order_customer_name,
+                    COALESCE(v_department_event, ''),
+                    'Clerk',
+                    p_tenant_id,
+                    COALESCE(p_payload->'snapshot_data', '{}'::JSONB)
+                )
+                RETURNING order_id INTO v_order_id;
+                EXIT;
+            EXCEPTION WHEN unique_violation THEN
+                GET STACKED DIAGNOSTICS v_constraint_name = CONSTRAINT_NAME;
+
+                IF v_constraint_name <> 'uq_om_orders_slot_department_event' THEN
+                    RAISE;
+                END IF;
+
+                SELECT COALESCE(
+                    MAX(
+                        CASE
+                            WHEN existing.department_event = v_base_department_event THEN 0
+                            WHEN substring(existing.department_event FROM length(v_base_department_event) + 2) ~ '^[0-9]+$'
+                            THEN substring(existing.department_event FROM length(v_base_department_event) + 2)::INTEGER
+                            ELSE NULL
+                        END
+                    ),
+                    0
+                ) + 1
+                  INTO v_next_department_event_suffix
+                  FROM om_orders existing
+                 WHERE existing.tenant_id = p_tenant_id
+                   AND existing.customer_id IS NOT DISTINCT FROM v_order_customer_id
+                   AND existing.production_date = v_production_date
+                   AND existing.production_code IS NOT DISTINCT FROM v_production_code
+                   AND (
+                        existing.department_event = v_base_department_event
+                        OR existing.department_event LIKE v_base_department_event || '-%'
+                   );
+
+                v_department_event := v_base_department_event || '-' || LPAD(v_next_department_event_suffix::TEXT, 2, '0');
+            END;
+        END LOOP;
+        v_mode := 'created';
     ELSE
         v_order_id := p_order_id;
 
@@ -354,6 +383,7 @@ BEGIN
         'success',      TRUE,
         'order_id',     v_order_id,
         'order_number', v_order_number,
+        'department_event', v_department_event,
         'mode',         v_mode,
         'line_refs',    v_line_refs,
         'deleted_lines', v_deleted_line_count,

@@ -14,7 +14,11 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { createClient } from '@/lib/supabase/client';
-import { OrderHeaderRow, type CustomerOption } from './OrderHeaderRow';
+import {
+  OrderHeaderRow,
+  type CustomerOption,
+  type DepartmentEventOption,
+} from './OrderHeaderRow';
 import { ItemEntryRow } from './ItemEntryRow';
 import { OrderLineGrid } from './OrderLineGrid';
 import { useOrderEntryState } from './useOrderEntryState';
@@ -25,6 +29,7 @@ import type {
   OrderHeaderListRow,
   OrderSavePayload,
   OrderSaveResult,
+  ProductionCode,
 } from '@/lib/types';
 import { OrderPickSheet } from './OrderPickSheet';
 
@@ -41,6 +46,7 @@ function normalizeOrderHeaderRow(raw: Record<string, unknown>): OrderHeaderListR
         ? String(raw.department_event)
         : undefined,
     amount: Number(raw.amount ?? 0),
+    total_quantity: Number(raw.total_quantity ?? 0),
     customer_id: Number(raw.customer_id ?? 0),
     customer_number:
       raw.customer_number !== undefined && raw.customer_number !== null
@@ -140,6 +146,8 @@ export function OrderEntryForm({
   const [orderPickOpen, setOrderPickOpen] = useState(false);
   const [orderPickMode, setOrderPickMode] = useState<OrderPickMode>('customer-scoped');
   const [orderPickCandidates, setOrderPickCandidates] = useState<OrderHeaderListRow[]>([]);
+  const [departmentEventOptions, setDepartmentEventOptions] = useState<DepartmentEventOption[]>([]);
+  const [selectedDepartmentEventId, setSelectedDepartmentEventId] = useState<string | null>(null);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
   const [isLoadingItems, setIsLoadingItems] = useState(false);
   const [itemsError, setItemsError] = useState<string | null>(null);
@@ -163,9 +171,11 @@ export function OrderEntryForm({
 
   const {
     customerInputRef,
+    departmentEventInputRef,
     itemInputRef,
     qtyRef,
     focusCustomer,
+    focusDepartmentEvent,
     focusItem,
     focusQty,
     focusGridCell,
@@ -230,6 +240,46 @@ export function OrderEntryForm({
       if (!customer) return '';
 
       return isDepartmentEventCustomer(customer) ? customer.customer_name.toUpperCase() : '';
+    },
+    [customers],
+  );
+
+  const buildDepartmentEventOptions = useCallback(
+    (customerId: number | null, rows: OrderHeaderListRow[]): DepartmentEventOption[] => {
+      const customer = customerId == null
+        ? null
+        : customers.find((candidate) => candidate.customer_id === customerId) ?? null;
+      const defaultDepartmentEvent =
+        customer && isDepartmentEventCustomer(customer)
+          ? customer.customer_name.toUpperCase()
+          : '';
+
+      const options: DepartmentEventOption[] = [];
+      if (defaultDepartmentEvent) {
+        options.push({
+          id: `new:${defaultDepartmentEvent}`,
+          order_id: null,
+          order_number: null,
+          department_event: defaultDepartmentEvent,
+          total_quantity: 0,
+          amount: 0,
+          is_new: true,
+        });
+      }
+
+      for (const row of rows) {
+        options.push({
+          id: `order:${row.order_id}`,
+          order_id: row.order_id,
+          order_number: row.order_number,
+          department_event: (row.department_event ?? '').toUpperCase(),
+          total_quantity: Number(row.total_quantity ?? 0),
+          amount: Number(row.amount ?? 0),
+          is_new: false,
+        });
+      }
+
+      return options;
     },
     [customers],
   );
@@ -367,12 +417,12 @@ export function OrderEntryForm({
     [tenantId, draft.production_date, draft.production_code],
   );
 
-  // ── Existing orders: headers-only list for slot, then detail fetch with lines ─
+  // ── Department/Event options for the selected customer/date/code ───────
   useEffect(() => {
     if (!tenantId || !draft.customer_id) {
       setField('order_number', '');
-      setOrderPickCandidates([]);
-      setOrderPickOpen(false);
+      setDepartmentEventOptions([]);
+      setSelectedDepartmentEventId(null);
       return;
     }
     if (!draft.production_date) return;
@@ -387,30 +437,23 @@ export function OrderEntryForm({
     const applyOrderHeaders = (rows: OrderHeaderListRow[]) => {
       if (generation !== slotLookupGenerationRef.current) return;
 
-      const matching = [...rows].sort((a, b) => b.order_id - a.order_id);
+      const matching = [...rows].sort((a, b) => {
+        const deptCompare = (a.department_event ?? '').localeCompare(b.department_event ?? '');
+        if (deptCompare !== 0) return deptCompare;
+        return b.order_id - a.order_id;
+      });
+      const options = buildDepartmentEventOptions(draft.customer_id, matching);
+      const defaultOption = options.find((option) => option.is_new) ?? null;
 
-      if (matching.length === 0) {
-        setField('order_number', 'New Order');
-        setField('order_ref', 'New Order');
-        setField('order_id', undefined);
-        setField('department_event', getDefaultDepartmentEvent(draft.customer_id));
-        setField('lines', []);
-        setField('total_amount', 0);
-        setOrderPickCandidates([]);
-        setOrderPickOpen(false);
-        setShouldFocusItemWhenReady(true);
-        return;
-      }
-
+      setDepartmentEventOptions(options);
+      setSelectedDepartmentEventId(defaultOption?.id ?? null);
       setField('order_number', 'New Order');
       setField('order_ref', 'New Order');
       setField('order_id', undefined);
-      setField('department_event', '');
+      setField('department_event', defaultOption?.department_event ?? getDefaultDepartmentEvent(draft.customer_id));
       setField('lines', []);
       setField('total_amount', 0);
-      setOrderPickMode('customer-scoped');
-      setOrderPickCandidates(matching);
-      setOrderPickOpen(true);
+      setOrderPickOpen(false);
     };
 
     fetchOrderHeaders(draft.customer_id)
@@ -428,6 +471,7 @@ export function OrderEntryForm({
     draft.customer_name,
     draft.production_date,
     draft.production_code,
+    buildDepartmentEventOptions,
     getDefaultDepartmentEvent,
     fetchOrderHeaders,
     mode,
@@ -495,21 +539,28 @@ export function OrderEntryForm({
 
   const handleCustomerChange = useCallback(
     (customer: CustomerOption | null) => {
-      const previousCustomerId = draft.customer_id;
       setShouldFocusItemWhenReady(false);
       setCustomer(customer?.customer_id ?? null, customer?.customer_name ?? '');
       setField('department_event', getDefaultDepartmentEvent(customer?.customer_id ?? null));
+      setSelectedDepartmentEventId(
+        customer && isDepartmentEventCustomer(customer)
+          ? `new:${customer.customer_name.toUpperCase()}`
+          : null,
+      );
       setField('order_number', '');
       setField('order_ref', '');
       setField('order_id', undefined);
       setField('lines', []);
       setField('total_amount', 0);
-      if (customer && customer.customer_id === previousCustomerId) {
-        void handleSearchExistingOrders();
-      }
     },
-    [draft.customer_id, getDefaultDepartmentEvent, handleSearchExistingOrders, setCustomer, setField],
+    [getDefaultDepartmentEvent, setCustomer, setField],
   );
+
+  const warnIfExistingOrderLoaded = useCallback(() => {
+    if (!draft.order_id) return false;
+    window.alert('Save any changes before changing production date or production code.');
+    return true;
+  }, [draft.order_id]);
 
   const handleProductionDateChange = useCallback(
     (value: string) => {
@@ -518,9 +569,75 @@ export function OrderEntryForm({
         setProductionDateBlockedOpen(true);
         return;
       }
+      if (warnIfExistingOrderLoaded()) return;
       setField('production_date', value);
     },
+    [setField, warnIfExistingOrderLoaded],
+  );
+
+  const handleProductionCodeChange = useCallback(
+    (value: ProductionCode) => {
+      if (warnIfExistingOrderLoaded()) return;
+      setField('production_code', value);
+    },
+    [setField, warnIfExistingOrderLoaded],
+  );
+
+  const handleDepartmentEventInputChange = useCallback(
+    (value: string) => {
+      setSelectedDepartmentEventId(null);
+      setField('department_event', value.toUpperCase());
+    },
     [setField],
+  );
+
+  const handleDepartmentEventCommit = useCallback(
+    (value: string) => {
+      setSelectedDepartmentEventId(null);
+      setField('department_event', value.toUpperCase());
+      setField('order_id', undefined);
+      setField('order_number', 'New Order');
+      setField('order_ref', 'New Order');
+      setShouldFocusItemWhenReady(true);
+    },
+    [setField],
+  );
+
+  const handleDepartmentEventSelect = useCallback(
+    (option: DepartmentEventOption | null) => {
+      if (!option) {
+        setSelectedDepartmentEventId(null);
+        setField('department_event', '');
+        setField('order_id', undefined);
+        setField('order_number', 'New Order');
+        setField('order_ref', 'New Order');
+        setField('lines', []);
+        setField('total_amount', 0);
+        return;
+      }
+
+      setSelectedDepartmentEventId(option.id);
+      setField('department_event', option.department_event.toUpperCase());
+
+      if (option.is_new || option.order_id === null) {
+        setField('order_id', undefined);
+        setField('order_number', 'New Order');
+        setField('order_ref', 'New Order');
+        setField('lines', []);
+        setField('total_amount', 0);
+        setShouldFocusItemWhenReady(true);
+        return;
+      }
+
+      suppressNextSlotLookupRef.current = true;
+      setField('order_id', option.order_id);
+      setField('order_number', option.order_number ?? '');
+      setField('order_ref', option.order_number ?? '');
+      void loadOrderById(option.order_id, {
+        preserveSelectedCustomer: true,
+      });
+    },
+    [loadOrderById, setField],
   );
 
   const handleItemCommit = useCallback(
@@ -748,9 +865,17 @@ export function OrderEntryForm({
           customers={customers}
           isLoadingCustomers={isLoadingCustomers}
           customerInputRef={customerInputRef}
+          departmentEventInputRef={departmentEventInputRef}
+          departmentEventOptions={departmentEventOptions}
+          selectedDepartmentEventId={selectedDepartmentEventId}
           onCustomerChange={handleCustomerChange}
+          onCustomerAfterSelect={focusDepartmentEvent}
           onSearchExistingOrders={handleSearchExistingOrders}
+          onDepartmentEventInputChange={handleDepartmentEventInputChange}
+          onDepartmentEventSelect={handleDepartmentEventSelect}
+          onDepartmentEventCommit={handleDepartmentEventCommit}
           onProductionDateChange={handleProductionDateChange}
+          onProductionCodeChange={handleProductionCodeChange}
           onFieldChange={setField}
         />
       </div>

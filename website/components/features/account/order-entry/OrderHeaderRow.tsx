@@ -27,17 +27,34 @@ export interface CustomerOption {
   sort_path: string;
 }
 
+export interface DepartmentEventOption {
+  id: string;
+  order_id: number | null;
+  order_number: string | null;
+  department_event: string;
+  total_quantity: number;
+  amount: number;
+  is_new: boolean;
+}
+
 interface OrderHeaderRowProps {
   draft: OrderEntryDraft;
   customers: CustomerOption[];
   isLoadingCustomers: boolean;
   /** External ref for the customer search <input> (used by useOrderFocus, alwaysOpen mode). */
   customerInputRef: React.RefObject<HTMLInputElement>;
+  departmentEventInputRef: React.RefObject<HTMLInputElement>;
+  departmentEventOptions: DepartmentEventOption[];
+  selectedDepartmentEventId: string | null;
   onCustomerChange: (customer: CustomerOption | null) => void;
   /** Optional — e.g. focus next control after pick (order entry defers to items-loaded focus). */
   onCustomerAfterSelect?: () => void;
   onSearchExistingOrders: () => void;
+  onDepartmentEventInputChange: (value: string) => void;
+  onDepartmentEventSelect: (option: DepartmentEventOption | null) => void;
+  onDepartmentEventCommit: (value: string) => void;
   onProductionDateChange: (value: string) => void;
+  onProductionCodeChange: (value: ProductionCode) => void;
   onFieldChange: <K extends keyof OrderEntryDraft>(field: K, value: OrderEntryDraft[K]) => void;
 }
 
@@ -56,10 +73,17 @@ export function OrderHeaderRow({
   customers,
   isLoadingCustomers,
   customerInputRef,
+  departmentEventInputRef,
+  departmentEventOptions,
+  selectedDepartmentEventId,
   onCustomerChange,
   onCustomerAfterSelect,
   onSearchExistingOrders,
+  onDepartmentEventInputChange,
+  onDepartmentEventSelect,
+  onDepartmentEventCommit,
   onProductionDateChange,
+  onProductionCodeChange,
   onFieldChange,
 }: OrderHeaderRowProps) {
   const maxProductionDate = addDays(draft.order_date || draft.production_date, 7);
@@ -81,6 +105,20 @@ export function OrderHeaderRow({
       return parent ? getCustomerLabel(parent) : getCustomerLabel(customer);
     }
     return getCustomerLabel(customer);
+  };
+
+  const formatMoney = (amount: number) =>
+    new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(amount);
+
+  const getDepartmentEventLabel = (option: DepartmentEventOption) => {
+    if (option.is_new) return option.department_event;
+    const orderNo = option.order_number ?? '';
+    return `${orderNo} ${option.department_event} Qty ${option.total_quantity} ${formatMoney(option.amount)}`.trim();
   };
 
   return (
@@ -124,15 +162,31 @@ export function OrderHeaderRow({
           <Label htmlFor="department-event" className="text-xs font-semibold text-muted-foreground tracking-wide">
             Department/Event
           </Label>
-          <input
-            id="department-event"
-            type="text"
-            className={cn(
-              'h-9 w-full rounded-md border border-input bg-background px-2 text-sm text-foreground',
-              'focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary',
-            )}
-            value={draft.department_event}
-            onChange={(e) => onFieldChange('department_event', e.target.value.toUpperCase())}
+          <EntityComboBox<DepartmentEventOption>
+            items={departmentEventOptions}
+            value={selectedDepartmentEventId}
+            inputValue={draft.department_event}
+            onInputValueChange={onDepartmentEventInputChange}
+            onInputCommit={onDepartmentEventCommit}
+            onChange={onDepartmentEventSelect}
+            getId={(option) => option.id}
+            getLabel={getDepartmentEventLabel}
+            getInputLabel={(option) => option.department_event}
+            getSearchText={(option) =>
+              `${option.order_number ?? ''} ${option.department_event} ${option.total_quantity} ${option.amount}`
+            }
+            getParentId={() => null}
+            getSortKey={(option) => (option.is_new ? '000000' : `100000-${option.department_event}-${option.order_id ?? 0}`)}
+            placeholder="Department/Event"
+            disabled={!draft.customer_id}
+            emptyText={draft.customer_id ? 'No existing Department/Event orders.' : 'Select a customer first.'}
+            clearable
+            alwaysOpen
+            collapseOnSelect
+            clearSearchOnFocus={false}
+            initialListCollapsed={departmentEventOptions.length === 0}
+            inputRef={departmentEventInputRef}
+            triggerId="department-event"
           />
         </div>
 
@@ -162,7 +216,7 @@ export function OrderHeaderRow({
           </Label>
           <Select
             value={draft.production_code}
-            onValueChange={(v) => onFieldChange('production_code', v as ProductionCode)}
+            onValueChange={(v) => onProductionCodeChange(v as ProductionCode)}
           >
             <SelectTrigger className="h-9 text-sm">
               <SelectValue />
