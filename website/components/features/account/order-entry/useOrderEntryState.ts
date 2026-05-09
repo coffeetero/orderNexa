@@ -68,7 +68,17 @@ export function useOrderEntryState(initial?: OrderEntryDraft) {
     [],
   );
 
-  const reset = useCallback(() => setDraft(emptyDraft()), []);
+  const reset = useCallback((options?: { preserveProductionSlot?: boolean }) => {
+    setDraft((prev) => {
+      const next = emptyDraft();
+      if (!options?.preserveProductionSlot) return next;
+      return {
+        ...next,
+        production_date: prev.production_date,
+        production_code: prev.production_code,
+      };
+    });
+  }, []);
 
   const loadOrder = useCallback((loaded: OrderEntryDraft) => setDraft(loaded), []);
 
@@ -157,6 +167,19 @@ export function useOrderEntryState(initial?: OrderEntryDraft) {
     });
   }, []);
 
+  const zeroLinePrices = useCallback(() => {
+    setDraft((prev) => ({
+      ...prev,
+      lines: prev.lines.map((line) => ({
+        ...line,
+        unit_price: 0,
+        unit_discount: 0,
+        extended_amount: 0,
+      })),
+      total_amount: 0,
+    }));
+  }, []);
+
   /**
    * Returns the current quantity for an item in the grid (for prefilling Qty SLE
    * when the user selects an item that already exists in the grid).
@@ -178,6 +201,7 @@ export function useOrderEntryState(initial?: OrderEntryDraft) {
     addOrUpdateLine,
     updateLine,
     removeLine,
+    zeroLinePrices,
     getLineQty,
   };
 }

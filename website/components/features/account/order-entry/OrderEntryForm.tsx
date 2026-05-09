@@ -166,16 +166,20 @@ export function OrderEntryForm({
     addOrUpdateLine,
     updateLine,
     removeLine,
+    zeroLinePrices,
     getLineQty,
   } = useOrderEntryState(initialData);
 
   const {
     customerInputRef,
     departmentEventInputRef,
+    productionDateInputRef,
+    productionCodeTriggerRef,
     itemInputRef,
     qtyRef,
     focusCustomer,
     focusDepartmentEvent,
+    focusProductionCode,
     focusItem,
     focusQty,
     focusGridCell,
@@ -663,9 +667,15 @@ export function OrderEntryForm({
   }, [focusItem]);
 
   const handleClear = useCallback(() => {
-    reset();
+    reset({ preserveProductionSlot: true });
+    setDepartmentEventOptions([]);
+    setSelectedDepartmentEventId(null);
     focusCustomer();
   }, [reset, focusCustomer]);
+
+  const handleSample = useCallback(() => {
+    zeroLinePrices();
+  }, [zeroLinePrices]);
 
   const handleOrderPickNew = useCallback(() => {
     setOrderPickOpen(false);
@@ -695,7 +705,7 @@ export function OrderEntryForm({
   // ── Save ───────────────────────────────────────────────────────────────
 
   const handleSave = useCallback(async () => {
-    if (!tenantId) return;
+    if (!tenantId || isSaving) return;
 
     const isExistingOrder = !!draft.order_id;
     const visibleOrderNumber = draft.order_number.trim();
@@ -777,12 +787,26 @@ export function OrderEntryForm({
         text: json.data?.message ?? 'Order saved.',
         type: 'success',
       });
-      reset();
+      reset({ preserveProductionSlot: true });
+      setDepartmentEventOptions([]);
+      setSelectedDepartmentEventId(null);
       requestAnimationFrame(() => focusCustomer());
     } finally {
       setIsSaving(false);
     }
-  }, [tenantId, draft, mode, reset, setField, focusCustomer]);
+  }, [tenantId, isSaving, draft, mode, reset, setField, focusCustomer]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.code !== 'NumpadMultiply') return;
+      if (orderPickOpen || productionDateBlockedOpen || isSaving) return;
+      event.preventDefault();
+      void handleSave();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleSave, isSaving, orderPickOpen, productionDateBlockedOpen]);
 
   // ── Delete ─────────────────────────────────────────────────────────────
 
@@ -866,6 +890,8 @@ export function OrderEntryForm({
           isLoadingCustomers={isLoadingCustomers}
           customerInputRef={customerInputRef}
           departmentEventInputRef={departmentEventInputRef}
+          productionDateInputRef={productionDateInputRef}
+          productionCodeTriggerRef={productionCodeTriggerRef}
           departmentEventOptions={departmentEventOptions}
           selectedDepartmentEventId={selectedDepartmentEventId}
           onCustomerChange={handleCustomerChange}
@@ -876,6 +902,8 @@ export function OrderEntryForm({
           onDepartmentEventCommit={handleDepartmentEventCommit}
           onProductionDateChange={handleProductionDateChange}
           onProductionCodeChange={handleProductionCodeChange}
+          onProductionDateEnter={focusProductionCode}
+          onProductionCodeEnter={focusCustomer}
           onFieldChange={setField}
         />
       </div>
@@ -896,8 +924,9 @@ export function OrderEntryForm({
                 variant="outline"
                 size="sm"
                 className="h-9 px-3 text-xs"
-                disabled
-                title="Load a sample order (coming soon)"
+                onClick={handleSample}
+                disabled={isSaving || draft.lines.length === 0}
+                title="Zero line prices for a sample order"
               >
                 Sample
               </Button>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { EntityComboBox } from '@/components/bps/EntityComboBox';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -44,6 +44,8 @@ interface OrderHeaderRowProps {
   /** External ref for the customer search <input> (used by useOrderFocus, alwaysOpen mode). */
   customerInputRef: React.RefObject<HTMLInputElement>;
   departmentEventInputRef: React.RefObject<HTMLInputElement>;
+  productionDateInputRef: React.RefObject<HTMLInputElement>;
+  productionCodeTriggerRef: React.RefObject<HTMLButtonElement>;
   departmentEventOptions: DepartmentEventOption[];
   selectedDepartmentEventId: string | null;
   onCustomerChange: (customer: CustomerOption | null) => void;
@@ -55,6 +57,8 @@ interface OrderHeaderRowProps {
   onDepartmentEventCommit: (value: string) => void;
   onProductionDateChange: (value: string) => void;
   onProductionCodeChange: (value: ProductionCode) => void;
+  onProductionDateEnter: () => void;
+  onProductionCodeEnter: () => void;
   onFieldChange: <K extends keyof OrderEntryDraft>(field: K, value: OrderEntryDraft[K]) => void;
 }
 
@@ -68,12 +72,23 @@ function addDays(dateValue: string, days: number): string {
   return `${nextYear}-${nextMonth}-${nextDay}`;
 }
 
+function localTomorrow(): string {
+  const date = new Date();
+  date.setDate(date.getDate() + 1);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export function OrderHeaderRow({
   draft,
   customers,
   isLoadingCustomers,
   customerInputRef,
   departmentEventInputRef,
+  productionDateInputRef,
+  productionCodeTriggerRef,
   departmentEventOptions,
   selectedDepartmentEventId,
   onCustomerChange,
@@ -84,9 +99,13 @@ export function OrderHeaderRow({
   onDepartmentEventCommit,
   onProductionDateChange,
   onProductionCodeChange,
+  onProductionDateEnter,
+  onProductionCodeEnter,
   onFieldChange,
 }: OrderHeaderRowProps) {
   const maxProductionDate = addDays(draft.order_date || draft.production_date, 7);
+  const [productionCodeOpen, setProductionCodeOpen] = useState(false);
+  const isTomorrow = draft.production_date === localTomorrow();
 
   const customerById = useMemo(() => {
     return new Map(customers.map((customer) => [customer.customer_id, customer]));
@@ -197,15 +216,24 @@ export function OrderHeaderRow({
           </Label>
           <input
             id="production-date"
+            ref={productionDateInputRef}
             type="date"
             className={cn(
-              'h-9 w-full rounded-md border border-input bg-background px-2 text-sm text-foreground',
+              'h-9 w-full rounded-md border border-input px-2 text-sm text-foreground',
+              isTomorrow
+                ? 'bg-emerald-100 dark:bg-emerald-950/50'
+                : 'bg-red-100 dark:bg-red-950/50',
               'focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary',
             )}
             value={draft.production_date}
             max={maxProductionDate}
             onChange={(e) => onProductionDateChange(e.target.value)}
             onFocus={(e) => e.target.select()}
+            onKeyDown={(event) => {
+              if (event.key !== 'Enter') return;
+              event.preventDefault();
+              onProductionDateEnter();
+            }}
           />
         </div>
 
@@ -217,8 +245,17 @@ export function OrderHeaderRow({
           <Select
             value={draft.production_code}
             onValueChange={(v) => onProductionCodeChange(v as ProductionCode)}
+            onOpenChange={setProductionCodeOpen}
           >
-            <SelectTrigger className="h-9 text-sm">
+            <SelectTrigger
+              ref={productionCodeTriggerRef}
+              className="h-9 text-sm"
+              onKeyDown={(event) => {
+                if (event.key !== 'Enter' || productionCodeOpen) return;
+                event.preventDefault();
+                onProductionCodeEnter();
+              }}
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

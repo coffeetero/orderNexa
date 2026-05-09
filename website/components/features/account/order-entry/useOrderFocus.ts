@@ -14,6 +14,12 @@ export function useOrderFocus() {
   /** Ref attached to the Department/Event EntityComboBox internal <input>. */
   const departmentEventInputRef = useRef<HTMLInputElement | null>(null);
 
+  /** Ref attached to the Production Date <input>. */
+  const productionDateInputRef = useRef<HTMLInputElement | null>(null);
+
+  /** Ref attached to the Production Time select trigger. */
+  const productionCodeTriggerRef = useRef<HTMLButtonElement | null>(null);
+
   /** Ref attached to the item EntityComboBox internal <input> (alwaysOpen mode).
    *  Populated via the EntityComboBox `inputRef` prop. */
   const itemInputRef = useRef<HTMLInputElement | null>(null);
@@ -48,6 +54,10 @@ export function useOrderFocus() {
       el.focus();
       el.select?.();
     });
+  }, []);
+
+  const focusProductionCode = useCallback(() => {
+    requestAnimationFrame(() => productionCodeTriggerRef.current?.focus());
   }, []);
 
   const focusQty = useCallback(() => {
@@ -92,10 +102,13 @@ export function useOrderFocus() {
   return {
     customerInputRef,
     departmentEventInputRef,
+    productionDateInputRef,
+    productionCodeTriggerRef,
     itemInputRef,
     qtyRef,
     focusCustomer,
     focusDepartmentEvent,
+    focusProductionCode,
     focusItem,
     focusQty,
     focusGridCell,
