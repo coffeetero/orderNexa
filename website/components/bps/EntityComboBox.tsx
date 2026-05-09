@@ -73,6 +73,8 @@ export type EntityComboBoxProps<T> = {
   clearSearchOnFocus?: boolean;
   /** Called after `onChange` when a row is chosen (keyboard, click, or Enter). */
   onAfterSelect?: (item: T) => void;
+  /** Called when ArrowDown expands an inline collapsed list. */
+  onArrowDownOpen?: () => void;
 
   /**
    * External ref that will be populated with the internal search <input>.
@@ -161,6 +163,7 @@ export function EntityComboBox<T>({
   initialListCollapsed,
   clearSearchOnFocus = false,
   onAfterSelect,
+  onArrowDownOpen,
   inputRef,
   triggerRef,
 }: EntityComboBoxProps<T>) {
@@ -537,6 +540,7 @@ export function EntityComboBox<T>({
 
       if (event.key === 'ArrowDown' && listCollapsed) {
         event.preventDefault();
+        onArrowDownOpen?.();
         setListCollapsed(false);
         return;
       }
@@ -550,7 +554,16 @@ export function EntityComboBox<T>({
         }
       }
     },
-    [alwaysOpen, currentInputValue, isInputControlled, listCollapsed, onInputCommit, onInputValueChange, rows.length],
+    [
+      alwaysOpen,
+      currentInputValue,
+      isInputControlled,
+      listCollapsed,
+      onArrowDownOpen,
+      onInputCommit,
+      onInputValueChange,
+      rows.length,
+    ],
   );
 
   const handleAlwaysOpenToggle = React.useCallback(
@@ -565,7 +578,7 @@ export function EntityComboBox<T>({
       setListCollapsed((current) => !current);
       requestAnimationFrame(() => searchInputRef.current?.focus());
     },
-    [cancelBlurRestoreTimer, isInputControlled, onInputValueChange],
+    [cancelBlurRestoreTimer, isInputControlled],
   );
 
   const triggerLabel = selectedItem ? getLabel(selectedItem) : null;

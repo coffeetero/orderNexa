@@ -30,6 +30,22 @@ function parseHeadersOnly(value: string | null): boolean {
   return true;
 }
 
+function parseBoolean(value: string | null): boolean {
+  if (value === null || value === '') return false;
+  const v = value.toLowerCase();
+  return v === 'true' || v === '1';
+}
+
+function addDays(dateValue: string, days: number): string {
+  const [year, month, day] = dateValue.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  date.setDate(date.getDate() + days);
+  const nextYear = date.getFullYear();
+  const nextMonth = String(date.getMonth() + 1).padStart(2, '0');
+  const nextDay = String(date.getDate()).padStart(2, '0');
+  return `${nextYear}-${nextMonth}-${nextDay}`;
+}
+
 /**
  * GET /api/orders
  *
@@ -42,6 +58,10 @@ function parseHeadersOnly(value: string | null): boolean {
  *   ?tenant_id=<n>&customer_id=<n>&production_date=<YYYY-MM-DD>&production_code=<AM|PM|SPECIAL>
  *   → p_production_date_from / p_production_date_to both set from production_date; p_order_id null.
  *   List branch always returns headers only; p_return_headers_only is passed as true.
+ *
+ * Department/Event history:
+ *   ?tenant_id=<n>&customer_id=<n>&production_date=<YYYY-MM-DD>&department_events_only=true
+ *   → returns distinct Department/Event suggestions from production_date - 14 through production_date.
  *
  * Optional legacy list filters (otherwise omitted): production_date_from, production_date_to.
  *
@@ -74,6 +94,8 @@ export async function GET(request: Request) {
       p_production_date_to: null,
       p_production_code: null,
       p_return_headers_only,
+      p_return_actives_only: true,
+      p_department_events_only: false,
     });
 
     if (error) {
@@ -84,12 +106,16 @@ export async function GET(request: Request) {
   }
 
   const p_customer_id = parseInteger(url.searchParams.get('customer_id'));
+  const departmentEventsOnly = parseBoolean(url.searchParams.get('department_events_only'));
 
   const productionDateSingle = parseDate(url.searchParams.get('production_date'));
   let p_production_date_from: string | null = null;
   let p_production_date_to: string | null = null;
 
-  if (productionDateSingle !== null) {
+  if (departmentEventsOnly && productionDateSingle !== null) {
+    p_production_date_from = addDays(productionDateSingle, -14);
+    p_production_date_to = productionDateSingle;
+  } else if (productionDateSingle !== null) {
     p_production_date_from = productionDateSingle;
     p_production_date_to = productionDateSingle;
   } else {
@@ -107,8 +133,10 @@ export async function GET(request: Request) {
     p_customer_id,
     p_production_date_from,
     p_production_date_to,
-    p_production_code,
+    p_production_code: departmentEventsOnly ? null : p_production_code,
     p_return_headers_only: true,
+    p_return_actives_only: true,
+    p_department_events_only: departmentEventsOnly,
   });
 
   if (error) {

@@ -71,6 +71,13 @@ function normalizeOrderHeaderRow(raw: Record<string, unknown>): OrderHeaderListR
   };
 }
 
+function normalizeDepartmentEventSuggestion(raw: Record<string, unknown>): string | null {
+  const value = raw.department_event;
+  if (value === undefined || value === null) return null;
+  const text = String(value).trim().toUpperCase();
+  return text.length > 0 ? text : null;
+}
+
 function getErrorMessage(error: unknown, fallback: string): string {
   return typeof error === 'string' && error.trim().length > 0 ? error : fallback;
 }
@@ -97,6 +104,10 @@ function daysAfterToday(dateValue: string): number | null {
 function isDepartmentEventCustomer(customer: CustomerOption): boolean {
   const type = customer.customer_type?.trim().toUpperCase();
   return type === 'LOCATION';
+}
+
+function normalizeDepartmentEventText(value: string): string {
+  return value.trim().toUpperCase();
 }
 
 interface OrderEntryFormProps {
@@ -148,6 +159,7 @@ export function OrderEntryForm({
   const [orderPickCandidates, setOrderPickCandidates] = useState<OrderHeaderListRow[]>([]);
   const [departmentEventOptions, setDepartmentEventOptions] = useState<DepartmentEventOption[]>([]);
   const [selectedDepartmentEventId, setSelectedDepartmentEventId] = useState<string | null>(null);
+  const [isLoadingDepartmentEvents, setIsLoadingDepartmentEvents] = useState(false);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
   const [isLoadingItems, setIsLoadingItems] = useState(false);
   const [itemsError, setItemsError] = useState<string | null>(null);
@@ -155,6 +167,7 @@ export function OrderEntryForm({
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [productionDateBlockedOpen, setProductionDateBlockedOpen] = useState(false);
   const [shouldFocusItemWhenReady, setShouldFocusItemWhenReady] = useState(false);
+  const productionDateBlockedOkRef = useRef<HTMLButtonElement | null>(null);
 
   // ── State & focus ──────────────────────────────────────────────────────
   const {
@@ -243,46 +256,63 @@ export function OrderEntryForm({
       const customer = customers.find((candidate) => candidate.customer_id === customerId);
       if (!customer) return '';
 
-      return isDepartmentEventCustomer(customer) ? customer.customer_name.toUpperCase() : '';
+      return isDepartmentEventCustomer(customer) ? customer.customer_name.toUpperCase() : 'ORDER';
     },
     [customers],
   );
 
   const buildDepartmentEventOptions = useCallback(
-    (customerId: number | null, rows: OrderHeaderListRow[]): DepartmentEventOption[] => {
-      const customer = customerId == null
-        ? null
-        : customers.find((candidate) => candidate.customer_id === customerId) ?? null;
-      const defaultDepartmentEvent =
-        customer && isDepartmentEventCustomer(customer)
-          ? customer.customer_name.toUpperCase()
-          : '';
+    (customerId: number | null, suggestions: string[]): DepartmentEventOption[] => {
+      if (customerId === null) return [];
+
+      const selectedCustomer = customers.find((customer) => customer.customer_id === customerId);
+      if (!selectedCustomer) return [];
+
+      const customersById = new Map(
+        customers.map((customer) => [customer.customer_id, customer]),
+      );
+      const hasAncestor = (customer: CustomerOption, ancestorId: number): boolean => {
+        let currentParentId = customer.customer_parent_id;
+        const seen = new Set<number>();
+        while (currentParentId !== null && !seen.has(currentParentId)) {
+          if (currentParentId === ancestorId) return true;
+          seen.add(currentParentId);
+          currentParentId = customersById.get(currentParentId)?.customer_parent_id ?? null;
+        }
+        return false;
+      };
+
+      const optionValues: string[] = [];
+      if (isDepartmentEventCustomer(selectedCustomer)) {
+        optionValues.push(selectedCustomer.customer_name);
+      } else {
+        optionValues.push('ORDER');
+        const locationChildren = customers
+          .filter((customer) => (
+            isDepartmentEventCustomer(customer)
+            && hasAncestor(customer, selectedCustomer.customer_id)
+          ))
+          .sort((a, b) => a.sort_path.localeCompare(b.sort_path));
+        optionValues.push(...locationChildren.map((customer) => customer.customer_name));
+      }
+      optionValues.push(...suggestions);
 
       const options: DepartmentEventOption[] = [];
-      if (defaultDepartmentEvent) {
+      const seen = new Set<string>();
+      for (const value of optionValues) {
+        const departmentEvent = normalizeDepartmentEventText(value);
+        if (!departmentEvent || seen.has(departmentEvent)) continue;
+        seen.add(departmentEvent);
         options.push({
-          id: `new:${defaultDepartmentEvent}`,
+          id: `new:${departmentEvent}`,
           order_id: null,
           order_number: null,
-          department_event: defaultDepartmentEvent,
+          department_event: departmentEvent,
           total_quantity: 0,
           amount: 0,
           is_new: true,
         });
       }
-
-      for (const row of rows) {
-        options.push({
-          id: `order:${row.order_id}`,
-          order_id: row.order_id,
-          order_number: row.order_number,
-          department_event: (row.department_event ?? '').toUpperCase(),
-          total_quantity: Number(row.total_quantity ?? 0),
-          amount: Number(row.amount ?? 0),
-          is_new: false,
-        });
-      }
-
       return options;
     },
     [customers],
@@ -421,15 +451,44 @@ export function OrderEntryForm({
     [tenantId, draft.production_date, draft.production_code],
   );
 
-  // ── Department/Event options for the selected customer/date/code ───────
-  useEffect(() => {
-    if (!tenantId || !draft.customer_id) {
-      setField('order_number', '');
+  const fetchDepartmentEventSuggestions = useCallback(
+    async (customerId: number | null): Promise<string[]> => {
+      if (!tenantId || !draft.production_date || customerId === null) return [];
+
+      const qs = new URLSearchParams({
+        tenant_id: String(tenantId),
+        customer_id: String(customerId),
+        production_date: draft.production_date,
+        department_events_only: 'true',
+      });
+
+      const response = await fetch(`/api/orders?${qs}`);
+      const ordJson = (await response.json()) as { data: unknown; error?: string };
+      if (!response.ok || ordJson.error) {
+        throw new Error(getErrorMessage(ordJson.error, 'Could not find Department/Event history.'));
+      }
+
+      const rawRows = Array.isArray(ordJson.data) ? ordJson.data : [];
+      const suggestions: string[] = [];
+      const seen = new Set<string>();
+      for (const item of rawRows) {
+        if (!item || typeof item !== 'object') continue;
+        const suggestion = normalizeDepartmentEventSuggestion(item as Record<string, unknown>);
+        if (!suggestion || seen.has(suggestion)) continue;
+        seen.add(suggestion);
+        suggestions.push(suggestion);
+      }
+      return suggestions;
+    },
+    [tenantId, draft.production_date],
+  );
+
+  const handleDepartmentEventListRequest = useCallback(async () => {
+    if (!tenantId || !draft.customer_id || !draft.production_date) {
       setDepartmentEventOptions([]);
       setSelectedDepartmentEventId(null);
       return;
     }
-    if (!draft.production_date) return;
     if (mode === 'edit' && orderId != null) return;
     if (suppressNextSlotLookupRef.current) {
       suppressNextSlotLookupRef.current = false;
@@ -437,49 +496,45 @@ export function OrderEntryForm({
     }
 
     const generation = ++slotLookupGenerationRef.current;
+    setIsLoadingDepartmentEvents(true);
+    setStatusMessage(null);
 
-    const applyOrderHeaders = (rows: OrderHeaderListRow[]) => {
+    try {
+      const suggestions = await fetchDepartmentEventSuggestions(draft.customer_id);
       if (generation !== slotLookupGenerationRef.current) return;
 
-      const matching = [...rows].sort((a, b) => {
-        const deptCompare = (a.department_event ?? '').localeCompare(b.department_event ?? '');
-        if (deptCompare !== 0) return deptCompare;
-        return b.order_id - a.order_id;
-      });
-      const options = buildDepartmentEventOptions(draft.customer_id, matching);
-      const defaultOption = options.find((option) => option.is_new) ?? null;
+      const options = buildDepartmentEventOptions(draft.customer_id, suggestions);
+      const firstOption = options[0] ?? null;
 
       setDepartmentEventOptions(options);
-      setSelectedDepartmentEventId(defaultOption?.id ?? null);
+      setSelectedDepartmentEventId(firstOption?.id ?? null);
       setField('order_number', 'New Order');
       setField('order_ref', 'New Order');
       setField('order_id', undefined);
-      setField('department_event', defaultOption?.department_event ?? getDefaultDepartmentEvent(draft.customer_id));
+      setField('department_event', firstOption?.department_event ?? '');
       setField('lines', []);
       setField('total_amount', 0);
       setOrderPickOpen(false);
-    };
-
-    fetchOrderHeaders(draft.customer_id)
-      .then(applyOrderHeaders)
-      .catch(() => {
-        setStatusMessage({
-          text: 'Could not find existing orders. Network request failed.',
-          type: 'error',
-        });
+    } catch {
+      if (generation !== slotLookupGenerationRef.current) return;
+      setStatusMessage({
+        text: 'Could not find Department/Event history. Network request failed.',
+        type: 'error',
       });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    } finally {
+      if (generation === slotLookupGenerationRef.current) {
+        setIsLoadingDepartmentEvents(false);
+      }
+    }
   }, [
     tenantId,
     draft.customer_id,
-    draft.customer_name,
     draft.production_date,
-    draft.production_code,
     buildDepartmentEventOptions,
-    getDefaultDepartmentEvent,
-    fetchOrderHeaders,
+    fetchDepartmentEventSuggestions,
     mode,
     orderId,
+    setField,
   ]);
 
   // ── Load existing order in edit mode ──────────────────────────────────
@@ -516,6 +571,11 @@ export function OrderEntryForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (!productionDateBlockedOpen) return;
+    requestAnimationFrame(() => productionDateBlockedOkRef.current?.focus());
+  }, [productionDateBlockedOpen]);
+
   // ── Event handlers ─────────────────────────────────────────────────────
 
   const handleSearchExistingOrders = useCallback(async () => {
@@ -546,11 +606,9 @@ export function OrderEntryForm({
       setShouldFocusItemWhenReady(false);
       setCustomer(customer?.customer_id ?? null, customer?.customer_name ?? '');
       setField('department_event', getDefaultDepartmentEvent(customer?.customer_id ?? null));
-      setSelectedDepartmentEventId(
-        customer && isDepartmentEventCustomer(customer)
-          ? `new:${customer.customer_name.toUpperCase()}`
-          : null,
-      );
+      setDepartmentEventOptions([]);
+      setSelectedDepartmentEventId(null);
+      setIsLoadingDepartmentEvents(false);
       setField('order_number', '');
       setField('order_ref', '');
       setField('order_id', undefined);
@@ -574,6 +632,9 @@ export function OrderEntryForm({
         return;
       }
       if (warnIfExistingOrderLoaded()) return;
+      setDepartmentEventOptions([]);
+      setSelectedDepartmentEventId(null);
+      setIsLoadingDepartmentEvents(false);
       setField('production_date', value);
     },
     [setField, warnIfExistingOrderLoaded],
@@ -794,7 +855,7 @@ export function OrderEntryForm({
     } finally {
       setIsSaving(false);
     }
-  }, [tenantId, isSaving, draft, mode, reset, setField, focusCustomer]);
+  }, [tenantId, isSaving, draft, reset, setField, focusCustomer]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -894,12 +955,14 @@ export function OrderEntryForm({
           productionCodeTriggerRef={productionCodeTriggerRef}
           departmentEventOptions={departmentEventOptions}
           selectedDepartmentEventId={selectedDepartmentEventId}
+          isLoadingDepartmentEvents={isLoadingDepartmentEvents}
           onCustomerChange={handleCustomerChange}
           onCustomerAfterSelect={focusDepartmentEvent}
           onSearchExistingOrders={handleSearchExistingOrders}
           onDepartmentEventInputChange={handleDepartmentEventInputChange}
           onDepartmentEventSelect={handleDepartmentEventSelect}
           onDepartmentEventCommit={handleDepartmentEventCommit}
+          onDepartmentEventListRequest={handleDepartmentEventListRequest}
           onProductionDateChange={handleProductionDateChange}
           onProductionCodeChange={handleProductionCodeChange}
           onProductionDateEnter={focusProductionCode}
@@ -996,7 +1059,7 @@ export function OrderEntryForm({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction>OK</AlertDialogAction>
+            <AlertDialogAction ref={productionDateBlockedOkRef}>OK</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -48,6 +48,7 @@ interface OrderHeaderRowProps {
   productionCodeTriggerRef: React.RefObject<HTMLButtonElement>;
   departmentEventOptions: DepartmentEventOption[];
   selectedDepartmentEventId: string | null;
+  isLoadingDepartmentEvents: boolean;
   onCustomerChange: (customer: CustomerOption | null) => void;
   /** Optional — e.g. focus next control after pick (order entry defers to items-loaded focus). */
   onCustomerAfterSelect?: () => void;
@@ -55,6 +56,7 @@ interface OrderHeaderRowProps {
   onDepartmentEventInputChange: (value: string) => void;
   onDepartmentEventSelect: (option: DepartmentEventOption | null) => void;
   onDepartmentEventCommit: (value: string) => void;
+  onDepartmentEventListRequest: () => void;
   onProductionDateChange: (value: string) => void;
   onProductionCodeChange: (value: ProductionCode) => void;
   onProductionDateEnter: () => void;
@@ -91,12 +93,14 @@ export function OrderHeaderRow({
   productionCodeTriggerRef,
   departmentEventOptions,
   selectedDepartmentEventId,
+  isLoadingDepartmentEvents,
   onCustomerChange,
   onCustomerAfterSelect,
   onSearchExistingOrders,
   onDepartmentEventInputChange,
   onDepartmentEventSelect,
   onDepartmentEventCommit,
+  onDepartmentEventListRequest,
   onProductionDateChange,
   onProductionCodeChange,
   onProductionDateEnter,
@@ -135,7 +139,7 @@ export function OrderHeaderRow({
     }).format(amount);
 
   const getDepartmentEventLabel = (option: DepartmentEventOption) => {
-    if (option.is_new) return option.department_event;
+    if (option.is_new || option.order_id === null) return option.department_event;
     const orderNo = option.order_number ?? '';
     return `${orderNo} ${option.department_event} Qty ${option.total_quantity} ${formatMoney(option.amount)}`.trim();
   };
@@ -188,6 +192,7 @@ export function OrderHeaderRow({
             onInputValueChange={onDepartmentEventInputChange}
             onInputCommit={onDepartmentEventCommit}
             onChange={onDepartmentEventSelect}
+            onArrowDownOpen={onDepartmentEventListRequest}
             getId={(option) => option.id}
             getLabel={getDepartmentEventLabel}
             getInputLabel={(option) => option.department_event}
@@ -195,9 +200,10 @@ export function OrderHeaderRow({
               `${option.order_number ?? ''} ${option.department_event} ${option.total_quantity} ${option.amount}`
             }
             getParentId={() => null}
-            getSortKey={(option) => (option.is_new ? '000000' : `100000-${option.department_event}-${option.order_id ?? 0}`)}
+            getSortKey={(option) => option.department_event}
             placeholder="Department/Event"
             disabled={!draft.customer_id}
+            loading={isLoadingDepartmentEvents}
             emptyText={draft.customer_id ? 'No existing Department/Event orders.' : 'Select a customer first.'}
             clearable
             alwaysOpen
