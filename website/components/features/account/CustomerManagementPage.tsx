@@ -78,6 +78,10 @@ type CustomerManagementPageProps = {
 
 const CUSTOMER_TYPES = ['ACCOUNT', 'SITE', 'LOCATION'] as const;
 
+function isLocationCustomer(customer: Pick<CustomerRow, 'customer_type'>): boolean {
+  return customer.customer_type?.trim().toUpperCase() === 'LOCATION';
+}
+
 /** Focus first text/select control in the visible tab panel (for post–customer-select navigation). */
 function focusFirstEditableInActiveTabPanel() {
   window.setTimeout(() => {
@@ -524,6 +528,9 @@ export function CustomerManagementPage({
                 }}
                 getId={(c) => c.customer_id}
                 getLabel={(c) => `${c.customer_number ?? ''} - ${c.customer_name}`}
+                getItemLabelClassName={(c) =>
+                  isLocationCustomer(c) ? 'text-emerald-700 dark:text-emerald-300' : undefined
+                }
                 getSearchText={(c) =>
                   `${c.customer_number ?? ''} ${c.customer_name}`.trim()
                 }

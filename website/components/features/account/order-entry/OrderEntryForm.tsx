@@ -157,6 +157,7 @@ export function OrderEntryForm({
   const [orderPickOpen, setOrderPickOpen] = useState(false);
   const [orderPickMode, setOrderPickMode] = useState<OrderPickMode>('customer-scoped');
   const [orderPickCandidates, setOrderPickCandidates] = useState<OrderHeaderListRow[]>([]);
+  const [isLoadingOrderPickCandidates, setIsLoadingOrderPickCandidates] = useState(false);
   const [departmentEventOptions, setDepartmentEventOptions] = useState<DepartmentEventOption[]>([]);
   const [selectedDepartmentEventId, setSelectedDepartmentEventId] = useState<string | null>(null);
   const [isLoadingDepartmentEvents, setIsLoadingDepartmentEvents] = useState(false);
@@ -248,6 +249,7 @@ export function OrderEntryForm({
 
   /** Serializes slot lookups so rapid header changes don't apply stale results. */
   const slotLookupGenerationRef = useRef(0);
+  const orderPickLookupGenerationRef = useRef(0);
   const suppressNextSlotLookupRef = useRef(false);
 
   const getDefaultDepartmentEvent = useCallback(
@@ -580,9 +582,15 @@ export function OrderEntryForm({
 
   const handleSearchExistingOrders = useCallback(async () => {
     if (!tenantId || !draft.production_date) return;
+    const generation = ++orderPickLookupGenerationRef.current;
     setStatusMessage(null);
+    setOrderPickCandidates([]);
+    setOrderPickMode(draft.customer_id === null ? 'global-search' : 'customer-scoped');
+    setOrderPickOpen(true);
+    setIsLoadingOrderPickCandidates(true);
     try {
       const rows = await fetchOrderHeaders(draft.customer_id);
+      if (generation !== orderPickLookupGenerationRef.current) return;
       if (rows.length === 0) {
         setOrderPickCandidates([]);
         setOrderPickOpen(false);
@@ -594,12 +602,26 @@ export function OrderEntryForm({
       setOrderPickCandidates(rows);
       setOrderPickOpen(true);
     } catch (error) {
+      if (generation !== orderPickLookupGenerationRef.current) return;
+      setOrderPickOpen(false);
       setStatusMessage({
         text: error instanceof Error ? error.message : 'Could not find existing orders.',
         type: 'error',
       });
+    } finally {
+      if (generation === orderPickLookupGenerationRef.current) {
+        setIsLoadingOrderPickCandidates(false);
+      }
     }
   }, [tenantId, draft.production_date, draft.customer_id, fetchOrderHeaders]);
+
+  const handleOrderPickOpenChange = useCallback((nextOpen: boolean) => {
+    if (!nextOpen) {
+      orderPickLookupGenerationRef.current += 1;
+      setIsLoadingOrderPickCandidates(false);
+    }
+    setOrderPickOpen(nextOpen);
+  }, []);
 
   const handleCustomerChange = useCallback(
     (customer: CustomerOption | null) => {
@@ -898,155 +920,158 @@ export function OrderEntryForm({
   }, [tenantId, draft.order_id, draft.order_number, router]);
 
   return (
-    <div className="flex flex-col h-full bg-background overflow-hidden">
-      {/* ── Title bar ─────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border/60 bg-card shrink-0">
-        <div>
-          <h2 className="text-base font-semibold text-foreground">
-            {mode === 'edit'
-              ? 'Edit Order'
-              : `Enter Orders - ${draft.customer_name || ''}`}
-          </h2>
+    <div className="flex h-full bg-background overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        {/* ── Title bar ─────────────────────────────────────────────────── */}
+        <div className="flex items-center justify-between px-3 py-2 border-b border-border/60 bg-card shrink-0">
+          <div>
+            <h2 className="text-base font-semibold text-foreground">
+              {mode === 'edit'
+                ? 'Edit Order'
+                : `Enter Orders - ${draft.customer_name || ''}`}
+            </h2>
+          </div>
+          {/* Status message inline */}
+          {statusMessage && (
+            <span
+              className={
+                statusMessage.type === 'success'
+                  ? 'text-xs text-emerald-600 dark:text-emerald-400 font-medium'
+                  : 'text-xs text-destructive font-medium'
+              }
+            >
+              {statusMessage.text}
+            </span>
+          )}
+          {/* Header action buttons: Cancel then Save */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={handleClear}
+              disabled={isSaving}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              className="h-7 text-xs gap-1"
+              onClick={handleSave}
+              disabled={isSaving || !tenantId}
+            >
+              <Save className="h-3 w-3" />
+              {isSaving ? 'Saving…' : 'Save'}
+            </Button>
+          </div>
         </div>
-        {/* Status message inline */}
-        {statusMessage && (
-          <span
-            className={
-              statusMessage.type === 'success'
-                ? 'text-xs text-emerald-600 dark:text-emerald-400 font-medium'
-                : 'text-xs text-destructive font-medium'
+
+        {/* ── ROW 1: Order Header ───────────────────────────────────────── */}
+        <div className="shrink-0">
+          <OrderHeaderRow
+            draft={draft}
+            customers={customers}
+            isLoadingCustomers={isLoadingCustomers}
+            customerInputRef={customerInputRef}
+            departmentEventInputRef={departmentEventInputRef}
+            productionDateInputRef={productionDateInputRef}
+            productionCodeTriggerRef={productionCodeTriggerRef}
+            departmentEventOptions={departmentEventOptions}
+            selectedDepartmentEventId={selectedDepartmentEventId}
+            isLoadingDepartmentEvents={isLoadingDepartmentEvents}
+            onCustomerChange={handleCustomerChange}
+            onCustomerAfterSelect={focusDepartmentEvent}
+            onSearchExistingOrders={handleSearchExistingOrders}
+            onDepartmentEventInputChange={handleDepartmentEventInputChange}
+            onDepartmentEventSelect={handleDepartmentEventSelect}
+            onDepartmentEventCommit={handleDepartmentEventCommit}
+            onDepartmentEventListRequest={handleDepartmentEventListRequest}
+            onProductionDateChange={handleProductionDateChange}
+            onProductionCodeChange={handleProductionCodeChange}
+            onProductionDateEnter={focusProductionCode}
+            onProductionCodeEnter={focusCustomer}
+            onFieldChange={setField}
+          />
+        </div>
+
+        {/* ── ROW 2: Item Entry Loop ────────────────────────────────────── */}
+        <div className="shrink-0">
+          <ItemEntryRow
+            items={items}
+            isLoadingItems={isLoadingItems}
+            disabled={(!draft.customer_id && customers.length > 0) || orderPickOpen || !draft.order_number}
+            itemInputRef={itemInputRef}
+            qtyRef={qtyRef}
+            onCommit={handleItemCommit}
+            orderTotal={draft.total_amount + draft.delivery_amount}
+            entryToolbar={
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 px-3 text-xs"
+                  onClick={handleSample}
+                  disabled={isSaving || draft.lines.length === 0}
+                  title="Zero line prices for a sample order"
+                >
+                  Sample
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 gap-1 px-3 text-xs"
+                  onClick={handleClear}
+                  title="Clear form"
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  Clear
+                </Button>
+              </>
             }
-          >
-            {statusMessage.text}
-          </span>
-        )}
-        {/* Header action buttons: Cancel then Save */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 text-xs"
-            onClick={handleClear}
-            disabled={isSaving}
-          >
-            Cancel
-          </Button>
-          <Button
-            size="sm"
-            className="h-7 text-xs gap-1"
-            onClick={handleSave}
-            disabled={isSaving || !tenantId}
-          >
-            <Save className="h-3 w-3" />
-            {isSaving ? 'Saving…' : 'Save'}
-          </Button>
+          />
+          {itemsError && (
+            <p className="px-3 pb-1 text-xs text-destructive">
+              Item search error: {itemsError}
+            </p>
+          )}
         </div>
-      </div>
 
-      {/* ── ROW 1: Order Header ───────────────────────────────────────── */}
-      <div className="shrink-0">
-        <OrderHeaderRow
-          draft={draft}
-          customers={customers}
-          isLoadingCustomers={isLoadingCustomers}
-          customerInputRef={customerInputRef}
-          departmentEventInputRef={departmentEventInputRef}
-          productionDateInputRef={productionDateInputRef}
-          productionCodeTriggerRef={productionCodeTriggerRef}
-          departmentEventOptions={departmentEventOptions}
-          selectedDepartmentEventId={selectedDepartmentEventId}
-          isLoadingDepartmentEvents={isLoadingDepartmentEvents}
-          onCustomerChange={handleCustomerChange}
-          onCustomerAfterSelect={focusDepartmentEvent}
-          onSearchExistingOrders={handleSearchExistingOrders}
-          onDepartmentEventInputChange={handleDepartmentEventInputChange}
-          onDepartmentEventSelect={handleDepartmentEventSelect}
-          onDepartmentEventCommit={handleDepartmentEventCommit}
-          onDepartmentEventListRequest={handleDepartmentEventListRequest}
-          onProductionDateChange={handleProductionDateChange}
-          onProductionCodeChange={handleProductionCodeChange}
-          onProductionDateEnter={focusProductionCode}
-          onProductionCodeEnter={focusCustomer}
-          onFieldChange={setField}
-        />
-      </div>
+        {/* ── ROW 3: Order Lines Grid ───────────────────────────────────── */}
+        <div className="flex-1 overflow-auto px-2 py-2 min-h-0">
+          <OrderLineGrid
+            lines={draft.lines}
+            activeLineIndex={activeLineIndex}
+            onLineUpdate={updateLine}
+            onLineRemove={removeLine}
+            registerGridCell={registerGridCell}
+            onDiscountEnter={handleDiscountEnter}
+          />
+        </div>
 
-      {/* ── ROW 2: Item Entry Loop ────────────────────────────────────── */}
-      <div className="shrink-0">
-        <ItemEntryRow
-          items={items}
-          isLoadingItems={isLoadingItems}
-          disabled={(!draft.customer_id && customers.length > 0) || orderPickOpen || !draft.order_number}
-          itemInputRef={itemInputRef}
-          qtyRef={qtyRef}
-          onCommit={handleItemCommit}
-          orderTotal={draft.total_amount + draft.delivery_amount}
-          entryToolbar={
-            <>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 px-3 text-xs"
-                onClick={handleSample}
-                disabled={isSaving || draft.lines.length === 0}
-                title="Zero line prices for a sample order"
-              >
-                Sample
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 gap-1 px-3 text-xs"
-                onClick={handleClear}
-                title="Clear form"
-              >
-                <RotateCcw className="h-3 w-3" />
-                Clear
-              </Button>
-            </>
-          }
-        />
-        {itemsError && (
-          <p className="px-3 pb-1 text-xs text-destructive">
-            Item search error: {itemsError}
-          </p>
-        )}
-      </div>
+        {/* ── Footer: Delete (edit) ──────────────────────────────────────── */}
+        <div className="shrink-0 flex items-center justify-between gap-2 px-3 py-2 border-t border-border/60 bg-card">
+          <div />
 
-      {/* ── ROW 3: Order Lines Grid ───────────────────────────────────── */}
-      <div className="flex-1 overflow-auto px-2 py-2 min-h-0">
-        <OrderLineGrid
-          lines={draft.lines}
-          activeLineIndex={activeLineIndex}
-          onLineUpdate={updateLine}
-          onLineRemove={removeLine}
-          registerGridCell={registerGridCell}
-          onDiscountEnter={handleDiscountEnter}
-        />
-      </div>
-
-      {/* ── Footer: Delete (edit) ──────────────────────────────────────── */}
-      <div className="shrink-0 flex items-center justify-between gap-2 px-3 py-2 border-t border-border/60 bg-card">
-        <div />
-
-        {mode === 'edit' && draft.order_id && (
-          <Button
-            variant="destructive"
-            size="sm"
-            className="h-7 text-xs gap-1"
-            onClick={handleDelete}
-            disabled={isSaving}
-          >
-            <Trash2 className="h-3 w-3" />
-            Delete
-          </Button>
-        )}
+          {mode === 'edit' && draft.order_id && (
+            <Button
+              variant="destructive"
+              size="sm"
+              className="h-7 text-xs gap-1"
+              onClick={handleDelete}
+              disabled={isSaving}
+            >
+              <Trash2 className="h-3 w-3" />
+              Delete
+            </Button>
+          )}
+        </div>
       </div>
 
       <OrderPickSheet
         open={orderPickOpen}
-        onOpenChange={setOrderPickOpen}
+        onOpenChange={handleOrderPickOpenChange}
         candidates={orderPickCandidates}
+        loading={isLoadingOrderPickCandidates}
         onNewOrder={handleOrderPickNew}
         onSelect={handleOrderPickSelect}
       />

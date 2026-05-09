@@ -83,6 +83,10 @@ function localTomorrow(): string {
   return `${year}-${month}-${day}`;
 }
 
+function isLocationCustomer(customer: CustomerOption): boolean {
+  return customer.customer_type?.trim().toUpperCase() === 'LOCATION';
+}
+
 export function OrderHeaderRow({
   draft,
   customers,
@@ -121,7 +125,7 @@ export function OrderHeaderRow({
       : customer.customer_name;
 
   const getCustomerInputLabel = (customer: CustomerOption) => {
-    if (customer.customer_type?.trim().toUpperCase() === 'LOCATION') {
+    if (isLocationCustomer(customer)) {
       const parent = customer.customer_parent_id
         ? customerById.get(customer.customer_parent_id)
         : undefined;
@@ -160,6 +164,9 @@ export function OrderHeaderRow({
             onAfterSelect={onCustomerAfterSelect}
             getId={(c) => c.customer_id}
             getLabel={getCustomerLabel}
+            getItemLabelClassName={(c) =>
+              isLocationCustomer(c) ? 'text-emerald-700 dark:text-emerald-300' : undefined
+            }
             getInputLabel={getCustomerInputLabel}
             getSearchText={(c) =>
               `${c.customer_number ?? ''} ${c.customer_name}`
@@ -169,6 +176,7 @@ export function OrderHeaderRow({
             placeholder="Search number or name…"
             disabled={isLoadingCustomers}
             loading={isLoadingCustomers}
+            autoFocus
             emptyText="No customers found."
             clearable
             alwaysOpen

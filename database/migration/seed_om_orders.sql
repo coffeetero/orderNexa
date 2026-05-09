@@ -43,6 +43,109 @@ BEGIN
 
     TRUNCATE TABLE om_orders CASCADE;
 
+    -- Location orders are stored under their immediate parent customer.
+    -- Department/Event stays as the location name unless the final slot key
+    -- would duplicate another order, in which case it is suffixed with the order number.
+    WITH order_source AS (
+        SELECT
+            trim(o.ordr_no::BIGINT::TEXT) AS order_number,
+            CASE
+                WHEN UPPER(TRIM(cus.customer_type)) = 'LOCATION'
+                 AND cus.customer_parent_id IS NOT NULL
+                THEN parent.customer_id
+                ELSE cus.customer_id
+            END AS customer_id,
+            CASE
+                WHEN UPPER(TRIM(cus.customer_type)) = 'LOCATION'
+                 AND cus.customer_parent_id IS NOT NULL
+                THEN parent.customer_name
+                ELSE cus.customer_name
+            END AS customer_name,
+            CASE
+                WHEN UPPER(TRIM(cus.customer_type)) = 'LOCATION'
+                THEN COALESCE(NULLIF(UPPER(TRIM(cus.customer_name)), ''), '')
+                ELSE ''
+            END AS base_department_event,
+            o.ordr_prdctn_dt::DATE AS order_date,
+            COALESCE(o.ordr_prdctn_dt::DATE, o.ordr_dt::DATE, DATE '2000-01-01') AS production_date,
+            NULLIF(UPPER(trim(o.ordr_prdctn_cd)), '') AS production_code,
+            (COALESCE(o.ordr_amt, 0) + COALESCE(o.ordr_discount_amt, 0))::NUMERIC(14,4) AS amount,
+            COALESCE(o.ordr_discount_amt, 0)::NUMERIC(14,4) AS discount_amount,
+            COALESCE(o.ordr_qty_sold, 0)::NUMERIC(14,4) AS quantity,
+            COALESCE(
+                jsonb_strip_nulls(
+                    jsonb_build_object(
+                        'cus_name', o.cus_name,
+                        'cus_key', o.cus_key,
+                        'route_id', o.route_id::BIGINT,
+                        'route_no', o.route_stop_no::INT,
+                        'shipping address',
+                            CASE WHEN cu.cus_invc_rqrd = 'Y' THEN
+                                NULLIF(
+                                    trim(both ' ,' FROM concat_ws(', ',
+                                        NULLIF(trim(COALESCE(cu.s_contact::TEXT, '')), ''),
+                                        NULLIF(trim(COALESCE(cu.s_addr1::TEXT, '')), ''),
+                                        NULLIF(trim(COALESCE(cu.s_addr2::TEXT, '')), ''),
+                                        NULLIF(trim(COALESCE(cu.s_city::TEXT, '')), ''),
+                                        NULLIF(trim(COALESCE(cu.s_state::TEXT, '')), ''),
+                                        NULLIF(trim(COALESCE(cu.s_zip::TEXT, '')), '')
+                                    )),
+                                    ''
+                                )
+                            END,
+                        'Delivery Instructions',
+                            CASE WHEN cu.cus_invc_rqrd = 'Y' THEN
+                                NULLIF(trim(COALESCE(cu.cus_dlvr_instr::TEXT, '')), '')
+                            END,
+                        'billing address',
+                            CASE
+                                WHEN cu.cus_parent_id IS NOT NULL
+                                 AND cu.cus_id IS NOT NULL
+                                 AND cu.cus_parent_id::NUMERIC = cu.cus_id::NUMERIC
+                                THEN
+                                    NULLIF(
+                                        trim(both ' ,' FROM concat_ws(', ',
+                                            NULLIF(trim(COALESCE(cu.b_contact::TEXT, '')), ''),
+                                            NULLIF(trim(COALESCE(cu.b_addr1::TEXT, '')), ''),
+                                            NULLIF(trim(COALESCE(cu.b_addr2::TEXT, '')), ''),
+                                            NULLIF(trim(COALESCE(cu.b_city::TEXT, '')), ''),
+                                            NULLIF(trim(COALESCE(cu.b_state::TEXT, '')), ''),
+                                            NULLIF(trim(COALESCE(cu.b_zip::TEXT, '')), '')
+                                        )),
+                                        ''
+                                    )
+                            END
+                    )
+                ),
+                '{}'::JSONB
+            ) AS snapshot_data,
+            v_tenant_id AS tenant_id
+        FROM ordr o
+        LEFT JOIN fnd_customers cus
+            ON cus.tenant_id = v_tenant_id
+           AND cus.legacy_id = o.cus_id::INT
+        LEFT JOIN fnd_customers parent
+            ON parent.tenant_id = cus.tenant_id
+           AND parent.customer_id = cus.customer_parent_id
+        LEFT JOIN customer cu
+            ON cu.cus_id::NUMERIC = o.cus_id
+    ),
+    duplicate_slots AS (
+        SELECT
+            tenant_id,
+            customer_id,
+            production_date,
+            production_code,
+            base_department_event
+        FROM order_source
+        GROUP BY
+            tenant_id,
+            customer_id,
+            production_date,
+            production_code,
+            base_department_event
+        HAVING COUNT(*) > 1
+    )
     INSERT INTO om_orders (
         order_number,
         customer_id,
@@ -58,87 +161,29 @@ BEGIN
         tenant_id
     )
     SELECT
-        trim(o.ordr_no::BIGINT::TEXT),
+        src.order_number,
+        src.customer_id,
+        src.customer_name,
         CASE
-            WHEN UPPER(TRIM(cus.customer_type)) = 'LOCATION'
-             AND cus.customer_parent_id IS NOT NULL
-            THEN parent.customer_id
-            ELSE cus.customer_id
+            WHEN dup.tenant_id IS NOT NULL
+            THEN src.base_department_event || ' #' || src.order_number
+            ELSE src.base_department_event
         END,
-        CASE
-            WHEN UPPER(TRIM(cus.customer_type)) = 'LOCATION'
-             AND cus.customer_parent_id IS NOT NULL
-            THEN parent.customer_name
-            ELSE cus.customer_name
-        END,
-        CASE
-            WHEN UPPER(TRIM(cus.customer_type)) = 'LOCATION'
-            THEN UPPER(TRIM(cus.customer_name)) || '-' || trim(o.ordr_no::BIGINT::TEXT)
-            ELSE ''
-        END,
-        o.ordr_prdctn_dt::DATE,
-        COALESCE(o.ordr_prdctn_dt::DATE, o.ordr_dt::DATE, DATE '2000-01-01'),
-        NULLIF(UPPER(trim(o.ordr_prdctn_cd)), ''),
-        (COALESCE(o.ordr_amt, 0) + COALESCE(o.ordr_discount_amt, 0))::NUMERIC(14,4) as amount,
-        COALESCE(o.ordr_discount_amt, 0)::NUMERIC(14,4) as discount_amount,
-        COALESCE(o.ordr_qty_sold, 0)::NUMERIC(14,4) as quantity,
-        COALESCE(
-            jsonb_strip_nulls(
-                jsonb_build_object(
-                    'cus_name', o.cus_name,
-                    'cus_key', o.cus_key,
-                    'route_id', o.route_id::BIGINT,
-                    'route_no', o.route_stop_no::INT,
-                    'shipping address',
-                        CASE WHEN cu.cus_invc_rqrd = 'Y' THEN
-                            NULLIF(
-                                trim(both ' ,' FROM concat_ws(', ',
-                                    NULLIF(trim(COALESCE(cu.s_contact::TEXT, '')), ''),
-                                    NULLIF(trim(COALESCE(cu.s_addr1::TEXT, '')), ''),
-                                    NULLIF(trim(COALESCE(cu.s_addr2::TEXT, '')), ''),
-                                    NULLIF(trim(COALESCE(cu.s_city::TEXT, '')), ''),
-                                    NULLIF(trim(COALESCE(cu.s_state::TEXT, '')), ''),
-                                    NULLIF(trim(COALESCE(cu.s_zip::TEXT, '')), '')
-                                )),
-                                ''
-                            )
-                        END,
-                    'Delivery Instructions',
-                        CASE WHEN cu.cus_invc_rqrd = 'Y' THEN
-                            NULLIF(trim(COALESCE(cu.cus_dlvr_instr::TEXT, '')), '')
-                        END,
-                    'billing address',
-                        CASE
-                            WHEN cu.cus_parent_id IS NOT NULL
-                             AND cu.cus_id IS NOT NULL
-                             AND cu.cus_parent_id::NUMERIC = cu.cus_id::NUMERIC
-                            THEN
-                                NULLIF(
-                                    trim(both ' ,' FROM concat_ws(', ',
-                                        NULLIF(trim(COALESCE(cu.b_contact::TEXT, '')), ''),
-                                        NULLIF(trim(COALESCE(cu.b_addr1::TEXT, '')), ''),
-                                        NULLIF(trim(COALESCE(cu.b_addr2::TEXT, '')), ''),
-                                        NULLIF(trim(COALESCE(cu.b_city::TEXT, '')), ''),
-                                        NULLIF(trim(COALESCE(cu.b_state::TEXT, '')), ''),
-                                        NULLIF(trim(COALESCE(cu.b_zip::TEXT, '')), '')
-                                    )),
-                                    ''
-                                )
-                        END
-                )
-            ),
-            '{}'::JSONB
-        ),
-        v_tenant_id
-    FROM ordr o
-    LEFT JOIN fnd_customers cus
-        ON cus.tenant_id = v_tenant_id
-       AND cus.legacy_id = o.cus_id::INT
-    LEFT JOIN fnd_customers parent
-        ON parent.tenant_id = cus.tenant_id
-       AND parent.customer_id = cus.customer_parent_id
-    LEFT JOIN customer cu
-        ON cu.cus_id::NUMERIC = o.cus_id;
+        src.order_date,
+        src.production_date,
+        src.production_code,
+        src.amount,
+        src.discount_amount,
+        src.quantity,
+        src.snapshot_data,
+        src.tenant_id
+    FROM order_source src
+    LEFT JOIN duplicate_slots dup
+        ON dup.tenant_id = src.tenant_id
+       AND dup.customer_id IS NOT DISTINCT FROM src.customer_id
+       AND dup.production_date = src.production_date
+       AND dup.production_code IS NOT DISTINCT FROM src.production_code
+       AND dup.base_department_event = src.base_department_event;
 
     GET DIAGNOSTICS v_inserted = ROW_COUNT;
     RAISE NOTICE 'om_orders: % rows inserted', v_inserted;

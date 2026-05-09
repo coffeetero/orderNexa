@@ -211,7 +211,7 @@ BEGIN
     END IF;
 
     -- ── List mode: order headers (no lines) ───────────────────────────────
-    SELECT jsonb_agg(row_data ORDER BY top_customer_name_sort ASC, department_event_sort ASC, order_id_sort DESC)
+    SELECT jsonb_agg(row_data ORDER BY customer_name_sort ASC, department_event_sort ASC, order_id_sort DESC)
       INTO v_result
       FROM (
         SELECT jsonb_build_object(
@@ -220,40 +220,21 @@ BEGIN
             'order_date',      o.order_date,
             'production_date', o.production_date,
             'production_code',   o.production_code,
-            'delivery_amount', 0,
             'department_event',  o.department_event,
             'amount',          o.amount,
-            'total_quantity',  o.quantity,
-            'discount_amount', o.discount_amount,
             'customer_id',     o.customer_id,
-            'customer_number', c.customer_number,
-            'customer_name',   COALESCE(o.customer_name, c.customer_name,
-                                        o.snapshot_data->>'cus_name', ''),
-            'top_customer_id', COALESCE(c.top_customer_id, c.customer_id),
-            'top_customer_name', COALESCE(top_c.customer_name, c.customer_name, o.snapshot_data->>'cus_name', '')
+            'customer_name',   o.customer_name
         ) AS row_data,
-        o.production_date AS production_date_sort,
         o.order_id AS order_id_sort,
-        COALESCE(top_c.customer_name, o.customer_name, c.customer_name, o.snapshot_data->>'cus_name', '') AS top_customer_name_sort,
-        COALESCE(o.customer_name, c.customer_name, o.snapshot_data->>'cus_name', '') || ' - ' || COALESCE(o.department_event, '') AS department_event_sort
+        COALESCE(o.customer_name, '') AS customer_name_sort,
+        COALESCE(o.department_event, '') AS department_event_sort
           FROM om_orders o
-          LEFT JOIN fnd_customers c
-                 ON c.customer_id = o.customer_id
-                AND c.tenant_id   = o.tenant_id
-          LEFT JOIN fnd_customers top_c
-                 ON top_c.customer_id = COALESCE(c.top_customer_id, c.customer_id)
-                AND top_c.tenant_id   = o.tenant_id
          WHERE o.tenant_id = p_tenant_id
            AND (v_lookup_customer_id IS NULL OR o.customer_id = v_lookup_customer_id)
            AND (p_production_date_from IS NULL OR o.production_date >= p_production_date_from)
            AND (p_production_date_to   IS NULL OR o.production_date <= p_production_date_to)
            AND (v_production_code IS NULL OR o.production_code = v_production_code)
-           AND (
-               NOT p_return_actives_only
-               OR o.customer_id IS NULL
-               OR (COALESCE(c.is_active, FALSE) AND COALESCE(top_c.is_active, c.is_active, FALSE))
-           )
-         ORDER BY top_customer_name_sort ASC, department_event_sort ASC, o.order_id DESC
+         ORDER BY customer_name_sort ASC, department_event_sort ASC, o.order_id DESC
          LIMIT 500
     ) sub;
 

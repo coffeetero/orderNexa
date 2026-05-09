@@ -31,6 +31,8 @@ export type EntityComboBoxProps<T> = {
   getId: (item: T) => string | number;
   /** Single-line display for the trigger (popover mode) and list rows. */
   getLabel: (item: T) => string;
+  /** Optional class applied to the row label text only. */
+  getItemLabelClassName?: (item: T) => string | undefined;
   /** Text shown in the inline search input after selection; defaults to getLabel. */
   getInputLabel?: (item: T) => string;
   getParentId: (item: T) => string | number | null;
@@ -47,6 +49,8 @@ export type EntityComboBoxProps<T> = {
   placeholder?: string;
   disabled?: boolean;
   loading?: boolean;
+  /** Focus the search input when it is mounted and enabled. */
+  autoFocus?: boolean;
   /** When true (default), a direct search match also includes all descendants in the result set. */
   includeChildren?: boolean;
   /** When false, rows included only as ancestors of a match (not a direct hit) cannot be selected. */
@@ -67,8 +71,8 @@ export type EntityComboBoxProps<T> = {
   /** Initial collapsed state for `alwaysOpen`; defaults to `collapseOnSelect`. */
   initialListCollapsed?: boolean;
   /**
-   * When `alwaysOpen`, focusing the search field clears it and expands the list.
-   * On blur, if the field is still empty and there is a selection, the label is restored.
+   * When `alwaysOpen`, focusing the search field selects its text and expands the list.
+   * On blur, if the field is empty and there is a selection, the label is restored.
    */
   clearSearchOnFocus?: boolean;
   /** Called after `onChange` when a row is chosen (keyboard, click, or Enter). */
@@ -139,6 +143,7 @@ export function EntityComboBox<T>({
   onChange,
   getId,
   getLabel,
+  getItemLabelClassName,
   getInputLabel,
   getParentId,
   getSearchText: getSearchTextProp,
@@ -149,6 +154,7 @@ export function EntityComboBox<T>({
   placeholder = 'Select…',
   disabled,
   loading,
+  autoFocus,
   includeChildren = true,
   contextParentsSelectable = true,
   maxResults = 2000,
@@ -428,6 +434,45 @@ export function EntityComboBox<T>({
     ]
   );
 
+  const clearSelection = React.useCallback(() => {
+    cancelBlurRestoreTimer();
+    onChange(null);
+    if (isInputControlled) {
+      onInputValueChange?.('');
+    } else {
+      setQuery('');
+    }
+    setFilterQuery('');
+    setListCollapsed(true);
+    requestAnimationFrame(() => searchInputRef.current?.focus());
+  }, [cancelBlurRestoreTimer, isInputControlled, onChange, onInputValueChange]);
+
+  const inputHasFullSelection = React.useCallback(() => {
+    const input = searchInputRef.current;
+    if (!input || input.value.length === 0) return false;
+    return input.selectionStart === 0 && input.selectionEnd === input.value.length;
+  }, []);
+
+  const focusSearchInput = React.useCallback((selection: 'caret-end' | 'select-all' = 'caret-end') => {
+    const input = searchInputRef.current;
+    if (!input || input.disabled) return;
+    input.focus({ preventScroll: true });
+    if (selection === 'select-all') {
+      input.select();
+      return;
+    }
+    const caretPosition = input.value.length;
+    input.setSelectionRange(caretPosition, caretPosition);
+  }, []);
+
+  React.useEffect(() => {
+    if (!autoFocus || disabled || loading) return;
+    requestAnimationFrame(() => {
+      focusSearchInput('caret-end');
+      requestAnimationFrame(() => focusSearchInput('caret-end'));
+    });
+  }, [autoFocus, disabled, focusSearchInput, loading]);
+
   const handleQueryChange = React.useCallback(
     (next: string) => {
       cancelBlurRestoreTimer();
@@ -490,16 +535,13 @@ export function EntityComboBox<T>({
   const handleSearchFocus = React.useCallback(() => {
     cancelBlurRestoreTimer();
     if (alwaysOpen && clearSearchOnFocus) {
-      if (currentInputValue !== '') {
-        requestAnimationFrame(() => {
-          if (isInputControlled) {
-            onInputValueChange?.('');
-          } else {
-            setQuery('');
-          }
-          setFilterQuery('');
-        });
+      if (listCollapsed) {
+        setListCollapsed(false);
       }
+      requestAnimationFrame(() => {
+        focusSearchInput('caret-end');
+        requestAnimationFrame(() => focusSearchInput('caret-end'));
+      });
       return;
     }
     if (alwaysOpen && !collapseOnSelect && listCollapsed) {
@@ -510,15 +552,35 @@ export function EntityComboBox<T>({
     cancelBlurRestoreTimer,
     clearSearchOnFocus,
     collapseOnSelect,
-    currentInputValue,
-    isInputControlled,
+    focusSearchInput,
     listCollapsed,
-    onInputValueChange,
   ]);
+
+  const rowIsDisabled = (contextOnly: boolean) =>
+    Boolean(contextOnly) && !contextParentsSelectable;
 
   const handleAlwaysOpenKeyDown = React.useCallback(
     (event: React.KeyboardEvent<HTMLInputElement>) => {
       if (!alwaysOpen) return;
+
+      if (event.key === 'Home') {
+        event.preventDefault();
+        event.stopPropagation();
+        clearSelection();
+        return;
+      }
+
+      if (event.key === 'Delete' && inputHasFullSelection()) {
+        event.preventDefault();
+        event.stopPropagation();
+        clearSelection();
+        return;
+      }
+
+      if (event.key === 'End') {
+        event.stopPropagation();
+        return;
+      }
 
       if (event.key === 'Escape') {
         event.preventDefault();
@@ -556,7 +618,9 @@ export function EntityComboBox<T>({
     },
     [
       alwaysOpen,
+      clearSelection,
       currentInputValue,
+      inputHasFullSelection,
       isInputControlled,
       listCollapsed,
       onArrowDownOpen,
@@ -582,9 +646,6 @@ export function EntityComboBox<T>({
   );
 
   const triggerLabel = selectedItem ? getLabel(selectedItem) : null;
-
-  const rowIsDisabled = (contextOnly: boolean) =>
-    Boolean(contextOnly) && !contextParentsSelectable;
 
   const listSection =
     loading ? (
@@ -620,7 +681,10 @@ export function EntityComboBox<T>({
                 )}
               />
               <span
-                className="min-w-0 flex-1 truncate font-mono text-xs leading-none"
+                className={cn(
+                  'min-w-0 flex-1 truncate font-mono text-xs leading-none',
+                  getItemLabelClassName?.(item),
+                )}
                 style={{ paddingLeft: level * 10 }}
               >
                 {display}
@@ -671,7 +735,7 @@ export function EntityComboBox<T>({
                 onBlur={handleSearchBlur}
                 onKeyDown={handleAlwaysOpenKeyDown}
                 disabled={loading || disabled}
-                className="h-9 min-h-0 border-0 py-0 text-sm leading-none shadow-none focus-visible:ring-0"
+                className="h-9 min-h-0 border-0 py-0 text-sm leading-none shadow-none outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0"
               />
               {clearable && selectedItem ? (
                 <Button
@@ -683,16 +747,7 @@ export function EntityComboBox<T>({
                   onClick={(event) => {
                     event.preventDefault();
                     event.stopPropagation();
-                    cancelBlurRestoreTimer();
-                    onChange(null);
-                    if (isInputControlled) {
-                      onInputValueChange?.('');
-                    } else {
-                      setQuery('');
-                    }
-                    setFilterQuery('');
-                    setListCollapsed(true);
-                    requestAnimationFrame(() => searchInputRef.current?.focus());
+                    clearSelection();
                   }}
                   aria-label="Clear selection"
                 >
@@ -776,7 +831,7 @@ export function EntityComboBox<T>({
             onClick={(event) => {
               event.preventDefault();
               event.stopPropagation();
-              onChange(null);
+              clearSelection();
             }}
             aria-label="Clear selection"
           >
@@ -802,6 +857,16 @@ export function EntityComboBox<T>({
             placeholder="Search…"
             value={currentInputValue}
             onValueChange={setQuery}
+            onKeyDown={(event) => {
+              const shouldClear =
+                event.key === 'Home'
+                || (event.key === 'Delete' && inputHasFullSelection());
+
+              if (!shouldClear) return;
+              event.preventDefault();
+              event.stopPropagation();
+              clearSelection();
+            }}
             disabled={loading}
           />
           <CommandList className="max-h-[min(320px,calc(100vh-12rem))]">
