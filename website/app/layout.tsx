@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { ThemeProvider } from '@/lib/theme-provider';
 import { TenantProvider } from '@/lib/tenant-context';
 import { Navbar } from '@/components/layout/Navbar';
+import { Toaster } from '@/components/ui/sonner';
 import { getSessionUser } from '@/lib/supabase/server';
 
 export const metadata: Metadata = {
@@ -28,6 +29,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <TenantProvider>
             {!user && <Navbar />}
             <main>{children}</main>
+            <Toaster position="top-right" duration={3000} />
           </TenantProvider>
         </ThemeProvider>
       </body>

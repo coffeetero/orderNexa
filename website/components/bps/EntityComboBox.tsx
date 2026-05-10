@@ -71,14 +71,15 @@ export type EntityComboBoxProps<T> = {
   /** Initial collapsed state for `alwaysOpen`; defaults to `collapseOnSelect`. */
   initialListCollapsed?: boolean;
   /**
-   * When `alwaysOpen`, focusing the search field selects its text and expands the list.
-   * On blur, if the field is empty and there is a selection, the label is restored.
+   * When `alwaysOpen`, an empty blurred field restores the selected label.
    */
   clearSearchOnFocus?: boolean;
   /** Called after `onChange` when a row is chosen (keyboard, click, or Enter). */
   onAfterSelect?: (item: T) => void;
-  /** Called when ArrowDown expands an inline collapsed list. */
-  onArrowDownOpen?: () => void;
+  /** Called before an inline collapsed list opens. Runs once per `listRequestKey`. */
+  onListOpenRequest?: () => void | Promise<void>;
+  /** Reset key for the once-per-context list open request. */
+  listRequestKey?: string | number | null;
 
   /**
    * External ref that will be populated with the internal search <input>.
@@ -169,13 +170,15 @@ export function EntityComboBox<T>({
   initialListCollapsed,
   clearSearchOnFocus = false,
   onAfterSelect,
-  onArrowDownOpen,
+  onListOpenRequest,
+  listRequestKey,
   inputRef,
   triggerRef,
 }: EntityComboBoxProps<T>) {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
   const [filterQuery, setFilterQuery] = React.useState('');
+  const [activeRowIndex, setActiveRowIndex] = React.useState(0);
   const [listCollapsed, setListCollapsed] = React.useState(
     initialListCollapsed ?? collapseOnSelect
   );
@@ -184,6 +187,7 @@ export function EntityComboBox<T>({
   const prevValueRef = React.useRef(value);
   const blurRestoreTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const pointerDownOnListRef = React.useRef(false);
+  const listOpenRequestKeyRef = React.useRef<string | number | null | undefined>(undefined);
   const isInputControlled = inputValue !== undefined;
   const currentInputValue = isInputControlled ? inputValue : query;
 
@@ -191,6 +195,10 @@ export function EntityComboBox<T>({
     if (!alwaysOpen) return;
     setListCollapsed(initialListCollapsed ?? collapseOnSelect);
   }, [alwaysOpen, collapseOnSelect, initialListCollapsed]);
+
+  React.useEffect(() => {
+    listOpenRequestKeyRef.current = undefined;
+  }, [listRequestKey]);
 
   // Sync external refs on every render so callers always have the current element.
   React.useEffect(() => {
@@ -352,6 +360,35 @@ export function EntityComboBox<T>({
     filterQuery,
   ]);
 
+  const rowIsDisabled = React.useCallback(
+    (contextOnly: boolean) => Boolean(contextOnly) && !contextParentsSelectable,
+    [contextParentsSelectable],
+  );
+
+  const selectableRowIndexes = React.useMemo(
+    () => rows
+      .map((row, index) => (rowIsDisabled(row.contextOnly) ? -1 : index))
+      .filter((index) => index >= 0),
+    [rowIsDisabled, rows],
+  );
+
+  React.useEffect(() => {
+    if (selectableRowIndexes.length === 0) {
+      setActiveRowIndex(0);
+      return;
+    }
+    setActiveRowIndex((current) => {
+      if (selectableRowIndexes.includes(current)) return current;
+      return selectableRowIndexes[0];
+    });
+  }, [selectableRowIndexes]);
+
+  React.useEffect(() => {
+    if (listCollapsed) return;
+    const activeRow = listRef.current?.querySelector('[data-active-row="true"]');
+    activeRow?.scrollIntoView({ block: 'nearest' });
+  }, [activeRowIndex, listCollapsed]);
+
   React.useEffect(() => {
     if (alwaysOpen) return;
     if (!open) {
@@ -412,10 +449,6 @@ export function EntityComboBox<T>({
       onAfterSelect?.(item);
       if (alwaysOpen && collapseOnSelect) {
         setListCollapsed(true);
-        // Prevent immediate re-open loops when cmdk keeps focus on the input.
-        requestAnimationFrame(() => {
-          searchInputRef.current?.blur();
-        });
       }
       if (!alwaysOpen) {
         setOpen(false);
@@ -534,33 +567,16 @@ export function EntityComboBox<T>({
 
   const handleSearchFocus = React.useCallback(() => {
     cancelBlurRestoreTimer();
-    if (alwaysOpen && clearSearchOnFocus) {
-      if (listCollapsed) {
-        setListCollapsed(false);
-      }
-      requestAnimationFrame(() => {
-        focusSearchInput('caret-end');
-        requestAnimationFrame(() => focusSearchInput('caret-end'));
-      });
-      return;
-    }
-    if (alwaysOpen && !collapseOnSelect && listCollapsed) {
-      setListCollapsed(false);
-    }
+    if (!alwaysOpen) return;
+    requestAnimationFrame(() => focusSearchInput('caret-end'));
   }, [
     alwaysOpen,
     cancelBlurRestoreTimer,
-    clearSearchOnFocus,
-    collapseOnSelect,
     focusSearchInput,
-    listCollapsed,
   ]);
 
-  const rowIsDisabled = (contextOnly: boolean) =>
-    Boolean(contextOnly) && !contextParentsSelectable;
-
   const handleAlwaysOpenKeyDown = React.useCallback(
-    (event: React.KeyboardEvent<HTMLInputElement>) => {
+    async (event: React.KeyboardEvent<HTMLInputElement>) => {
       if (!alwaysOpen) return;
 
       if (event.key === 'Home') {
@@ -600,33 +616,73 @@ export function EntityComboBox<T>({
         return;
       }
 
-      if (event.key === 'ArrowDown' && listCollapsed) {
+      if (event.key === 'Enter' && !listCollapsed) {
+        const activeRow = rows[activeRowIndex];
+        if (activeRow && !rowIsDisabled(activeRow.contextOnly)) {
+          event.preventDefault();
+          event.stopPropagation();
+          commitSelection(activeRow.item);
+        }
+        return;
+      }
+
+      if (event.key === 'ArrowDown') {
         event.preventDefault();
-        onArrowDownOpen?.();
-        setListCollapsed(false);
+        event.stopPropagation();
+        if (listCollapsed) {
+          if (listOpenRequestKeyRef.current !== listRequestKey) {
+            listOpenRequestKeyRef.current = listRequestKey;
+            await onListOpenRequest?.();
+          }
+          setActiveRowIndex(selectableRowIndexes[0] ?? 0);
+          setListCollapsed(false);
+          requestAnimationFrame(() => focusSearchInput('caret-end'));
+          return;
+        }
+        if (selectableRowIndexes.length > 0) {
+          setActiveRowIndex((current) => {
+            const currentPosition = selectableRowIndexes.indexOf(current);
+            const nextPosition = currentPosition < 0
+              ? 0
+              : Math.min(currentPosition + 1, selectableRowIndexes.length - 1);
+            return selectableRowIndexes[nextPosition];
+          });
+        }
         return;
       }
 
       if (event.key === 'ArrowUp' && !listCollapsed) {
-        const selected = listRef.current?.querySelector('[cmdk-item][data-selected="true"]');
-        const first = listRef.current?.querySelector('[cmdk-item]:not([aria-disabled="true"])');
-        if (!selected || selected === first) {
-          event.preventDefault();
-          setListCollapsed(true);
+        event.preventDefault();
+        event.stopPropagation();
+        if (selectableRowIndexes.length > 0) {
+          setActiveRowIndex((current) => {
+            const currentPosition = selectableRowIndexes.indexOf(current);
+            if (currentPosition <= 0) {
+              setListCollapsed(true);
+              return selectableRowIndexes[0];
+            }
+            return selectableRowIndexes[currentPosition - 1];
+          });
         }
       }
     },
     [
       alwaysOpen,
+      activeRowIndex,
       clearSelection,
+      commitSelection,
       currentInputValue,
       inputHasFullSelection,
       isInputControlled,
       listCollapsed,
-      onArrowDownOpen,
       onInputCommit,
       onInputValueChange,
-      rows.length,
+      onListOpenRequest,
+      listRequestKey,
+      focusSearchInput,
+      rowIsDisabled,
+      rows,
+      selectableRowIndexes,
     ],
   );
 
@@ -657,23 +713,17 @@ export function EntityComboBox<T>({
       <CommandEmpty>{emptyText}</CommandEmpty>
     ) : (
       <CommandGroup className="p-0 [&_[cmdk-group-items]]:space-y-0">
-        {rows.map(({ item, idStr, level, contextOnly }) => {
+        {rows.map(({ item, idStr, level, contextOnly }, index) => {
           const selected = value !== null && idKey(value) === idStr;
           const rowDisabled = rowIsDisabled(contextOnly);
           const label = getLabel(item);
           const display = highlightMatches(label, currentInputValue.trim().toLowerCase());
-
-          return (
-            <CommandItem
-              key={idStr}
-              value={idStr}
-              disabled={rowDisabled}
-              onSelect={() => {
-                if (rowDisabled) return;
-                commitSelection(item);
-              }}
-              className="my-0 h-5 min-h-0 cursor-pointer py-0 text-xs leading-none data-[disabled=true]:cursor-not-allowed"
-            >
+          const rowClassName = cn(
+            'my-0 flex h-5 min-h-0 w-full cursor-pointer items-center rounded-sm px-2 py-0 text-left text-xs leading-none outline-none data-[disabled=true]:cursor-not-allowed data-[disabled=true]:opacity-50',
+            activeRowIndex === index && !rowDisabled && 'bg-accent text-accent-foreground',
+          );
+          const rowContent = (
+            <>
               <Check
                 className={cn(
                   'mr-2 h-3 w-3 shrink-0',
@@ -689,6 +739,45 @@ export function EntityComboBox<T>({
               >
                 {display}
               </span>
+            </>
+          );
+
+          if (alwaysOpen) {
+            return (
+              <button
+                key={idStr}
+                type="button"
+                role="option"
+                aria-selected={activeRowIndex === index}
+                disabled={rowDisabled}
+                data-active-row={activeRowIndex === index ? 'true' : undefined}
+                className={rowClassName}
+                onMouseDown={(event) => event.preventDefault()}
+                onMouseEnter={() => {
+                  if (!rowDisabled) setActiveRowIndex(index);
+                }}
+                onClick={() => {
+                  if (rowDisabled) return;
+                  commitSelection(item);
+                }}
+              >
+                {rowContent}
+              </button>
+            );
+          }
+
+          return (
+            <CommandItem
+              key={idStr}
+              value={idStr}
+              disabled={rowDisabled}
+              onSelect={() => {
+                if (rowDisabled) return;
+                commitSelection(item);
+              }}
+              className="my-0 h-5 min-h-0 cursor-pointer py-0 text-xs leading-none data-[disabled=true]:cursor-not-allowed"
+            >
+              {rowContent}
             </CommandItem>
           );
         })}
@@ -734,7 +823,7 @@ export function EntityComboBox<T>({
                 onFocus={handleSearchFocus}
                 onBlur={handleSearchBlur}
                 onKeyDown={handleAlwaysOpenKeyDown}
-                disabled={loading || disabled}
+                disabled={disabled}
                 className="h-9 min-h-0 border-0 py-0 text-sm leading-none shadow-none outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0"
               />
               {clearable && selectedItem ? (

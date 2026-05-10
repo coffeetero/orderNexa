@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Save, Trash2, RotateCcw } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -69,13 +70,6 @@ function normalizeOrderHeaderRow(raw: Record<string, unknown>): OrderHeaderListR
         ? String(raw.order_date)
         : undefined,
   };
-}
-
-function normalizeDepartmentEventSuggestion(raw: Record<string, unknown>): string | null {
-  const value = raw.department_event;
-  if (value === undefined || value === null) return null;
-  const text = String(value).trim().toUpperCase();
-  return text.length > 0 ? text : null;
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -165,10 +159,25 @@ export function OrderEntryForm({
   const [isLoadingItems, setIsLoadingItems] = useState(false);
   const [itemsError, setItemsError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [productionDateBlockedOpen, setProductionDateBlockedOpen] = useState(false);
   const [shouldFocusItemWhenReady, setShouldFocusItemWhenReady] = useState(false);
   const productionDateBlockedOkRef = useRef<HTMLButtonElement | null>(null);
+
+  const showStatusMessage = useCallback(
+    (message: { text: string; type: 'success' | 'error' } | null) => {
+      if (!message) {
+        toast.dismiss();
+        return;
+      }
+
+      if (message.type === 'success') {
+        toast.success(message.text);
+      } else {
+        toast.error(message.text);
+      }
+    },
+    [],
+  );
 
   // ── State & focus ──────────────────────────────────────────────────────
   const {
@@ -264,7 +273,7 @@ export function OrderEntryForm({
   );
 
   const buildDepartmentEventOptions = useCallback(
-    (customerId: number | null, suggestions: string[]): DepartmentEventOption[] => {
+    (customerId: number | null): DepartmentEventOption[] => {
       if (customerId === null) return [];
 
       const selectedCustomer = customers.find((customer) => customer.customer_id === customerId);
@@ -286,7 +295,17 @@ export function OrderEntryForm({
 
       const optionValues: string[] = [];
       if (isDepartmentEventCustomer(selectedCustomer)) {
-        optionValues.push(selectedCustomer.customer_name);
+        const rootCustomerId = selectedCustomer.customer_parent_id ?? selectedCustomer.customer_id;
+        const locationCustomers = customers
+          .filter((customer) => (
+            isDepartmentEventCustomer(customer)
+            && (
+              customer.customer_id === rootCustomerId
+              || hasAncestor(customer, rootCustomerId)
+            )
+          ))
+          .sort((a, b) => a.sort_path.localeCompare(b.sort_path));
+        optionValues.push(...locationCustomers.map((customer) => customer.customer_name));
       } else {
         optionValues.push('ORDER');
         const locationChildren = customers
@@ -297,7 +316,6 @@ export function OrderEntryForm({
           .sort((a, b) => a.sort_path.localeCompare(b.sort_path));
         optionValues.push(...locationChildren.map((customer) => customer.customer_name));
       }
-      optionValues.push(...suggestions);
 
       const options: DepartmentEventOption[] = [];
       const seen = new Set<string>();
@@ -320,6 +338,12 @@ export function OrderEntryForm({
     [customers],
   );
 
+  const departmentEventListRequestKey = [
+    draft.customer_id ?? 'none',
+    draft.production_date,
+    draft.production_code,
+  ].join('|');
+
   const loadOrderById = useCallback(
     async (
       targetOrderId: number,
@@ -329,14 +353,14 @@ export function OrderEntryForm({
       const gen = opts?.generation;
       const selectedCustomerId = draft.customer_id;
       const selectedCustomerName = draft.customer_name;
-      setStatusMessage(null);
+      showStatusMessage(null);
       let response: Response;
       try {
         response = await fetch(
           `/api/orders?tenant_id=${tenantId}&order_id=${targetOrderId}&headers_only=false`,
         );
       } catch {
-        setStatusMessage({ text: 'Could not load order lines. Network request failed.', type: 'error' });
+        showStatusMessage({ text: 'Could not load order lines. Network request failed.', type: 'error' });
         return;
       }
 
@@ -345,14 +369,14 @@ export function OrderEntryForm({
         error?: unknown;
       };
       if (!response.ok || json.error) {
-        setStatusMessage({
+        showStatusMessage({
           text: getErrorMessage(json.error, 'Could not load order lines.'),
           type: 'error',
         });
         return;
       }
       if (!json.data || typeof json.data !== 'object') {
-        setStatusMessage({ text: 'Order detail was empty; no lines were loaded.', type: 'error' });
+        showStatusMessage({ text: 'Order detail was empty; no lines were loaded.', type: 'error' });
         return;
       }
       if (gen !== undefined && gen !== slotLookupGenerationRef.current) return;
@@ -365,7 +389,7 @@ export function OrderEntryForm({
       setActiveLineIndex(null);
       setShouldFocusItemWhenReady(true);
     },
-    [tenantId, draft.customer_id, draft.customer_name, loadOrder, mapOrderToDraft],
+    [tenantId, draft.customer_id, draft.customer_name, loadOrder, mapOrderToDraft, showStatusMessage],
   );
 
   // ── Fetch customers when tenantId is ready ─────────────────────────────
@@ -453,39 +477,7 @@ export function OrderEntryForm({
     [tenantId, draft.production_date, draft.production_code],
   );
 
-  const fetchDepartmentEventSuggestions = useCallback(
-    async (customerId: number | null): Promise<string[]> => {
-      if (!tenantId || !draft.production_date || customerId === null) return [];
-
-      const qs = new URLSearchParams({
-        tenant_id: String(tenantId),
-        customer_id: String(customerId),
-        production_date: draft.production_date,
-        department_events_only: 'true',
-      });
-
-      const response = await fetch(`/api/orders?${qs}`);
-      const ordJson = (await response.json()) as { data: unknown; error?: string };
-      if (!response.ok || ordJson.error) {
-        throw new Error(getErrorMessage(ordJson.error, 'Could not find Department/Event history.'));
-      }
-
-      const rawRows = Array.isArray(ordJson.data) ? ordJson.data : [];
-      const suggestions: string[] = [];
-      const seen = new Set<string>();
-      for (const item of rawRows) {
-        if (!item || typeof item !== 'object') continue;
-        const suggestion = normalizeDepartmentEventSuggestion(item as Record<string, unknown>);
-        if (!suggestion || seen.has(suggestion)) continue;
-        seen.add(suggestion);
-        suggestions.push(suggestion);
-      }
-      return suggestions;
-    },
-    [tenantId, draft.production_date],
-  );
-
-  const handleDepartmentEventListRequest = useCallback(async () => {
+  const handleDepartmentEventListRequest = useCallback(() => {
     if (!tenantId || !draft.customer_id || !draft.production_date) {
       setDepartmentEventOptions([]);
       setSelectedDepartmentEventId(null);
@@ -499,44 +491,29 @@ export function OrderEntryForm({
 
     const generation = ++slotLookupGenerationRef.current;
     setIsLoadingDepartmentEvents(true);
-    setStatusMessage(null);
+    showStatusMessage(null);
 
-    try {
-      const suggestions = await fetchDepartmentEventSuggestions(draft.customer_id);
-      if (generation !== slotLookupGenerationRef.current) return;
+    const options = buildDepartmentEventOptions(draft.customer_id);
+    if (generation !== slotLookupGenerationRef.current) return;
 
-      const options = buildDepartmentEventOptions(draft.customer_id, suggestions);
-      const firstOption = options[0] ?? null;
-
-      setDepartmentEventOptions(options);
-      setSelectedDepartmentEventId(firstOption?.id ?? null);
-      setField('order_number', 'New Order');
-      setField('order_ref', 'New Order');
-      setField('order_id', undefined);
-      setField('department_event', firstOption?.department_event ?? '');
-      setField('lines', []);
-      setField('total_amount', 0);
-      setOrderPickOpen(false);
-    } catch {
-      if (generation !== slotLookupGenerationRef.current) return;
-      setStatusMessage({
-        text: 'Could not find Department/Event history. Network request failed.',
-        type: 'error',
-      });
-    } finally {
-      if (generation === slotLookupGenerationRef.current) {
-        setIsLoadingDepartmentEvents(false);
-      }
-    }
+    setDepartmentEventOptions(options);
+    setSelectedDepartmentEventId(null);
+    setField('order_number', 'New Order');
+    setField('order_ref', 'New Order');
+    setField('order_id', undefined);
+    setField('lines', []);
+    setField('total_amount', 0);
+    setOrderPickOpen(false);
+    setIsLoadingDepartmentEvents(false);
   }, [
     tenantId,
     draft.customer_id,
     draft.production_date,
     buildDepartmentEventOptions,
-    fetchDepartmentEventSuggestions,
     mode,
     orderId,
     setField,
+    showStatusMessage,
   ]);
 
   // ── Load existing order in edit mode ──────────────────────────────────
@@ -546,22 +523,22 @@ export function OrderEntryForm({
       .then((r) => r.json())
       .then(({ data, error }) => {
         if (error) {
-          setStatusMessage({
+          showStatusMessage({
             text: getErrorMessage(error, 'Could not load order lines.'),
             type: 'error',
           });
           return;
         }
         if (!data || typeof data !== 'object') {
-          setStatusMessage({ text: 'Order detail was empty; no lines were loaded.', type: 'error' });
+          showStatusMessage({ text: 'Order detail was empty; no lines were loaded.', type: 'error' });
           return;
         }
         loadOrder(mapOrderToDraft(data as Record<string, unknown>));
       })
       .catch(() => {
-        setStatusMessage({ text: 'Could not load order lines. Network request failed.', type: 'error' });
+        showStatusMessage({ text: 'Could not load order lines. Network request failed.', type: 'error' });
       });
-  }, [mode, orderId, tenantId, initialData, loadOrder, mapOrderToDraft]);
+  }, [mode, orderId, tenantId, initialData, loadOrder, mapOrderToDraft, showStatusMessage]);
 
   // ── Focus on initial load ──────────────────────────────────────────────
   useEffect(() => {
@@ -583,7 +560,7 @@ export function OrderEntryForm({
   const handleSearchExistingOrders = useCallback(async () => {
     if (!tenantId || !draft.production_date) return;
     const generation = ++orderPickLookupGenerationRef.current;
-    setStatusMessage(null);
+    showStatusMessage(null);
     setOrderPickCandidates([]);
     setOrderPickMode(draft.customer_id === null ? 'global-search' : 'customer-scoped');
     setOrderPickOpen(true);
@@ -594,7 +571,7 @@ export function OrderEntryForm({
       if (rows.length === 0) {
         setOrderPickCandidates([]);
         setOrderPickOpen(false);
-        setStatusMessage({ text: 'No existing orders found for this production slot.', type: 'error' });
+        showStatusMessage({ text: 'No existing orders found for this production slot.', type: 'error' });
         return;
       }
 
@@ -604,7 +581,7 @@ export function OrderEntryForm({
     } catch (error) {
       if (generation !== orderPickLookupGenerationRef.current) return;
       setOrderPickOpen(false);
-      setStatusMessage({
+      showStatusMessage({
         text: error instanceof Error ? error.message : 'Could not find existing orders.',
         type: 'error',
       });
@@ -613,15 +590,16 @@ export function OrderEntryForm({
         setIsLoadingOrderPickCandidates(false);
       }
     }
-  }, [tenantId, draft.production_date, draft.customer_id, fetchOrderHeaders]);
+  }, [tenantId, draft.production_date, draft.customer_id, fetchOrderHeaders, showStatusMessage]);
 
   const handleOrderPickOpenChange = useCallback((nextOpen: boolean) => {
     if (!nextOpen) {
       orderPickLookupGenerationRef.current += 1;
       setIsLoadingOrderPickCandidates(false);
+      requestAnimationFrame(() => focusCustomer());
     }
     setOrderPickOpen(nextOpen);
-  }, []);
+  }, [focusCustomer]);
 
   const handleCustomerChange = useCallback(
     (customer: CustomerOption | null) => {
@@ -665,6 +643,9 @@ export function OrderEntryForm({
   const handleProductionCodeChange = useCallback(
     (value: ProductionCode) => {
       if (warnIfExistingOrderLoaded()) return;
+      setDepartmentEventOptions([]);
+      setSelectedDepartmentEventId(null);
+      setIsLoadingDepartmentEvents(false);
       setField('production_code', value);
     },
     [setField, warnIfExistingOrderLoaded],
@@ -787,8 +768,10 @@ export function OrderEntryForm({
 
   // ── Save ───────────────────────────────────────────────────────────────
 
+  const canSave = Boolean(tenantId) && draft.lines.length > 0;
+
   const handleSave = useCallback(async () => {
-    if (!tenantId || isSaving) return;
+    if (!canSave || !tenantId || isSaving) return;
 
     const isExistingOrder = !!draft.order_id;
     const visibleOrderNumber = draft.order_number.trim();
@@ -797,12 +780,12 @@ export function OrderEntryForm({
         ? (!isExistingOrder ? 'New Order' : '')
         : visibleOrderNumber || (!isExistingOrder ? 'New Order' : '');
     if (!orderNumber.trim()) {
-      setStatusMessage({ text: 'Order number is missing for this order.', type: 'error' });
+      showStatusMessage({ text: 'Order number is missing for this order.', type: 'error' });
       return;
     }
 
     setIsSaving(true);
-    setStatusMessage(null);
+    showStatusMessage(null);
     try {
       const payload: OrderSavePayload = {
         customer_id: draft.customer_id,
@@ -839,12 +822,12 @@ export function OrderEntryForm({
 
       const json = (await res.json()) as { data?: OrderSaveResult; error?: string };
       if (!res.ok || json.error) {
-        setStatusMessage({ text: json.error ?? 'Save failed.', type: 'error' });
+        showStatusMessage({ text: json.error ?? 'Save failed.', type: 'error' });
         return;
       }
       const resolvedOrderId = json.data?.order_id;
       if (!resolvedOrderId) {
-        setStatusMessage({ text: 'Order saved but order id was not returned.', type: 'error' });
+        showStatusMessage({ text: 'Order saved but order id was not returned.', type: 'error' });
         return;
       }
 
@@ -866,7 +849,7 @@ export function OrderEntryForm({
         setField('lines', updatedLines);
       }
 
-      setStatusMessage({
+      showStatusMessage({
         text: json.data?.message ?? 'Order saved.',
         type: 'success',
       });
@@ -877,19 +860,35 @@ export function OrderEntryForm({
     } finally {
       setIsSaving(false);
     }
-  }, [tenantId, isSaving, draft, reset, setField, focusCustomer]);
+  }, [canSave, tenantId, isSaving, draft, reset, setField, focusCustomer, showStatusMessage]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (isSaving) return;
+
+      if (event.code === 'NumpadSubtract') {
+        event.preventDefault();
+        handleClear();
+        return;
+      }
+
+      if (event.code === 'NumpadDivide') {
+        event.preventDefault();
+        void handleSearchExistingOrders();
+        return;
+      }
+
       if (event.code !== 'NumpadMultiply') return;
-      if (orderPickOpen || productionDateBlockedOpen || isSaving) return;
       event.preventDefault();
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
       void handleSave();
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleSave, isSaving, orderPickOpen, productionDateBlockedOpen]);
+  }, [handleClear, handleSave, handleSearchExistingOrders, isSaving]);
 
   // ── Delete ─────────────────────────────────────────────────────────────
 
@@ -910,14 +909,14 @@ export function OrderEntryForm({
       });
       const json = await res.json();
       if (!res.ok || json.error) {
-        setStatusMessage({ text: json.error ?? 'Delete failed.', type: 'error' });
+        showStatusMessage({ text: json.error ?? 'Delete failed.', type: 'error' });
         return;
       }
       router.push('/manage-orders');
     } finally {
       setIsSaving(false);
     }
-  }, [tenantId, draft.order_id, draft.order_number, router]);
+  }, [tenantId, draft.order_id, draft.order_number, router, showStatusMessage]);
 
   return (
     <div className="flex h-full bg-background overflow-hidden">
@@ -931,18 +930,6 @@ export function OrderEntryForm({
                 : `Enter Orders - ${draft.customer_name || ''}`}
             </h2>
           </div>
-          {/* Status message inline */}
-          {statusMessage && (
-            <span
-              className={
-                statusMessage.type === 'success'
-                  ? 'text-xs text-emerald-600 dark:text-emerald-400 font-medium'
-                  : 'text-xs text-destructive font-medium'
-              }
-            >
-              {statusMessage.text}
-            </span>
-          )}
           {/* Header action buttons: Cancel then Save */}
           <div className="flex items-center gap-1.5 shrink-0">
             <Button
@@ -958,7 +945,7 @@ export function OrderEntryForm({
               size="sm"
               className="h-7 text-xs gap-1"
               onClick={handleSave}
-              disabled={isSaving || !tenantId}
+              disabled={isSaving || !canSave}
             >
               <Save className="h-3 w-3" />
               {isSaving ? 'Saving…' : 'Save'}
@@ -986,6 +973,7 @@ export function OrderEntryForm({
             onDepartmentEventSelect={handleDepartmentEventSelect}
             onDepartmentEventCommit={handleDepartmentEventCommit}
             onDepartmentEventListRequest={handleDepartmentEventListRequest}
+            departmentEventListRequestKey={departmentEventListRequestKey}
             onProductionDateChange={handleProductionDateChange}
             onProductionCodeChange={handleProductionCodeChange}
             onProductionDateEnter={focusProductionCode}
@@ -1091,3 +1079,4 @@ export function OrderEntryForm({
     </div>
   );
 }
+

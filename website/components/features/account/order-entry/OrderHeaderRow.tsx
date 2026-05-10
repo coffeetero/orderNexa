@@ -56,7 +56,8 @@ interface OrderHeaderRowProps {
   onDepartmentEventInputChange: (value: string) => void;
   onDepartmentEventSelect: (option: DepartmentEventOption | null) => void;
   onDepartmentEventCommit: (value: string) => void;
-  onDepartmentEventListRequest: () => void;
+  onDepartmentEventListRequest: () => void | Promise<void>;
+  departmentEventListRequestKey: string;
   onProductionDateChange: (value: string) => void;
   onProductionCodeChange: (value: ProductionCode) => void;
   onProductionDateEnter: () => void;
@@ -105,6 +106,7 @@ export function OrderHeaderRow({
   onDepartmentEventSelect,
   onDepartmentEventCommit,
   onDepartmentEventListRequest,
+  departmentEventListRequestKey,
   onProductionDateChange,
   onProductionCodeChange,
   onProductionDateEnter,
@@ -200,7 +202,8 @@ export function OrderHeaderRow({
             onInputValueChange={onDepartmentEventInputChange}
             onInputCommit={onDepartmentEventCommit}
             onChange={onDepartmentEventSelect}
-            onArrowDownOpen={onDepartmentEventListRequest}
+            onListOpenRequest={onDepartmentEventListRequest}
+            listRequestKey={departmentEventListRequestKey}
             getId={(option) => option.id}
             getLabel={getDepartmentEventLabel}
             getInputLabel={(option) => option.department_event}

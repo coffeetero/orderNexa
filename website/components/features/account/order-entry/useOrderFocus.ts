@@ -52,7 +52,8 @@ export function useOrderFocus() {
       const el = departmentEventInputRef.current;
       if (!el) return;
       el.focus();
-      el.select?.();
+      const caretPosition = el.value.length;
+      el.setSelectionRange(caretPosition, caretPosition);
     });
   }, []);
 
