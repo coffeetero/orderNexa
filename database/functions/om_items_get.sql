@@ -1,7 +1,7 @@
 -- ============================================================
 -- om_items_get
 -- Returns the item catalogue for a tenant with:
---   - bps_items preparation capabilities and defaults
+--   - JSONB item prep allowed/default options
 --   - effective unit_price from the customer's active pricebook
 --     (lowest min_quantity tier; NULL when no pricebook is found)
 --   - active-only filtering by default, with an opt-out parameter
@@ -56,23 +56,60 @@ BEGIN
             'item_name',      i.item_name,
             'category',       i.category,
             'unit_of_sale',   i.unit_of_sale,
-            -- Prep capabilities
-            'is_sliceable',   COALESCE(b.is_sliceable,   FALSE),
-            'is_wrappable',   COALESCE(b.is_wrappable,   FALSE),
-            'is_coverable',   COALESCE(b.is_coverable,   FALSE),
+            'allowed_prep_options', COALESCE(prep_allowed.allowed_prep_options, '[]'::JSONB),
+            'default_prep_options', COALESCE(prep_default.default_prep_options, '[]'::JSONB),
             -- is_scoreable / default_scored require add_order_entry_fields.sql to be run first;
             -- hardcoded to FALSE until that migration is deployed.
             'is_scoreable',   FALSE,
-            -- Prep defaults (applied to new order line on item select)
-            'default_sliced', COALESCE(b.default_sliced, FALSE),
-            'default_wrapped',COALESCE(b.default_wrapped,FALSE),
-            'default_covered',COALESCE(b.default_covered,FALSE),
             'default_scored', FALSE,
             -- Effective price (NULL when no pricebook resolved)
             'unit_price',     pi.item_price
         ) AS row_data
           FROM fnd_items i
-          LEFT JOIN bps_items b ON b.item_id = i.item_id
+          LEFT JOIN LATERAL (
+                SELECT COALESCE(
+                    jsonb_agg(
+                        jsonb_build_object(
+                            'value', vv.value,
+                            'label', vv.label
+                        )
+                        ORDER BY vv.display_order, vv.label
+                    ),
+                    '[]'::JSONB
+                ) AS allowed_prep_options
+                  FROM jsonb_array_elements_text(COALESCE(i.allowed_prep_options, '[]'::JSONB)) opt(value)
+                  JOIN fnd_valuesets vs
+                    ON vs.tenant_id = i.tenant_id
+                   AND vs.valueset_code = 'ITEMPREP'
+                   AND vs.is_active = TRUE
+                  JOIN fnd_valueset_values vv
+                    ON vv.tenant_id = vs.tenant_id
+                   AND vv.valueset_id = vs.valueset_id
+                   AND vv.value = opt.value
+                   AND vv.is_disabled = FALSE
+              ) prep_allowed ON TRUE
+          LEFT JOIN LATERAL (
+                SELECT COALESCE(
+                    jsonb_agg(
+                        jsonb_build_object(
+                            'value', vv.value,
+                            'label', vv.label
+                        )
+                        ORDER BY vv.display_order, vv.label
+                    ),
+                    '[]'::JSONB
+                ) AS default_prep_options
+                  FROM jsonb_array_elements_text(COALESCE(i.default_prep_options, '[]'::JSONB)) opt(value)
+                  JOIN fnd_valuesets vs
+                    ON vs.tenant_id = i.tenant_id
+                   AND vs.valueset_code = 'ITEMPREP'
+                   AND vs.is_active = TRUE
+                  JOIN fnd_valueset_values vv
+                    ON vv.tenant_id = vs.tenant_id
+                   AND vv.valueset_id = vs.valueset_id
+                   AND vv.value = opt.value
+                   AND vv.is_disabled = FALSE
+              ) prep_default ON TRUE
           LEFT JOIN LATERAL (
                 SELECT p.item_price
                   FROM fnd_pricebook_items p

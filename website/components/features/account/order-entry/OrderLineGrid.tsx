@@ -1,10 +1,11 @@
 'use client';
 
 import { useCallback } from 'react';
-import { Trash2 } from 'lucide-react';
+import { ChevronDown, Trash2 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import type { OrderEntryLine } from '@/lib/types';
+import type { OrderEntryLine, PrepOption } from '@/lib/types';
 
 interface OrderLineGridProps {
   lines: OrderEntryLine[];
@@ -70,6 +71,77 @@ function CellInput({
   );
 }
 
+function PrepOptionsDropdown({
+  idBase,
+  allowedOptions,
+  selectedOptions,
+  onChange,
+}: {
+  idBase: string;
+  allowedOptions: PrepOption[];
+  selectedOptions: PrepOption[];
+  onChange: (next: PrepOption[]) => void;
+}) {
+  const selectedValues = new Set(selectedOptions.map((option) => option.value));
+  const summary = selectedOptions.length > 0
+    ? selectedOptions.map((option) => option.label).join(', ')
+    : 'None';
+
+  const toggleOption = (option: PrepOption, checked: boolean) => {
+    if (checked) {
+      onChange([...selectedOptions.filter((selected) => selected.value !== option.value), option]);
+      return;
+    }
+    onChange(selectedOptions.filter((selected) => selected.value !== option.value));
+  };
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            'flex h-7 w-36 max-w-36 min-w-36 items-center justify-between gap-1 rounded border border-input bg-background px-2',
+            'text-left text-xs text-foreground shadow-sm transition-colors hover:bg-muted/40',
+            'focus:outline-none focus:ring-1 focus:ring-primary',
+          )}
+          title={summary}
+        >
+          <span className="min-w-0 truncate">{summary}</span>
+          <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-48 p-2">
+        <div className="space-y-1">
+          {allowedOptions.length === 0 ? (
+            <div className="px-1.5 py-1 text-xs text-muted-foreground">
+              No prep options
+            </div>
+          ) : (
+            allowedOptions.map((option) => (
+              <div
+                key={option.value}
+                className="flex items-center gap-2 rounded px-1.5 py-1 text-xs hover:bg-muted/50"
+              >
+                <Checkbox
+                  id={`${idBase}-${option.value}`}
+                  checked={selectedValues.has(option.value)}
+                  onCheckedChange={(checked) => toggleOption(option, Boolean(checked))}
+                  className="h-3.5 w-3.5"
+                  aria-label={option.label}
+                />
+                <label htmlFor={`${idBase}-${option.value}`} className="min-w-0 truncate">
+                  {option.label}
+                </label>
+              </div>
+            ))
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export function OrderLineGrid({
   lines,
   activeLineIndex,
@@ -94,10 +166,7 @@ export function OrderLineGrid({
           <tr className="bg-muted/50 border-b border-border/60">
             <th className="px-2 py-1.5 text-left font-semibold text-muted-foreground whitespace-nowrap w-20">Item No.</th>
             <th className="px-2 py-1.5 text-left font-semibold text-muted-foreground">Item Description</th>
-            <th className="px-1.5 py-1.5 text-center font-semibold text-muted-foreground w-7">SL</th>
-            <th className="px-1.5 py-1.5 text-center font-semibold text-muted-foreground w-7">W</th>
-            <th className="px-1.5 py-1.5 text-center font-semibold text-muted-foreground w-7">CV</th>
-            <th className="px-1.5 py-1.5 text-center font-semibold text-muted-foreground w-7">CS</th>
+            <th className="px-2 py-1.5 text-left font-semibold text-muted-foreground w-40 min-w-40 max-w-40">Prep</th>
             <th className="px-2 py-1.5 text-right font-semibold text-muted-foreground w-20">Quantity</th>
             <th className="px-2 py-1.5 text-right font-semibold text-muted-foreground w-20">Price</th>
             <th className="px-2 py-1.5 text-right font-semibold text-muted-foreground w-20">Discnt</th>
@@ -109,7 +178,7 @@ export function OrderLineGrid({
           {lines.length === 0 && (
             <tr>
               <td
-                colSpan={11}
+                colSpan={8}
                 className="py-8 text-center text-xs text-muted-foreground italic"
               >
                 No items added yet. Use the search above to add items.
@@ -128,69 +197,23 @@ export function OrderLineGrid({
                     : 'hover:bg-muted/20',
                 )}
               >
-                {/* Item No */}
                 <td className="px-2 py-1 font-mono text-muted-foreground whitespace-nowrap">
                   {line.item_number}
                 </td>
 
-                {/* Item Description */}
                 <td className="px-2 py-1 font-medium text-foreground">
                   {line.item_description}
                 </td>
 
-                {/* SL */}
-                <td className="px-1.5 py-1 text-center">
-                  <Checkbox
-                    checked={line.is_sliced}
-                    disabled={!line.can_slice}
-                    onCheckedChange={(checked) =>
-                      onLineUpdate(line.tempId, { is_sliced: Boolean(checked) })
-                    }
-                    className="h-3.5 w-3.5"
-                    aria-label="Sliced"
+                <td className="w-40 min-w-40 max-w-40 px-1 py-0.5">
+                  <PrepOptionsDropdown
+                    idBase={`prep-${line.tempId}`}
+                    allowedOptions={line.allowed_prep_options}
+                    selectedOptions={line.prep_options}
+                    onChange={(prep_options) => onLineUpdate(line.tempId, { prep_options })}
                   />
                 </td>
 
-                {/* W */}
-                <td className="px-1.5 py-1 text-center">
-                  <Checkbox
-                    checked={line.is_wrapped}
-                    disabled={!line.can_wrap}
-                    onCheckedChange={(checked) =>
-                      onLineUpdate(line.tempId, { is_wrapped: Boolean(checked) })
-                    }
-                    className="h-3.5 w-3.5"
-                    aria-label="Wrapped"
-                  />
-                </td>
-
-                {/* CV */}
-                <td className="px-1.5 py-1 text-center">
-                  <Checkbox
-                    checked={line.is_covered}
-                    disabled={!line.can_cover}
-                    onCheckedChange={(checked) =>
-                      onLineUpdate(line.tempId, { is_covered: Boolean(checked) })
-                    }
-                    className="h-3.5 w-3.5"
-                    aria-label="Covered"
-                  />
-                </td>
-
-                {/* CS */}
-                <td className="px-1.5 py-1 text-center">
-                  <Checkbox
-                    checked={line.is_scored}
-                    disabled={!line.can_score}
-                    onCheckedChange={(checked) =>
-                      onLineUpdate(line.tempId, { is_scored: Boolean(checked) })
-                    }
-                    className="h-3.5 w-3.5"
-                    aria-label="Scored"
-                  />
-                </td>
-
-                {/* Qty */}
                 <td className="px-1 py-0.5">
                   <CellInput
                     value={line.quantity}
@@ -206,7 +229,6 @@ export function OrderLineGrid({
                   />
                 </td>
 
-                {/* Price */}
                 <td className="px-1 py-0.5">
                   <CellInput
                     value={line.unit_price}
@@ -215,7 +237,6 @@ export function OrderLineGrid({
                   />
                 </td>
 
-                {/* Discount */}
                 <td className="px-1 py-0.5">
                   <CellInput
                     value={line.unit_discount}
@@ -225,16 +246,14 @@ export function OrderLineGrid({
                   />
                 </td>
 
-                {/* Total */}
                 <td className="px-2 py-1 text-right tabular-nums font-semibold text-foreground">
                   {line.extended_amount === 0 ? (
-                    <span className="text-muted-foreground">—</span>
+                    <span className="text-muted-foreground">-</span>
                   ) : (
                     line.extended_amount.toFixed(2)
                   )}
                 </td>
 
-                {/* Remove */}
                 <td className="px-1 py-1 text-center">
                   <button
                     type="button"
@@ -250,11 +269,10 @@ export function OrderLineGrid({
           })}
         </tbody>
 
-        {/* Footer totals */}
         {lines.length > 0 && (
           <tfoot>
             <tr className="border-t border-border/60 bg-muted/30 font-semibold">
-              <td colSpan={6} className="px-2 py-1.5 text-xs text-muted-foreground">
+              <td colSpan={3} className="px-2 py-1.5 text-xs text-muted-foreground">
                 {lines.length} {lines.length === 1 ? 'item' : 'items'}
               </td>
               <td className="px-2 py-1.5 text-right tabular-nums text-xs">{totals.qty}</td>

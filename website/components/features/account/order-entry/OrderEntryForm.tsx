@@ -30,6 +30,7 @@ import type {
   OrderHeaderListRow,
   OrderSavePayload,
   OrderSaveResult,
+  PrepOption,
   ProductionCode,
 } from '@/lib/types';
 import { OrderPickSheet } from './OrderPickSheet';
@@ -102,6 +103,24 @@ function isDepartmentEventCustomer(customer: CustomerOption): boolean {
 
 function normalizeDepartmentEventText(value: string): string {
   return value.trim().toUpperCase();
+}
+
+function normalizePrepOptions(raw: unknown): PrepOption[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((option): option is Record<string, unknown> => (
+      option !== null
+      && typeof option === 'object'
+      && typeof (option as Record<string, unknown>).value === 'string'
+    ))
+    .map((option) => {
+      const value = String(option.value).trim();
+      const label = typeof option.label === 'string' && option.label.trim()
+        ? option.label.trim()
+        : value;
+      return { value, label };
+    })
+    .filter((option) => option.value.length > 0);
 }
 
 interface OrderEntryFormProps {
@@ -223,13 +242,9 @@ export function OrderEntryForm({
       item_id: l.item_id as number,
       item_number: (l.item_number as string) ?? '',
       item_description: (l.item_description as string) ?? '',
-      is_sliced: Boolean(l.is_sliced),
-      is_wrapped: Boolean(l.is_wrapped),
-      is_covered: Boolean(l.is_covered),
+      allowed_prep_options: normalizePrepOptions(l.allowed_prep_options),
+      prep_options: normalizePrepOptions(l.prep_options),
       is_scored: Boolean(l.is_scored),
-      can_slice: Boolean(l.can_slice),
-      can_wrap: Boolean(l.can_wrap),
-      can_cover: Boolean(l.can_cover),
       can_score: Boolean(l.can_score),
       quantity: Number(l.quantity ?? 0),
       unit_price: Number(l.unit_price ?? 0),
@@ -803,9 +818,7 @@ export function OrderEntryForm({
           quantity: l.quantity,
           unit_price: l.unit_price,
           unit_discount: l.unit_discount,
-          is_sliced: l.is_sliced,
-          is_wrapped: l.is_wrapped,
-          is_covered: l.is_covered,
+          prep_options: l.prep_options,
           is_scored: l.is_scored,
         })),
       };

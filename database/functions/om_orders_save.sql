@@ -25,9 +25,7 @@
 --         "quantity":         <numeric>,
 --         "unit_price":       <numeric>,
 --         "unit_discount":    <numeric>,
---         "is_sliced":        <bool>,
---         "is_wrapped":       <bool>,
---         "is_covered":       <bool>,
+--         "prep_options":     <jsonb array>,
 --       }, ...
 --     ]
 --   }
@@ -298,9 +296,7 @@ BEGIN
                 unit_price,
                 unit_discount,
                 extended_amount,
-                is_sliced,
-                is_wrapped,
-                is_covered,
+                prep_options,
                 tenant_id
             ) VALUES (
                 v_order_id,
@@ -310,9 +306,7 @@ BEGIN
                 v_price,
                 v_discount,
                 v_extended,
-                COALESCE((v_line->>'is_sliced')::BOOLEAN,  FALSE),
-                COALESCE((v_line->>'is_wrapped')::BOOLEAN, FALSE),
-                COALESCE((v_line->>'is_covered')::BOOLEAN, FALSE),
+                COALESCE(v_line->'prep_options', '[]'::JSONB),
                 p_tenant_id
             )
             RETURNING order_line_id INTO v_line_id;
@@ -324,9 +318,7 @@ BEGIN
                    unit_price = v_price,
                    unit_discount = v_discount,
                    extended_amount = v_extended,
-                   is_sliced = COALESCE((v_line->>'is_sliced')::BOOLEAN, FALSE),
-                   is_wrapped = COALESCE((v_line->>'is_wrapped')::BOOLEAN, FALSE),
-                   is_covered = COALESCE((v_line->>'is_covered')::BOOLEAN, FALSE)
+                   prep_options = COALESCE(v_line->'prep_options', '[]'::JSONB)
              WHERE order_line_id = v_line_id
                AND order_id = v_order_id
                AND tenant_id = p_tenant_id;

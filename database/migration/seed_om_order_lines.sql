@@ -65,6 +65,7 @@ BEGIN
         extended_amount,
         unit_discount,
         fulfilled_quantity,
+        prep_options,
         tenant_id
     )
     SELECT
@@ -77,6 +78,38 @@ BEGIN
             * (d.od_item_cost::NUMERIC(14,4) - COALESCE(d.od_item_discount, 0)::NUMERIC(14,4)) as extended_amount,
         COALESCE(-d.od_item_discount, 0)::NUMERIC(14,4) as unit_discount,
         0::NUMERIC(14,4) as fulfilled_quantity,
+        COALESCE(
+            (
+                SELECT jsonb_agg(
+                    jsonb_build_object('value', v.value, 'label', v.label)
+                    ORDER BY v.display_order
+                )
+                FROM (
+                    VALUES
+                        (
+                            'SLICED',
+                            'Sliced',
+                            10,
+                            COALESCE(UPPER(TRIM(d.od_item_sliced::TEXT)), '') IN ('Y', 'YES', 'TRUE', '1')
+                            OR COALESCE(UPPER(TRIM(d.od_item_canopy_sliced::TEXT)), '') IN ('Y', 'YES', 'TRUE', '1')
+                        ),
+                        (
+                            'WRAPPED',
+                            'Wrapped',
+                            20,
+                            COALESCE(UPPER(TRIM(d.od_item_wrapped::TEXT)), '') IN ('Y', 'YES', 'TRUE', '1')
+                        ),
+                        (
+                            'COVERED',
+                            'Covered',
+                            30,
+                            COALESCE(UPPER(TRIM(d.od_item_covered::TEXT)), '') IN ('Y', 'YES', 'TRUE', '1')
+                        )
+                ) AS v(value, label, display_order, selected)
+                WHERE v.selected
+            ),
+            '[]'::JSONB
+        ) as prep_options,
         v_tenant_id
     FROM ordr_detail d
     INNER JOIN om_orders ordr

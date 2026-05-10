@@ -160,21 +160,21 @@ export interface OrderHeaderListRow {
 }
 
 /** An item row returned by om_items_get, used in the Item combobox. */
+export interface PrepOption {
+  value: string;
+  label: string;
+}
+
 export interface OrderEntryItem {
   item_id: number;
   item_number: string;
   item_name: string;
   category: string | null;
   unit_of_sale: string;
-  /** Preparation capabilities — drive which checkboxes are enabled on the line */
-  is_sliceable: boolean;
-  is_wrappable: boolean;
-  is_coverable: boolean;
   is_scoreable: boolean;
-  /** Prep defaults copied to the order line when item is first selected */
-  default_sliced: boolean;
-  default_wrapped: boolean;
-  default_covered: boolean;
+  /** Item preparation options copied to the order line when item is selected */
+  allowed_prep_options: PrepOption[];
+  default_prep_options: PrepOption[];
   default_scored: boolean;
   /** Effective unit price from customer pricebook; null when no pricebook found */
   unit_price: number | null;
@@ -189,15 +189,10 @@ export interface OrderEntryLine {
   item_id: number;
   item_number: string;
   item_description: string;
-  /** Preparation flags — customer's choice for this line */
-  is_sliced: boolean;
-  is_wrapped: boolean;
-  is_covered: boolean;
+  /** Preparation options available for this line and selected by the customer */
+  allowed_prep_options: PrepOption[];
+  prep_options: PrepOption[];
   is_scored: boolean;
-  /** Capabilities from bps_items — enable/disable checkboxes in the grid */
-  can_slice: boolean;
-  can_wrap: boolean;
-  can_cover: boolean;
   can_score: boolean;
   quantity: number;
   unit_price: number;
@@ -234,9 +229,7 @@ export interface OrderSavePayloadLine {
   quantity: number;
   unit_price: number;
   unit_discount: number;
-  is_sliced: boolean;
-  is_wrapped: boolean;
-  is_covered: boolean;
+  prep_options: PrepOption[];
   is_scored: boolean;
 }
 

@@ -19,9 +19,7 @@ CREATE TABLE IF NOT EXISTS om_order_lines (
     item_id             BIGINT      REFERENCES fnd_items(item_id),
     item_description    TEXT,       -- display text; legacy: ordr_detail.item_desc
 
-    is_sliced boolean default false,
-    is_covered boolean default false,
-    is_wrapped boolean default false,
+    prep_options JSONB NOT NULL DEFAULT '[]'::JSONB,
 
     quantity            NUMERIC(14,4) NOT NULL,
     unit_price          NUMERIC(14,4),
@@ -35,6 +33,14 @@ CREATE TABLE IF NOT EXISTS om_order_lines (
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_by          BIGINT
 );
+
+ALTER TABLE om_order_lines
+    ADD COLUMN IF NOT EXISTS prep_options JSONB NOT NULL DEFAULT '[]'::JSONB;
+
+ALTER TABLE om_order_lines
+    DROP COLUMN IF EXISTS is_sliced,
+    DROP COLUMN IF EXISTS is_covered,
+    DROP COLUMN IF EXISTS is_wrapped;
 
 CREATE INDEX IF NOT EXISTS idx_om_order_lines_tenant
     ON om_order_lines (tenant_id);

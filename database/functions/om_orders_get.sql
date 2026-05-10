@@ -125,21 +125,37 @@ BEGIN
                             'unit_price',      COALESCE(l.unit_price, 0),
                             'unit_discount',   l.unit_discount,
                             'extended_amount', COALESCE(l.extended_amount, 0),
-                            'is_sliced',       COALESCE(l.is_sliced,  FALSE),
-                            'is_wrapped',      COALESCE(l.is_wrapped, FALSE),
-                            'is_covered',      COALESCE(l.is_covered, FALSE),
+                            'allowed_prep_options', COALESCE(prep_allowed.allowed_prep_options, '[]'::JSONB),
+                            'prep_options',    COALESCE(l.prep_options, '[]'::JSONB),
                             'is_scored',       FALSE,
-                            -- Capabilities from bps_items for UI checkbox enabling
-                            'can_slice',       COALESCE(b.is_sliceable, FALSE),
-                            'can_wrap',        COALESCE(b.is_wrappable,  FALSE),
-                            'can_cover',       COALESCE(b.is_coverable,  FALSE),
                             'can_score',       FALSE
                         )
                         ORDER BY l.order_line_id
                     ) AS lines
                       FROM om_order_lines l
                       LEFT JOIN fnd_items  i ON i.item_id = l.item_id
-                      LEFT JOIN bps_items  b ON b.item_id = l.item_id
+                      LEFT JOIN LATERAL (
+                            SELECT COALESCE(
+                                jsonb_agg(
+                                    jsonb_build_object(
+                                        'value', vv.value,
+                                        'label', vv.label
+                                    )
+                                    ORDER BY vv.display_order, vv.label
+                                ),
+                                '[]'::JSONB
+                            ) AS allowed_prep_options
+                              FROM jsonb_array_elements_text(COALESCE(i.allowed_prep_options, '[]'::JSONB)) opt(value)
+                              JOIN fnd_valuesets vs
+                                ON vs.tenant_id = i.tenant_id
+                               AND vs.valueset_code = 'ITEMPREP'
+                               AND vs.is_active = TRUE
+                              JOIN fnd_valueset_values vv
+                                ON vv.tenant_id = vs.tenant_id
+                               AND vv.valueset_id = vs.valueset_id
+                               AND vv.value = opt.value
+                               AND vv.is_disabled = FALSE
+                          ) prep_allowed ON TRUE
                      WHERE l.order_id  = o.order_id
                        AND l.tenant_id = o.tenant_id
                    ) lines_agg ON TRUE

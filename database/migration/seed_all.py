@@ -12,16 +12,17 @@ Order:
   3. seed_fnd_customer_pricebooks   — PRIMARY price book per customer (cus_price_cd)
   4. seed_fnd_items                 — truncate items + cascaded dependents (incl. pricebook_items)
   5. seed_bps_items
-  6. seed_fnd_item_bom
-  7. seed_fnd_pricebook_items       — item_price rows -> fnd_pricebook_items
-  8. seed_om_orders
-  9. seed_fnd_tenant_sequences     — Alpine order_number sequence from max(ordr_no)
-  10. seed_om_order_lines          — ordr_detail -> om_order_lines (after orders)
-  11. seed_om_order_shipments      — optional qty events from ordr_detail
-  12. seed_ar_transactions         — om_orders + legacy ordr -> ar_transactions (INVOICE)
-  13. seed_ar_transaction_lines    — INVOICE/DISCOUNT from shipments + legacy allowance
-  14. seed_ar_payments             — legacy public.ar (PMT) -> ar_payments
-  15. seed_ar_payment_applications — pmt_detail -> ar_payment_applications (payment + invoice links)
+  6. seed_item_prep_options         — ITEMPREP valueset + item JSONB prep defaults
+  7. seed_fnd_item_bom
+  8. seed_fnd_pricebook_items       — item_price rows -> fnd_pricebook_items
+  9. seed_om_orders
+  10. seed_fnd_tenant_sequences     — Alpine order_number sequence from max(ordr_no)
+  11. seed_om_order_lines           — ordr_detail -> om_order_lines (after orders)
+  12. seed_om_order_shipments       — optional qty events from ordr_detail
+  13. seed_ar_transactions          — om_orders + legacy ordr -> ar_transactions (INVOICE)
+  14. seed_ar_transaction_lines     — INVOICE/DISCOUNT from shipments + legacy allowance
+  15. seed_ar_payments              — legacy public.ar (PMT) -> ar_payments
+  16. seed_ar_payment_applications  — pmt_detail -> ar_payment_applications (payment + invoice links)
 
 Usage (from repo root):
   python dataMigration/seed_all.py
@@ -52,6 +53,7 @@ SEEDS: list[str] = [
     "seed_fnd_customer_pricebooks.sql",
     "seed_fnd_items.sql",
     "seed_bps_items.sql",
+    "seed_item_prep_options.sql",
     "seed_fnd_item_bom.sql",
     "seed_fnd_pricebook_items.sql",
     "seed_om_orders.sql",

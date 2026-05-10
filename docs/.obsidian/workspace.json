@@ -27,12 +27,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Architecture/order-entry-blueprint.md",
+                "file": "Architecture/project-blueprint.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "order-entry-blueprint"
+              "title": "project-blueprint"
             }
           }
         ],
@@ -197,7 +197,11 @@
   },
   "active": "1ce2a5f2be6e6213",
   "lastOpenFiles": [
+    "Architecture/Adding Item Options via JSONB.md",
+    "Architecture/Custom Fields Architecture.md",
     "Architecture/project-blueprint.md",
+    "3FDC4F00",
+    "3D9A4F00",
     "Architecture/order-entry-blueprint.md",
     "ideas/Ideas for future products.md",
     "Architecture",
@@ -211,9 +215,7 @@
     "D0225400",
     "Application Design/order_entry_ui_pattern_v2.md",
     "Application Design",
-    "Prompts",
     "Cursor/cursor.md",
-    "Cursor",
     "table Relationships/Invoice No to order numbers.md",
     "table Relationships/Customer to Item Price.md",
     "Cursor/cursorOrderEntryUiPattern.md",

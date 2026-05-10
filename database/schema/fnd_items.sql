@@ -58,6 +58,9 @@ CREATE TABLE IF NOT EXISTS fnd_items (
     is_covered boolean default false,
     is_wrapped boolean default false,
 
+    allowed_prep_options JSONB NOT NULL DEFAULT '[]'::JSONB,
+    default_prep_options JSONB NOT NULL DEFAULT '[]'::JSONB,
+
     -- Audit (BIGINT user ids — not Supabase auth.uid())
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     created_by          BIGINT,
@@ -67,6 +70,12 @@ CREATE TABLE IF NOT EXISTS fnd_items (
     UNIQUE (tenant_id, item_number),
     UNIQUE (tenant_id, legacy_id)
 );
+
+ALTER TABLE fnd_items
+    ADD COLUMN IF NOT EXISTS allowed_prep_options JSONB NOT NULL DEFAULT '[]'::JSONB;
+
+ALTER TABLE fnd_items
+    ADD COLUMN IF NOT EXISTS default_prep_options JSONB NOT NULL DEFAULT '[]'::JSONB;
 
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_fnd_items_tenant_id

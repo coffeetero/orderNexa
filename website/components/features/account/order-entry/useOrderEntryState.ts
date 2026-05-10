@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import type { OrderEntryDraft, OrderEntryItem, OrderEntryLine } from '@/lib/types';
+import type { OrderEntryDraft, OrderEntryItem, OrderEntryLine, PrepOption } from '@/lib/types';
 
 function calcExtended(qty: number, price: number, discount: number): number {
   return qty * (price - discount);
@@ -16,6 +16,16 @@ function resolveItemUnitPrice(item: OrderEntryItem): number {
 
 function calcTotal(lines: OrderEntryLine[]): number {
   return lines.reduce((sum, l) => sum + l.extended_amount, 0);
+}
+
+function normalizePrepOptions(options: PrepOption[] | null | undefined): PrepOption[] {
+  if (!Array.isArray(options)) return [];
+  return options
+    .filter((option) => option && typeof option.value === 'string' && option.value.trim())
+    .map((option) => ({
+      value: option.value.trim(),
+      label: option.label?.trim() || option.value.trim(),
+    }));
 }
 
 function today(): string {
@@ -113,18 +123,15 @@ export function useOrderEntryState(initial?: OrderEntryDraft) {
         affectedTempId = tempId;
         const unitPrice = resolveItemUnitPrice(item);
         const extended = calcExtended(quantity, unitPrice, 0);
+        const allowedPrepOptions = normalizePrepOptions(item.allowed_prep_options);
         const newLine: OrderEntryLine = {
           tempId,
           item_id: item.item_id,
           item_number: item.item_number,
           item_description: item.item_name,
-          is_sliced: item.default_sliced,
-          is_wrapped: item.default_wrapped,
-          is_covered: item.default_covered,
+          allowed_prep_options: allowedPrepOptions,
+          prep_options: normalizePrepOptions(item.default_prep_options),
           is_scored: item.default_scored,
-          can_slice: item.is_sliceable,
-          can_wrap: item.is_wrappable,
-          can_cover: item.is_coverable,
           can_score: item.is_scoreable,
           quantity,
           unit_price: unitPrice,
