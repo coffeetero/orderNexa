@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { EntityComboBox } from '@/components/bps/EntityComboBox';
 import { cn } from '@/lib/utils';
 
 type PrepCode = 'SLICED' | 'WRAPPED' | 'COVERED';
@@ -258,7 +259,12 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
     setDraft((prev) => (prev ? { ...prev, [field]: value } : prev));
   };
 
-  const selectItem = (itemId: string) => {
+  const selectItem = (itemId: string | number | null) => {
+    if (itemId === '' || itemId === null) {
+      setSelectedItemId(null);
+      setDraft(null);
+      return;
+    }
     const numericId = Number(itemId);
     const item = items.find((candidate) => candidate.item_id === numericId) ?? null;
     setSelectedItemId(item?.item_id ?? null);
@@ -323,18 +329,25 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
             <div className="min-w-0 flex-1">
               <div className="text-xs font-semibold text-foreground">Items</div>
               <div className="flex items-center gap-1">
-                <Select value={selectedItemId == null ? undefined : String(selectedItemId)} onValueChange={selectItem}>
-                  <SelectTrigger className="h-7 min-w-0 flex-1 rounded-none bg-background px-2 py-1 text-xs">
-                    <SelectValue placeholder={isLoading ? 'Loading items...' : 'Select item'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {items.map((item) => (
-                      <SelectItem key={item.item_id} value={String(item.item_id)}>
-                        {item.item_number} - {item.item_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <EntityComboBox<ItemProfile>
+                  items={items}
+                  value={selectedItemId}
+                  onChange={(item) => selectItem(item?.item_id ?? null)}
+                  getId={(item) => item.item_id ?? 0}
+                  getLabel={(item) => `${item.item_number} - ${item.item_name}`}
+                  getSearchText={(item) => `${item.item_number} ${item.item_name} ${item.category ?? ''}`}
+                  getParentId={() => null}
+                  getSortKey={(item) => item.item_number}
+                  placeholder={isLoading ? 'Loading items...' : 'Search items…'}
+                  disabled={isLoading}
+                  loading={isLoading}
+                  emptyText="No items found."
+                  clearable
+                  alwaysOpen
+                  collapseOnSelect
+                  className="flex-1"
+                  triggerClassName="h-7 rounded-none bg-background px-2 py-1 text-xs"
+                />
               </div>
             </div>
             <label className="flex shrink-0 items-center gap-2 text-xs">
