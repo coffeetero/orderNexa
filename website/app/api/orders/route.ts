@@ -86,7 +86,7 @@ export async function GET(request: Request) {
 
   if (p_order_id !== null) {
     const p_return_headers_only = parseHeadersOnly(url.searchParams.get('headers_only'));
-    const { data, error } = await supabase.rpc('om_orders_get', {
+    const { data, error } = await supabase.rpc('om_orders_get_v2', {
       p_tenant_id,
       p_order_id,
       p_customer_id: null,
@@ -127,7 +127,7 @@ export async function GET(request: Request) {
   const p_production_code =
     productionCodeRaw !== null && productionCodeRaw !== '' ? productionCodeRaw.trim() : null;
 
-  const { data, error } = await supabase.rpc('om_orders_get', {
+  const { data, error } = await supabase.rpc('om_orders_get_v2', {
     p_tenant_id,
     p_order_id: null,
     p_customer_id,

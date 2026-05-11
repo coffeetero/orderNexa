@@ -38,7 +38,7 @@ export async function GET(request: Request) {
   }
 
   const supabase = createClient();
-  const { data, error } = await supabase.rpc('om_items_get', {
+  const { data, error } = await supabase.rpc('om_items_get_v2', {
     p_tenant_id,
     p_customer_id,
   });

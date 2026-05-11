@@ -68,39 +68,10 @@ export async function GET(request: Request) {
   }
 
   const supabase = createClient();
-  let itemQuery = supabase
-    .from('fnd_items')
-    .select(`
-      tenant_id,
-      item_id,
-      legacy_id,
-      item_number,
-      item_name,
-      item_description,
-      category,
-      unit_of_sale,
-      item_weight,
-      weight_uom,
-      box_qty_per_box,
-      box_capacity_weight,
-      box_capacity_optimal,
-      box_capacity_volume,
-      preorder_days,
-      sales_terms_apply,
-      is_active,
-      allowed_prep_options,
-      default_prep_options
-    `)
-    .eq('tenant_id', tenantId)
-    .order('item_number', { ascending: true });
-
-  if (inactiveOnly) {
-    itemQuery = itemQuery.eq('is_active', false);
-  }
 
   const [{ data: items, error: itemError }, { data: bpsRows, error: bpsError }, { data: valuesetRows, error: valuesetError }] =
     await Promise.all([
-      itemQuery,
+      supabase.rpc('om_items_get', { p_tenant_id: tenantId, p_customer_id: null }),
       supabase.from('bps_items').select('*').eq('tenant_id', tenantId),
       supabase
         .from('fnd_valuesets')
@@ -110,9 +81,14 @@ export async function GET(request: Request) {
         .maybeSingle(),
     ]);
 
-  if (itemError) return NextResponse.json({ error: itemError.message }, { status: 400 });
-  if (bpsError) return NextResponse.json({ error: bpsError.message }, { status: 400 });
-  if (valuesetError) return NextResponse.json({ error: valuesetError.message }, { status: 400 });
+  if (itemError) return NextResponse.json({ error: `itemError: ${itemError.message}` }, { status: 400 });
+  if (bpsError) return NextResponse.json({ error: `bpsError: ${bpsError.message}` }, { status: 400 });
+  if (valuesetError) return NextResponse.json({ error: `valuesetError: ${valuesetError.message}` }, { status: 400 });
+
+  let filteredItems = items ?? [];
+  if (inactiveOnly && Array.isArray(filteredItems)) {
+    filteredItems = filteredItems.filter((item) => !item.is_active);
+  }
 
   const bpsByItem = new Map((bpsRows ?? []).map((row) => [row.item_id, row]));
   const rawPrepValues = valuesetRows?.fnd_valueset_values;
@@ -122,7 +98,7 @@ export async function GET(request: Request) {
         .sort((a, b) => Number(a.display_order ?? 0) - Number(b.display_order ?? 0))
     : [];
 
-  const data = (items ?? []).map((item) => {
+  const data = filteredItems.map((item) => {
     const bps = bpsByItem.get(item.item_id) ?? {};
     const allowedCodes = Array.isArray(item.allowed_prep_options) ? item.allowed_prep_options : [];
     const defaultCodes = Array.isArray(item.default_prep_options) ? item.default_prep_options : [];
