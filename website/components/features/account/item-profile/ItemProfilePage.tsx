@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { EntityComboBox } from '@/components/bps/EntityComboBox';
+import { ItemPricebooksTab } from './ItemPricebooksTab';
 import type { PrepOption } from '@/lib/types';
 
 interface ItemProfile {
@@ -558,9 +559,7 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
 
               {/* ── Pricebooks Tab ──────────────────────────────────── */}
               <TabsContent value="pricebooks">
-                <p className="text-sm text-muted-foreground">
-                  Pricebook assignments for {selectedLabel}.
-                </p>
+                <ItemPricebooksTab tenantId={tenantId} itemId={selectedItemId} />
               </TabsContent>
 
               {/* ── Notes Tab ───────────────────────────────────────── */}
