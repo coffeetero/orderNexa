@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "defaultMode": "dontAsk",
+    "allow": [
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
+      "Bash",
+      "PowerShell",
+      "NotebookEdit",
+      "Agent",
+      "mcp__ccd_directory__request_directory",
+      "Skill"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(rm -f *)",
+      "PowerShell(Remove-Item -Recurse -Force)",
+      "PowerShell(Remove-Item -Force)"
+    ]
+  }
+}

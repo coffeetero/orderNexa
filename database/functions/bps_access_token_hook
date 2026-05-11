@@ -70,8 +70,12 @@ begin
   claims := jsonb_set(claims, '{app_metadata,app_user_id}', to_jsonb(v_app_user_id), true);
   claims := jsonb_set(claims, '{app_metadata,allowed_tenant_ids}', to_jsonb(v_allowed_tenant_ids), true);
   claims := jsonb_set(claims, '{app_metadata,restricted_tenant_ids}', to_jsonb(v_restricted_tenant_ids), true);
-
   claims := jsonb_set(claims, '{app_metadata,allowed_customer_ids}', to_jsonb(v_allowed_customer_ids), true);
+
+  -- Set primary tenant_id for backward compatibility (first allowed tenant)
+  if array_length(v_allowed_tenant_ids, 1) > 0 then
+    claims := jsonb_set(claims, '{app_metadata,tenant_id}', to_jsonb(v_allowed_tenant_ids[1]), true);
+  end if;
 
   return jsonb_set(event, '{claims}', claims, true);
 end;

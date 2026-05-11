@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "orderNexa",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--", "--cwd", "website"],
+      "port": 3000
+    }
+  ]
+}
