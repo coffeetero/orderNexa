@@ -71,7 +71,7 @@ UPDATE om_orders o
    AND parent.customer_id = location.customer_parent_id
  WHERE location.tenant_id = o.tenant_id
    AND location.customer_id = o.customer_id
-   AND UPPER(TRIM(location.customer_type)) = 'LOCATION'
+   AND UPPER(TRIM(location.customer_type)) IN ('DEPARTMENT', 'LOCATION')
    AND location.customer_parent_id IS NOT NULL;
 
 UPDATE om_orders

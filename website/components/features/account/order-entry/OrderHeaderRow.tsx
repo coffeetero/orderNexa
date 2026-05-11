@@ -84,8 +84,9 @@ function localTomorrow(): string {
   return `${year}-${month}-${day}`;
 }
 
-function isLocationCustomer(customer: CustomerOption): boolean {
-  return customer.customer_type?.trim().toUpperCase() === 'LOCATION';
+function isDepartmentCustomer(customer: CustomerOption): boolean {
+  const customerType = customer.customer_type?.trim().toUpperCase();
+  return customerType === 'DEPARTMENT' || customerType === 'LOCATION';
 }
 
 export function OrderHeaderRow({
@@ -127,7 +128,7 @@ export function OrderHeaderRow({
       : customer.customer_name;
 
   const getCustomerInputLabel = (customer: CustomerOption) => {
-    if (isLocationCustomer(customer)) {
+    if (isDepartmentCustomer(customer)) {
       const parent = customer.customer_parent_id
         ? customerById.get(customer.customer_parent_id)
         : undefined;
@@ -167,7 +168,7 @@ export function OrderHeaderRow({
             getId={(c) => c.customer_id}
             getLabel={getCustomerLabel}
             getItemLabelClassName={(c) =>
-              isLocationCustomer(c) ? 'text-emerald-700 dark:text-emerald-300' : undefined
+              isDepartmentCustomer(c) ? 'text-emerald-700 dark:text-emerald-300' : undefined
             }
             getInputLabel={getCustomerInputLabel}
             getSearchText={(c) =>

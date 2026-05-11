@@ -22,6 +22,7 @@ DECLARE
   v_is_authorized boolean;
   v_action text;
   v_customer_id bigint;
+  v_customer_type text;
 BEGIN
   -- Same pattern as fnd_tenants_get: read JWT from GUC so we never call auth.* (no USAGE on schema auth).
   v_jwt_raw := current_setting('request.jwt.claims', true);
@@ -60,6 +61,10 @@ BEGIN
   END IF;
 
   v_action := lower(coalesce(trim(p_action), ''));
+  v_customer_type := NULLIF(UPPER(TRIM(p_payload ->> 'customer_type')), '');
+  IF v_customer_type = 'LOCATION' THEN
+    v_customer_type := 'DEPARTMENT';
+  END IF;
 
   IF v_action = 'create' THEN
     INSERT INTO fnd_customers (
@@ -86,7 +91,7 @@ BEGIN
       CASE WHEN p_payload ? 'customer_parent_id' AND p_payload ->> 'customer_parent_id' <> '' THEN (p_payload ->> 'customer_parent_id')::bigint ELSE NULL END,
       coalesce(nullif(p_payload ->> 'customer_name', ''), 'New Customer'),
       nullif(p_payload ->> 'customer_number', ''),
-      coalesce(nullif(p_payload ->> 'customer_type', ''), 'ACCOUNT'),
+      coalesce(v_customer_type, 'ACCOUNT'),
       CASE WHEN p_payload ? 'legacy_id' AND p_payload ->> 'legacy_id' <> '' THEN (p_payload ->> 'legacy_id')::int ELSE NULL END,
       greatest(coalesce((p_payload ->> 'invoice_copy_count')::int, 1), 1),
       coalesce((p_payload ->> 'is_standing_order')::boolean, false),
@@ -149,7 +154,7 @@ BEGIN
       customer_parent_id = CASE WHEN p_payload ? 'customer_parent_id' THEN CASE WHEN p_payload ->> 'customer_parent_id' = '' THEN NULL ELSE (p_payload ->> 'customer_parent_id')::bigint END ELSE cus.customer_parent_id END,
       customer_name = CASE WHEN p_payload ? 'customer_name' THEN coalesce(nullif(p_payload ->> 'customer_name', ''), cus.customer_name) ELSE cus.customer_name END,
       customer_number = CASE WHEN p_payload ? 'customer_number' THEN nullif(p_payload ->> 'customer_number', '') ELSE cus.customer_number END,
-      customer_type = CASE WHEN p_payload ? 'customer_type' THEN coalesce(nullif(p_payload ->> 'customer_type', ''), cus.customer_type) ELSE cus.customer_type END,
+      customer_type = CASE WHEN p_payload ? 'customer_type' THEN coalesce(v_customer_type, cus.customer_type) ELSE cus.customer_type END,
       legacy_id = CASE WHEN p_payload ? 'legacy_id' THEN CASE WHEN p_payload ->> 'legacy_id' = '' THEN NULL ELSE (p_payload ->> 'legacy_id')::int END ELSE cus.legacy_id END,
       invoice_copy_count = CASE WHEN p_payload ? 'invoice_copy_count' THEN greatest(coalesce((p_payload ->> 'invoice_copy_count')::int, cus.invoice_copy_count), 1) ELSE cus.invoice_copy_count END,
       is_standing_order = CASE WHEN p_payload ? 'is_standing_order' THEN (p_payload ->> 'is_standing_order')::boolean ELSE cus.is_standing_order END,

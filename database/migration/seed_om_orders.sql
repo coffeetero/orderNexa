@@ -43,26 +43,26 @@ BEGIN
 
     TRUNCATE TABLE om_orders CASCADE;
 
-    -- Location orders are stored under their immediate parent customer.
-    -- Department/Event stays as the location name unless the final slot key
+    -- Department orders are stored under their immediate parent customer.
+    -- Department/Event stays as the department name unless the final slot key
     -- would duplicate another order, in which case it is suffixed with the order number.
     WITH order_source AS (
         SELECT
             trim(o.ordr_no::BIGINT::TEXT) AS order_number,
             CASE
-                WHEN UPPER(TRIM(cus.customer_type)) = 'LOCATION'
+                WHEN UPPER(TRIM(cus.customer_type)) IN ('DEPARTMENT', 'LOCATION')
                  AND cus.customer_parent_id IS NOT NULL
                 THEN parent.customer_id
                 ELSE cus.customer_id
             END AS customer_id,
             CASE
-                WHEN UPPER(TRIM(cus.customer_type)) = 'LOCATION'
+                WHEN UPPER(TRIM(cus.customer_type)) IN ('DEPARTMENT', 'LOCATION')
                  AND cus.customer_parent_id IS NOT NULL
                 THEN parent.customer_name
                 ELSE cus.customer_name
             END AS customer_name,
             CASE
-                WHEN UPPER(TRIM(cus.customer_type)) = 'LOCATION'
+                WHEN UPPER(TRIM(cus.customer_type)) IN ('DEPARTMENT', 'LOCATION')
                 THEN COALESCE(NULLIF(UPPER(TRIM(cus.customer_name)), ''), '')
                 ELSE ''
             END AS base_department_event,

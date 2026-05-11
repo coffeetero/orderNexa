@@ -177,13 +177,13 @@ BEGIN
 
     IF p_customer_id IS NOT NULL THEN
         SELECT CASE
-                   WHEN UPPER(TRIM(customer_type)) = 'LOCATION'
+                   WHEN UPPER(TRIM(customer_type)) IN ('DEPARTMENT', 'LOCATION')
                     AND customer_parent_id IS NOT NULL
                    THEN customer_parent_id
                    ELSE customer_id
                END,
                CASE
-                   WHEN UPPER(TRIM(customer_type)) = 'LOCATION'
+                   WHEN UPPER(TRIM(customer_type)) IN ('DEPARTMENT', 'LOCATION')
                    THEN UPPER(TRIM(customer_name))
                    ELSE 'ORDER'
                END

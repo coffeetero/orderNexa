@@ -121,13 +121,13 @@ BEGIN
     IF v_payload_customer_id IS NOT NULL THEN
         SELECT
             CASE
-                WHEN UPPER(TRIM(selected.customer_type)) = 'LOCATION'
+                WHEN UPPER(TRIM(selected.customer_type)) IN ('DEPARTMENT', 'LOCATION')
                  AND selected.customer_parent_id IS NOT NULL
                 THEN parent.customer_id
                 ELSE selected.customer_id
             END,
             CASE
-                WHEN UPPER(TRIM(selected.customer_type)) = 'LOCATION'
+                WHEN UPPER(TRIM(selected.customer_type)) IN ('DEPARTMENT', 'LOCATION')
                  AND selected.customer_parent_id IS NOT NULL
                 THEN parent.customer_name
                 ELSE selected.customer_name

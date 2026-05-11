@@ -3,7 +3,7 @@
 --
 -- Run after seed_fnd_pricebooks.sql and seed_fnd_customers.sql.
 -- Inserts PRIMARY assignment when legacy cus_price_cd maps to a price book name;
--- skips LOCATION rows and blank price codes (same rules as former fnd_customers.pricebook_id).
+-- skips DEPARTMENT rows and blank price codes (same rules as former fnd_customers.pricebook_id).
 --
 -- effective_start_date / effective_end_date: open-ended from a fixed start for seed data.
 -- ============================================================

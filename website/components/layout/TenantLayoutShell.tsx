@@ -13,6 +13,7 @@ const breadcrumbMap: Record<string, string> = {
   '/orders/new': 'Enter Orders',
   '/manage-orders': 'Manage Orders',
   '/customers': 'Customers',
+  '/inventory/item-profile': 'Item Profile',
   // Legacy paths (e.g. main host without subdomain)
   '/tenant': 'Dashboard',
   '/tenant/dashboard': 'Dashboard',
@@ -20,6 +21,7 @@ const breadcrumbMap: Record<string, string> = {
   '/tenant/orders/new': 'Enter Orders',
   '/tenant/manage-orders': 'Manage Orders',
   '/tenant/customers': 'Customers',
+  '/tenant/inventory/item-profile': 'Item Profile',
 };
 
 /** Resolves breadcrumb label for dynamic routes not in the static map. */

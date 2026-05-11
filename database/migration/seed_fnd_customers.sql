@@ -5,7 +5,7 @@
 --   Requires tenant "Alpine Bakery" in fnd_tenants (tenant_id resolved at runtime).
 --   fnd_pricebooks rows are needed before seed_fnd_customer_pricebooks.sql (match by pricebook_name).
 --   Primary price book assignments: see seed_fnd_customer_pricebooks.sql (cus_price_cd → PRIMARY;
---   NULL for LOCATION customer_type or blank code).
+--   NULL for DEPARTMENT customer_type or blank code).
 --   Adjust the tenant_name filter if you use a different tenant.
 --
 -- TRUNCATE fnd_customers CASCADE removes every customer row (all tenants) and
@@ -42,7 +42,7 @@ BEGIN
     -- text formatting (e.g. '123' vs '0123').
     --
     -- customer_type derivation from legacy data:
-    --   LOCATION : cus_invc_rqrd = 'N'  — delivery point, not invoiced directly
+    --   DEPARTMENT : cus_invc_rqrd = 'N'  — department/event grouping, not invoiced directly
     --   ACCOUNT  : cus_invc_rqrd = 'Y'  + self-referencing (cus_id = cus_parent_id)
     --   SITE     : cus_invc_rqrd = 'Y'  + has a real parent
     -- --------------------------------------------------------
@@ -76,7 +76,7 @@ BEGIN
         NULLIF(TRIM(c.cus_key), ''),
 
         CASE
-            WHEN c.cus_invc_rqrd = 'N' OR c.cus_invc_rqrd IS NULL THEN 'LOCATION'
+            WHEN c.cus_invc_rqrd = 'N' OR c.cus_invc_rqrd IS NULL THEN 'DEPARTMENT'
             WHEN (NULLIF(TRIM(BOTH FROM COALESCE(c.cus_id::text, '')), ''))::integer
                  IS NOT DISTINCT FROM (NULLIF(TRIM(BOTH FROM COALESCE(c.cus_parent_id::text, '')), ''))::integer
                  AND NULLIF(TRIM(BOTH FROM COALESCE(c.cus_parent_id::text, '')), '') IS NOT NULL
@@ -181,9 +181,9 @@ BEGIN
         SELECT COUNT(*) FROM fnd_customers
         WHERE tenant_id = v_tenant_id AND customer_type = 'SITE'
     );
-    RAISE NOTICE '    LOCATION : %', (
+    RAISE NOTICE '    DEPARTMENT : %', (
         SELECT COUNT(*) FROM fnd_customers
-        WHERE tenant_id = v_tenant_id AND customer_type = 'LOCATION'
+        WHERE tenant_id = v_tenant_id AND customer_type = 'DEPARTMENT'
     );
     RAISE NOTICE '    TOTAL    : %', (
         SELECT COUNT(*) FROM fnd_customers

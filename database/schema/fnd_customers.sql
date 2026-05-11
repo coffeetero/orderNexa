@@ -90,8 +90,12 @@ END $$;
 DROP TYPE IF EXISTS customer_type_enum CASCADE;
 DROP TYPE IF EXISTS org_type_enum CASCADE;
 
+UPDATE fnd_customers
+   SET customer_type = 'DEPARTMENT'
+ WHERE UPPER(TRIM(customer_type)) = 'LOCATION';
+
 COMMENT ON COLUMN fnd_customers.customer_type IS
-    'Hierarchy role (text): ACCOUNT — bill-to / top-level; SITE — invoiced under an account; LOCATION — delivery point, not invoiced directly.';
+    'Hierarchy role (text): ACCOUNT — bill-to / top-level; SITE — invoiced under an account; DEPARTMENT — department/event grouping, not invoiced directly.';
 
 CREATE INDEX IF NOT EXISTS idx_fnd_customers_tenant_id
     ON fnd_customers (tenant_id);

@@ -98,7 +98,7 @@ function daysAfterToday(dateValue: string): number | null {
 
 function isDepartmentEventCustomer(customer: CustomerOption): boolean {
   const type = customer.customer_type?.trim().toUpperCase();
-  return type === 'LOCATION';
+  return type === 'DEPARTMENT' || type === 'LOCATION';
 }
 
 function normalizeDepartmentEventText(value: string): string {
@@ -311,7 +311,7 @@ export function OrderEntryForm({
       const optionValues: string[] = [];
       if (isDepartmentEventCustomer(selectedCustomer)) {
         const rootCustomerId = selectedCustomer.customer_parent_id ?? selectedCustomer.customer_id;
-        const locationCustomers = customers
+        const departmentCustomers = customers
           .filter((customer) => (
             isDepartmentEventCustomer(customer)
             && (
@@ -320,16 +320,16 @@ export function OrderEntryForm({
             )
           ))
           .sort((a, b) => a.sort_path.localeCompare(b.sort_path));
-        optionValues.push(...locationCustomers.map((customer) => customer.customer_name));
+        optionValues.push(...departmentCustomers.map((customer) => customer.customer_name));
       } else {
         optionValues.push('ORDER');
-        const locationChildren = customers
+        const departmentChildren = customers
           .filter((customer) => (
             isDepartmentEventCustomer(customer)
             && hasAncestor(customer, selectedCustomer.customer_id)
           ))
           .sort((a, b) => a.sort_path.localeCompare(b.sort_path));
-        optionValues.push(...locationChildren.map((customer) => customer.customer_name));
+        optionValues.push(...departmentChildren.map((customer) => customer.customer_name));
       }
 
       const options: DepartmentEventOption[] = [];

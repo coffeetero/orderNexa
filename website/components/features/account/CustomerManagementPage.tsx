@@ -76,10 +76,15 @@ type CustomerManagementPageProps = {
   isDebugActive?: boolean;
 };
 
-const CUSTOMER_TYPES = ['ACCOUNT', 'SITE', 'LOCATION'] as const;
+const CUSTOMER_TYPES = ['ACCOUNT', 'SITE', 'DEPARTMENT'] as const;
 
-function isLocationCustomer(customer: Pick<CustomerRow, 'customer_type'>): boolean {
-  return customer.customer_type?.trim().toUpperCase() === 'LOCATION';
+function normalizeCustomerType(value: string | null | undefined): string {
+  const customerType = value?.trim().toUpperCase() || 'ACCOUNT';
+  return customerType === 'LOCATION' ? 'DEPARTMENT' : customerType;
+}
+
+function isDepartmentCustomer(customer: Pick<CustomerRow, 'customer_type'>): boolean {
+  return normalizeCustomerType(customer.customer_type) === 'DEPARTMENT';
 }
 
 /** Focus first text/select control in the visible tab panel (for post–customer-select navigation). */
@@ -142,7 +147,7 @@ function toFormState(customer: CustomerRow): CustomerFormState {
     customer_parent_id: customer.customer_parent_id,
     customer_name: customer.customer_name,
     customer_number: customer.customer_number ?? '',
-    customer_type: customer.customer_type,
+    customer_type: normalizeCustomerType(customer.customer_type),
     legacy_id: customer.legacy_id === null ? '' : String(customer.legacy_id),
     invoice_copy_count: String(customer.invoice_copy_count),
     is_standing_order: customer.is_standing_order,
@@ -175,7 +180,7 @@ function mergeFullCustomerJson(hier: CustomerRow, full: unknown): CustomerRow {
       o.customer_number === null || o.customer_number === undefined
         ? null
         : String(o.customer_number),
-    customer_type: String(o.customer_type ?? hier.customer_type),
+    customer_type: normalizeCustomerType(String(o.customer_type ?? hier.customer_type)),
     legacy_id: toNumber(o.legacy_id),
     level: hier.level,
     sort_path: hier.sort_path,
@@ -207,7 +212,7 @@ function normalizeCustomerRows(rows: unknown[]): CustomerRow[] {
         customer_parent_id: toNumber(candidate.customer_parent_id),
         customer_name: candidate.customer_name ?? '',
         customer_number: candidate.customer_number ?? null,
-        customer_type: candidate.customer_type ?? 'ACCOUNT',
+        customer_type: normalizeCustomerType(candidate.customer_type),
         legacy_id: toNumber(candidate.legacy_id),
         level: toNumber(candidate.level) ?? 0,
         sort_path: candidate.sort_path ?? '',
@@ -529,7 +534,7 @@ export function CustomerManagementPage({
                 getId={(c) => c.customer_id}
                 getLabel={(c) => `${c.customer_number ?? ''} - ${c.customer_name}`}
                 getItemLabelClassName={(c) =>
-                  isLocationCustomer(c) ? 'text-emerald-700 dark:text-emerald-300' : undefined
+                  isDepartmentCustomer(c) ? 'text-emerald-700 dark:text-emerald-300' : undefined
                 }
                 getSearchText={(c) =>
                   `${c.customer_number ?? ''} ${c.customer_name}`.trim()

@@ -3,8 +3,8 @@
 --
 -- - production_code is stored as UPPER(TRIM(value)).
 -- - department_event is stored uppercase and non-null.
--- - orders saved against LOCATION customers are moved to the
---   immediate parent customer, with the LOCATION name preserved in
+-- - orders saved against DEPARTMENT customers are moved to the
+--   immediate parent customer, with the DEPARTMENT name preserved in
 --   department_event and suffixed with legacy order_number.
 -- - Adds lookup indexes for existing-orders retrieval.
 -- - Adds unique slot index for one order per customer/date/code/Department-Event.
@@ -24,7 +24,7 @@ UPDATE om_orders o
    AND parent.customer_id = location.customer_parent_id
  WHERE location.tenant_id = o.tenant_id
    AND location.customer_id = o.customer_id
-   AND UPPER(TRIM(location.customer_type)) = 'LOCATION'
+   AND UPPER(TRIM(location.customer_type)) IN ('DEPARTMENT', 'LOCATION')
    AND location.customer_parent_id IS NOT NULL;
 
 UPDATE om_orders
