@@ -1,23 +1,19 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Save, Plus } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Plus, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { EntityComboBox } from '@/components/bps/EntityComboBox';
 import { cn } from '@/lib/utils';
-
-type PrepCode = 'SLICED' | 'WRAPPED' | 'COVERED';
-
-interface PrepValue {
-  value: PrepCode;
-  label: string;
-  display_order?: number;
-}
+import { EntityComboBox } from '@/components/bps/EntityComboBox';
+import type { PrepOption } from '@/lib/types';
 
 interface ItemProfile {
   tenant_id: number;
@@ -34,8 +30,8 @@ interface ItemProfile {
   box_capacity_optimal: number | null;
   sales_terms_apply: boolean;
   is_active: boolean;
-  allowed_prep_options: PrepCode[];
-  default_prep_options: PrepCode[];
+  allowed_prep_options: string[];
+  default_prep_options: string[];
   dough_type: string | null;
   shape: string | null;
   packing: string | null;
@@ -46,12 +42,18 @@ interface ItemProfile {
   scale_qty: number;
 }
 
+interface SlimItem {
+  item_id: number;
+  item_number: string;
+  item_name: string;
+  is_active: boolean;
+}
+
 interface ItemProfilePageProps {
   tenantId?: number;
 }
 
-const EMPTY_ITEM: ItemProfile = {
-  tenant_id: 0,
+const EMPTY_ITEM: Omit<ItemProfile, 'tenant_id'> = {
   item_id: null,
   item_number: '',
   item_name: '',
@@ -77,13 +79,15 @@ const EMPTY_ITEM: ItemProfile = {
   scale_qty: 0,
 };
 
-function normalizePrepCodes(raw: unknown): PrepCode[] {
+function emptyDraft(tenantId: number): ItemProfile {
+  return { ...EMPTY_ITEM, tenant_id: tenantId };
+}
+
+function normalizePrepCodes(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
   return raw
-    .map((value) => String(value).trim().toUpperCase())
-    .filter((value): value is PrepCode => (
-      value === 'SLICED' || value === 'WRAPPED' || value === 'COVERED'
-    ));
+    .map((v) => String(v).trim().toUpperCase())
+    .filter((v) => v.length > 0);
 }
 
 function normalizeItem(raw: Record<string, unknown>, tenantId: number): ItemProfile {
@@ -116,112 +120,198 @@ function normalizeItem(raw: Record<string, unknown>, tenantId: number): ItemProf
   };
 }
 
-function uniqueValues(items: ItemProfile[], selector: (item: ItemProfile) => string | null) {
-  return Array.from(
-    new Set(items.map(selector).filter((value): value is string => Boolean(value?.trim()))),
-  ).sort((a, b) => a.localeCompare(b));
+
+const TAB_TRIGGER =
+  'relative z-0 -mb-px rounded-b-none rounded-t-lg border border-muted bg-muted/70 px-4 py-1.5 data-[state=active]:z-10 data-[state=active]:translate-y-[1px] data-[state=active]:border-border/60 data-[state=active]:border-b-transparent data-[state=active]:bg-card';
+
+function PrepOptionsDropdown({
+  idBase,
+  allowedOptions,
+  selectedOptions,
+  onChange,
+  disabled = false,
+}: {
+  idBase: string;
+  allowedOptions: PrepOption[];
+  selectedOptions: string[];
+  onChange: (next: string[]) => void;
+  disabled?: boolean;
+}) {
+  const selectedValues = new Set(selectedOptions);
+  const summary = selectedOptions.length > 0
+    ? allowedOptions
+        .filter((opt) => selectedValues.has(opt.value))
+        .map((opt) => opt.label)
+        .join(', ')
+    : 'None';
+
+  const toggleOption = (optionValue: string, checked: boolean) => {
+    if (checked) {
+      onChange([...selectedOptions, optionValue]);
+    } else {
+      onChange(selectedOptions.filter((v) => v !== optionValue));
+    }
+  };
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          disabled={disabled}
+          className={cn(
+            'flex w-full items-center justify-between gap-2 rounded border border-input bg-background px-3 py-2',
+            'text-left text-sm text-foreground shadow-sm transition-colors hover:bg-muted/40',
+            'focus:outline-none focus:ring-1 focus:ring-primary',
+            disabled && 'cursor-not-allowed opacity-50',
+          )}
+          title={summary}
+        >
+          <span className="min-w-0 truncate">{summary}</span>
+          <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-64 p-2">
+        <div className="space-y-1">
+          {allowedOptions.length === 0 ? (
+            <div className="px-2 py-1.5 text-sm text-muted-foreground">
+              No prep options available
+            </div>
+          ) : (
+            allowedOptions.map((option) => (
+              <div
+                key={option.value}
+                className="flex items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted/50"
+              >
+                <Checkbox
+                  id={`${idBase}-${option.value}`}
+                  checked={selectedValues.has(option.value)}
+                  onCheckedChange={(checked) => toggleOption(option.value, Boolean(checked))}
+                  className="h-4 w-4"
+                  aria-label={option.label}
+                />
+                <label htmlFor={`${idBase}-${option.value}`} className="min-w-0 truncate cursor-pointer">
+                  {option.label}
+                </label>
+              </div>
+            ))
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
-  const [items, setItems] = useState<ItemProfile[]>([]);
-  const [prepValues, setPrepValues] = useState<PrepValue[]>([]);
+  const [items, setItems] = useState<SlimItem[]>([]);
+  const [prepValues, setPrepValues] = useState<PrepOption[]>([]);
+  const [categories, setCategories] = useState<PrepOption[]>([]);
+  const [doughTypes, setDoughTypes] = useState<PrepOption[]>([]);
+  const [shapes, setShapes] = useState<PrepOption[]>([]);
+  const [packings, setPackings] = useState<PrepOption[]>([]);
+  const [units, setUnits] = useState<PrepOption[]>([]);
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
-  const [draft, setDraft] = useState<ItemProfile | null>(null);
+  const [draft, setDraft] = useState<ItemProfile>(() => emptyDraft(tenantId ?? 0));
   const [isLoading, setIsLoading] = useState(false);
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isCreatingNew, setIsCreatingNew] = useState(false);
+  const loadedRef = useRef(false);
+  const detailAbortRef = useRef<AbortController | null>(null);
 
+  // Fetches slim list + valueset lookups once on mount (and after save to refresh names).
   const loadItems = useCallback(async () => {
     if (!tenantId) return;
     setIsLoading(true);
     try {
       const response = await fetch(`/api/items/profile?tenant_id=${tenantId}&inactive_only=false`);
       const json = (await response.json()) as {
-        data?: Record<string, unknown>[];
-        prepValues?: PrepValue[];
+        data?: { item_id: number; item_number: string; item_name: string; is_active: boolean }[];
+        prepValues?: PrepOption[];
+        categories?: PrepOption[];
+        doughTypes?: PrepOption[];
+        shapes?: PrepOption[];
+        packings?: PrepOption[];
+        units?: PrepOption[];
         error?: string;
       };
       if (!response.ok || json.error) {
-        toast.error(json.error ?? 'Could not load item profiles.');
+        toast.error(json.error ?? 'Could not load items.', { duration: Infinity });
         return;
       }
-      const rows = Array.isArray(json.data)
-        ? json.data.map((item) => normalizeItem(item, tenantId))
-        : [];
-      setItems(rows);
+      setItems(Array.isArray(json.data) ? json.data : []);
       setPrepValues(Array.isArray(json.prepValues) ? json.prepValues : []);
-      const preferred = selectedItemId
-        ? rows.find((item) => item.item_id === selectedItemId)
-        : rows[0];
-      setSelectedItemId(preferred?.item_id ?? null);
-      setDraft(preferred ? { ...preferred } : null);
+      setCategories(Array.isArray(json.categories) ? json.categories : []);
+      setDoughTypes(Array.isArray(json.doughTypes) ? json.doughTypes : []);
+      setShapes(Array.isArray(json.shapes) ? json.shapes : []);
+      setPackings(Array.isArray(json.packings) ? json.packings : []);
+      setUnits(Array.isArray(json.units) ? json.units : []);
     } finally {
       setIsLoading(false);
     }
-  }, [selectedItemId, tenantId]);
+  }, [tenantId]);
+
+  // Fetches full detail for a single item. Cancels any in-flight request.
+  const loadItemDetail = useCallback(async (itemId: number) => {
+    if (!tenantId) return;
+    detailAbortRef.current?.abort();
+    const controller = new AbortController();
+    detailAbortRef.current = controller;
+    setIsDetailLoading(true);
+    try {
+      const response = await fetch(
+        `/api/items/profile?tenant_id=${tenantId}&item_id=${itemId}`,
+        { signal: controller.signal },
+      );
+      const json = (await response.json()) as { data?: Record<string, unknown> | null; error?: string };
+      if (!response.ok || json.error) {
+        toast.error(json.error ?? 'Could not load item detail.', { duration: Infinity });
+        return;
+      }
+      if (json.data && typeof json.data === 'object') {
+        setDraft(normalizeItem(json.data, tenantId));
+        setSelectedItemId(itemId);
+      }
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError') toast.error('Could not load item detail.', { duration: Infinity });
+    } finally {
+      if (!controller.signal.aborted) setIsDetailLoading(false);
+    }
+  }, [tenantId]);
 
   useEffect(() => {
+    if (loadedRef.current) return;
+    loadedRef.current = true;
     void loadItems();
   }, [loadItems]);
 
-  const filteredItems = useMemo(() => {
-    if (!searchQuery.trim()) return items;
-    const q = searchQuery.toLowerCase();
-    return items.filter((item) =>
-      item.item_number.toLowerCase().includes(q) ||
-      item.item_name.toLowerCase().includes(q)
-    );
-  }, [items, searchQuery]);
+  const isFormDisabled = !isCreatingNew && selectedItemId === null && draft.item_id === null;
 
-  const lists = useMemo(() => ({
-    doughTypes: uniqueValues(items, (item) => item.dough_type),
-    categories: uniqueValues(items, (item) => item.category),
-    shapes: uniqueValues(items, (item) => item.shape),
-    packings: uniqueValues(items, (item) => item.packing),
-    units: uniqueValues(items, (item) => item.unit_of_sale),
-  }), [items]);
+  const set = <K extends keyof ItemProfile>(field: K, value: ItemProfile[K]) =>
+    setDraft((prev) => ({ ...prev, [field]: value }));
 
-  const setDraftField = <K extends keyof ItemProfile>(field: K, value: ItemProfile[K]) => {
-    setDraft((prev) => (prev ? { ...prev, [field]: value } : prev));
-  };
-
-  const selectItem = (item: ItemProfile | null) => {
+  const selectItem = (item: SlimItem | null) => {
     if (!item) {
       setSelectedItemId(null);
-      setDraft(null);
+      setDraft(emptyDraft(tenantId ?? 0));
+      setIsCreatingNew(false);
       return;
     }
-    setSelectedItemId(item.item_id);
-    setDraft({ ...item });
+    void loadItemDetail(item.item_id);
+    setIsCreatingNew(false);
   };
 
   const startNewItem = () => {
-    const next = { ...EMPTY_ITEM, tenant_id: tenantId ?? 0 };
+    detailAbortRef.current?.abort();
     setSelectedItemId(null);
-    setDraft(next);
+    setDraft(emptyDraft(tenantId ?? 0));
     setSearchQuery('');
-  };
-
-  const togglePrep = (code: PrepCode, checked: boolean, mode: 'allowed' | 'default') => {
-    setDraft((prev) => {
-      if (!prev) return prev;
-      const field = mode === 'allowed' ? 'allowed_prep_options' : 'default_prep_options';
-      const nextCodes = checked
-        ? Array.from(new Set([...prev[field], code]))
-        : prev[field].filter((value) => value !== code);
-      const next = { ...prev, [field]: nextCodes };
-      if (mode === 'allowed' && !checked) {
-        next.default_prep_options = next.default_prep_options.filter((value) => value !== code);
-      }
-      if (mode === 'default' && checked) {
-        next.allowed_prep_options = Array.from(new Set([...next.allowed_prep_options, code]));
-      }
-      return next;
-    });
+    setIsCreatingNew(true);
   };
 
   const saveItem = async () => {
-    if (!tenantId || !draft) return;
+    if (!tenantId) return;
     setIsSaving(true);
     try {
       const response = await fetch('/api/items/profile', {
@@ -231,12 +321,14 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
       });
       const json = (await response.json()) as { data?: { item_id?: number }; error?: string };
       if (!response.ok || json.error) {
-        toast.error(json.error ?? 'Could not save item.');
+        toast.error(json.error ?? 'Could not save item.', { duration: Infinity });
         return;
       }
       toast.success('Item saved.');
-      setSelectedItemId(json.data?.item_id ?? draft.item_id);
+      const savedId = json.data?.item_id ?? draft.item_id;
+      setIsCreatingNew(false);
       await loadItems();
+      if (savedId) await loadItemDetail(savedId);
     } finally {
       setIsSaving(false);
     }
@@ -246,371 +338,241 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
     return <div className="p-4 text-sm text-muted-foreground">Tenant context is unavailable.</div>;
   }
 
+  const formTitle = draft.item_number || draft.item_name
+    ? `${draft.item_number || 'New'} — ${draft.item_name || 'Item'}`
+    : 'Item Form';
+
+  const selectedLabel = selectedItemId ? formTitle : 'No item selected';
+
   return (
-    <div className="flex h-full bg-background overflow-hidden">
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        {/* ── Title Bar ─────────────────────────────────────────────────── */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border/60 bg-card shrink-0">
-          <h2 className="text-base font-semibold text-foreground">Item Master</h2>
-          <div className="flex items-center gap-1.5 shrink-0">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 text-xs gap-1"
-              onClick={startNewItem}
-              disabled={isSaving}
-            >
-              <Plus className="h-3.5 w-3.5" />
-              New
+    <div className="space-y-6">
+      <div className="flex min-h-0 flex-1 flex-col gap-4">
+
+        {/* ── Item Selector + Actions ─────────────────────────────────── */}
+        <div className="grid grid-cols-3 items-start gap-3">
+          <div className="col-span-2 flex flex-col gap-1.5">
+            <Label htmlFor="item-combobox" className="text-xs font-semibold text-muted-foreground">Search Item</Label>
+            <EntityComboBox
+              triggerId="item-combobox"
+              items={items}
+              value={selectedItemId}
+              onChange={selectItem}
+              getId={(item) => item.item_id}
+              getLabel={(item) => `${item.item_number} — ${item.item_name}`}
+              getParentId={() => null}
+              getSearchText={(item) => `${item.item_number} ${item.item_name}`}
+              inputValue={searchQuery}
+              onInputValueChange={setSearchQuery}
+              placeholder="Search number or name"
+              alwaysOpen
+              collapseOnSelect
+              clearSearchOnFocus
+              disabled={isLoading}
+              loading={isLoading}
+              clearable
+              className="w-full"
+            />
+          </div>
+          <div className="flex items-center justify-end gap-2 pt-6">
+            <Button type="button" variant="outline" size="sm" onClick={startNewItem} disabled={isLoading || isDetailLoading}>
+              <Plus className="mr-1 h-3.5 w-3.5" />
+              Item
             </Button>
-            <Button
-              size="sm"
-              className="h-8 text-xs gap-1"
-              onClick={saveItem}
-              disabled={isSaving || !draft}
-            >
-              <Save className="h-3.5 w-3.5" />
-              {isSaving ? 'Saving…' : 'Save'}
+            <Button type="button" size="sm" onClick={saveItem} disabled={isSaving || isDetailLoading || isFormDisabled}>
+              {isSaving ? 'Saving…' : isDetailLoading ? 'Loading…' : 'Save'}
             </Button>
           </div>
         </div>
 
-        {/* ── EntityComboBox for Item Selection ──────────────────────── */}
-        <div className="shrink-0 px-4 py-3 border-b border-border/60 bg-muted/30">
-          <EntityComboBox
-            items={items}
-            value={selectedItemId}
-            onChange={selectItem}
-            getId={(item) => item.item_id ?? 0}
-            getLabel={(item) => `${item.item_number} — ${item.item_name}`}
-            getParentId={() => null}
-            getSearchText={(item) => `${item.item_number} ${item.item_name}`}
-            inputValue={searchQuery}
-            onInputValueChange={setSearchQuery}
-            placeholder="Search or select item..."
-            alwaysOpen={true}
-            collapseOnSelect={true}
-            clearSearchOnFocus={true}
-            disabled={isLoading}
-            loading={isLoading}
-            clearable={true}
-          />
-        </div>
+        {/* ── Tabs ────────────────────────────────────────────────────── */}
+        <Tabs defaultValue="profile" className="space-y-0">
+          <TabsList className="relative z-0 h-auto w-fit justify-start gap-0.5 rounded-none bg-transparent p-0">
+            <TabsTrigger value="profile" className={TAB_TRIGGER}>Profile</TabsTrigger>
+            <TabsTrigger value="pricebooks" className={TAB_TRIGGER}>Pricebooks</TabsTrigger>
+            <TabsTrigger value="notes" className={TAB_TRIGGER}>Notes</TabsTrigger>
+          </TabsList>
 
-        {/* ── Main Form Area ────────────────────────────────────────── */}
-        <div className="flex-1 overflow-auto flex flex-col">
-            {draft ? (
-              <>
-                <Tabs defaultValue="profile" className="flex-1 flex flex-col overflow-hidden">
-                  <TabsList className="shrink-0 h-10 rounded-none border-b border-border/60 bg-muted/50 p-0 justify-start px-4">
-                    <TabsTrigger value="profile" className="h-10 rounded-none px-4 text-xs">Profile</TabsTrigger>
-                    <TabsTrigger value="dimensions" className="h-10 rounded-none px-4 text-xs">Dimensions</TabsTrigger>
-                    <TabsTrigger value="production" className="h-10 rounded-none px-4 text-xs">Production</TabsTrigger>
-                    <TabsTrigger value="pricing" disabled className="h-10 rounded-none px-4 text-xs">Pricing</TabsTrigger>
-                    <TabsTrigger value="notes" className="h-10 rounded-none px-4 text-xs">Notes</TabsTrigger>
-                  </TabsList>
+          <Card className="rounded-b-lg border border-border/60 border-t-0">
+            <CardContent className="pt-4">
 
-                  {/* Profile Tab */}
-                  <TabsContent value="profile" className="flex-1 overflow-auto p-6">
-                    <div className="space-y-6 max-w-4xl">
-                      <div className="grid grid-cols-3 gap-4">
-                        <div>
-                          <label className="text-xs font-medium text-muted-foreground mb-1 block">Item Number</label>
-                          <Input
-                            value={draft.item_number}
-                            onChange={(e) => setDraftField('item_number', e.target.value)}
-                            className="text-sm"
-                            placeholder="SKU or item code"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs font-medium text-muted-foreground mb-1 block">Description</label>
-                          <Input
-                            value={draft.item_name}
-                            onChange={(e) => setDraftField('item_name', e.target.value)}
-                            className="text-sm"
-                            placeholder="Item description"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs font-medium text-muted-foreground mb-1 block">Status</label>
-                          <Select value={draft.is_active ? 'active' : 'inactive'} onValueChange={(v) => setDraftField('is_active', v === 'active')}>
-                            <SelectTrigger className="text-sm">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="active">Active</SelectItem>
-                              <SelectItem value="inactive">Inactive</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
+              {/* ── Profile Tab ─────────────────────────────────────── */}
+              <TabsContent value="profile" className="space-y-9">
 
-                      <div>
-                        <div className="grid grid-cols-4 gap-4">
-                          <div>
-                            <label className="text-xs font-medium text-muted-foreground mb-1 block">Category</label>
-                            <Select value={draft.category || ''} onValueChange={(v) => setDraftField('category', v)}>
-                              <SelectTrigger className="text-sm">
-                                <SelectValue placeholder="Select..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {lists.categories.map((cat) => (
-                                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div>
-                            <label className="text-xs font-medium text-muted-foreground mb-1 block">Dough Type</label>
-                            <Select value={draft.dough_type || ''} onValueChange={(v) => setDraftField('dough_type', v)}>
-                              <SelectTrigger className="text-sm">
-                                <SelectValue placeholder="Select..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {lists.doughTypes.map((dt) => (
-                                  <SelectItem key={dt} value={dt}>{dt}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div>
-                            <label className="text-xs font-medium text-muted-foreground mb-1 block">Shape</label>
-                            <Select value={draft.shape || ''} onValueChange={(v) => setDraftField('shape', v)}>
-                              <SelectTrigger className="text-sm">
-                                <SelectValue placeholder="Select..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {lists.shapes.map((shape) => (
-                                  <SelectItem key={shape} value={shape}>{shape}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div>
-                            <label className="text-xs font-medium text-muted-foreground mb-1 block">Unit of Sale</label>
-                            <Select value={draft.unit_of_sale || 'PCS'} onValueChange={(v) => setDraftField('unit_of_sale', v)}>
-                              <SelectTrigger className="text-sm">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {(lists.units.length ? lists.units : ['PCS']).map((unit) => (
-                                  <SelectItem key={unit} value={unit}>{unit}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="grid grid-cols-2 gap-6">
-                          <div>
-                            <p className="text-xs font-medium text-muted-foreground mb-2">Allowed Prep Options</p>
-                            <div className="space-y-2">
-                              {prepValues.map((option) => (
-                                <label key={`allowed-${option.value}`} className="flex items-center gap-2 text-sm cursor-pointer">
-                                  <Checkbox
-                                    checked={draft.allowed_prep_options.includes(option.value)}
-                                    onCheckedChange={(checked) => togglePrep(option.value, Boolean(checked), 'allowed')}
-                                  />
-                                  <span>{option.label}</span>
-                                </label>
-                              ))}
-                            </div>
-                          </div>
-                          <div>
-                            <p className="text-xs font-medium text-muted-foreground mb-2">Default Prep Options</p>
-                            <div className="space-y-2">
-                              {prepValues.map((option) => (
-                                <label key={`default-${option.value}`} className="flex items-center gap-2 text-sm cursor-pointer">
-                                  <Checkbox
-                                    checked={draft.default_prep_options.includes(option.value)}
-                                    onCheckedChange={(checked) => togglePrep(option.value, Boolean(checked), 'default')}
-                                  />
-                                  <span>{option.label}</span>
-                                </label>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <label className="flex items-center gap-2 text-sm cursor-pointer">
-                        <Checkbox
-                          checked={draft.sales_terms_apply}
-                          onCheckedChange={(v) => setDraftField('sales_terms_apply', Boolean(v))}
-                        />
-                        <span>Eligible for discount</span>
-                      </label>
+                {/* Item Description */}
+                <fieldset className="rounded-lg border border-border/60 bg-muted/20 p-4">
+                  <legend className="m-0 px-1 text-xs font-semibold text-muted-foreground">Item Description</legend>
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 -mt-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold text-muted-foreground">Item Number</Label>
+                      <Input disabled={isFormDisabled} value={draft.item_number} onChange={(e) => set('item_number', e.target.value)} placeholder="SKU or item code" />
                     </div>
-                  </TabsContent>
-
-                  {/* Dimensions Tab */}
-                  <TabsContent value="dimensions" className="flex-1 overflow-auto p-6">
-                    <div className="space-y-6 max-w-4xl">
-                      <div>
-                        <h3 className="text-sm font-semibold mb-4">Item Weight</h3>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="text-xs font-medium text-muted-foreground mb-1 block">Weight</label>
-                            <Input
-                              type="number"
-                              value={draft.item_weight ?? ''}
-                              onChange={(e) => setDraftField('item_weight', e.target.value === '' ? null : Number(e.target.value))}
-                              className="text-sm"
-                              placeholder="0"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-xs font-medium text-muted-foreground mb-1 block">Unit</label>
-                            <Input
-                              value={draft.weight_uom ?? ''}
-                              onChange={(e) => setDraftField('weight_uom', e.target.value)}
-                              className="text-sm"
-                              placeholder="LB"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <h3 className="text-sm font-semibold mb-4">Box Capacity</h3>
-                        <div className="grid grid-cols-3 gap-4">
-                          <div>
-                            <label className="text-xs font-medium text-muted-foreground mb-1 block">Qty per Box</label>
-                            <Input
-                              type="number"
-                              value={draft.box_qty_per_box ?? ''}
-                              onChange={(e) => setDraftField('box_qty_per_box', e.target.value === '' ? null : Number(e.target.value))}
-                              className="text-sm"
-                              placeholder="0"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-xs font-medium text-muted-foreground mb-1 block">Weight Capacity</label>
-                            <Input
-                              type="number"
-                              value={draft.box_capacity_weight ?? ''}
-                              onChange={(e) => setDraftField('box_capacity_weight', e.target.value === '' ? null : Number(e.target.value))}
-                              className="text-sm"
-                              placeholder="0"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-xs font-medium text-muted-foreground mb-1 block">Optimal Capacity</label>
-                            <Input
-                              type="number"
-                              value={draft.box_capacity_optimal ?? ''}
-                              onChange={(e) => setDraftField('box_capacity_optimal', e.target.value === '' ? null : Number(e.target.value))}
-                              className="text-sm"
-                              placeholder="0"
-                            />
-                          </div>
-                        </div>
-                      </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold text-muted-foreground">Description</Label>
+                      <Input disabled={isFormDisabled} value={draft.item_name} onChange={(e) => set('item_name', e.target.value)} placeholder="Item description" />
                     </div>
-                  </TabsContent>
-
-                  {/* Production Tab */}
-                  <TabsContent value="production" className="flex-1 overflow-auto p-6">
-                    <div className="space-y-6 max-w-4xl">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-xs font-medium text-muted-foreground mb-1 block">Packing</label>
-                          <Select value={draft.packing || ''} onValueChange={(v) => setDraftField('packing', v)}>
-                            <SelectTrigger className="text-sm">
-                              <SelectValue placeholder="Select..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {lists.packings.map((pack) => (
-                                <SelectItem key={pack} value={pack}>{pack}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <label className="text-xs font-medium text-muted-foreground mb-1 block">Machine Setting</label>
-                          <Input
-                            value={draft.machine_setting ?? ''}
-                            onChange={(e) => setDraftField('machine_setting', e.target.value)}
-                            className="text-sm"
-                            placeholder="Machine setting code"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-xs font-medium text-muted-foreground mb-1 block">Weight Adjuster</label>
-                          <Input
-                            type="number"
-                            value={draft.weight_adjuster ?? 0}
-                            onChange={(e) => setDraftField('weight_adjuster', Number(e.target.value || 0))}
-                            className="text-sm"
-                            placeholder="0"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs font-medium text-muted-foreground mb-1 block">Sheeter Setting</label>
-                          <Input
-                            value={draft.sheeter_setting ?? ''}
-                            onChange={(e) => setDraftField('sheeter_setting', e.target.value)}
-                            className="text-sm"
-                            placeholder="Sheeter setting code"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-xs font-medium text-muted-foreground mb-1 block">Scale Weight</label>
-                          <Input
-                            type="number"
-                            value={draft.scale_weight ?? 0}
-                            onChange={(e) => setDraftField('scale_weight', Number(e.target.value || 0))}
-                            className="text-sm"
-                            placeholder="0"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs font-medium text-muted-foreground mb-1 block">Scale Quantity</label>
-                          <Input
-                            type="number"
-                            value={draft.scale_qty ?? 0}
-                            onChange={(e) => setDraftField('scale_qty', Number(e.target.value || 0))}
-                            className="text-sm"
-                            placeholder="0"
-                          />
-                        </div>
-                      </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold text-muted-foreground">Status</Label>
+                      <Select disabled={isFormDisabled} value={draft.is_active ? 'active' : 'inactive'} onValueChange={(v) => set('is_active', v === 'active')}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="inactive">Inactive</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-                  </TabsContent>
+                  </div>
+                </fieldset>
 
-                  {/* Pricing Tab (placeholder) */}
-                  <TabsContent value="pricing" className="flex-1 p-6">
-                    <div className="text-sm text-muted-foreground">Pricing integration coming soon.</div>
-                  </TabsContent>
+                {/* Classification */}
+                <fieldset className="rounded-lg border border-border/60 bg-muted/20 p-4">
+                  <legend className="m-0 px-1 text-xs font-semibold text-muted-foreground">Classification</legend>
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 -mt-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold text-muted-foreground">Category</Label>
+                      <Select disabled={isFormDisabled} value={draft.category || ''} onValueChange={(v) => set('category', v)}>
+                        <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
+                        <SelectContent>{categories.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold text-muted-foreground">Dough Type</Label>
+                      <Select disabled={isFormDisabled} value={draft.dough_type || ''} onValueChange={(v) => set('dough_type', v)}>
+                        <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
+                        <SelectContent>{doughTypes.map((d) => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold text-muted-foreground">Shape</Label>
+                      <Select disabled={isFormDisabled} value={draft.shape || ''} onValueChange={(v) => set('shape', v)}>
+                        <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
+                        <SelectContent>{shapes.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold text-muted-foreground">Unit of Sale</Label>
+                      <Select disabled={isFormDisabled} value={draft.unit_of_sale || 'PCS'} onValueChange={(v) => set('unit_of_sale', v)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>{(units.length ? units : [{ value: 'PCS', label: 'Pcs' }]).map((u) => <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </fieldset>
 
-                  {/* Notes Tab (placeholder) */}
-                  <TabsContent value="notes" className="flex-1 overflow-auto p-6">
-                    <div className="text-sm text-muted-foreground">Notes section coming soon.</div>
-                  </TabsContent>
-                </Tabs>
-              </>
-            ) : (
-              <div className="flex-1 flex items-center justify-center text-muted-foreground">
-                <div className="text-center">
-                  <p className="text-sm mb-3">No item selected</p>
-                  <Button onClick={startNewItem} size="sm">
-                    <Plus className="h-3.5 w-3.5 mr-2" />
-                    Create New Item
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+                {/* Preparation */}
+                <fieldset className="rounded-lg border border-border/60 bg-muted/20 p-4">
+                  <legend className="m-0 px-1 text-xs font-semibold text-muted-foreground">Preparation</legend>
+                  <div className="grid gap-4 sm:grid-cols-3 -mt-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold text-muted-foreground">Allowed Prep Options</Label>
+                      <PrepOptionsDropdown
+                        idBase="prep-allowed"
+                        allowedOptions={prepValues}
+                        selectedOptions={draft.allowed_prep_options}
+                        onChange={(codes) => {
+                          set('allowed_prep_options', codes);
+                          const filtered = draft.default_prep_options.filter((code) => codes.includes(code));
+                          set('default_prep_options', filtered);
+                        }}
+                        disabled={isFormDisabled}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold text-muted-foreground">Default Prep Options</Label>
+                      <PrepOptionsDropdown
+                        idBase="prep-default"
+                        allowedOptions={prepValues.filter((opt) => draft.allowed_prep_options.includes(opt.value))}
+                        selectedOptions={draft.default_prep_options}
+                        onChange={(codes) => set('default_prep_options', codes)}
+                        disabled={isFormDisabled}
+                      />
+                    </div>
+                    <div className="flex items-center gap-2 pt-6">
+                      <Checkbox id="sales-terms" disabled={isFormDisabled} checked={draft.sales_terms_apply} onCheckedChange={(v) => set('sales_terms_apply', Boolean(v))} />
+                      <label htmlFor="sales-terms" className="text-sm cursor-pointer">Eligible for discount</label>
+                    </div>
+                  </div>
+                </fieldset>
+
+                {/* Dimensions */}
+                <fieldset className="rounded-lg border border-border/60 bg-muted/20 p-4">
+                  <legend className="m-0 px-1 text-xs font-semibold text-muted-foreground">Dimensions</legend>
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5 -mt-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold text-muted-foreground">Weight</Label>
+                      <Input disabled={isFormDisabled} type="number" value={draft.item_weight ?? ''} onChange={(e) => set('item_weight', e.target.value === '' ? null : Number(e.target.value))} placeholder="0" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold text-muted-foreground">Weight Unit</Label>
+                      <Input disabled={isFormDisabled} value={draft.weight_uom ?? ''} onChange={(e) => set('weight_uom', e.target.value)} placeholder="LB" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold text-muted-foreground">Qty / Box</Label>
+                      <Input disabled={isFormDisabled} type="number" value={draft.box_qty_per_box ?? ''} onChange={(e) => set('box_qty_per_box', e.target.value === '' ? null : Number(e.target.value))} placeholder="0" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold text-muted-foreground">Box Wt. Cap.</Label>
+                      <Input disabled={isFormDisabled} type="number" value={draft.box_capacity_weight ?? ''} onChange={(e) => set('box_capacity_weight', e.target.value === '' ? null : Number(e.target.value))} placeholder="0" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold text-muted-foreground">Box Opt. Cap.</Label>
+                      <Input disabled={isFormDisabled} type="number" value={draft.box_capacity_optimal ?? ''} onChange={(e) => set('box_capacity_optimal', e.target.value === '' ? null : Number(e.target.value))} placeholder="0" />
+                    </div>
+                  </div>
+                </fieldset>
+
+                {/* Production */}
+                <fieldset className="rounded-lg border border-border/60 bg-muted/20 p-4">
+                  <legend className="m-0 px-1 text-xs font-semibold text-muted-foreground">Production</legend>
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 -mt-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold text-muted-foreground">Packing</Label>
+                      <Select disabled={isFormDisabled} value={draft.packing || ''} onValueChange={(v) => set('packing', v)}>
+                        <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
+                        <SelectContent>{packings.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold text-muted-foreground">Machine Setting</Label>
+                      <Input disabled={isFormDisabled} value={draft.machine_setting ?? ''} onChange={(e) => set('machine_setting', e.target.value)} placeholder="Code" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold text-muted-foreground">Sheeter Setting</Label>
+                      <Input disabled={isFormDisabled} value={draft.sheeter_setting ?? ''} onChange={(e) => set('sheeter_setting', e.target.value)} placeholder="Code" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold text-muted-foreground">Weight Adjuster</Label>
+                      <Input disabled={isFormDisabled} type="number" value={draft.weight_adjuster ?? 0} onChange={(e) => set('weight_adjuster', Number(e.target.value || 0))} placeholder="0" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold text-muted-foreground">Scale Weight</Label>
+                      <Input disabled={isFormDisabled} type="number" value={draft.scale_weight ?? 0} onChange={(e) => set('scale_weight', Number(e.target.value || 0))} placeholder="0" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold text-muted-foreground">Scale Quantity</Label>
+                      <Input disabled={isFormDisabled} type="number" value={draft.scale_qty ?? 0} onChange={(e) => set('scale_qty', Number(e.target.value || 0))} placeholder="0" />
+                    </div>
+                  </div>
+                </fieldset>
+
+              </TabsContent>
+
+              {/* ── Pricebooks Tab ──────────────────────────────────── */}
+              <TabsContent value="pricebooks">
+                <p className="text-sm text-muted-foreground">
+                  Pricebook assignments for {selectedLabel}.
+                </p>
+              </TabsContent>
+
+              {/* ── Notes Tab ───────────────────────────────────────── */}
+              <TabsContent value="notes">
+                <p className="text-sm text-muted-foreground">
+                  Notes for {selectedLabel}.
+                </p>
+              </TabsContent>
+
+            </CardContent>
+          </Card>
+        </Tabs>
       </div>
     </div>
   );
