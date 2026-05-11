@@ -153,13 +153,15 @@ export const ItemPricebooksTab = forwardRef<ItemPricebooksTabHandle, ItemPricebo
 
     return (
       <div className="space-y-3">
-        {/* Search */}
-        <Input
-          placeholder="Search pricebooks…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="h-8 max-w-xs text-sm"
-        />
+        {/* Search — sticky so it stays visible while scrolling the grid */}
+        <div className="sticky top-0 z-10 bg-card pb-1 pt-0">
+          <Input
+            placeholder="Search pricebooks…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-8 max-w-xs text-sm"
+          />
+        </div>
 
         {/* Grid */}
         {isLoading ? (
@@ -170,7 +172,7 @@ export const ItemPricebooksTab = forwardRef<ItemPricebooksTabHandle, ItemPricebo
             <div className="grid grid-cols-[1fr_72px_148px] border-b border-border/60 bg-muted/40 px-3 py-2 text-xs font-semibold text-muted-foreground">
               <span>Pricebook</span>
               <span className="text-center">Active</span>
-              <span className="text-right">Price</span>
+              <span className="text-center">Price</span>
             </div>
 
             {/* Rows */}
@@ -216,7 +218,7 @@ export const ItemPricebooksTab = forwardRef<ItemPricebooksTabHandle, ItemPricebo
                         value={row.item_price}
                         onChange={(e) => updateRow(row.pricebook_id, { item_price: e.target.value })}
                         placeholder="—"
-                        className="h-7 w-28 text-right text-sm"
+                        className="h-7 w-28 text-center text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                       />
                     </div>
                   </div>
