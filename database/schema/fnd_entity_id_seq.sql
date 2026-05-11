@@ -7,7 +7,8 @@
 --
 -- Adopters: fnd_tenants.tenant_id, fnd_audit_log.id, fnd_customers.customer_id,
 -- fnd_currencies.currency_id, fnd_items.item_id, om_orders.order_id, om_order_lines.order_line_id,
--- fnd_item_bom.item_bom_id, fnd_pricebooks.pricebook_id, fnd_pricebook_items.pricebook_item_id
+-- fnd_item_bom.item_bom_id, fnd_pricebooks.pricebook_id, fnd_pricebook_items.pricebook_item_id,
+-- fnd_notes.note_id
 --
 -- Do not use OWNED BY when multiple tables share this sequence.
 -- After loading legacy data, align the sequence:
