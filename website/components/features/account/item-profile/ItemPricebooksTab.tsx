@@ -153,15 +153,12 @@ export const ItemPricebooksTab = forwardRef<ItemPricebooksTabHandle, ItemPricebo
 
     return (
       <div className="space-y-3">
-        {/* Search — sticky so it stays visible while scrolling the grid */}
-        <div className="sticky top-0 z-10 bg-card pb-1 pt-0">
-          <Input
-            placeholder="Search pricebooks…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-8 max-w-xs text-sm"
-          />
-        </div>
+        <Input
+          placeholder="Search pricebooks…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="h-8 max-w-xs text-sm"
+        />
 
         {/* Grid */}
         {isLoading ? (

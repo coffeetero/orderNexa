@@ -387,7 +387,7 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
       <div className="flex min-h-0 flex-1 flex-col gap-4">
 
         {/* ── Item Selector + Actions ─────────────────────────────────── */}
-        <div className="grid grid-cols-3 items-start gap-3">
+        <div className="sticky top-0 z-10 grid grid-cols-3 items-start gap-3 bg-background pb-2 pt-1">
           <div className="col-span-2 flex flex-col gap-1.5">
             <Label htmlFor="item-combobox" className="text-xs font-semibold text-muted-foreground">Search Item</Label>
             <EntityComboBox
