@@ -1,13 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Save, Plus, Trash2, RotateCcw, X, Search } from 'lucide-react';
+import { Save, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { EntityComboBox } from '@/components/bps/EntityComboBox';
 import { cn } from '@/lib/utils';
 
 type PrepCode = 'SLICED' | 'WRAPPED' | 'COVERED';
@@ -126,7 +127,6 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
   const [prepValues, setPrepValues] = useState<PrepValue[]>([]);
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
   const [draft, setDraft] = useState<ItemProfile | null>(null);
-  const [inactiveOnly, setInactiveOnly] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -135,7 +135,7 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
     if (!tenantId) return;
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/items/profile?tenant_id=${tenantId}&inactive_only=${inactiveOnly}`);
+      const response = await fetch(`/api/items/profile?tenant_id=${tenantId}&inactive_only=false`);
       const json = (await response.json()) as {
         data?: Record<string, unknown>[];
         prepValues?: PrepValue[];
@@ -158,7 +158,7 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [inactiveOnly, selectedItemId, tenantId]);
+  }, [selectedItemId, tenantId]);
 
   useEffect(() => {
     void loadItems();
@@ -185,10 +185,14 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
     setDraft((prev) => (prev ? { ...prev, [field]: value } : prev));
   };
 
-  const selectItem = (item: ItemProfile) => {
+  const selectItem = (item: ItemProfile | null) => {
+    if (!item) {
+      setSelectedItemId(null);
+      setDraft(null);
+      return;
+    }
     setSelectedItemId(item.item_id);
     setDraft({ ...item });
-    setSearchQuery('');
   };
 
   const startNewItem = () => {
@@ -247,12 +251,7 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* ── Title Bar ─────────────────────────────────────────────────── */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/60 bg-card shrink-0">
-          <div>
-            <h2 className="text-base font-semibold text-foreground">Item Master</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {selectedItemId && draft ? `${draft.item_number} — ${draft.item_name}` : 'Select or create an item'}
-            </p>
-          </div>
+          <h2 className="text-base font-semibold text-foreground">Item Master</h2>
           <div className="flex items-center gap-1.5 shrink-0">
             <Button
               variant="outline"
@@ -276,102 +275,78 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-1">
-          {/* ── Item List Sidebar ─────────────────────────────────────── */}
-          <div className="w-80 border-r border-border/60 flex flex-col overflow-hidden bg-muted/30">
-            <div className="shrink-0 p-3 border-b border-border/60">
-              <div className="relative">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search items..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8 h-9 text-sm rounded-md"
-                />
-              </div>
-              <label className="flex items-center gap-2 mt-3 text-xs cursor-pointer">
-                <Checkbox
-                  checked={inactiveOnly}
-                  onCheckedChange={(value) => setInactiveOnly(Boolean(value))}
-                />
-                <span className="text-muted-foreground">Show inactive only</span>
-              </label>
-            </div>
+        {/* ── EntityComboBox for Item Selection ──────────────────────── */}
+        <div className="shrink-0 px-4 py-3 border-b border-border/60 bg-muted/30">
+          <EntityComboBox
+            items={items}
+            value={selectedItemId}
+            onChange={selectItem}
+            getId={(item) => item.item_id ?? 0}
+            getLabel={(item) => `${item.item_number} — ${item.item_name}`}
+            getParentId={() => null}
+            getSearchText={(item) => `${item.item_number} ${item.item_name}`}
+            inputValue={searchQuery}
+            onInputValueChange={setSearchQuery}
+            placeholder="Search or select item..."
+            alwaysOpen={true}
+            collapseOnSelect={true}
+            clearSearchOnFocus={true}
+            disabled={isLoading}
+            loading={isLoading}
+            clearable={true}
+          />
+        </div>
 
-            {/* Item List */}
-            <div className="flex-1 overflow-auto">
-              {isLoading ? (
-                <div className="p-4 text-center text-xs text-muted-foreground">Loading items...</div>
-              ) : filteredItems.length === 0 ? (
-                <div className="p-4 text-center text-xs text-muted-foreground">
-                  {items.length === 0 ? 'No items found' : 'No matching items'}
-                </div>
-              ) : (
-                <div className="space-y-1 p-2">
-                  {filteredItems.map((item) => (
-                    <button
-                      key={item.item_id}
-                      onClick={() => selectItem(item)}
-                      className={cn(
-                        'w-full text-left px-3 py-2 rounded-md text-xs transition-colors',
-                        selectedItemId === item.item_id
-                          ? 'bg-primary text-primary-foreground'
-                          : 'hover:bg-muted text-foreground'
-                      )}
-                    >
-                      <div className="font-medium truncate">{item.item_number}</div>
-                      <div className="text-xs opacity-75 truncate">{item.item_name}</div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* ── Main Form Area ────────────────────────────────────────── */}
-          <div className="flex-1 overflow-auto flex flex-col">
+        {/* ── Main Form Area ────────────────────────────────────────── */}
+        <div className="flex-1 overflow-auto flex flex-col">
             {draft ? (
               <>
-                <Tabs defaultValue="basic" className="flex-1 flex flex-col overflow-hidden">
+                <Tabs defaultValue="profile" className="flex-1 flex flex-col overflow-hidden">
                   <TabsList className="shrink-0 h-10 rounded-none border-b border-border/60 bg-muted/50 p-0 justify-start px-4">
-                    <TabsTrigger value="basic" className="h-10 rounded-none px-4 text-xs">Basic Info</TabsTrigger>
+                    <TabsTrigger value="profile" className="h-10 rounded-none px-4 text-xs">Profile</TabsTrigger>
                     <TabsTrigger value="dimensions" className="h-10 rounded-none px-4 text-xs">Dimensions</TabsTrigger>
                     <TabsTrigger value="production" className="h-10 rounded-none px-4 text-xs">Production</TabsTrigger>
                     <TabsTrigger value="pricing" disabled className="h-10 rounded-none px-4 text-xs">Pricing</TabsTrigger>
                     <TabsTrigger value="notes" className="h-10 rounded-none px-4 text-xs">Notes</TabsTrigger>
                   </TabsList>
 
-                  {/* Basic Info Tab */}
-                  <TabsContent value="basic" className="flex-1 overflow-auto p-6">
+                  {/* Profile Tab */}
+                  <TabsContent value="profile" className="flex-1 overflow-auto p-6">
                     <div className="space-y-6 max-w-4xl">
-                      {/* Item Identity */}
-                      <div>
-                        <h3 className="text-sm font-semibold mb-4">Item Identity</h3>
-                        <div className="grid grid-cols-3 gap-4">
-                          <div>
-                            <label className="text-xs font-medium text-muted-foreground mb-1 block">Item Number</label>
-                            <Input
-                              value={draft.item_number}
-                              onChange={(e) => setDraftField('item_number', e.target.value)}
-                              className="text-sm"
-                              placeholder="SKU or item code"
-                            />
-                          </div>
-                          <div className="col-span-2">
-                            <label className="text-xs font-medium text-muted-foreground mb-1 block">Description</label>
-                            <Input
-                              value={draft.item_name}
-                              onChange={(e) => setDraftField('item_name', e.target.value)}
-                              className="text-sm"
-                              placeholder="Item description"
-                            />
-                          </div>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <label className="text-xs font-medium text-muted-foreground mb-1 block">Item Number</label>
+                          <Input
+                            value={draft.item_number}
+                            onChange={(e) => setDraftField('item_number', e.target.value)}
+                            className="text-sm"
+                            placeholder="SKU or item code"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-muted-foreground mb-1 block">Description</label>
+                          <Input
+                            value={draft.item_name}
+                            onChange={(e) => setDraftField('item_name', e.target.value)}
+                            className="text-sm"
+                            placeholder="Item description"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-muted-foreground mb-1 block">Status</label>
+                          <Select value={draft.is_active ? 'active' : 'inactive'} onValueChange={(v) => setDraftField('is_active', v === 'active')}>
+                            <SelectTrigger className="text-sm">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="active">Active</SelectItem>
+                              <SelectItem value="inactive">Inactive</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
 
-                      {/* Classification */}
                       <div>
-                        <h3 className="text-sm font-semibold mb-4">Classification</h3>
                         <div className="grid grid-cols-4 gap-4">
                           <div>
                             <label className="text-xs font-medium text-muted-foreground mb-1 block">Category</label>
@@ -428,9 +403,7 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
                         </div>
                       </div>
 
-                      {/* Prep Options */}
                       <div>
-                        <h3 className="text-sm font-semibold mb-4">Preparation Options</h3>
                         <div className="grid grid-cols-2 gap-6">
                           <div>
                             <p className="text-xs font-medium text-muted-foreground mb-2">Allowed Prep Options</p>
@@ -463,31 +436,13 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
                         </div>
                       </div>
 
-                      {/* Status */}
-                      <div>
-                        <h3 className="text-sm font-semibold mb-4">Status</h3>
-                        <div className="flex items-center gap-4">
-                          <div className="w-32">
-                            <label className="text-xs font-medium text-muted-foreground mb-1 block">Item Status</label>
-                            <Select value={draft.is_active ? 'active' : 'inactive'} onValueChange={(v) => setDraftField('is_active', v === 'active')}>
-                              <SelectTrigger className="text-sm">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="active">Active</SelectItem>
-                                <SelectItem value="inactive">Inactive</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <label className="flex items-center gap-2 text-sm cursor-pointer mt-6">
-                            <Checkbox
-                              checked={draft.sales_terms_apply}
-                              onCheckedChange={(v) => setDraftField('sales_terms_apply', Boolean(v))}
-                            />
-                            <span>Eligible for discount</span>
-                          </label>
-                        </div>
-                      </div>
+                      <label className="flex items-center gap-2 text-sm cursor-pointer">
+                        <Checkbox
+                          checked={draft.sales_terms_apply}
+                          onCheckedChange={(v) => setDraftField('sales_terms_apply', Boolean(v))}
+                        />
+                        <span>Eligible for discount</span>
+                      </label>
                     </div>
                   </TabsContent>
 
