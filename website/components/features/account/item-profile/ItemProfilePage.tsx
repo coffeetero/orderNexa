@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import { Plus, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { EntityComboBox } from '@/components/bps/EntityComboBox';
-import { ItemPricebooksTab } from './ItemPricebooksTab';
+import { ItemPricebooksTab, type ItemPricebooksTabHandle } from './ItemPricebooksTab';
 import type { PrepOption } from '@/lib/types';
 
 interface ItemProfile {
@@ -213,6 +213,8 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
   const [units, setUnits] = useState<PrepOption[]>([]);
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
   const [draft, setDraft] = useState<ItemProfile>(() => emptyDraft(tenantId ?? 0));
+  const [originalDraft, setOriginalDraft] = useState<ItemProfile>(() => emptyDraft(tenantId ?? 0));
+  const [isPricebooksDirty, setIsPricebooksDirty] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -220,6 +222,7 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const loadedRef = useRef(false);
   const detailAbortRef = useRef<AbortController | null>(null);
+  const pricebooksRef = useRef<ItemPricebooksTabHandle>(null);
 
   // Fetches slim list + valueset lookups once on mount (and after save to refresh names).
   const loadItems = useCallback(async () => {
@@ -271,7 +274,9 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
         return;
       }
       if (json.data && typeof json.data === 'object') {
-        setDraft(normalizeItem(json.data, tenantId));
+        const normalized = normalizeItem(json.data, tenantId);
+        setDraft(normalized);
+        setOriginalDraft(normalized);
         setSelectedItemId(itemId);
       }
     } catch (err) {
@@ -289,13 +294,28 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
 
   const isFormDisabled = !isCreatingNew && selectedItemId === null && draft.item_id === null;
 
+  // Profile is dirty when creating new, or when the draft differs from what was last loaded/saved.
+  const isProfileDirty = useMemo(
+    () => isCreatingNew || JSON.stringify(draft) !== JSON.stringify(originalDraft),
+    [draft, originalDraft, isCreatingNew],
+  );
+  const isAnythingDirty = isProfileDirty || isPricebooksDirty;
+
   const set = <K extends keyof ItemProfile>(field: K, value: ItemProfile[K]) =>
     setDraft((prev) => ({ ...prev, [field]: value }));
 
+  const resetAll = useCallback(() => {
+    setDraft(originalDraft);
+    setIsCreatingNew(false);
+    pricebooksRef.current?.reset();
+  }, [originalDraft]);
+
   const selectItem = (item: SlimItem | null) => {
     if (!item) {
+      const empty = emptyDraft(tenantId ?? 0);
       setSelectedItemId(null);
-      setDraft(emptyDraft(tenantId ?? 0));
+      setDraft(empty);
+      setOriginalDraft(empty);
       setIsCreatingNew(false);
       return;
     }
@@ -305,31 +325,48 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
 
   const startNewItem = () => {
     detailAbortRef.current?.abort();
+    const empty = emptyDraft(tenantId ?? 0);
     setSelectedItemId(null);
-    setDraft(emptyDraft(tenantId ?? 0));
+    setDraft(empty);
+    setOriginalDraft(empty);
     setSearchQuery('');
     setIsCreatingNew(true);
   };
 
-  const saveItem = async () => {
+  const saveAll = async () => {
     if (!tenantId) return;
     setIsSaving(true);
     try {
-      const response = await fetch('/api/items/profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...draft, tenant_id: tenantId }),
-      });
-      const json = (await response.json()) as { data?: { item_id?: number }; error?: string };
-      if (!response.ok || json.error) {
-        toast.error(json.error ?? 'Could not save item.', { duration: Infinity });
-        return;
+      // ── 1. Save profile (if dirty or creating) ────────────────────────
+      let savedId: number | null | undefined = draft.item_id;
+      if (isProfileDirty) {
+        const response = await fetch('/api/items/profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...draft, tenant_id: tenantId }),
+        });
+        const json = (await response.json()) as { data?: { item_id?: number }; error?: string };
+        if (!response.ok || json.error) {
+          toast.error(json.error ?? 'Could not save item.', { duration: Infinity });
+          return;
+        }
+        savedId = json.data?.item_id ?? draft.item_id;
+        setIsCreatingNew(false);
+        await loadItems();
+        if (savedId) await loadItemDetail(savedId);
       }
-      toast.success('Item saved.');
-      const savedId = json.data?.item_id ?? draft.item_id;
-      setIsCreatingNew(false);
-      await loadItems();
-      if (savedId) await loadItemDetail(savedId);
+
+      // ── 2. Save pricebooks (if dirty) ─────────────────────────────────
+      if (isPricebooksDirty) {
+        const ok = await pricebooksRef.current?.save();
+        if (!ok) {
+          // Error already toasted by the tab; profile may have saved — inform user.
+          if (isProfileDirty) toast.error('Profile saved, but prices could not be saved.', { duration: Infinity });
+          return;
+        }
+      }
+
+      toast.success('Saved.');
     } finally {
       setIsSaving(false);
     }
@@ -379,7 +416,10 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
               <Plus className="mr-1 h-3.5 w-3.5" />
               Item
             </Button>
-            <Button type="button" size="sm" onClick={saveItem} disabled={isSaving || isDetailLoading || isFormDisabled}>
+            <Button type="button" variant="outline" size="sm" onClick={resetAll} disabled={isSaving || isDetailLoading || !isAnythingDirty}>
+              Cancel
+            </Button>
+            <Button type="button" size="sm" onClick={saveAll} disabled={isSaving || isDetailLoading || isFormDisabled || !isAnythingDirty}>
               {isSaving ? 'Saving…' : isDetailLoading ? 'Loading…' : 'Save'}
             </Button>
           </div>
@@ -559,7 +599,12 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
 
               {/* ── Pricebooks Tab ──────────────────────────────────── */}
               <TabsContent value="pricebooks">
-                <ItemPricebooksTab tenantId={tenantId} itemId={selectedItemId} />
+                <ItemPricebooksTab
+                  ref={pricebooksRef}
+                  tenantId={tenantId}
+                  itemId={selectedItemId}
+                  onDirtyChange={setIsPricebooksDirty}
+                />
               </TabsContent>
 
               {/* ── Notes Tab ───────────────────────────────────────── */}
