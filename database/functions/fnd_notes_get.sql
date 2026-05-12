@@ -4,7 +4,7 @@
 -- Returns all active notes for a given entity, with author name
 -- joined from fnd_users. Sorted: pinned first, then newest first.
 --
--- SECURITY DEFINER — bypasses RLS; validates tenant via JWT.
+-- SECURITY INVOKER — RLS on fnd_notes enforces tenant scoping and visibility.
 -- Prerequisites: fnd_notes.sql, fnd_users.sql
 -- ============================================================
 
@@ -16,23 +16,12 @@ CREATE OR REPLACE FUNCTION bps.fnd_notes_get(
 RETURNS JSONB
 LANGUAGE plpgsql
 STABLE
-SECURITY DEFINER
+SECURITY INVOKER
 SET search_path = bps, public
 AS $$
 DECLARE
   v_result JSONB;
 BEGIN
-  IF NOT (
-    p_tenant_id::text = ANY (ARRAY(
-      SELECT jsonb_array_elements_text(
-        (NULLIF(current_setting('request.jwt.claims', true), ''))::jsonb
-          -> 'app_metadata' -> 'allowed_tenant_ids'
-      )
-    ))
-  ) THEN
-    RAISE EXCEPTION 'Access denied for tenant %', p_tenant_id;
-  END IF;
-
   SELECT COALESCE(
     jsonb_agg(
       jsonb_build_object(
