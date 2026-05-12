@@ -599,7 +599,7 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
               </TabsContent>
 
               {/* ── Pricebooks Tab ──────────────────────────────────── */}
-              <TabsContent value="pricebooks">
+              <TabsContent value="pricebooks" forceMount className="data-[state=inactive]:hidden">
                 <ItemPricebooksTab
                   ref={pricebooksRef}
                   tenantId={tenantId}
@@ -609,7 +609,7 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
               </TabsContent>
 
               {/* ── Notes Tab ───────────────────────────────────────── */}
-              <TabsContent value="notes">
+              <TabsContent value="notes" forceMount className="data-[state=inactive]:hidden">
                 <ItemNotesTab tenantId={tenantId} itemId={selectedItemId} />
               </TabsContent>
 
