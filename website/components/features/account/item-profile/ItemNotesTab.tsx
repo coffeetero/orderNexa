@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { format } from 'date-fns';
-import { Pin, Star, Lock, Globe, Trash2 } from 'lucide-react';
+import { Pin, Star, Lock, Globe, Trash2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -91,15 +91,21 @@ function ToggleBtn({
   );
 }
 
+const MIN_PANEL_WIDTH = 140;
+const MAX_PANEL_WIDTH = 400;
+const DEFAULT_PANEL_WIDTH = 208; // w-52
+
 export function ItemNotesTab({ tenantId, itemId }: ItemNotesTabProps) {
-  const [notes, setNotes]         = useState<Note[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [selection, setSelection] = useState<number | 'new' | null>(null);
-  const [form, setForm]           = useState<NoteForm>(EMPTY_FORM);
-  const [isSaving, setIsSaving]   = useState(false);
-  const savedFormRef              = useRef<NoteForm>(EMPTY_FORM);
-  const loadedItemId              = useRef<number | null | undefined>(undefined);
-  const titleInputRef             = useRef<HTMLInputElement>(null);
+  const [notes, setNotes]           = useState<Note[]>([]);
+  const [isLoading, setIsLoading]   = useState(false);
+  const [selection, setSelection]   = useState<number | 'new' | null>(null);
+  const [form, setForm]             = useState<NoteForm>(EMPTY_FORM);
+  const [isSaving, setIsSaving]     = useState(false);
+  const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH);
+  const savedFormRef                = useRef<NoteForm>(EMPTY_FORM);
+  const loadedItemId                = useRef<number | null | undefined>(undefined);
+  const titleInputRef               = useRef<HTMLInputElement>(null);
+  const dragRef                     = useRef<{ startX: number; startWidth: number } | null>(null);
 
   const isDirty = JSON.stringify(form) !== JSON.stringify(savedFormRef.current);
 
@@ -149,6 +155,26 @@ export function ItemNotesTab({ tenantId, itemId }: ItemNotesTabProps) {
     }
   }, [itemId, load]);
 
+  // Drag-resize logic
+  const onDragStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    dragRef.current = { startX: e.clientX, startWidth: panelWidth };
+
+    const onMove = (ev: MouseEvent) => {
+      if (!dragRef.current) return;
+      const delta    = ev.clientX - dragRef.current.startX;
+      const newWidth = Math.min(MAX_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, dragRef.current.startWidth + delta));
+      setPanelWidth(newWidth);
+    };
+    const onUp = () => {
+      dragRef.current = null;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
   const save = async () => {
     if (!itemId || form.note_text.trim() === '') return;
     setIsSaving(true);
@@ -196,157 +222,170 @@ export function ItemNotesTab({ tenantId, itemId }: ItemNotesTabProps) {
     return <p className="py-4 text-sm text-muted-foreground">Select an item to view notes.</p>;
   }
 
-  const sorted = sortNotes(notes);
+  const sorted   = sortNotes(notes);
   const setField = <K extends keyof NoteForm>(k: K, v: NoteForm[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
 
   return (
-    <div className="flex divide-x divide-border/60 overflow-hidden rounded-lg border border-border/60" style={{ height: '520px' }}>
+    <div className="flex flex-col overflow-hidden rounded-lg border border-border/60" style={{ height: '520px' }}>
 
-      {/* ── Left panel ───────────────────────────────────── */}
-      <div className="flex w-52 shrink-0 flex-col overflow-hidden">
-        <div className="flex-1 overflow-y-auto">
-          {isLoading ? (
-            <p className="p-3 text-xs text-muted-foreground">Loading…</p>
-          ) : (
-            sorted.map((note) => {
-              const title = note.note_title || note.note_text.slice(0, 38) + (note.note_text.length > 38 ? '…' : '');
-              return (
-                <button
-                  key={note.note_id}
-                  type="button"
-                  onClick={() => applySelection(note)}
-                  className={cn(
-                    'w-full border-b border-border/40 px-3 py-2.5 text-left transition-colors',
-                    selection === note.note_id ? 'bg-muted' : 'hover:bg-muted/50',
-                  )}
-                >
-                  <div className="mb-0.5 flex items-start gap-1.5">
-                    {note.is_pinned && (
-                      <Pin className="mt-0.5 h-3 w-3 shrink-0 text-sky-500" fill="currentColor" />
-                    )}
-                    {note.is_important && !note.is_pinned && (
-                      <Star className="mt-0.5 h-3 w-3 shrink-0 text-amber-500" fill="currentColor" />
-                    )}
-                    <span className={cn(
-                      'line-clamp-2 text-sm leading-snug',
-                      !note.note_title && 'italic text-foreground/60',
-                    )}>
-                      {title}
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">{noteDate(note.created_at)}</p>
-                </button>
-              );
-            })
-          )}
-        </div>
-
-        {/* New note entry */}
-        <button
+      {/* ── Top header bar ──────────────────────────────── */}
+      <div className="flex shrink-0 items-center gap-2 border-b border-border/60 px-3 py-1.5">
+        <span className="text-xs font-medium text-muted-foreground">Notes</span>
+        <div className="flex-1" />
+        <Button
           type="button"
+          variant="ghost"
+          size="sm"
           onClick={applyNew}
-          className={cn(
-            'shrink-0 border-t border-border/40 px-3 py-2.5 text-left text-sm italic text-muted-foreground/50 transition-colors',
-            selection === 'new' ? 'bg-muted' : 'hover:bg-muted/50',
-          )}
+          className="h-7 gap-1 px-2 text-xs"
         >
-          Enter new note title here
-        </button>
+          <Plus className="h-3.5 w-3.5" />
+          Note
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          onClick={save}
+          disabled={isSaving || form.note_text.trim() === '' || !isDirty || selection === null}
+          className="h-7"
+        >
+          {isSaving ? 'Saving…' : 'Save'}
+        </Button>
       </div>
 
-      {/* ── Right panel ──────────────────────────────────── */}
-      {selection === null ? (
-        <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-          Select a note or create a new one
-        </div>
-      ) : (
-        <div className="flex flex-1 flex-col overflow-hidden">
+      {/* ── Body: left list + drag handle + right editor ─ */}
+      <div className="flex flex-1 overflow-hidden divide-x divide-border/60">
 
-          {/* Header: title + metadata */}
-          <div className="shrink-0 border-b border-border/40 px-4 pb-2 pt-4">
-            <Input
-              ref={titleInputRef}
-              value={form.note_title}
-              onChange={(e) => setField('note_title', e.target.value)}
-              placeholder="Title"
-              className="h-8 border-0 bg-transparent px-0 text-base font-semibold shadow-none focus-visible:ring-0"
-            />
-            {typeof selection === 'number' && (() => {
-              const n = notes.find((x) => x.note_id === selection);
-              return n ? (
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {n.author_name} · {noteDate(n.created_at)}
-                  {n.updated_at !== n.created_at && ' · edited'}
-                </p>
-              ) : null;
-            })()}
-          </div>
-
-          {/* Note body */}
-          <textarea
-            value={form.note_text}
-            onChange={(e) => setField('note_text', e.target.value)}
-            placeholder="Write your note…"
-            className="flex-1 resize-none bg-transparent px-4 py-3 text-sm placeholder:text-muted-foreground/50 focus:outline-none"
-          />
-
-          {/* Toolbar */}
-          <div className="flex shrink-0 items-center gap-1 border-t border-border/40 px-4 py-2">
-            <ToggleBtn
-              active={form.visibility === 'shared'}
-              onClick={() => setField('visibility', form.visibility === 'shared' ? 'tenant_only' : 'shared')}
-              activeClass="bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-400"
-            >
-              {form.visibility === 'shared'
-                ? <><Globe className="h-3.5 w-3.5" />Shared</>
-                : <><Lock className="h-3.5 w-3.5" />Internal</>}
-            </ToggleBtn>
-
-            <ToggleBtn
-              active={form.is_important}
-              onClick={() => setField('is_important', !form.is_important)}
-              activeClass="bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400"
-            >
-              <Star className="h-3.5 w-3.5" fill={form.is_important ? 'currentColor' : 'none'} />
-              Important
-            </ToggleBtn>
-
-            <ToggleBtn
-              active={form.is_pinned}
-              onClick={() => setField('is_pinned', !form.is_pinned)}
-              activeClass="bg-sky-50 text-sky-600 dark:bg-sky-950/40 dark:text-sky-400"
-            >
-              <Pin className="h-3.5 w-3.5" fill={form.is_pinned ? 'currentColor' : 'none'} />
-              Pin
-            </ToggleBtn>
-
-            <div className="flex-1" />
-
-            {form.note_id && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={deleteNote}
-                className="h-7 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
+        {/* Left panel */}
+        <div className="flex shrink-0 flex-col overflow-hidden" style={{ width: panelWidth }}>
+          <div className="flex-1 overflow-y-auto">
+            {isLoading ? (
+              <p className="p-3 text-xs text-muted-foreground">Loading…</p>
+            ) : (
+              sorted.map((note) => {
+                const title = note.note_title || note.note_text.slice(0, 38) + (note.note_text.length > 38 ? '…' : '');
+                return (
+                  <button
+                    key={note.note_id}
+                    type="button"
+                    onClick={() => applySelection(note)}
+                    className={cn(
+                      'w-full border-b border-border/40 px-3 py-2.5 text-left transition-colors',
+                      selection === note.note_id ? 'bg-muted' : 'hover:bg-muted/50',
+                    )}
+                  >
+                    <div className="mb-0.5 flex items-start gap-1.5">
+                      {note.is_pinned && (
+                        <Pin className="mt-0.5 h-3 w-3 shrink-0 text-sky-500" fill="currentColor" />
+                      )}
+                      {note.is_important && !note.is_pinned && (
+                        <Star className="mt-0.5 h-3 w-3 shrink-0 text-amber-500" fill="currentColor" />
+                      )}
+                      <span className={cn(
+                        'line-clamp-2 text-sm leading-snug',
+                        !note.note_title && 'italic text-foreground/60',
+                      )}>
+                        {title}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{noteDate(note.created_at)}</p>
+                  </button>
+                );
+              })
             )}
-
-            <Button
-              type="button"
-              size="sm"
-              onClick={save}
-              disabled={isSaving || form.note_text.trim() === '' || !isDirty}
-              className="h-7"
-            >
-              {isSaving ? 'Saving…' : 'Save'}
-            </Button>
           </div>
         </div>
-      )}
+
+        {/* Drag handle */}
+        <div
+          onMouseDown={onDragStart}
+          className="w-1 shrink-0 cursor-col-resize bg-border/60 hover:bg-primary/30 transition-colors"
+        />
+
+        {/* Right panel */}
+        {selection === null ? (
+          <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+            Select a note or click + Note
+          </div>
+        ) : (
+          <div className="flex flex-1 flex-col overflow-hidden">
+
+            {/* Title + metadata */}
+            <div className="shrink-0 border-b border-border/40 px-4 pb-2 pt-4">
+              <Input
+                ref={titleInputRef}
+                value={form.note_title}
+                onChange={(e) => setField('note_title', e.target.value)}
+                placeholder="Title"
+                className="h-8 border-0 bg-transparent px-0 text-base font-semibold shadow-none focus-visible:ring-0"
+              />
+              {typeof selection === 'number' && (() => {
+                const n = notes.find((x) => x.note_id === selection);
+                return n ? (
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {n.author_name} · {noteDate(n.created_at)}
+                    {n.updated_at !== n.created_at && ' · edited'}
+                  </p>
+                ) : null;
+              })()}
+            </div>
+
+            {/* Note body */}
+            <textarea
+              value={form.note_text}
+              onChange={(e) => setField('note_text', e.target.value)}
+              placeholder="Write your note…"
+              className="flex-1 resize-none bg-transparent px-4 py-3 text-sm placeholder:text-muted-foreground/50 focus:outline-none"
+            />
+
+            {/* Toolbar */}
+            <div className="flex shrink-0 items-center gap-1 border-t border-border/40 px-4 py-2">
+              <ToggleBtn
+                active={form.visibility === 'shared'}
+                onClick={() => setField('visibility', form.visibility === 'shared' ? 'tenant_only' : 'shared')}
+                activeClass="bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-400"
+              >
+                {form.visibility === 'shared'
+                  ? <><Globe className="h-3.5 w-3.5" />Shared</>
+                  : <><Lock className="h-3.5 w-3.5" />Internal</>}
+              </ToggleBtn>
+
+              <ToggleBtn
+                active={form.is_important}
+                onClick={() => setField('is_important', !form.is_important)}
+                activeClass="bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400"
+              >
+                <Star className="h-3.5 w-3.5" fill={form.is_important ? 'currentColor' : 'none'} />
+                Important
+              </ToggleBtn>
+
+              <ToggleBtn
+                active={form.is_pinned}
+                onClick={() => setField('is_pinned', !form.is_pinned)}
+                activeClass="bg-sky-50 text-sky-600 dark:bg-sky-950/40 dark:text-sky-400"
+              >
+                <Pin className="h-3.5 w-3.5" fill={form.is_pinned ? 'currentColor' : 'none'} />
+                Pin
+              </ToggleBtn>
+
+              <div className="flex-1" />
+
+              {form.note_id && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={deleteNote}
+                  className="h-7 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

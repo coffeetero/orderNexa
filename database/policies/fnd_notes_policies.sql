@@ -33,12 +33,14 @@ CREATE POLICY pol_fnd_notes_select ON fnd_notes
             )
         ))
         AND
-        -- 2. Visibility gate: customer users see shared notes only
+        -- 2. Visibility gate: customer users see shared notes only.
+        --    IS DISTINCT FROM handles NULL user_type correctly (NULL != 'CUSTOMER_USER' = NULL, not TRUE).
         (
             (NULLIF(current_setting('request.jwt.claims', true), '')::jsonb
-                -> 'app_metadata' ->> 'user_type') != 'CUSTOMER_USER'
+                -> 'app_metadata' ->> 'user_type') IS DISTINCT FROM 'CUSTOMER_USER'
             OR visibility = 'shared'
         )
+        AND deleted_at IS NULL
     );
 
 DROP POLICY IF EXISTS pol_fnd_notes_insert ON fnd_notes;
