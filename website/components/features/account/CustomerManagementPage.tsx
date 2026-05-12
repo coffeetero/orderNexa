@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { CustomerNotesTab } from '@/components/features/account/CustomerNotesTab';
 
 type TenantOption = {
   tenant_id: number;
@@ -589,6 +590,12 @@ export function CustomerManagementPage({
                 Pricing
               </TabsTrigger>
               <TabsTrigger
+                value="notes"
+                className="relative z-0 -mb-px rounded-b-none rounded-t-lg border border-muted bg-muted/70 px-4 py-1.5 data-[state=active]:z-10 data-[state=active]:translate-y-[1px] data-[state=active]:border-border/60 data-[state=active]:border-b-transparent data-[state=active]:bg-card"
+              >
+                Notes
+              </TabsTrigger>
+              <TabsTrigger
                 value="settings"
                 className="relative z-0 -mb-px rounded-b-none rounded-t-lg border border-muted bg-muted/70 px-4 py-1.5 data-[state=active]:z-10 data-[state=active]:translate-y-[1px] data-[state=active]:border-border/60 data-[state=active]:border-b-transparent data-[state=active]:bg-card"
               >
@@ -744,6 +751,13 @@ export function CustomerManagementPage({
                   <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
                     Pricing configuration will be added here for <span className="font-medium">{selectedCustomerLabel}</span>.
                   </div>
+                </TabsContent>
+
+                <TabsContent value="notes" forceMount className="data-[state=inactive]:hidden">
+                  <CustomerNotesTab
+                    tenantId={tenantId ?? 0}
+                    customerId={selectedCustomerId}
+                  />
                 </TabsContent>
 
                 <TabsContent value="settings">
