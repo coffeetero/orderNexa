@@ -29,7 +29,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <TenantProvider>
             {!user && <Navbar />}
             <main>{children}</main>
-            <Toaster position="top-right" duration={3000} />
+            <Toaster position="top-right" duration={3000} closeButton />
           </TenantProvider>
         </ThemeProvider>
       </body>
