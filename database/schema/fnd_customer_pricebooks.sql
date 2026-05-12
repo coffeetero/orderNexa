@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS fnd_customer_pricebooks (
     effective_end_date        DATE,
 
     precedence                BIGINT      NOT NULL DEFAULT 0,
+    status                    TEXT        NOT NULL DEFAULT 'Draft',
     is_active                 BOOLEAN     NOT NULL DEFAULT TRUE,
 
     created_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
