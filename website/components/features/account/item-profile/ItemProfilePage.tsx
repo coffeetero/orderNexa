@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { EntityComboBox } from '@/components/bps/EntityComboBox';
 import { ItemPricebooksTab, type ItemPricebooksTabHandle } from './ItemPricebooksTab';
+import { ItemNotesTab } from './ItemNotesTab';
 import type { PrepOption } from '@/lib/types';
 
 interface ItemProfile {
@@ -609,9 +610,7 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
 
               {/* ── Notes Tab ───────────────────────────────────────── */}
               <TabsContent value="notes">
-                <p className="text-sm text-muted-foreground">
-                  Notes for {selectedLabel}.
-                </p>
+                <ItemNotesTab tenantId={tenantId} itemId={selectedItemId} />
               </TabsContent>
 
             </CardContent>
