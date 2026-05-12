@@ -651,8 +651,7 @@ export function CustomerManagementPage({
 
             <Card className="rounded-b-lg border border-border/60 border-t-0">
               <CardContent className="pt-4">
-                <h2 className="text-base font-semibold tracking-tight">{formTitle}</h2>
-                <TabsContent value="profile" className="space-y-4">
+<TabsContent value="profile" className="space-y-4">
                 <div className="flex items-center gap-2">
                   <div className="flex-1" />
                   <Button type="button" variant="outline" size="sm" onClick={handleProfileCancel} disabled={!profileIsDirty} className="h-7">
