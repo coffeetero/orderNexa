@@ -16,8 +16,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CustomerNotesTab } from '@/components/features/account/CustomerNotesTab';
-import { CustomerPricebooksTab } from '@/components/features/account/CustomerPricebooksTab';
+import { CustomerNotesTab, CustomerNotesTabHandle } from '@/components/features/account/CustomerNotesTab';
+import { CustomerPricebooksTab, CustomerPricebooksTabHandle } from '@/components/features/account/CustomerPricebooksTab';
+import { SaveChangesDialog } from '@/components/features/account/SaveChangesDialog';
 
 type TenantOption = {
   tenant_id: number;
@@ -250,6 +251,13 @@ export function CustomerManagementPage({
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(initialMessage);
+  const [activeTab, setActiveTab] = useState('profile');
+  const [pendingTab, setPendingTab] = useState<string | null>(null);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [pricingIsDirty, setPricingIsDirty] = useState(false);
+  const [notesIsDirty, setNotesIsDirty] = useState(false);
+  const notesTabRef = useRef<CustomerNotesTabHandle>(null);
+  const pricingTabRef = useRef<CustomerPricebooksTabHandle>(null);
   const didRetryInitialCustomersRef = useRef(false);
 
   useEffect(() => {
@@ -473,6 +481,48 @@ export function CustomerManagementPage({
     setIsSaving(false);
   };
 
+  const profileIsDirty = selectedOriginal
+    ? JSON.stringify(formState) !== JSON.stringify(toFormState(selectedOriginal))
+    : formState.customer_name.trim() !== '' || formState.customer_number.trim() !== '';
+
+  const currentTabIsDirty =
+    activeTab === 'profile' ? profileIsDirty :
+    activeTab === 'pricing' ? pricingIsDirty :
+    activeTab === 'notes'   ? notesIsDirty   : false;
+
+  const handleTabChange = (newTab: string) => {
+    if (currentTabIsDirty) {
+      setPendingTab(newTab);
+      setShowSaveDialog(true);
+    } else {
+      setActiveTab(newTab);
+    }
+  };
+
+  const handleDialogYes = async () => {
+    setShowSaveDialog(false);
+    if (activeTab === 'profile') await handleSave();
+    else if (activeTab === 'pricing') await pricingTabRef.current?.save();
+    else if (activeTab === 'notes') await notesTabRef.current?.save();
+    if (pendingTab) setActiveTab(pendingTab);
+    setPendingTab(null);
+  };
+
+  const handleDialogNo = () => {
+    setShowSaveDialog(false);
+    if (pendingTab) setActiveTab(pendingTab);
+    setPendingTab(null);
+  };
+
+  const handleProfileCancel = () => {
+    if (selectedOriginal) {
+      setFormState(toFormState(selectedOriginal));
+    } else if (tenantId) {
+      setFormState(emptyForm(tenantId));
+    }
+    setStatusMessage(null);
+  };
+
   const tenantSelectHidden = tenants.length <= 1;
   const titleNumber = formState.customer_number.trim();
   const titleName = formState.customer_name.trim();
@@ -552,25 +602,20 @@ export function CustomerManagementPage({
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-6">
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCreateClick}
-                  disabled={!tenantId}
-                >
-                  <Plus className="mr-1 h-3.5 w-3.5" />
-                  Customer
-                </Button>
-                <Button type="button" onClick={handleSave} size="sm" disabled={isSaving || !tenantId}>
-                  {isSaving ? 'Saving...' : 'Save'}
-                </Button>
-              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleCreateClick}
+                disabled={!tenantId}
+              >
+                <Plus className="mr-1 h-3.5 w-3.5" />
+                Customer
+              </Button>
             </div>
           </div>
 
-          <Tabs defaultValue="profile" className="space-y-0">
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-0">
             <TabsList className="relative z-0 h-auto w-fit justify-start gap-0.5 rounded-none bg-transparent p-0">
               <TabsTrigger
                 value="profile"
@@ -607,7 +652,17 @@ export function CustomerManagementPage({
             <Card className="rounded-b-lg border border-border/60 border-t-0">
               <CardContent className="pt-4">
                 <h2 className="text-base font-semibold tracking-tight">{formTitle}</h2>
-                <TabsContent value="profile" className="space-y-6">
+                <TabsContent value="profile" className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1" />
+                  <Button type="button" variant="outline" size="sm" onClick={handleProfileCancel} disabled={!profileIsDirty} className="h-7">
+                    Cancel
+                  </Button>
+                  <Button type="button" size="sm" onClick={handleSave} disabled={isSaving || !profileIsDirty} className="h-7">
+                    {isSaving ? 'Saving…' : 'Save'}
+                  </Button>
+                </div>
+                <div className="space-y-6">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
                     <Label htmlFor="customer_number">Customer Number</Label>
@@ -740,6 +795,7 @@ export function CustomerManagementPage({
                 </div>
 
                 {statusMessage && <p className="text-xs text-muted-foreground">{statusMessage}</p>}
+                </div>
               </TabsContent>
 
                 <TabsContent value="contacts">
@@ -750,15 +806,19 @@ export function CustomerManagementPage({
 
                 <TabsContent value="pricing" forceMount className="data-[state=inactive]:hidden">
                   <CustomerPricebooksTab
+                    ref={pricingTabRef}
                     tenantId={tenantId ?? 0}
                     customerId={selectedCustomerId}
+                    onDirtyChange={setPricingIsDirty}
                   />
                 </TabsContent>
 
                 <TabsContent value="notes" forceMount className="data-[state=inactive]:hidden">
                   <CustomerNotesTab
+                    ref={notesTabRef}
                     tenantId={tenantId ?? 0}
                     customerId={selectedCustomerId}
+                    onDirtyChange={setNotesIsDirty}
                   />
                 </TabsContent>
 
@@ -772,6 +832,12 @@ export function CustomerManagementPage({
           </Tabs>
         </div>
       </div>
+
+      <SaveChangesDialog
+        open={showSaveDialog}
+        onYes={handleDialogYes}
+        onNo={handleDialogNo}
+      />
     </div>
   );
 }
