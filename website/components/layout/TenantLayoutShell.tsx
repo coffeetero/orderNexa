@@ -98,7 +98,7 @@ export function TenantLayoutShell({ children, sidebarHomeHref = '/dashboard' }: 
           userRole="Bakery Admin"
         />
 
-        <main className="flex-1 overflow-y-auto bg-background pt-[1px] pb-[1px] px-[10px] scrollbar-thin">
+        <main className="flex-1 overflow-y-auto bg-background pb-[1px] px-[10px] scrollbar-thin">
           {children}
         </main>
       </div>

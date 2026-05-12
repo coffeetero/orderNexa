@@ -11,9 +11,5 @@ export default async function TenantItemProfileRoute() {
   const tenants = Array.isArray(tenantData) ? tenantData : [];
   const tenantId: number | undefined = tenants.length > 0 ? tenants[0].tenant_id : undefined;
 
-  return (
-    <div className="h-full overflow-hidden -mx-[10px] -my-[1px]">
-      <ItemProfilePage tenantId={tenantId} />
-    </div>
-  );
+  return <ItemProfilePage tenantId={tenantId} />;
 }
