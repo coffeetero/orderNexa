@@ -4,7 +4,7 @@
 -- Soft-deletes a note by setting deleted_at = now().
 -- Records updated_by from the calling user.
 --
--- SECURITY INVOKER — RLS on fnd_notes enforces tenant scoping.
+-- SECURITY DEFINER — bypasses RLS for writes; tenant validated via JWT.
 -- Prerequisites: fnd_notes.sql, fnd_users.sql
 -- ============================================================
 
@@ -14,12 +14,23 @@ CREATE OR REPLACE FUNCTION bps.fnd_notes_delete(
 )
 RETURNS JSONB
 LANGUAGE plpgsql
-SECURITY INVOKER
+SECURITY DEFINER
 SET search_path = bps, public
 AS $$
 DECLARE
   v_user_id BIGINT;
 BEGIN
+  IF NOT (
+    p_tenant_id::text = ANY (ARRAY(
+      SELECT jsonb_array_elements_text(
+        (NULLIF(current_setting('request.jwt.claims', true), ''))::jsonb
+          -> 'app_metadata' -> 'allowed_tenant_ids'
+      )
+    ))
+  ) THEN
+    RAISE EXCEPTION 'Access denied for tenant %', p_tenant_id;
+  END IF;
+
   SELECT user_id INTO v_user_id
   FROM fnd_users
   WHERE auth_user_id = auth.uid()

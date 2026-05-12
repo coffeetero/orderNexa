@@ -5,7 +5,8 @@
 -- When p_entry.note_id is null → INSERT; otherwise UPDATE.
 -- created_by / updated_by resolved from auth.uid() → fnd_users.
 --
--- SECURITY INVOKER — RLS on fnd_notes enforces tenant scoping.
+-- SECURITY DEFINER — bypasses RLS for writes; tenant validated via JWT.
+-- fnd_notes_get (reads) uses SECURITY INVOKER so RLS visibility gate applies.
 -- Prerequisites: fnd_notes.sql, fnd_users.sql
 -- ============================================================
 
@@ -15,7 +16,7 @@ CREATE OR REPLACE FUNCTION bps.fnd_notes_save(
 )
 RETURNS JSONB
 LANGUAGE plpgsql
-SECURITY INVOKER
+SECURITY DEFINER
 SET search_path = bps, public
 AS $$
 DECLARE
@@ -30,6 +31,17 @@ DECLARE
   v_is_pinned    BOOLEAN;
   v_visibility   TEXT;
 BEGIN
+  IF NOT (
+    p_tenant_id::text = ANY (ARRAY(
+      SELECT jsonb_array_elements_text(
+        (NULLIF(current_setting('request.jwt.claims', true), ''))::jsonb
+          -> 'app_metadata' -> 'allowed_tenant_ids'
+      )
+    ))
+  ) THEN
+    RAISE EXCEPTION 'Access denied for tenant %', p_tenant_id;
+  END IF;
+
   SELECT user_id INTO v_user_id
   FROM fnd_users
   WHERE auth_user_id = auth.uid()
