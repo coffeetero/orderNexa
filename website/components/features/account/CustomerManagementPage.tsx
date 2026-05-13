@@ -732,22 +732,10 @@ export function CustomerManagementPage({
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="customer_type">Customer Type</Label>
-                    <Select
-                      value={formState.customer_type}
-                      onValueChange={(value) => updateField('customer_type', value)}
-                    >
-                      <SelectTrigger id="customer_type">
-                        <SelectValue placeholder="Select type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {CUSTOMER_TYPES.map((type) => (
-                          <SelectItem key={type} value={type}>
-                            {type}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label>Customer Type</Label>
+                    <div className="flex h-9 items-center rounded-md border border-input bg-muted/30 px-3 text-sm text-muted-foreground">
+                      {formState.customer_type || <span className="italic opacity-50">None</span>}
+                    </div>
                   </div>
                   <div className="space-y-1.5">
                     <Label>Parent Customer</Label>
