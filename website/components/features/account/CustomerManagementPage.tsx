@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { CustomerContactsTab, CustomerContactsTabHandle } from '@/components/features/account/CustomerContactsTab';
 import { CustomerNotesTab, CustomerNotesTabHandle } from '@/components/features/account/CustomerNotesTab';
 import { CustomerPricebooksTab, CustomerPricebooksTabHandle } from '@/components/features/account/CustomerPricebooksTab';
 import { SaveChangesDialog } from '@/components/features/account/SaveChangesDialog';
@@ -254,8 +255,10 @@ export function CustomerManagementPage({
   const [activeTab, setActiveTab] = useState('profile');
   const [pendingTab, setPendingTab] = useState<string | null>(null);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [contactsIsDirty, setContactsIsDirty] = useState(false);
   const [pricingIsDirty, setPricingIsDirty] = useState(false);
   const [notesIsDirty, setNotesIsDirty] = useState(false);
+  const contactsTabRef = useRef<CustomerContactsTabHandle>(null);
   const notesTabRef = useRef<CustomerNotesTabHandle>(null);
   const pricingTabRef = useRef<CustomerPricebooksTabHandle>(null);
   const didRetryInitialCustomersRef = useRef(false);
@@ -486,6 +489,7 @@ export function CustomerManagementPage({
   useEffect(() => {
     if (isDepartment) {
       setActiveTab('profile');
+      setContactsIsDirty(false);
       setPricingIsDirty(false);
       setNotesIsDirty(false);
       focusFirstEditableInActiveTabPanel();
@@ -497,9 +501,10 @@ export function CustomerManagementPage({
     : formState.customer_name.trim() !== '' || formState.customer_number.trim() !== '';
 
   const currentTabIsDirty =
-    activeTab === 'profile' ? profileIsDirty :
-    activeTab === 'pricing' ? pricingIsDirty :
-    activeTab === 'notes'   ? notesIsDirty   : false;
+    activeTab === 'profile'  ? profileIsDirty  :
+    activeTab === 'contacts' ? contactsIsDirty :
+    activeTab === 'pricing'  ? pricingIsDirty  :
+    activeTab === 'notes'    ? notesIsDirty    : false;
 
   const handleTabChange = (newTab: string) => {
     if (currentTabIsDirty) {
@@ -512,9 +517,10 @@ export function CustomerManagementPage({
 
   const handleDialogYes = async () => {
     setShowSaveDialog(false);
-    if (activeTab === 'profile') await handleSave();
-    else if (activeTab === 'pricing') await pricingTabRef.current?.save();
-    else if (activeTab === 'notes') await notesTabRef.current?.save();
+    if (activeTab === 'profile')       await handleSave();
+    else if (activeTab === 'contacts') await contactsTabRef.current?.save();
+    else if (activeTab === 'pricing')  await pricingTabRef.current?.save();
+    else if (activeTab === 'notes')    await notesTabRef.current?.save();
     if (pendingTab) setActiveTab(pendingTab);
     setPendingTab(null);
   };
@@ -810,10 +816,13 @@ export function CustomerManagementPage({
               </TabsContent>
 
                 {!isDepartment && (<>
-                <TabsContent value="contacts">
-                  <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
-                    Contacts grid will be added here for <span className="font-medium">{selectedCustomerLabel}</span>.
-                  </div>
+                <TabsContent value="contacts" forceMount className="data-[state=inactive]:hidden">
+                  <CustomerContactsTab
+                    ref={contactsTabRef}
+                    tenantId={tenantId ?? 0}
+                    customerId={selectedCustomerId}
+                    onDirtyChange={setContactsIsDirty}
+                  />
                 </TabsContent>
 
                 <TabsContent value="pricing" forceMount className="data-[state=inactive]:hidden">
