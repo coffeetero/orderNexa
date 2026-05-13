@@ -750,18 +750,20 @@ export function CustomerManagementPage({
                     </Select>
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="parent_id">Parent Customer ID</Label>
-                    <Input
-                      id="parent_id"
-                      type="number"
-                      value={formState.customer_parent_id ?? ''}
-                      onChange={(event) =>
-                        updateField(
-                          'customer_parent_id',
-                          event.target.value === '' ? null : Number(event.target.value)
-                        )
-                      }
-                    />
+                    <Label>Parent Customer</Label>
+                    {(() => {
+                      const parent = customers.find(c => c.customer_id === formState.customer_parent_id);
+                      const label = parent
+                        ? [parent.customer_number, parent.customer_name].filter(Boolean).join(' – ')
+                        : formState.customer_parent_id
+                        ? String(formState.customer_parent_id)
+                        : '';
+                      return (
+                        <div className="flex h-9 items-center rounded-md border border-input bg-muted/30 px-3 text-sm text-muted-foreground">
+                          {label || <span className="italic opacity-50">None</span>}
+                        </div>
+                      );
+                    })()}
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="legacy_id">Legacy ID</Label>
