@@ -23,6 +23,14 @@ function idKey(id: string | number): string {
   return String(id);
 }
 
+export type ItemWeight = 'bold' | 'regular' | 'muted';
+
+const WEIGHT_CLASS: Record<ItemWeight, string> = {
+  bold:    'font-semibold text-foreground dark:text-white',
+  regular: 'text-foreground dark:text-white',
+  muted:   'text-foreground/50 dark:text-white/50',
+};
+
 export type EntityComboBoxProps<T> = {
   items: T[];
   /** Current selection id, or null. */
@@ -33,6 +41,8 @@ export type EntityComboBoxProps<T> = {
   getLabel: (item: T) => string;
   /** Optional class applied to the row label text only. */
   getItemLabelClassName?: (item: T) => string | undefined;
+  /** Semantic weight applied to the row label; takes precedence over getItemLabelClassName. */
+  getItemWeight?: (item: T) => ItemWeight | undefined;
   /** Text shown in the inline search input after selection; defaults to getLabel. */
   getInputLabel?: (item: T) => string;
   getParentId: (item: T) => string | number | null;
@@ -145,6 +155,7 @@ export function EntityComboBox<T>({
   getId,
   getLabel,
   getItemLabelClassName,
+  getItemWeight,
   getInputLabel,
   getParentId,
   getSearchText: getSearchTextProp,
@@ -733,7 +744,7 @@ export function EntityComboBox<T>({
               <span
                 className={cn(
                   'min-w-0 flex-1 truncate font-mono text-xs leading-none',
-                  getItemLabelClassName?.(item),
+                  getItemWeight ? WEIGHT_CLASS[getItemWeight(item) ?? 'regular'] : getItemLabelClassName?.(item),
                 )}
                 style={{ paddingLeft: level * 10 }}
               >

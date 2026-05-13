@@ -315,11 +315,11 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
 
         {/* Tab header */}
         <div className="flex flex-wrap shrink-0 items-center gap-2 border-b border-border/60 px-3 py-1.5">
+          <div className="flex-1" />
           <Button type="button" variant="ghost" size="sm" onClick={applyNew} className="h-7 gap-1 px-2 text-xs">
             <Plus className="h-3.5 w-3.5" />
             Contact
           </Button>
-          <div className="flex-1" />
           <Button
             type="button" variant="outline" size="sm"
             onClick={cancel} disabled={!isDirty} className="h-7"
@@ -409,7 +409,7 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
 
               {/* Contact details */}
               <div className="space-y-2.5">
-                <div className="grid grid-cols-[76px_1fr_1fr] gap-2">
+                <div className="grid grid-cols-[76px_1fr_1fr_auto_auto] items-end gap-2">
                   <div>
                     <p className="mb-0.5 text-xs text-muted-foreground">Salutation</p>
                     <Input
@@ -434,18 +434,38 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
                       className="h-7 text-sm"
                     />
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setField('is_primary', !form.is_primary)}
+                    className={cn(
+                      'flex h-7 items-center gap-1.5 text-xs transition-colors',
+                      form.is_primary ? 'text-amber-500' : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    <Star className="h-3.5 w-3.5" fill={form.is_primary ? 'currentColor' : 'none'} />
+                    Primary
+                  </button>
+                  <label className="flex h-7 items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.is_active}
+                      onChange={e => setField('is_active', e.target.checked)}
+                      className="h-3.5 w-3.5 rounded border-input"
+                    />
+                    Active
+                  </label>
                 </div>
-                <div>
-                  <p className="mb-0.5 text-xs text-muted-foreground">
-                    Display Name <span className="text-destructive">*</span>
-                  </p>
-                  <Input
-                    value={form.contact_name}
-                    onChange={e => setField('contact_name', e.target.value)}
-                    className="h-7 text-sm" placeholder="Full name or company"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-[1fr_1fr_1fr] gap-2">
+                  <div>
+                    <p className="mb-0.5 text-xs text-muted-foreground">
+                      Display Name <span className="text-destructive">*</span>
+                    </p>
+                    <Input
+                      value={form.contact_name}
+                      onChange={e => setField('contact_name', e.target.value)}
+                      className="h-7 text-sm" placeholder="Full name or company"
+                    />
+                  </div>
                   <div>
                     <p className="mb-0.5 text-xs text-muted-foreground">Job Title</p>
                     <Input
@@ -463,28 +483,6 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
                     />
                   </div>
                 </div>
-                <div className="flex items-center gap-4">
-                  <button
-                    type="button"
-                    onClick={() => setField('is_primary', !form.is_primary)}
-                    className={cn(
-                      'flex items-center gap-1.5 text-xs transition-colors',
-                      form.is_primary ? 'text-amber-500' : 'text-muted-foreground hover:text-foreground',
-                    )}
-                  >
-                    <Star className="h-3.5 w-3.5" fill={form.is_primary ? 'currentColor' : 'none'} />
-                    Primary contact
-                  </button>
-                  <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={form.is_active}
-                      onChange={e => setField('is_active', e.target.checked)}
-                      className="h-3.5 w-3.5 rounded border-input"
-                    />
-                    Active
-                  </label>
-                </div>
               </div>
 
               {/* Divider */}
@@ -498,9 +496,9 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
                     className="grid items-center gap-2 px-0.5"
                     style={{ gridTemplateColumns: '108px 80px 1fr auto' }}
                   >
-                    <p className="text-xs text-muted-foreground">Type</p>
-                    <p className="text-xs text-muted-foreground">Label</p>
-                    <p className="text-xs text-muted-foreground">Value</p>
+                    <p className="text-xs text-muted-foreground text-center">Type</p>
+                    <p className="text-xs text-muted-foreground text-center">Label</p>
+                    <p className="text-xs text-muted-foreground text-center">Details</p>
                     <div className="w-[68px]" />
                   </div>
                 )}

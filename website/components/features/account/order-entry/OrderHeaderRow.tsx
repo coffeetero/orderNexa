@@ -167,9 +167,13 @@ export function OrderHeaderRow({
             onAfterSelect={onCustomerAfterSelect}
             getId={(c) => c.customer_id}
             getLabel={getCustomerLabel}
-            getItemLabelClassName={(c) =>
-              isDepartmentCustomer(c) ? 'text-emerald-700 dark:text-emerald-300' : undefined
-            }
+            getItemWeight={(c) => {
+              const t = (c.customer_type ?? '').trim().toUpperCase();
+              if (t === 'ACCOUNT')    return 'bold';
+              if (t === 'SITE')       return 'regular';
+              if (t === 'DEPARTMENT') return 'muted';
+              return undefined;
+            }}
             getInputLabel={getCustomerInputLabel}
             getSearchText={(c) =>
               `${c.customer_number ?? ''} ${c.customer_name}`
