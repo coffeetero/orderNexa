@@ -251,6 +251,7 @@ export function CustomerManagementPage({
   const [statusMessage, setStatusMessage] = useState<string | null>(initialMessage);
   const [activeTab, setActiveTab] = useState('profile');
   const [pendingTab, setPendingTab] = useState<string | null>(null);
+  const [pendingCustomer, setPendingCustomer] = useState<CustomerRow | null>(null);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [contactsIsDirty, setContactsIsDirty] = useState(false);
   const [pricingIsDirty, setPricingIsDirty] = useState(false);
@@ -527,14 +528,14 @@ export function CustomerManagementPage({
     else if (activeTab === 'contacts') await contactsTabRef.current?.save();
     else if (activeTab === 'pricing')  await pricingTabRef.current?.save();
     else if (activeTab === 'notes')    await notesTabRef.current?.save();
-    if (pendingTab) setActiveTab(pendingTab);
-    setPendingTab(null);
+    if (pendingTab) { setActiveTab(pendingTab); setPendingTab(null); }
+    if (pendingCustomer) { void loadCustomerIntoForm(pendingCustomer); setPendingCustomer(null); }
   };
 
   const handleDialogNo = () => {
     setShowSaveDialog(false);
-    if (pendingTab) setActiveTab(pendingTab);
-    setPendingTab(null);
+    if (pendingTab) { setActiveTab(pendingTab); setPendingTab(null); }
+    if (pendingCustomer) { void loadCustomerIntoForm(pendingCustomer); setPendingCustomer(null); }
   };
 
   const handleProfileCancel = () => {
@@ -759,7 +760,14 @@ export function CustomerManagementPage({
                               size="sm"
                               className="h-9 px-2.5"
                               title="Go to parent customer"
-                              onClick={() => void loadCustomerIntoForm(parent)}
+                              onClick={() => {
+                                if (currentTabIsDirty) {
+                                  setPendingCustomer(parent);
+                                  setShowSaveDialog(true);
+                                } else {
+                                  void loadCustomerIntoForm(parent);
+                                }
+                              }}
                             >
                               <CornerUpLeft className="h-3.5 w-3.5" />
                             </Button>
@@ -769,13 +777,10 @@ export function CustomerManagementPage({
                     })()}
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="legacy_id">Legacy ID</Label>
-                    <Input
-                      id="legacy_id"
-                      type="number"
-                      value={formState.legacy_id}
-                      onChange={(event) => updateField('legacy_id', event.target.value)}
-                    />
+                    <Label>Legacy ID</Label>
+                    <div className="flex h-9 items-center rounded-md border border-input bg-muted/30 px-3 text-sm text-muted-foreground">
+                      {formState.legacy_id || <span className="italic opacity-50">None</span>}
+                    </div>
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="invoice_copy_count">Invoice Copy Count</Label>
