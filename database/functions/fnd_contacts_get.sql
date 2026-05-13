@@ -3,6 +3,9 @@
 -- Returns all active contacts (with nested contact_points)
 -- for a given entity. Used by the Contacts tab.
 --
+-- Order: BILLING first, SHIPPING second, PERSON contacts after
+-- (sorted by is_primary DESC, contact_name within PERSON).
+--
 -- SECURITY DEFINER — bypasses RLS; tenant validated via JWT.
 -- ============================================================
 
@@ -33,6 +36,7 @@ BEGIN
     SELECT jsonb_agg(
       jsonb_build_object(
         'contact_id',          c.contact_id,
+        'contact_type',        c.contact_type,
         'salutation',          COALESCE(c.salutation, ''),
         'first_name',          COALESCE(c.first_name, ''),
         'last_name',           COALESCE(c.last_name, ''),
@@ -66,7 +70,10 @@ BEGIN
             AND cp.is_active  = TRUE
         ), '[]'::jsonb)
       )
-      ORDER BY c.is_primary DESC, c.contact_name
+      ORDER BY
+        CASE c.contact_type WHEN 'BILLING' THEN 0 WHEN 'SHIPPING' THEN 1 ELSE 2 END,
+        c.is_primary DESC,
+        c.contact_name
     )
     FROM fnd_contacts c
     WHERE c.tenant_id    = p_tenant_id

@@ -19,6 +19,12 @@ CREATE TABLE IF NOT EXISTS fnd_contacts (
     entity_id           BIGINT      NOT NULL,
     source_table        TEXT        NOT NULL,   -- 'fnd_customers' | 'fnd_users' | 'fnd_tenants' | ...
 
+    -- ── Contact role ─────────────────────────────────────────
+    -- PERSON  = regular person contact (default)
+    -- BILLING = system contact for billing addresses (auto-created, one per entity)
+    -- SHIPPING= system contact for shipping/delivery addresses (auto-created, one per entity)
+    contact_type        TEXT        NOT NULL DEFAULT 'PERSON',
+
     -- ── Person details ───────────────────────────────────────
     salutation          TEXT,                   -- Mr. Ms. Dr. etc.
     first_name          TEXT,
@@ -58,10 +64,24 @@ CREATE INDEX IF NOT EXISTS idx_fnd_contacts_active
     ON fnd_contacts (tenant_id)
     WHERE is_active = TRUE;
 
--- Only one primary contact per entity
+-- One BILLING and one SHIPPING system contact per entity
+CREATE UNIQUE INDEX IF NOT EXISTS uq_fnd_contacts_billing
+    ON fnd_contacts (tenant_id, source_table, entity_id)
+    WHERE contact_type = 'BILLING';
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_fnd_contacts_shipping
+    ON fnd_contacts (tenant_id, source_table, entity_id)
+    WHERE contact_type = 'SHIPPING';
+
+-- Only one primary PERSON contact per entity
 CREATE UNIQUE INDEX IF NOT EXISTS uq_fnd_contacts_primary
     ON fnd_contacts (tenant_id, source_table, entity_id)
-    WHERE is_primary = TRUE;
+    WHERE is_primary = TRUE AND contact_type = 'PERSON';
+
+-- Check: valid contact types
+ALTER TABLE fnd_contacts DROP CONSTRAINT IF EXISTS chk_fnd_contacts_contact_type;
+ALTER TABLE fnd_contacts ADD CONSTRAINT chk_fnd_contacts_contact_type
+    CHECK (contact_type IN ('PERSON', 'BILLING', 'SHIPPING'));
 
 -- ── Triggers ─────────────────────────────────────────────────────────────────
 

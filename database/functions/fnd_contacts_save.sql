@@ -5,6 +5,13 @@
 -- updated; points previously saved but absent from the array
 -- are deleted.
 --
+-- contact_type is immutable after creation:
+--   PERSON   — regular person contact
+--   BILLING  — system billing address contact (auto-created)
+--   SHIPPING — system shipping address contact (auto-created)
+-- contact_name is locked to 'Billing Address' / 'Shipping Address'
+-- for system contacts; is_primary is forced FALSE for them.
+--
 -- SECURITY DEFINER — bypasses RLS; tenant validated via JWT.
 -- ============================================================
 
@@ -20,13 +27,14 @@ SECURITY DEFINER
 SET search_path = bps, public
 AS $$
 DECLARE
-  v_user_id    BIGINT;
-  v_contact_id BIGINT;
-  v_is_primary BOOLEAN;
-  v_point      JSONB;
-  v_point_id   BIGINT;
-  v_pt_primary BOOLEAN;
-  v_kept_ids   BIGINT[] := '{}';
+  v_user_id      BIGINT;
+  v_contact_id   BIGINT;
+  v_contact_type TEXT;
+  v_is_primary   BOOLEAN;
+  v_point        JSONB;
+  v_point_id     BIGINT;
+  v_pt_primary   BOOLEAN;
+  v_kept_ids     BIGINT[] := '{}';
 BEGIN
   -- JWT tenant check
   IF NOT (
@@ -47,21 +55,43 @@ BEGIN
   LIMIT 1;
 
   v_contact_id := NULLIF(p_contact->>'contact_id', '')::BIGINT;
-  v_is_primary := COALESCE((p_contact->>'is_primary')::BOOLEAN, FALSE);
+
+  -- Resolve contact_type: read from DB for existing contacts (immutable),
+  -- use input value (default PERSON) for new contacts.
+  IF v_contact_id IS NOT NULL THEN
+    SELECT contact_type INTO v_contact_type
+    FROM fnd_contacts
+    WHERE contact_id = v_contact_id
+      AND tenant_id  = p_tenant_id;
+  ELSE
+    v_contact_type := COALESCE(NULLIF(p_contact->>'contact_type', ''), 'PERSON');
+  END IF;
+
+  -- System contacts are never the primary person contact
+  v_is_primary := CASE
+    WHEN v_contact_type IN ('BILLING', 'SHIPPING') THEN FALSE
+    ELSE COALESCE((p_contact->>'is_primary')::BOOLEAN, FALSE)
+  END;
 
   -- ── Upsert contact ──────────────────────────────────────────
   IF v_contact_id IS NULL THEN
     INSERT INTO fnd_contacts (
       tenant_id, entity_id, source_table,
+      contact_type,
       salutation, first_name, last_name, contact_name,
       job_title, department, is_primary, is_active,
       created_by, updated_by
     ) VALUES (
       p_tenant_id, p_entity_id, p_source_table,
+      v_contact_type,
       NULLIF(p_contact->>'salutation', ''),
       NULLIF(p_contact->>'first_name', ''),
       NULLIF(p_contact->>'last_name',  ''),
-      p_contact->>'contact_name',
+      CASE v_contact_type
+        WHEN 'BILLING'  THEN 'Billing Address'
+        WHEN 'SHIPPING' THEN 'Shipping Address'
+        ELSE p_contact->>'contact_name'
+      END,
       NULLIF(p_contact->>'job_title',  ''),
       NULLIF(p_contact->>'department', ''),
       v_is_primary,
@@ -71,12 +101,18 @@ BEGIN
     RETURNING contact_id INTO v_contact_id;
   ELSE
     UPDATE fnd_contacts SET
-      salutation   = NULLIF(p_contact->>'salutation', ''),
-      first_name   = NULLIF(p_contact->>'first_name', ''),
-      last_name    = NULLIF(p_contact->>'last_name',  ''),
-      contact_name = p_contact->>'contact_name',
-      job_title    = NULLIF(p_contact->>'job_title',  ''),
-      department   = NULLIF(p_contact->>'department', ''),
+      -- Person fields only updated for PERSON contacts
+      salutation   = CASE WHEN v_contact_type = 'PERSON' THEN NULLIF(p_contact->>'salutation', '') ELSE salutation END,
+      first_name   = CASE WHEN v_contact_type = 'PERSON' THEN NULLIF(p_contact->>'first_name', '') ELSE first_name END,
+      last_name    = CASE WHEN v_contact_type = 'PERSON' THEN NULLIF(p_contact->>'last_name',  '') ELSE last_name  END,
+      -- contact_name locked for system contacts
+      contact_name = CASE v_contact_type
+                       WHEN 'BILLING'  THEN 'Billing Address'
+                       WHEN 'SHIPPING' THEN 'Shipping Address'
+                       ELSE p_contact->>'contact_name'
+                     END,
+      job_title    = CASE WHEN v_contact_type = 'PERSON' THEN NULLIF(p_contact->>'job_title',  '') ELSE job_title  END,
+      department   = CASE WHEN v_contact_type = 'PERSON' THEN NULLIF(p_contact->>'department', '') ELSE department END,
       is_primary   = v_is_primary,
       is_active    = COALESCE((p_contact->>'is_active')::BOOLEAN, TRUE),
       updated_by   = v_user_id
@@ -84,12 +120,13 @@ BEGIN
       AND tenant_id  = p_tenant_id;
   END IF;
 
-  -- Enforce one primary contact per entity
-  IF v_is_primary THEN
+  -- Enforce one primary PERSON contact per entity
+  IF v_is_primary AND v_contact_type = 'PERSON' THEN
     UPDATE fnd_contacts SET is_primary = FALSE
     WHERE tenant_id    = p_tenant_id
       AND entity_id    = p_entity_id
       AND source_table = p_source_table
+      AND contact_type = 'PERSON'
       AND contact_id  != v_contact_id;
   END IF;
 
