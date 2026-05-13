@@ -11,6 +11,7 @@ import {
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -18,7 +19,6 @@ import { cn } from '@/lib/utils';
 const POINT_TYPES = ['PHONE', 'MOBILE', 'FAX', 'EMAIL', 'ADDRESS', 'WEBSITE', 'OTHER'] as const;
 type PointType = typeof POINT_TYPES[number];
 
-const PHONE_TYPES = new Set<PointType>(['PHONE', 'MOBILE', 'FAX']);
 
 const TYPE_LABEL: Record<PointType, string> = {
   PHONE: 'Phone', MOBILE: 'Mobile', FAX: 'Fax',
@@ -307,8 +307,6 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
       );
     }
 
-    const typesWithPoints    = POINT_TYPES.filter(t => form.contact_points.some(p => p.type === t));
-    const typesWithoutPoints = POINT_TYPES.filter(t => !form.contact_points.some(p => p.type === t));
 
     // ── Render ────────────────────────────────────────────────────────────────
 
@@ -492,146 +490,120 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
               {/* Divider */}
               <div className="border-t border-border/40" />
 
-              {/* Contact points — grouped by type */}
-              {typesWithPoints.length > 0 && (
-                <div className="space-y-5">
-                  {typesWithPoints.map(type => {
-                    const Icon     = TYPE_ICON[type];
-                    const isPhone  = PHONE_TYPES.has(type);
-                    const typeRows = form.contact_points
-                      .map((p, i) => ({ p, i }))
-                      .filter(({ p }) => p.type === type);
+              {/* Contact points — flat rows */}
+              <div className="space-y-1.5">
+                {/* Column headers (only when rows exist) */}
+                {form.contact_points.length > 0 && (
+                  <div
+                    className="grid items-center gap-2 px-0.5"
+                    style={{ gridTemplateColumns: '108px 80px 1fr auto' }}
+                  >
+                    <p className="text-xs text-muted-foreground">Type</p>
+                    <p className="text-xs text-muted-foreground">Label</p>
+                    <p className="text-xs text-muted-foreground">Value</p>
+                    <div className="w-[68px]" />
+                  </div>
+                )}
 
-                    return (
-                      <div key={type}>
-                        {/* Type header */}
-                        <div className="mb-2 flex items-center gap-1.5">
-                          <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                            {TYPE_LABEL[type]}
-                          </span>
-                        </div>
+                {form.contact_points.map((p, i) => (
+                  <div
+                    key={p.contact_point_id ?? `new-${i}`}
+                    className="grid items-start gap-2"
+                    style={{ gridTemplateColumns: '108px 80px 1fr auto' }}
+                  >
+                    {/* Type */}
+                    <Select
+                      value={p.type}
+                      onValueChange={(t) => updatePoint(i, { type: t as PointType })}
+                    >
+                      <SelectTrigger className="h-7 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {POINT_TYPES.map(t => (
+                          <SelectItem key={t} value={t} className="text-xs">
+                            {TYPE_LABEL[t]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
 
-                        <div className="space-y-2 pl-5">
-                          {typeRows.map(({ p, i }) => (
-                            <div
-                              key={p.contact_point_id ?? `new-${i}`}
-                              className="rounded-md border border-border/40 px-2.5 py-2 space-y-1.5"
-                            >
-                              {/* Value row */}
-                              <div className="flex gap-2">
-                                {isPhone && (
-                                  <Input
-                                    value={p.country_dial_code}
-                                    onChange={e => updatePoint(i, { country_dial_code: e.target.value })}
-                                    className="h-7 w-14 shrink-0 px-1.5 text-xs"
-                                    placeholder="+1"
-                                  />
-                                )}
-                                <textarea
-                                  value={p.value}
-                                  onChange={e => updatePoint(i, { value: e.target.value })}
-                                  rows={type === 'ADDRESS' ? 3 : isPhone ? 2 : 1}
-                                  className="flex-1 min-w-0 resize-none rounded border border-input bg-transparent px-2 py-1 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
-                                  placeholder={
-                                    type === 'EMAIL'   ? 'email@example.com' :
-                                    type === 'WEBSITE' ? 'https://' :
-                                    type === 'ADDRESS' ? '123 Main St\nCity, State 12345' :
-                                    (type === 'PHONE' || type === 'MOBILE') ? '555-1234' : ''
-                                  }
-                                />
-                              </div>
+                    {/* Label */}
+                    <Input
+                      value={p.label}
+                      onChange={e => updatePoint(i, { label: e.target.value })}
+                      className="h-7 text-xs"
+                      placeholder="e.g. Office"
+                    />
 
-                              {/* Geocode status */}
-                              {type === 'ADDRESS' && (
-                                <GeocodeStatus
-                                  status={p.geocode_status}
-                                  formattedAddress={p.formatted_address}
-                                />
-                              )}
+                    {/* Value + geocode status */}
+                    <div>
+                      <textarea
+                        value={p.value}
+                        onChange={e => updatePoint(i, { value: e.target.value })}
+                        rows={p.type === 'ADDRESS' ? 3 : 1}
+                        className="w-full resize-none rounded border border-input bg-transparent px-2 py-1 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
+                        placeholder={
+                          p.type === 'EMAIL'                    ? 'email@example.com' :
+                          p.type === 'WEBSITE'                  ? 'https://' :
+                          p.type === 'ADDRESS'                  ? '123 Main St\nCity, State 12345' :
+                          p.type === 'PHONE' || p.type === 'MOBILE' || p.type === 'FAX'
+                                                                ? '+1 555-1234' : ''
+                        }
+                      />
+                      {p.type === 'ADDRESS' && (
+                        <GeocodeStatus
+                          status={p.geocode_status}
+                          formattedAddress={p.formatted_address}
+                        />
+                      )}
+                    </div>
 
-                              {/* Controls row */}
-                              <div className="flex items-center gap-1.5">
-                                <Input
-                                  value={p.label}
-                                  onChange={e => updatePoint(i, { label: e.target.value })}
-                                  className="h-6 w-24 px-1.5 text-xs text-muted-foreground"
-                                  placeholder="Label"
-                                />
-                                <div className="flex-1" />
-                                <button
-                                  type="button"
-                                  title={p.is_primary ? 'Primary' : 'Set as primary'}
-                                  onClick={() => togglePointPrimary(i)}
-                                  className={cn(
-                                    'rounded p-0.5 transition-colors',
-                                    p.is_primary
-                                      ? 'text-amber-500'
-                                      : 'text-muted-foreground/40 hover:text-amber-400',
-                                  )}
-                                >
-                                  <Star className="h-3.5 w-3.5" fill={p.is_primary ? 'currentColor' : 'none'} />
-                                </button>
-                                <button
-                                  type="button"
-                                  title={p.do_not_contact ? 'Do not contact (click to toggle)' : 'Mark as do not contact'}
-                                  onClick={() => updatePoint(i, { do_not_contact: !p.do_not_contact })}
-                                  className={cn(
-                                    'rounded p-0.5 transition-colors',
-                                    p.do_not_contact
-                                      ? 'text-rose-500'
-                                      : 'text-muted-foreground/40 hover:text-rose-400',
-                                  )}
-                                >
-                                  <Ban className="h-3.5 w-3.5" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => removePoint(i)}
-                                  className="rounded p-0.5 text-muted-foreground/40 hover:text-destructive transition-colors"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-
-                          {/* Add another of same type */}
-                          <button
-                            type="button"
-                            onClick={() => addPoint(type)}
-                            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                          >
-                            <Plus className="h-3 w-3" />
-                            Add {TYPE_LABEL[type]}
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Add first-of-type chips */}
-              {typesWithoutPoints.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {typesWithoutPoints.map(type => {
-                    const Icon = TYPE_ICON[type];
-                    return (
+                    {/* Controls */}
+                    <div className="flex items-center gap-0.5 pt-0.5">
                       <button
-                        key={type}
                         type="button"
-                        onClick={() => addPoint(type)}
-                        className="flex items-center gap-1 rounded-full border border-border/60 px-2.5 py-0.5 text-xs text-muted-foreground hover:border-border hover:text-foreground transition-colors"
+                        title={p.is_primary ? 'Primary' : 'Set as primary'}
+                        onClick={() => togglePointPrimary(i)}
+                        className={cn(
+                          'rounded p-0.5 transition-colors',
+                          p.is_primary ? 'text-amber-500' : 'text-muted-foreground/40 hover:text-amber-400',
+                        )}
                       >
-                        <Plus className="h-3 w-3" />
-                        <Icon className="h-3 w-3" />
-                        {TYPE_LABEL[type]}
+                        <Star className="h-3.5 w-3.5" fill={p.is_primary ? 'currentColor' : 'none'} />
                       </button>
-                    );
-                  })}
-                </div>
-              )}
+                      <button
+                        type="button"
+                        title={p.do_not_contact ? 'Do not contact' : 'Mark as do not contact'}
+                        onClick={() => updatePoint(i, { do_not_contact: !p.do_not_contact })}
+                        className={cn(
+                          'rounded p-0.5 transition-colors',
+                          p.do_not_contact ? 'text-rose-500' : 'text-muted-foreground/40 hover:text-rose-400',
+                        )}
+                      >
+                        <Ban className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removePoint(i)}
+                        className="rounded p-0.5 text-muted-foreground/40 hover:text-destructive transition-colors"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Add row */}
+                <button
+                  type="button"
+                  onClick={() => addPoint('PHONE')}
+                  className="mt-1 flex items-center gap-1 rounded border border-dashed border-border/50 px-2 py-1 text-xs text-muted-foreground hover:border-border hover:text-foreground transition-colors"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add contact method
+                </button>
+              </div>
 
             </div>
           )}
