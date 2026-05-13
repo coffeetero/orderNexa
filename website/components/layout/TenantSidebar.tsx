@@ -65,7 +65,7 @@ const navSections: NavSection[] = [
     icon: Package,
     children: [
       { label: 'Manage Items', href: '/inventory', icon: Boxes },
-      { label: 'Item Profile', href: '/inventory/item-profile', icon: Package },
+      { label: 'Item Profiles', href: '/inventory/item-profile', icon: Package },
       { label: 'Pricing Lists', href: '/inventory/pricing', icon: Tags },
       { label: 'Recipes', href: '/inventory/recipes', icon: FlaskConical },
       { label: 'Waste Tracking', href: '/inventory/waste', icon: Trash2 },
