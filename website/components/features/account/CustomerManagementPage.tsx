@@ -695,21 +695,17 @@ export function CustomerManagementPage({
             <Card className="rounded-b-lg border border-border/60 border-t-0">
               <CardContent className="pt-4">
 <TabsContent value="profile" className="space-y-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  {selectedOriginal?.customer_type === 'ACCOUNT' && (<>
-                    <Button type="button" variant="outline" size="sm" onClick={() => handleCreateChild('SITE')} className="h-7">
-                      <Plus className="mr-1 h-3.5 w-3.5" />Site
-                    </Button>
-                    <Button type="button" variant="ghost" size="sm" onClick={() => handleCreateChild('DEPARTMENT')} className="h-7">
-                      <Plus className="mr-1 h-3.5 w-3.5" />Dept
-                    </Button>
-                  </>)}
-                  {selectedOriginal?.customer_type === 'SITE' && (
+                <div className="flex flex-wrap justify-end items-center gap-2">
+                  {(selectedOriginal?.customer_type === 'ACCOUNT' || selectedOriginal?.customer_type === 'SITE') && (
                     <Button type="button" variant="ghost" size="sm" onClick={() => handleCreateChild('DEPARTMENT')} className="h-7">
                       <Plus className="mr-1 h-3.5 w-3.5" />Dept
                     </Button>
                   )}
-                  <div className="flex-1" />
+                  {selectedOriginal?.customer_type === 'ACCOUNT' && (
+                    <Button type="button" variant="outline" size="sm" onClick={() => handleCreateChild('SITE')} className="h-7">
+                      <Plus className="mr-1 h-3.5 w-3.5" />Site
+                    </Button>
+                  )}
                   <Button type="button" variant="outline" size="sm" onClick={handleProfileCancel} disabled={!profileIsDirty} className="h-7">
                     Cancel
                   </Button>
