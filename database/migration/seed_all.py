@@ -9,20 +9,22 @@ Prerequisites (same as the individual seeds):
 Order:
   1. seed_fnd_pricebooks            — distinct cus_price_cd -> books; truncate pricebooks CASCADE
   2. seed_fnd_customers             — truncate customers + orders/lines; legacy customer
-  3. seed_fnd_customer_pricebooks   — PRIMARY price book per customer (cus_price_cd)
+  3. seed_fnd_contacts              — BILLING/SHIPPING contacts + billing/shipping address points
+  4. seed_fnd_customer_pricebooks   — PRIMARY price book per customer (cus_price_cd)
   4. seed_fnd_items                 — truncate items + cascaded dependents (incl. pricebook_items)
   5. seed_bps_items
-  6. seed_item_prep_options         — ITEMPREP valueset + item JSONB prep defaults
-  7. seed_fnd_item_bom
-  8. seed_fnd_pricebook_items       — item_price rows -> fnd_pricebook_items
-  9. seed_om_orders
-  10. seed_fnd_tenant_sequences     — Alpine order_number sequence from max(ordr_no)
-  11. seed_om_order_lines           — ordr_detail -> om_order_lines (after orders)
-  12. seed_om_order_shipments       — optional qty events from ordr_detail
-  13. seed_ar_transactions          — om_orders + legacy ordr -> ar_transactions (INVOICE)
-  14. seed_ar_transaction_lines     — INVOICE/DISCOUNT from shipments + legacy allowance
-  15. seed_ar_payments              — legacy public.ar (PMT) -> ar_payments
-  16. seed_ar_payment_applications  — pmt_detail -> ar_payment_applications (payment + invoice links)
+  6. seed_fnd_valuesets_from_legacy_item — ITEM_* valuesets from legacy item columns
+  7. seed_item_prep_options         — ITEMPREP valueset + item JSONB prep defaults
+  8. seed_fnd_item_bom
+  9. seed_fnd_pricebook_items       — item_price rows -> fnd_pricebook_items
+  10. seed_om_orders
+  11. seed_fnd_tenant_sequences     — Alpine order_number sequence from max(ordr_no)
+  12. seed_om_order_lines           — ordr_detail -> om_order_lines (after orders)
+  13. seed_om_order_shipments       — optional qty events from ordr_detail
+  14. seed_ar_transactions          — om_orders + legacy ordr -> ar_transactions (INVOICE)
+  15. seed_ar_transaction_lines     — INVOICE/DISCOUNT from shipments + legacy allowance
+  16. seed_ar_payments              — legacy public.ar (PMT) -> ar_payments
+  17. seed_ar_payment_applications  — pmt_detail -> ar_payment_applications (payment + invoice links)
 
 Usage (from repo root):
   python dataMigration/seed_all.py
@@ -50,9 +52,11 @@ BOOTSTRAP_SQL = ROOT / "newTables" / "seed_fnd_tenants.sql"
 SEEDS: list[str] = [
     "seed_fnd_pricebooks.sql",
     "seed_fnd_customers.sql",
+    "seed_fnd_contacts.sql",
     "seed_fnd_customer_pricebooks.sql",
     "seed_fnd_items.sql",
     "seed_bps_items.sql",
+    "seed_fnd_valuesets_from_legacy_item.sql",
     "seed_item_prep_options.sql",
     "seed_fnd_item_bom.sql",
     "seed_fnd_pricebook_items.sql",
