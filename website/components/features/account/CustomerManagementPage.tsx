@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, CornerUpLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { EntityComboBox } from '@/components/bps/EntityComboBox';
 import { Button } from '@/components/ui/button';
@@ -748,8 +748,22 @@ export function CustomerManagementPage({
                         ? String(formState.customer_parent_id)
                         : '';
                       return (
-                        <div className="flex h-9 items-center rounded-md border border-input bg-muted/30 px-3 text-sm text-muted-foreground">
-                          {label || <span className="italic opacity-50">None</span>}
+                        <div className="flex gap-1.5">
+                          <div className="flex h-9 flex-1 items-center rounded-md border border-input bg-muted/30 px-3 text-sm text-muted-foreground">
+                            {label || <span className="italic opacity-50">None</span>}
+                          </div>
+                          {parent && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-9 px-2.5"
+                              title="Go to parent customer"
+                              onClick={() => void loadCustomerIntoForm(parent)}
+                            >
+                              <CornerUpLeft className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                         </div>
                       );
                     })()}
