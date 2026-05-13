@@ -781,6 +781,13 @@ export function CustomerManagementPage({
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="flex items-center gap-2 text-sm">
                     <Checkbox
+                      checked={formState.is_active}
+                      onCheckedChange={(checked) => toggleField('is_active', checked === true)}
+                    />
+                    Active
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <Checkbox
                       checked={formState.is_standing_order}
                       onCheckedChange={(checked) => toggleField('is_standing_order', checked === true)}
                     />
@@ -793,13 +800,6 @@ export function CustomerManagementPage({
                       disabled={isDepartment}
                     />
                     Signature Required
-                  </label>
-                  <label className="flex items-center gap-2 text-sm">
-                    <Checkbox
-                      checked={formState.is_active}
-                      onCheckedChange={(checked) => toggleField('is_active', checked === true)}
-                    />
-                    Active
                   </label>
                   <label className={cn('flex items-center gap-2 text-sm', isDepartment && 'cursor-not-allowed opacity-50')}>
                     <Checkbox
