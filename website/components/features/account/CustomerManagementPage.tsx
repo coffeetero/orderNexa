@@ -87,10 +87,6 @@ function normalizeCustomerType(value: string | null | undefined): string {
   return customerType === 'LOCATION' ? 'DEPARTMENT' : customerType;
 }
 
-function isDepartmentCustomer(customer: Pick<CustomerRow, 'customer_type'>): boolean {
-  return normalizeCustomerType(customer.customer_type) === 'DEPARTMENT';
-}
-
 /** Focus first text/select control in the visible tab panel (for post–customer-select navigation). */
 function focusFirstEditableInActiveTabPanel() {
   window.setTimeout(() => {
@@ -485,6 +481,7 @@ export function CustomerManagementPage({
   };
 
   const isDepartment = formState.customer_type === 'DEPARTMENT';
+  const isAccount    = formState.customer_type === 'ACCOUNT';
 
   useEffect(() => {
     if (isDepartment) {
@@ -495,6 +492,14 @@ export function CustomerManagementPage({
       focusFirstEditableInActiveTabPanel();
     }
   }, [isDepartment]);
+
+  useEffect(() => {
+    if (!isAccount) {
+      if (activeTab === 'pricing') setActiveTab('contacts');
+      setPricingIsDirty(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAccount]);
 
   const profileIsDirty = selectedOriginal
     ? JSON.stringify(formState) !== JSON.stringify(toFormState(selectedOriginal))
@@ -538,6 +543,19 @@ export function CustomerManagementPage({
       setFormState(emptyForm(tenantId));
     }
     setStatusMessage(null);
+  };
+
+  const handleCreateChild = (type: 'SITE' | 'DEPARTMENT') => {
+    if (!tenantId || !selectedCustomerId) return;
+    const parentName = formState.customer_name.trim() || 'this customer';
+    setSelectedCustomerId(null);
+    setSelectedOriginal(null);
+    setFormState({
+      ...emptyForm(tenantId),
+      customer_type: type,
+      customer_parent_id: selectedCustomerId,
+    });
+    setStatusMessage(`New ${type === 'SITE' ? 'site' : 'department'} under ${parentName}.`);
   };
 
   const tenantSelectHidden = tenants.length <= 1;
@@ -602,9 +620,13 @@ export function CustomerManagementPage({
                 }}
                 getId={(c) => c.customer_id}
                 getLabel={(c) => `${c.customer_number ?? ''} - ${c.customer_name}`}
-                getItemLabelClassName={(c) =>
-                  isDepartmentCustomer(c) ? 'text-emerald-700 dark:text-emerald-300' : undefined
-                }
+                getItemWeight={(c) => {
+                  const t = normalizeCustomerType(c.customer_type);
+                  if (t === 'ACCOUNT')    return 'bold';
+                  if (t === 'SITE')       return 'regular';
+                  if (t === 'DEPARTMENT') return 'muted';
+                  return undefined;
+                }}
                 getSearchText={(c) =>
                   `${c.customer_number ?? ''} ${c.customer_name}`.trim()
                 }
@@ -647,12 +669,14 @@ export function CustomerManagementPage({
               >
                 Contacts
               </TabsTrigger>
+              {isAccount && (
               <TabsTrigger
                 value="pricing"
                 className="relative z-0 -mb-px rounded-b-none rounded-t-lg border border-muted bg-muted/70 px-4 py-1.5 data-[state=active]:z-10 data-[state=active]:translate-y-[1px] data-[state=active]:border-border/60 data-[state=active]:border-b-transparent data-[state=active]:bg-card"
               >
                 Pricing
               </TabsTrigger>
+              )}
               <TabsTrigger
                 value="notes"
                 className="relative z-0 -mb-px rounded-b-none rounded-t-lg border border-muted bg-muted/70 px-4 py-1.5 data-[state=active]:z-10 data-[state=active]:translate-y-[1px] data-[state=active]:border-border/60 data-[state=active]:border-b-transparent data-[state=active]:bg-card"
@@ -671,7 +695,21 @@ export function CustomerManagementPage({
             <Card className="rounded-b-lg border border-border/60 border-t-0">
               <CardContent className="pt-4">
 <TabsContent value="profile" className="space-y-4">
-                <div className="flex flex-wrap justify-end items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {selectedOriginal?.customer_type === 'ACCOUNT' && (<>
+                    <Button type="button" variant="outline" size="sm" onClick={() => handleCreateChild('SITE')} className="h-7">
+                      <Plus className="mr-1 h-3.5 w-3.5" />Site
+                    </Button>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => handleCreateChild('DEPARTMENT')} className="h-7">
+                      <Plus className="mr-1 h-3.5 w-3.5" />Dept
+                    </Button>
+                  </>)}
+                  {selectedOriginal?.customer_type === 'SITE' && (
+                    <Button type="button" variant="ghost" size="sm" onClick={() => handleCreateChild('DEPARTMENT')} className="h-7">
+                      <Plus className="mr-1 h-3.5 w-3.5" />Dept
+                    </Button>
+                  )}
+                  <div className="flex-1" />
                   <Button type="button" variant="outline" size="sm" onClick={handleProfileCancel} disabled={!profileIsDirty} className="h-7">
                     Cancel
                   </Button>
@@ -825,6 +863,7 @@ export function CustomerManagementPage({
                   />
                 </TabsContent>
 
+                {isAccount && (
                 <TabsContent value="pricing" forceMount className="data-[state=inactive]:hidden">
                   <CustomerPricebooksTab
                     ref={pricingTabRef}
@@ -833,6 +872,7 @@ export function CustomerManagementPage({
                     onDirtyChange={setPricingIsDirty}
                   />
                 </TabsContent>
+                )}
 
                 <TabsContent value="notes" forceMount className="data-[state=inactive]:hidden">
                   <CustomerNotesTab
