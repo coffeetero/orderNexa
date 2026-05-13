@@ -15,18 +15,19 @@ export async function GET(request: Request) {
   const tenantId   = parseInteger(url.searchParams.get('tenant_id'));
   const customerId = parseInteger(url.searchParams.get('customer_id'));
 
-  if (tenantId === null || customerId === null) {
-    return NextResponse.json({ error: 'Invalid or missing tenant_id / customer_id' }, { status: 400 });
+  if (tenantId === null) {
+    return NextResponse.json({ error: 'Invalid or missing tenant_id' }, { status: 400 });
   }
 
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const supabase = createClient();
-  const { data, error } = await supabase.rpc('fnd_customer_pricebooks_get', {
-    p_tenant_id:   tenantId,
-    p_customer_id: customerId,
-  });
+  const rpcArgs: Record<string, unknown> = { p_tenant_id: tenantId };
+  if (customerId !== null) rpcArgs.p_customer_id = customerId;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.rpc as any)('fnd_customer_pricebooks_get', rpcArgs);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ data });

@@ -481,6 +481,17 @@ export function CustomerManagementPage({
     setIsSaving(false);
   };
 
+  const isDepartment = formState.customer_type === 'DEPARTMENT';
+
+  useEffect(() => {
+    if (isDepartment) {
+      setActiveTab('profile');
+      setPricingIsDirty(false);
+      setNotesIsDirty(false);
+      focusFirstEditableInActiveTabPanel();
+    }
+  }, [isDepartment]);
+
   const profileIsDirty = selectedOriginal
     ? JSON.stringify(formState) !== JSON.stringify(toFormState(selectedOriginal))
     : formState.customer_name.trim() !== '' || formState.customer_number.trim() !== '';
@@ -623,6 +634,7 @@ export function CustomerManagementPage({
               >
                 Profile
               </TabsTrigger>
+              {!isDepartment && (<>
               <TabsTrigger
                 value="contacts"
                 className="relative z-0 -mb-px rounded-b-none rounded-t-lg border border-muted bg-muted/70 px-4 py-1.5 data-[state=active]:z-10 data-[state=active]:translate-y-[1px] data-[state=active]:border-border/60 data-[state=active]:border-b-transparent data-[state=active]:bg-card"
@@ -647,13 +659,13 @@ export function CustomerManagementPage({
               >
                 Settings
               </TabsTrigger>
+              </>)}
             </TabsList>
 
             <Card className="rounded-b-lg border border-border/60 border-t-0">
               <CardContent className="pt-4">
 <TabsContent value="profile" className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <div className="flex-1" />
+                <div className="flex flex-wrap justify-end items-center gap-2">
                   <Button type="button" variant="outline" size="sm" onClick={handleProfileCancel} disabled={!profileIsDirty} className="h-7">
                     Cancel
                   </Button>
@@ -797,6 +809,7 @@ export function CustomerManagementPage({
                 </div>
               </TabsContent>
 
+                {!isDepartment && (<>
                 <TabsContent value="contacts">
                   <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
                     Contacts grid will be added here for <span className="font-medium">{selectedCustomerLabel}</span>.
@@ -826,6 +839,7 @@ export function CustomerManagementPage({
                     Customer settings will be added here for <span className="font-medium">{selectedCustomerLabel}</span>.
                   </div>
                 </TabsContent>
+                </>)}
               </CardContent>
             </Card>
           </Tabs>

@@ -10,7 +10,7 @@
 
 CREATE OR REPLACE FUNCTION bps.fnd_customer_pricebooks_get(
   p_tenant_id   BIGINT,
-  p_customer_id BIGINT
+  p_customer_id BIGINT DEFAULT NULL
 )
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -52,6 +52,7 @@ BEGIN
       JOIN fnd_pricebooks pb ON pb.pricebook_id = cp.pricebook_id
       WHERE cp.tenant_id   = p_tenant_id
         AND cp.customer_id = p_customer_id
+        AND p_customer_id IS NOT NULL
     ), '[]'::jsonb),
     'pricebooks', COALESCE((
       SELECT jsonb_agg(

@@ -248,7 +248,7 @@ export const CustomerNotesTab = forwardRef<CustomerNotesTabHandle, CustomerNotes
       <div className="flex flex-col overflow-hidden rounded-lg border border-border/60" style={{ height: '520px' }}>
 
         {/* ── Tab header ──────────────────────────────────── */}
-        <div className="flex shrink-0 items-center gap-2 border-b border-border/60 px-3 py-1.5">
+        <div className="flex flex-wrap shrink-0 items-center gap-2 border-b border-border/60 px-3 py-1.5">
           <Button
             type="button"
             variant="ghost"
