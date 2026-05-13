@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { EntityComboBox } from '@/components/bps/EntityComboBox';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -770,6 +771,7 @@ export function CustomerManagementPage({
                       min={1}
                       value={formState.invoice_copy_count}
                       onChange={(event) => updateField('invoice_copy_count', event.target.value)}
+                      disabled={isDepartment}
                     />
                   </div>
                 </div>
@@ -784,10 +786,11 @@ export function CustomerManagementPage({
                     />
                     Standing Order
                   </label>
-                  <label className="flex items-center gap-2 text-sm">
+                  <label className={cn('flex items-center gap-2 text-sm', isDepartment && 'cursor-not-allowed opacity-50')}>
                     <Checkbox
                       checked={formState.is_signature_required}
                       onCheckedChange={(checked) => toggleField('is_signature_required', checked === true)}
+                      disabled={isDepartment}
                     />
                     Signature Required
                   </label>
@@ -798,38 +801,43 @@ export function CustomerManagementPage({
                     />
                     Active
                   </label>
-                  <label className="flex items-center gap-2 text-sm">
+                  <label className={cn('flex items-center gap-2 text-sm', isDepartment && 'cursor-not-allowed opacity-50')}>
                     <Checkbox
                       checked={formState.is_label_required}
                       onCheckedChange={(checked) => toggleField('is_label_required', checked === true)}
+                      disabled={isDepartment}
                     />
                     Label Required
                   </label>
-                  <label className="flex items-center gap-2 text-sm">
+                  <label className={cn('flex items-center gap-2 text-sm', isDepartment && 'cursor-not-allowed opacity-50')}>
                     <Checkbox
                       checked={formState.is_invoice_required}
                       onCheckedChange={(checked) => toggleField('is_invoice_required', checked === true)}
+                      disabled={isDepartment}
                     />
                     Invoice Required
                   </label>
-                  <label className="flex items-center gap-2 text-sm">
+                  <label className={cn('flex items-center gap-2 text-sm', isDepartment && 'cursor-not-allowed opacity-50')}>
                     <Checkbox
                       checked={formState.is_cost_on_invoice}
                       onCheckedChange={(checked) => toggleField('is_cost_on_invoice', checked === true)}
+                      disabled={isDepartment}
                     />
                     Cost On Invoice
                   </label>
-                  <label className="flex items-center gap-2 text-sm">
+                  <label className={cn('flex items-center gap-2 text-sm', isDepartment && 'cursor-not-allowed opacity-50')}>
                     <Checkbox
                       checked={formState.is_cost_on_bill_of_lading}
                       onCheckedChange={(checked) => toggleField('is_cost_on_bill_of_lading', checked === true)}
+                      disabled={isDepartment}
                     />
                     Cost On Bill Of Lading
                   </label>
-                  <label className="flex items-center gap-2 text-sm">
+                  <label className={cn('flex items-center gap-2 text-sm', isDepartment && 'cursor-not-allowed opacity-50')}>
                     <Checkbox
                       checked={formState.is_returns_allowed}
                       onCheckedChange={(checked) => toggleField('is_returns_allowed', checked === true)}
+                      disabled={isDepartment}
                     />
                     Returns Allowed
                   </label>
