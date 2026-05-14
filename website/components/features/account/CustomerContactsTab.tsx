@@ -429,11 +429,11 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
 
         {/* Tab header */}
         <div className="flex flex-wrap shrink-0 items-center gap-2 border-b border-border/60 px-3 py-1.5">
+          <div className="flex-1" />
           <Button type="button" variant="ghost" size="sm" onClick={applyNew} className="h-7 gap-1 px-2 text-xs">
             <Plus className="h-3.5 w-3.5" />
             Contact
           </Button>
-          <div className="flex-1" />
           <Button type="button" variant="outline" size="sm" onClick={cancel} disabled={!isDirty} className="h-7">Cancel</Button>
           <Button type="button" size="sm" onClick={save}
             disabled={isSaving || !isDirty || !isFormValid || selection === null} className="h-7">
