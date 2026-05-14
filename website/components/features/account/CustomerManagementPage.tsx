@@ -695,7 +695,7 @@ export function CustomerManagementPage({
             </TabsList>
 
             <Card className="rounded-b-lg border border-border/60 border-t-0">
-              <CardContent className="p-[3px]">
+              <CardContent className="px-[10px] py-[3px]">
 <TabsContent value="profile" className="space-y-4">
                 <div className="flex flex-wrap justify-end items-center gap-2">
                   {(selectedOriginal?.customer_type === 'ACCOUNT' || selectedOriginal?.customer_type === 'SITE') && (
@@ -795,7 +795,7 @@ export function CustomerManagementPage({
                   </div>
                 </div>
 
-                <div className="h-2" />
+                <div className="h-2 !mt-[12px] leading-[12px]" />
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="flex items-center gap-2 text-sm">

@@ -5,7 +5,7 @@
 -- Target:  public.fnd_items
 --
 -- Strategy:
---   1. TRUNCATE fnd_items CASCADE (also clears bps_items, fnd_item_bom, rows in
+--   1. TRUNCATE fnd_items CASCADE (also clears fnd_item_bom, rows in
 --      om_order_lines / fnd_pricebook_items that reference items — re-run those seeds if needed)
 --   2. Stage normalised source rows into a temp table
 --   3. Insert fnd_items (item_id from global fnd_entity_id_seq default)
@@ -51,6 +51,22 @@ BEGIN
     CREATE TEMP TABLE tmp_items AS
     SELECT
         item_id::INT                                                        AS legacy_id,
+        -- Bakery-specific fields (formerly bps_items)
+        NULLIF(TRIM(item_dough),           '')  AS dough_type,
+        NULLIF(TRIM(item_shape),           '')  AS shape,
+        NULLIF(TRIM(item_packing),         '')  AS packing,
+        NULLIF(TRIM(item_machine_setting), '')  AS machine_setting,
+        NULLIF(TRIM(item_sheeter),         '')  AS sheeter_setting,
+        COALESCE(item_weight_adjuster, 0)       AS weight_adjuster,
+        COALESCE(item_scale_wt,        0)       AS scale_weight,
+        COALESCE(item_scale_qty,       0)       AS scale_qty,
+        -- Capability flags: auto-promote if default is set
+        (item_sliceable = 'Y' OR item_sliced  = 'Y') AS is_sliceable,
+        (item_wrappable = 'Y' OR item_wrapped = 'Y') AS is_wrappable,
+        (item_coverable = 'Y' OR item_covered = 'Y') AS is_coverable,
+        (item_sliced  = 'Y') AS default_sliced,
+        (item_wrapped = 'Y') AS default_wrapped,
+        (item_covered = 'Y') AS default_covered,
         -- Deduplicate item_no: append -item_id suffix for duplicates, generate
         -- NOID-{item_id} for nulls so the unique constraint is never violated.
         CASE
@@ -109,40 +125,24 @@ BEGIN
     -- 3. Insert fnd_items
     -- --------------------------------------------------------
     INSERT INTO fnd_items (
-        tenant_id,
-        legacy_id,
-        item_number,
-        item_name,
-        category,
-        unit_of_sale,
-        item_weight,
-        weight_uom,
-        legacy_box_id,
-        box_qty_per_box,
-        box_capacity_volume,
-        box_capacity_weight,
-        box_capacity_optimal,
-        preorder_days,
-        sales_terms_apply,
-        is_active
+        tenant_id, legacy_id, item_number, item_name, category, unit_of_sale,
+        item_weight, weight_uom, legacy_box_id, box_qty_per_box,
+        box_capacity_volume, box_capacity_weight, box_capacity_optimal,
+        preorder_days, sales_terms_apply, is_active,
+        dough_type, shape, packing, machine_setting, sheeter_setting,
+        weight_adjuster, scale_weight, scale_qty,
+        is_sliceable, is_wrappable, is_coverable,
+        default_sliced, default_wrapped, default_covered
     )
     SELECT
-        v_tenant_id,
-        t.legacy_id,
-        t.item_number,
-        t.item_name,
-        t.category,
-        t.unit_of_sale,
-        t.item_weight,
-        t.weight_uom,
-        t.legacy_box_id,
-        t.box_qty_per_box,
-        t.box_capacity_volume,
-        t.box_capacity_weight,
-        t.box_capacity_optimal,
-        t.preorder_days,
-        t.sales_terms_apply,
-        t.is_active
+        v_tenant_id, t.legacy_id, t.item_number, t.item_name, t.category, t.unit_of_sale,
+        t.item_weight, t.weight_uom, t.legacy_box_id, t.box_qty_per_box,
+        t.box_capacity_volume, t.box_capacity_weight, t.box_capacity_optimal,
+        t.preorder_days, t.sales_terms_apply, t.is_active,
+        t.dough_type, t.shape, t.packing, t.machine_setting, t.sheeter_setting,
+        t.weight_adjuster, t.scale_weight, t.scale_qty,
+        t.is_sliceable, t.is_wrappable, t.is_coverable,
+        t.default_sliced, t.default_wrapped, t.default_covered
     FROM tmp_items t;
 
     GET DIAGNOSTICS v_inserted = ROW_COUNT;

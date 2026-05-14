@@ -45,7 +45,6 @@ DROP TABLE IF EXISTS fnd_item_bom CASCADE;
 
 -- --- Price books & items ---
 DROP TABLE IF EXISTS fnd_pricebook_items CASCADE;
-DROP TABLE IF EXISTS bps_items CASCADE;
 DROP TABLE IF EXISTS fnd_customer_pricebooks CASCADE;
 DROP TABLE IF EXISTS fnd_customers CASCADE;
 DROP TABLE IF EXISTS fnd_pricebooks CASCADE;

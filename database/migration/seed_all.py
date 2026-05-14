@@ -11,8 +11,7 @@ Order:
   2. seed_fnd_customers             — truncate customers + orders/lines; legacy customer
   3. seed_fnd_contacts              — BILLING/SHIPPING contacts + billing/shipping address points
   4. seed_fnd_customer_pricebooks   — PRIMARY price book per customer (cus_price_cd)
-  4. seed_fnd_items                 — truncate items + cascaded dependents (incl. pricebook_items)
-  5. seed_bps_items
+  5. seed_fnd_items                 — truncate items + cascaded dependents; includes bakery-specific columns
   6. seed_fnd_valuesets_from_legacy_item — ITEM_* valuesets from legacy item columns
   7. seed_item_prep_options         — ITEMPREP valueset + item JSONB prep defaults
   8. seed_fnd_item_bom
@@ -55,7 +54,6 @@ SEEDS: list[str] = [
     "seed_fnd_contacts.sql",
     "seed_fnd_customer_pricebooks.sql",
     "seed_fnd_items.sql",
-    "seed_bps_items.sql",
     "seed_fnd_valuesets_from_legacy_item.sql",
     "seed_item_prep_options.sql",
     "seed_fnd_item_bom.sql",

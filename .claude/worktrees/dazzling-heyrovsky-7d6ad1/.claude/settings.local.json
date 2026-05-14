@@ -1,0 +1,43 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd .. && pwd && ls -la)",
+      "Bash(cd ../../.. && pwd && ls -la | head -20)",
+      "mcp__Claude_Preview__preview_start",
+      "mcp__Claude_in_Chrome__switch_browser",
+      "mcp__Claude_in_Chrome__list_connected_browsers",
+      "mcp__29ef3d11-6979-4169-903c-f2a759cdfb8f__execute_sql",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "PowerShell(netstat -ano)",
+      "PowerShell($tenant_id = 200000000002; $url = \"http://localhost:3000/api/items/profile?tenant_id=$tenant_id\"; curl -s $url | ConvertFrom-Json | Select-Object -Property data -First 5)",
+      "PowerShell($tenant_id = 200000000002; $response = Invoke-WebRequest -Uri \"http://localhost:3000/api/items/profile?tenant_id=$tenant_id\" -UseBasicParsing; $response.StatusCode; \\($response.Content | ConvertFrom-Json\\).data.Count)",
+      "Bash(pkill -f \"next dev\")",
+      "Bash(Select-String -Pattern \"\\(fnd_customers_get|om_items_get|om_orders_get\\)\")",
+      "mcp__29ef3d11-6979-4169-903c-f2a759cdfb8f__list_projects",
+      "mcp__29ef3d11-6979-4169-903c-f2a759cdfb8f__apply_migration",
+      "Bash(curl -s \"http://localhost:3000/api/items?tenant_id=200000000002&customer_id=200000000005\" -H \"Cookie: sb-auth-token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoyMDAwMDAwMDAwLCJpYXQiOjAsInN1YiI6IjliOWI0M2I3LTVhNGMtNGNiZC1iNWY0LWIwNTg1Y2JjMzkzYiIsImVtYWlsIjoidGVzdEBlbWFpbC5jb20iLCJwaG9uZSI6IiIsImFwcF9tZXRhZGF0YSI6eyJhbGxvd2VkX3RlbmFudF9pZHMiOlsiMjAwMDAwMDAwMDAyIl0sImFwcF91c2VyX2lkIjoiOWI5YjQzYjctNWE0Yy00Y2JkLWI1ZjQtYjA1ODVjYmMzOTNiIn0sInVzZXJfbWV0YWRhdGEiOnt9fQ.fake\")",
+      "Bash(Select-String \"node|npm\")",
+      "Bash(Select-Object -First 5)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(netstat -ano)",
+      "Bash(awk '{print $NF}')",
+      "Bash(xargs -I {} taskkill /PID {} /F)",
+      "Bash(npm run *)",
+      "Bash(rm -rf .next)",
+      "Bash(npx next *)",
+      "Bash(taskkill /PID 19300 /F)",
+      "Bash(curl -s http://localhost:3000/inventory/item-profile)",
+      "Bash(curl -s -L http://localhost:3000/tenant/inventory/item-profile)",
+      "PowerShell(cd D:\\\\Dev\\\\orderNexa\\\\website; npm run dev 2>&1 | Out-Null &)",
+      "PowerShell(Get-NetTCPConnection -State Listen -LocalPort 3000, 56114, 5173 -ErrorAction SilentlyContinue | Select-Object LocalPort, OwningProcess | ForEach-Object { if \\($null -ne $_\\) { Write-Host \"Port $\\($_.LocalPort\\) is listening \\(PID: $\\($_.OwningProcess\\)\\)\" } })",
+      "Bash(curl -s http://localhost:3001)",
+      "Bash(curl -s http://localhost:3001/tenant/inventory/item-profile)",
+      "Bash(Get-ChildItem -Path \"D:\\\\Dev\\\\orderNexa\" -Directory)",
+      "Bash(Select-Object Name)",
+      "Bash(Get-ChildItem -Recurse -Filter \"*.sql\" \"D:\\\\Dev\\\\orderNexa\\\\database\")",
+      "Bash(Select-Object FullName)",
+      "Bash(xargs grep -l -i \"valueset\")"
+    ]
+  }
+}

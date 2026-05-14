@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "nextjs",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "D:\\Dev\\orderNexa\\website", "run", "dev", "--", "--port", "3001"],
+      "port": 3001
+    }
+  ]
+}

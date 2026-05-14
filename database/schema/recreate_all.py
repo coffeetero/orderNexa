@@ -43,7 +43,6 @@ DDL_SCRIPTS: list[str] = [
     "fnd_user_customers.sql",
     "fnd_currencies.sql",
     "fnd_items.sql",
-    "bps_items.sql",
     "fnd_pricebooks.sql",
     "fnd_customer_pricebooks.sql",
     "fnd_pricebook_items.sql",

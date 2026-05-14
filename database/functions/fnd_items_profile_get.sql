@@ -6,11 +6,10 @@
 --   p_item_id IS NULL  → slim list (id, number, name, is_active)
 --                         used to populate the search combobox on mount
 --
---   p_item_id IS NOT NULL → full detail for one item
---                           joins fnd_items + bps_items
+--   p_item_id IS NOT NULL → full detail for one item (all fnd_items columns)
 --                           used when a user selects an item in the UI
 --
--- Prerequisites: fnd_items.sql, bps_items.sql
+-- Prerequisites: fnd_items.sql
 -- ============================================================
 
 DROP FUNCTION IF EXISTS bps.fnd_items_profile_get(BIGINT, BOOLEAN, BIGINT);
@@ -79,23 +78,22 @@ BEGIN
         -- Sales
         'sales_terms_apply',    i.sales_terms_apply,
         'is_active',            i.is_active,
-        -- Prep options (stored as JSONB text arrays in fnd_items)
+        -- Prep options (JSONB text arrays)
         'allowed_prep_options', i.allowed_prep_options,
         'default_prep_options', i.default_prep_options,
-        -- bps_items: product characteristics
-        'dough_type',           b.dough_type,
-        'shape',                b.shape,
-        'packing',              b.packing,
-        -- bps_items: production settings
-        'machine_setting',      b.machine_setting,
-        'sheeter_setting',      b.sheeter_setting,
-        'weight_adjuster',      COALESCE(b.weight_adjuster, 0),
-        'scale_weight',         COALESCE(b.scale_weight, 0),
-        'scale_qty',            COALESCE(b.scale_qty, 0)
+        -- Product characteristics
+        'dough_type',           i.dough_type,
+        'shape',                i.shape,
+        'packing',              i.packing,
+        -- Production settings
+        'machine_setting',      i.machine_setting,
+        'sheeter_setting',      i.sheeter_setting,
+        'weight_adjuster',      COALESCE(i.weight_adjuster, 0),
+        'scale_weight',         COALESCE(i.scale_weight, 0),
+        'scale_qty',            COALESCE(i.scale_qty, 0)
     )
       INTO v_result
       FROM fnd_items i
-      LEFT JOIN bps_items b ON b.item_id = i.item_id
      WHERE i.tenant_id = p_tenant_id
        AND i.item_id   = p_item_id
      LIMIT 1;
