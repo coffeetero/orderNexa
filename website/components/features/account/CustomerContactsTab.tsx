@@ -470,7 +470,7 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
                           </div>
                         )}
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium leading-tight">{contact.contact_name}</p>
+                          <p className="truncate text-xs font-medium leading-tight">{contact.contact_name}</p>
                           {cfg ? (
                             <p className="text-xs text-muted-foreground">
                               {contact.contact_type === 'ADDRESSES'
@@ -606,7 +606,7 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
               {/* Mixed point rows — show type select */}
               <div className="space-y-1.5">
                 {form.contact_points.length > 0 && (
-                  <div className="grid items-center gap-2 px-0.5" style={{ gridTemplateColumns: '108px 80px 1fr auto' }}>
+                  <div className="grid items-center gap-2 px-0.5" style={{ gridTemplateColumns: '162px 120px 1fr auto' }}>
                     <p className="text-xs text-muted-foreground text-center">Type</p>
                     <p className="text-xs text-muted-foreground text-center">Label</p>
                     <p className="text-xs text-muted-foreground">Details</p>
@@ -615,7 +615,7 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
                 )}
 
                 {form.contact_points.map((p, i) => (
-                  <div key={p.contact_point_id ?? `new-${i}`} className="grid items-start gap-2" style={{ gridTemplateColumns: '108px 80px 1fr auto' }}>
+                  <div key={p.contact_point_id ?? `new-${i}`} className="grid items-start gap-2" style={{ gridTemplateColumns: '162px 120px 1fr auto' }}>
                     <Select value={p.type} onValueChange={t => updatePoint(i, { type: t as PointType })}>
                       <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
                       <SelectContent>
@@ -695,7 +695,7 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
               {/* Person contact points */}
               <div className="space-y-1.5">
                 {form.contact_points.length > 0 && (
-                  <div className="grid items-center gap-2 px-0.5" style={{ gridTemplateColumns: '108px 80px 1fr auto' }}>
+                  <div className="grid items-center gap-2 px-0.5" style={{ gridTemplateColumns: '162px 120px 1fr auto' }}>
                     <p className="text-xs text-muted-foreground text-center">Type</p>
                     <p className="text-xs text-muted-foreground text-center">Label</p>
                     <p className="text-xs text-muted-foreground">Details</p>
@@ -704,7 +704,7 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
                 )}
 
                 {form.contact_points.map((p, i) => (
-                  <div key={p.contact_point_id ?? `new-${i}`} className="grid items-start gap-2" style={{ gridTemplateColumns: '108px 80px 1fr auto' }}>
+                  <div key={p.contact_point_id ?? `new-${i}`} className="grid items-start gap-2" style={{ gridTemplateColumns: '162px 120px 1fr auto' }}>
                     <Select value={p.type} onValueChange={t => updatePoint(i, { type: t as PointType })}>
                       <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
                       <SelectContent>
