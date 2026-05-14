@@ -300,7 +300,7 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
 
         {/* Row 2: Item search + Qty + Save To */}
         <div className="flex flex-wrap items-end gap-2">
-        <div className="flex w-[311px] min-w-[311px] max-w-[311px] shrink-0 flex-col gap-1">
+        <div className="flex w-[280px] min-w-[280px] max-w-[280px] xl:w-[311px] xl:min-w-[311px] xl:max-w-[311px] shrink-0 flex-col gap-1">
           <Label htmlFor="item-search" className={LABEL_CLASS}>Item</Label>
           <EntityComboBox<SlimItem>
             items={items}
@@ -325,7 +325,7 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
           />
         </div>
 
-        <div className="flex w-[86px] shrink-0 flex-col gap-1">
+        <div className="flex w-[77px] xl:w-[86px] shrink-0 flex-col gap-1">
           <Label htmlFor="entry-qty" className={cn(LABEL_CLASS, 'text-center')}>Quantity</Label>
           <input
             id="entry-qty"
@@ -348,7 +348,7 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
         </div>
 
         {/* Spacer — same width as Qty */}
-        <div className="w-[86px] shrink-0" />
+        <div className="w-[77px] xl:w-[86px] shrink-0" />
 
         {/* Save To fieldset: pills + Save */}
         <fieldset className="flex shrink-0 flex-col justify-between rounded border border-border/60 px-2 pb-1.5 pt-0.5">
