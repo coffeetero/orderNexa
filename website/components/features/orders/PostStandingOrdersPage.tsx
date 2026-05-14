@@ -277,10 +277,10 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
 
             {/* Column headers */}
             <div className="grid border-b border-border/60 bg-muted/20 px-3 py-1.5 text-xs font-semibold text-muted-foreground"
-              style={{ gridTemplateColumns: '36px 90px 1fr 140px' }}>
-              <span />
+              style={{ gridTemplateColumns: '90px 1fr 140px 36px' }}>
               <span>Cust. No.</span>
               <span>Customer Name</span>
+              <span />
               <span />
             </div>
 
@@ -296,19 +296,8 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
                     row.already_posted ? 'opacity-50' : 'hover:bg-muted/20',
                     isChecked && !row.already_posted ? 'bg-primary/5' : '',
                   )}
-                  style={{ gridTemplateColumns: '36px 90px 1fr 140px' }}
+                  style={{ gridTemplateColumns: '90px 1fr 140px 36px' }}
                 >
-                  <Checkbox
-                    checked={isChecked}
-                    disabled={!canCheck}
-                    onCheckedChange={v => {
-                      setChecked(prev => {
-                        const next = new Set(prev);
-                        if (v) next.add(key); else next.delete(key);
-                        return next;
-                      });
-                    }}
-                  />
                   <span className="font-mono text-xs text-muted-foreground">{row.customer_number}</span>
                   <span className="truncate text-sm">{row.customer_name}</span>
                   <span className={cn('text-xs', row.status ? STATUS_CLASS[row.status] : 'text-muted-foreground/60')}>
@@ -316,6 +305,19 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
                       ? `${STATUS_LABEL[row.status]}${row.order_number ? ` #${row.order_number}` : ''}${row.message ? ` — ${row.message}` : ''}`
                       : row.already_posted ? '— Already posted' : ''}
                   </span>
+                  <div className="flex items-center justify-center">
+                    <Checkbox
+                      checked={isChecked}
+                      disabled={!canCheck}
+                      onCheckedChange={v => {
+                        setChecked(prev => {
+                          const next = new Set(prev);
+                          if (v) next.add(key); else next.delete(key);
+                          return next;
+                        });
+                      }}
+                    />
+                  </div>
                 </div>
               );
             })}
