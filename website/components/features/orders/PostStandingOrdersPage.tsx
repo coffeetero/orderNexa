@@ -327,7 +327,7 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
         {!isLoading && grouped.map(({ code, rows }) => (
           <div key={code}>
             {/* Group header */}
-            <div className="bg-muted/50 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b border-border/60">
+            <div className="bg-emerald-100 dark:bg-emerald-950/50 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-emerald-800 dark:text-emerald-300 border-b border-emerald-200 dark:border-emerald-800">
               {code.charAt(0) + code.slice(1).toLowerCase()}
             </div>
 
