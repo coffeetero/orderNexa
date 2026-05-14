@@ -222,7 +222,7 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
     <div className="flex flex-col gap-0">
 
       {/* Row 1: Customer | DOW | Code | Buttons */}
-      <div className="flex flex-wrap items-end gap-2 border-b border-border/60 bg-card px-3 py-2">
+      <div className="flex flex-wrap items-end justify-center gap-2 border-b border-border/60 bg-card px-3 py-2">
         <div className="flex w-[346px] min-w-[346px] max-w-[346px] shrink-0 flex-col gap-1">
           <Label htmlFor="customer-search" className={LABEL_CLASS}>Customer</Label>
           <EntityComboBox<Customer>
