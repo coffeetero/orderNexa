@@ -292,8 +292,8 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
 
       </div>
 
-      {/* Row 2 + Grid — constrained to content width */}
-      <div className="w-fit">
+      {/* Row 2 + Grid — constrained to content width, centered */}
+      <div className="mx-auto w-fit">
 
       {/* Row 2: Item search + Qty */}
       <div className="flex flex-wrap items-end gap-2 border-b border-border/60 bg-muted/20 px-3 py-2">
