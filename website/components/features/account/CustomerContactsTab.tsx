@@ -545,24 +545,21 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
                   const idx = form.contact_points.indexOf(p);
                   const isBillingRow = p.label.toLowerCase() === 'billing';
                   return (
-                    <div key={p.contact_point_id ?? `new-${idx}`} className="space-y-1">
-                      <div className="grid items-start gap-2" style={{ gridTemplateColumns: '1fr 2fr auto' }}>
-                        <AddressLabelInput value={p.label} onChange={v => updatePoint(idx, { label: v })} hasShipping={hasUseAsShipping} />
-                        <div>
-                          <AutoTextarea value={p.value} onChange={e => updatePoint(idx, { value: e.target.value })} className={textareaClass} placeholder={'123 Main St\nCity, State 12345'} />
-                          <GeocodeStatus status={p.geocode_status} formattedAddress={p.formatted_address} />
-                          <Input value={p.display_name} onChange={e => updatePoint(idx, { display_name: e.target.value })} className={displayNameClass} placeholder="Display name" />
-                        </div>
-                        <button type="button" onClick={() => removePoint(idx)} className="mt-1 rounded p-0.5 text-muted-foreground/40 hover:text-destructive transition-colors">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                    <div key={p.contact_point_id ?? `new-${idx}`} className="grid items-start gap-2" style={{ gridTemplateColumns: '1fr 2fr auto' }}>
+                      <AddressLabelInput value={p.label} onChange={v => updatePoint(idx, { label: v })} hasShipping={hasUseAsShipping} />
+                      <div>
+                        <AutoTextarea value={p.value} onChange={e => updatePoint(idx, { value: e.target.value })} className={textareaClass} placeholder={'123 Main St\nCity, State 12345'} />
+                        <GeocodeStatus status={p.geocode_status} formattedAddress={p.formatted_address} />
+                        {isBillingRow && (
+                          <label className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+                            <input type="checkbox" checked={p.use_as_shipping} onChange={e => setUseAsShipping(idx, e.target.checked)} className="h-3.5 w-3.5 rounded border-input" />
+                            Shipping, same as billing
+                          </label>
+                        )}
                       </div>
-                      {isBillingRow && (
-                        <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
-                          <input type="checkbox" checked={p.use_as_shipping} onChange={e => setUseAsShipping(idx, e.target.checked)} className="h-3.5 w-3.5 rounded border-input" />
-                          Shipping: Same as Billing
-                        </label>
-                      )}
+                      <button type="button" onClick={() => removePoint(idx)} className="mt-1 rounded p-0.5 text-muted-foreground/40 hover:text-destructive transition-colors">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
                     </div>
                   );
                 })}
