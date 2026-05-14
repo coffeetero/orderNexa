@@ -25,13 +25,14 @@ CREATE TABLE IF NOT EXISTS fnd_contacts (
     -- OTHER_CONTACTS = system contact for legacy/miscellaneous contact data (created on migration)
     contact_type        TEXT        NOT NULL DEFAULT 'PERSON',
 
-    -- ── Person details ───────────────────────────────────────
-    salutation          TEXT,                   -- Mr. Ms. Dr. etc.
+    -- ── Card identity ────────────────────────────────────────
+    -- card_name: the role/title shown on the card selector (e.g. "Owner",
+    -- "Receivables Dept"). Auto-derives from department → job_title in the UI.
+    card_name           TEXT        NOT NULL,
+
+    -- ── Person details (optional structured metadata) ─────
     first_name          TEXT,
     last_name           TEXT,
-    -- contact_name is the display name; defaults to first + last but
-    -- can be overridden (e.g. company name, nickname, single-word name)
-    contact_name        TEXT        NOT NULL,
     job_title           TEXT,
     department          TEXT,
 

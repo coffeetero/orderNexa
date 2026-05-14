@@ -31,6 +31,12 @@ CREATE TABLE IF NOT EXISTS fnd_contact_points (
     value                   TEXT        NOT NULL,
     label                   TEXT,                   -- 'Home' | 'Work' | 'Billing' | 'Delivery' | ...
 
+    -- ── Display name (person for this specific point) ────────
+    -- e.g. "Mary Brown", "Bob - Loading Dock", "Accounts Payable"
+    -- Auto-derived from contact first+last in the UI; user can override.
+    -- Shown as line 2 in the card selector (from the primary point).
+    display_name            TEXT,
+
     -- ── Ordering & flags ─────────────────────────────────────
     sequence                SMALLINT    NOT NULL DEFAULT 1,   -- order within type
     is_primary              BOOLEAN     NOT NULL DEFAULT FALSE,

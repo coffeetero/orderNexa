@@ -33,29 +33,26 @@ const TYPE_ICON: Record<PointType, React.ComponentType<{ className?: string }>> 
 const SYSTEM_CONFIG: Record<'ADDRESSES' | 'OTHER_CONTACTS', {
   icon: React.ComponentType<{ className?: string }>;
   color: string;
-  label: string;
   description: string;
 }> = {
   ADDRESSES: {
     icon: Home,
     color: 'bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300',
-    label: 'Billing & Shipping',
     description: 'Billing, shipping, and delivery addresses',
   },
   OTHER_CONTACTS: {
     icon: PhoneCall,
     color: 'bg-slate-100 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300',
-    label: 'Other Contacts',
     description: 'Legacy contact data — review and update',
   },
 };
 
-// Address label presets for the ADDRESSES combobox
 const ADDRESS_LABEL_PRESETS = ['Billing', 'Shipping'];
 
 interface ContactPoint {
   contact_point_id: number | null;
   type: PointType;
+  display_name: string;
   value: string;
   label: string;
   sequence: number;
@@ -73,10 +70,9 @@ interface ContactPoint {
 interface Contact {
   contact_id: number;
   contact_type: ContactType;
-  salutation: string;
+  card_name: string;
   first_name: string;
   last_name: string;
-  contact_name: string;
   job_title: string;
   department: string;
   is_primary: boolean;
@@ -87,10 +83,9 @@ interface Contact {
 interface ContactForm {
   contact_id: number | null;
   contact_type: ContactType;
-  salutation: string;
+  card_name: string;
   first_name: string;
   last_name: string;
-  contact_name: string;
   job_title: string;
   department: string;
   is_primary: boolean;
@@ -113,14 +108,16 @@ interface CustomerContactsTabProps {
 
 const EMPTY_FORM: ContactForm = {
   contact_id: null, contact_type: 'PERSON',
-  salutation: '', first_name: '', last_name: '',
-  contact_name: '', job_title: '', department: '',
+  card_name: '', first_name: '', last_name: '',
+  job_title: '', department: '',
   is_primary: false, is_active: true, contact_points: [],
 };
 
-function emptyPoint(type: PointType, seq: number): ContactPoint {
+function emptyPoint(type: PointType, seq: number, defaultDisplayName = ''): ContactPoint {
   return {
-    contact_point_id: null, type, value: '', label: '', sequence: seq,
+    contact_point_id: null, type,
+    display_name: defaultDisplayName,
+    value: '', label: '', sequence: seq,
     is_primary: false, is_active: true, do_not_contact: false,
     use_as_shipping: false, country_dial_code: '',
   };
@@ -129,15 +126,20 @@ function emptyPoint(type: PointType, seq: number): ContactPoint {
 function contactToForm(c: Contact): ContactForm {
   return {
     contact_id: c.contact_id, contact_type: c.contact_type,
-    salutation: c.salutation, first_name: c.first_name, last_name: c.last_name,
-    contact_name: c.contact_name, job_title: c.job_title, department: c.department,
+    card_name: c.card_name, first_name: c.first_name, last_name: c.last_name,
+    job_title: c.job_title, department: c.department,
     is_primary: c.is_primary, is_active: c.is_active,
-    contact_points: c.contact_points.map(p => ({ ...p, use_as_shipping: p.use_as_shipping ?? false })),
+    contact_points: c.contact_points.map(p => ({
+      ...p,
+      display_name:    p.display_name    ?? '',
+      use_as_shipping: p.use_as_shipping ?? false,
+    })),
   };
 }
 
-function deriveContactName(first: string, last: string) {
-  return [first.trim(), last.trim()].filter(Boolean).join(' ');
+// card_name auto-derives from department → job_title
+function deriveCardName(department: string, jobTitle: string) {
+  return department.trim() || jobTitle.trim();
 }
 
 const AVATAR_COLORS = [
@@ -174,7 +176,8 @@ function GeocodeStatus({ status, formattedAddress }: { status?: string; formatte
   return null;
 }
 
-// ── Label combobox for ADDRESSES contact ──────────────────────────────────────
+// ── Label combobox for ADDRESSES ─────────────────────────────────────────────
+
 function AddressLabelInput({ value, onChange, hasShipping }: {
   value: string;
   onChange: (v: string) => void;
@@ -198,12 +201,8 @@ function AddressLabelInput({ value, onChange, hasShipping }: {
       {open && presets.length > 0 && (
         <div className="absolute left-0 top-full z-50 mt-0.5 w-full rounded-md border border-border bg-popover shadow-md">
           {presets.map(p => (
-            <button
-              key={p}
-              type="button"
-              onMouseDown={() => onChange(p)}
-              className="w-full px-2 py-1.5 text-left text-xs hover:bg-muted"
-            >
+            <button key={p} type="button" onMouseDown={() => onChange(p)}
+              className="w-full px-2 py-1.5 text-left text-xs hover:bg-muted">
               {p}
             </button>
           ))}
@@ -228,11 +227,7 @@ function AutoTextarea({ value, onChange, className, placeholder }: {
     el.current.style.height = `${el.current.scrollHeight}px`;
   }, [value]);
   return (
-    <textarea
-      ref={el}
-      value={value}
-      onChange={onChange}
-      rows={1}
+    <textarea ref={el} value={value} onChange={onChange} rows={1}
       style={{ overflow: 'hidden' }}
       className={cn('resize-none', className)}
       placeholder={placeholder}
@@ -253,9 +248,9 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
     const loadedCustomerIdRef       = useRef<number | null | undefined>(undefined);
     const contactsRef               = useRef<Contact[]>([]);
 
-    const isDirty     = JSON.stringify(form) !== JSON.stringify(savedFormRef.current);
-    const isFormValid = form.contact_type !== 'PERSON' || form.contact_name.trim() !== '';
-    const isSystem    = form.contact_type === 'ADDRESSES' || form.contact_type === 'OTHER_CONTACTS';
+    const isDirty    = JSON.stringify(form) !== JSON.stringify(savedFormRef.current);
+    const isFormValid = form.contact_type !== 'PERSON' || form.card_name.trim() !== '';
+    const isSystem   = form.contact_type === 'ADDRESSES' || form.contact_type === 'OTHER_CONTACTS';
 
     useEffect(() => { contactsRef.current = contacts; }, [contacts]);
     useEffect(() => { onDirtyChange(isDirty); }, [isDirty, onDirtyChange]);
@@ -345,14 +340,15 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
     const setField = <K extends keyof ContactForm>(k: K, v: ContactForm[K]) =>
       setForm(f => ({ ...f, [k]: v }));
 
-    const updateNameField = (field: 'first_name' | 'last_name', value: string) =>
+    // department or job_title → auto-derive card_name if not manually overridden
+    const updateCardSource = (field: 'department' | 'job_title', value: string) =>
       setForm(f => {
-        const prevDerived = deriveContactName(f.first_name, f.last_name);
-        const newFirst    = field === 'first_name' ? value : f.first_name;
-        const newLast     = field === 'last_name'  ? value : f.last_name;
-        const newDerived  = deriveContactName(newFirst, newLast);
-        const autoUpdate  = f.contact_name === '' || f.contact_name === prevDerived;
-        return { ...f, [field]: value, contact_name: autoUpdate ? newDerived : f.contact_name };
+        const prevDerived = deriveCardName(f.department, f.job_title);
+        const newDept     = field === 'department' ? value : f.department;
+        const newJob      = field === 'job_title'  ? value : f.job_title;
+        const newDerived  = deriveCardName(newDept, newJob);
+        const autoUpdate  = f.card_name === '' || f.card_name === prevDerived;
+        return { ...f, [field]: value, card_name: autoUpdate ? newDerived : f.card_name };
       });
 
     const updatePoint = (idx: number, updates: Partial<ContactPoint>) =>
@@ -366,7 +362,14 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
 
     const addPoint = (type: PointType) => {
       const seq = form.contact_points.filter(p => p.type === type).length + 1;
-      setForm(f => ({ ...f, contact_points: [...f.contact_points, emptyPoint(type, seq)] }));
+      // default display_name from first + last name for PERSON contacts
+      const defaultDn = form.contact_type === 'PERSON'
+        ? [form.first_name, form.last_name].filter(Boolean).join(' ')
+        : '';
+      setForm(f => ({
+        ...f,
+        contact_points: [...f.contact_points, emptyPoint(type, seq, defaultDn)],
+      }));
     };
 
     const togglePointPrimary = (idx: number) =>
@@ -388,7 +391,6 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
         ...f,
         contact_points: f.contact_points
           .map((p, i) => i === idx ? { ...p, use_as_shipping: checked } : p)
-          // When checked, drop any Shipping-labelled rows
           .filter((p, i) => i === idx || !checked || p.label.toLowerCase() !== 'shipping'),
       }));
 
@@ -398,11 +400,14 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
       return <p className="py-4 text-sm text-muted-foreground">Select a customer to view contacts.</p>;
     }
 
-    // Derived state for ADDRESSES rendering
     const hasUseAsShipping = form.contact_points.some(p => p.use_as_shipping);
     const visiblePoints    = form.contact_type === 'ADDRESSES'
       ? form.contact_points.filter(p => !hasUseAsShipping || p.label.toLowerCase() !== 'shipping')
       : form.contact_points;
+
+    // Shared textarea class
+    const textareaClass = 'w-full rounded border border-input bg-transparent px-2 py-1 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring';
+    const displayNameClass = 'mt-1 h-6 w-full px-1.5 text-xs text-muted-foreground placeholder:text-muted-foreground/40';
 
     // ── Render ────────────────────────────────────────────────────────────────
 
@@ -416,14 +421,9 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
             Contact
           </Button>
           <div className="flex-1" />
-          <Button type="button" variant="outline" size="sm" onClick={cancel} disabled={!isDirty} className="h-7">
-            Cancel
-          </Button>
-          <Button
-            type="button" size="sm" onClick={save}
-            disabled={isSaving || !isDirty || !isFormValid || selection === null}
-            className="h-7"
-          >
+          <Button type="button" variant="outline" size="sm" onClick={cancel} disabled={!isDirty} className="h-7">Cancel</Button>
+          <Button type="button" size="sm" onClick={save}
+            disabled={isSaving || !isDirty || !isFormValid || selection === null} className="h-7">
             {isSaving ? 'Saving…' : 'Save'}
           </Button>
         </div>
@@ -438,30 +438,30 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
                 <p className="p-3 text-xs text-muted-foreground">Loading…</p>
               ) : (
                 contacts.map(contact => {
-                  const cfg        = contact.contact_type !== 'PERSON' ? SYSTEM_CONFIG[contact.contact_type] : null;
-                  const usedTypes  = Array.from(new Set(contact.contact_points.map(p => p.type))) as PointType[];
-                  const addrCount  = contact.contact_points.length;
+                  const cfg       = contact.contact_type !== 'PERSON' ? SYSTEM_CONFIG[contact.contact_type] : null;
+                  const usedTypes = Array.from(new Set(contact.contact_points.map(p => p.type))) as PointType[];
+                  const addrCount = contact.contact_points.length;
                   const sameAsBill = contact.contact_type === 'ADDRESSES' && contact.contact_points.some(p => p.use_as_shipping);
+                  // Line 2: display_name from primary point, or first non-blank
+                  const line2 = contact.contact_points.find(p => p.is_primary && p.display_name)?.display_name
+                              ?? contact.contact_points.find(p => p.display_name)?.display_name
+                              ?? '';
 
                   return (
-                    <button
-                      key={contact.contact_id}
-                      type="button"
-                      onClick={() => applySelection(contact)}
+                    <button key={contact.contact_id} type="button" onClick={() => applySelection(contact)}
                       className={cn(
                         'w-full border-b border-border/40 px-3 py-2.5 text-left transition-colors',
                         selection === contact.contact_id ? 'bg-muted' : 'hover:bg-muted/50',
                         !contact.is_active && contact.contact_type === 'PERSON' && 'opacity-50',
-                      )}
-                    >
+                      )}>
                       <div className="flex items-center gap-2.5">
                         {cfg ? (
                           <div className={cn('h-9 w-9 shrink-0 rounded-lg flex items-center justify-center', cfg.color)}>
                             <cfg.icon className="h-4 w-4" />
                           </div>
                         ) : (
-                          <div className={cn('relative h-9 w-9 shrink-0 rounded-full flex items-center justify-center text-sm font-semibold select-none', avatarColor(contact.contact_name || '?'))}>
-                            {initials(contact.contact_name || '?')}
+                          <div className={cn('relative h-9 w-9 shrink-0 rounded-full flex items-center justify-center text-sm font-semibold select-none', avatarColor(contact.card_name || '?'))}>
+                            {initials(contact.card_name || '?')}
                             {contact.is_primary && (
                               <div className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-background shadow-sm">
                                 <Star className="h-2.5 w-2.5 text-amber-500" fill="currentColor" />
@@ -470,20 +470,18 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
                           </div>
                         )}
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-xs font-medium leading-tight">{contact.contact_name}</p>
+                          <p className="truncate text-xs font-medium leading-tight">{contact.card_name}</p>
                           {cfg ? (
                             <p className="text-xs text-muted-foreground">
                               {contact.contact_type === 'ADDRESSES'
-                                ? addrCount === 0
-                                  ? 'No addresses'
-                                  : sameAsBill
-                                  ? 'Billing · Shipping same'
+                                ? addrCount === 0 ? 'No addresses'
+                                  : sameAsBill ? 'Billing · Shipping same'
                                   : `${addrCount} address${addrCount > 1 ? 'es' : ''}`
                                 : `${addrCount} item${addrCount !== 1 ? 's' : ''}`}
                             </p>
                           ) : (
                             <>
-                              {contact.job_title && <p className="truncate text-xs text-muted-foreground">{contact.job_title}</p>}
+                              {line2 && <p className="truncate text-xs text-muted-foreground leading-tight">{line2}</p>}
                               {usedTypes.length > 0 && (
                                 <div className="mt-0.5 flex gap-1">
                                   {usedTypes.map(t => { const Icon = TYPE_ICON[t]; return <Icon key={t} className="h-3 w-3 text-muted-foreground/50" />; })}
@@ -505,6 +503,7 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
             <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
               Select a contact or click + Contact
             </div>
+
           ) : form.contact_type === 'ADDRESSES' ? (
 
             /* ── Billing & Shipping ── */
@@ -514,14 +513,11 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
                   <Home className="h-4 w-4" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold leading-tight">Billing &amp; Shipping</p>
+                  <p className="text-sm font-semibold leading-tight">{form.card_name}</p>
                   <p className="text-xs text-muted-foreground">{SYSTEM_CONFIG.ADDRESSES.description}</p>
                 </div>
               </div>
-
               <div className="border-t border-border/40" />
-
-              {/* Address rows */}
               <div className="space-y-1.5">
                 {visiblePoints.length > 0 && (
                   <div className="grid items-center gap-2 px-0.5" style={{ gridTemplateColumns: '1fr 1fr auto' }}>
@@ -530,59 +526,34 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
                     <div className="w-8" />
                   </div>
                 )}
-
                 {visiblePoints.map((p) => {
-                  // Find real index in form.contact_points
-                  const idx = form.contact_points.findIndex(fp => fp === p || (fp.contact_point_id !== null && fp.contact_point_id === p.contact_point_id) || (fp.contact_point_id === null && fp.sequence === p.sequence && fp.label === p.label && fp.value === p.value));
+                  const idx = form.contact_points.indexOf(p);
                   const isBillingRow = p.label.toLowerCase() === 'billing';
-
                   return (
                     <div key={p.contact_point_id ?? `new-${idx}`} className="space-y-1">
                       <div className="grid items-start gap-2" style={{ gridTemplateColumns: '1fr 1fr auto' }}>
-                        <AddressLabelInput
-                          value={p.label}
-                          onChange={v => updatePoint(idx, { label: v })}
-                          hasShipping={hasUseAsShipping}
-                        />
+                        <AddressLabelInput value={p.label} onChange={v => updatePoint(idx, { label: v })} hasShipping={hasUseAsShipping} />
                         <div>
-                          <AutoTextarea
-                            value={p.value}
-                            onChange={e => updatePoint(idx, { value: e.target.value })}
-                            className="w-full rounded border border-input bg-transparent px-2 py-1 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
-                            placeholder={'123 Main St\nCity, State 12345'}
-                          />
+                          <AutoTextarea value={p.value} onChange={e => updatePoint(idx, { value: e.target.value })} className={textareaClass} placeholder={'123 Main St\nCity, State 12345'} />
                           <GeocodeStatus status={p.geocode_status} formattedAddress={p.formatted_address} />
+                          <Input value={p.display_name} onChange={e => updatePoint(idx, { display_name: e.target.value })} className={displayNameClass} placeholder="Display name" />
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => removePoint(idx)}
-                          className="mt-1 rounded p-0.5 text-muted-foreground/40 hover:text-destructive transition-colors"
-                        >
+                        <button type="button" onClick={() => removePoint(idx)} className="mt-1 rounded p-0.5 text-muted-foreground/40 hover:text-destructive transition-colors">
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       </div>
                       {isBillingRow && (
-                        <label className="flex items-center gap-1.5 pl-0 text-xs text-muted-foreground cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            checked={p.use_as_shipping}
-                            onChange={e => setUseAsShipping(idx, e.target.checked)}
-                            className="h-3.5 w-3.5 rounded border-input"
-                          />
+                        <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+                          <input type="checkbox" checked={p.use_as_shipping} onChange={e => setUseAsShipping(idx, e.target.checked)} className="h-3.5 w-3.5 rounded border-input" />
                           Shipping: Same as Billing
                         </label>
                       )}
                     </div>
                   );
                 })}
-
-                <button
-                  type="button"
-                  onClick={() => addPoint('ADDRESS')}
-                  className="mt-1 flex items-center gap-1 rounded border border-dashed border-border/50 px-2 py-1 text-xs text-muted-foreground hover:border-border hover:text-foreground transition-colors"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Add address
+                <button type="button" onClick={() => addPoint('ADDRESS')}
+                  className="mt-1 flex items-center gap-1 rounded border border-dashed border-border/50 px-2 py-1 text-xs text-muted-foreground hover:border-border hover:text-foreground transition-colors">
+                  <Plus className="h-3.5 w-3.5" />Add address
                 </button>
               </div>
             </div>
@@ -596,14 +567,11 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
                   <PhoneCall className="h-4 w-4" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold leading-tight">Other Contacts</p>
+                  <p className="text-sm font-semibold leading-tight">{form.card_name}</p>
                   <p className="text-xs text-muted-foreground">{SYSTEM_CONFIG.OTHER_CONTACTS.description}</p>
                 </div>
               </div>
-
               <div className="border-t border-border/40" />
-
-              {/* Mixed point rows — show type select */}
               <div className="space-y-1.5">
                 {form.contact_points.length > 0 && (
                   <div className="grid items-center gap-2 px-0.5" style={{ gridTemplateColumns: '162px 120px 1fr auto' }}>
@@ -613,34 +581,25 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
                     <div className="w-8" />
                   </div>
                 )}
-
                 {form.contact_points.map((p, i) => (
                   <div key={p.contact_point_id ?? `new-${i}`} className="grid items-start gap-2" style={{ gridTemplateColumns: '162px 120px 1fr auto' }}>
                     <Select value={p.type} onValueChange={t => updatePoint(i, { type: t as PointType })}>
                       <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {POINT_TYPES.map(t => <SelectItem key={t} value={t} className="text-xs">{TYPE_LABEL[t]}</SelectItem>)}
-                      </SelectContent>
+                      <SelectContent>{POINT_TYPES.map(t => <SelectItem key={t} value={t} className="text-xs">{TYPE_LABEL[t]}</SelectItem>)}</SelectContent>
                     </Select>
                     <Input value={p.label} onChange={e => updatePoint(i, { label: e.target.value })} className="h-7 text-xs" placeholder="Label" />
-                    <AutoTextarea
-                      value={p.value}
-                      onChange={e => updatePoint(i, { value: e.target.value })}
-                      className="w-full rounded border border-input bg-transparent px-2 py-1 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
-                    />
+                    <div>
+                      <AutoTextarea value={p.value} onChange={e => updatePoint(i, { value: e.target.value })} className={textareaClass} />
+                      <Input value={p.display_name} onChange={e => updatePoint(i, { display_name: e.target.value })} className={displayNameClass} placeholder="Display name" />
+                    </div>
                     <button type="button" onClick={() => removePoint(i)} className="mt-1 rounded p-0.5 text-muted-foreground/40 hover:text-destructive transition-colors">
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 ))}
-
-                <button
-                  type="button"
-                  onClick={() => addPoint('NOTE')}
-                  className="mt-1 flex items-center gap-1 rounded border border-dashed border-border/50 px-2 py-1 text-xs text-muted-foreground hover:border-border hover:text-foreground transition-colors"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Add contact method
+                <button type="button" onClick={() => addPoint('NOTE')}
+                  className="mt-1 flex items-center gap-1 rounded border border-dashed border-border/50 px-2 py-1 text-xs text-muted-foreground hover:border-border hover:text-foreground transition-colors">
+                  <Plus className="h-3.5 w-3.5" />Add contact method
                 </button>
               </div>
             </div>
@@ -650,36 +609,32 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
             /* ── Person contact ── */
             <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
               <div className="space-y-2.5">
+                {/* Card Name — auto-derives from dept → job_title */}
                 <div>
                   <p className="mb-0.5 text-xs text-muted-foreground">Card Name <span className="text-destructive">*</span></p>
-                  <Input value={form.contact_name} onChange={e => setField('contact_name', e.target.value)} className="h-7 text-sm" placeholder="Full name or company" />
-                </div>
-                <div className="grid grid-cols-[76px_1fr_1fr] gap-2">
-                  <div>
-                    <p className="mb-0.5 text-xs text-muted-foreground">Salutation</p>
-                    <Input value={form.salutation} onChange={e => setField('salutation', e.target.value)} className="h-7 text-sm" placeholder="Mr." />
-                  </div>
-                  <div>
-                    <p className="mb-0.5 text-xs text-muted-foreground">First Name</p>
-                    <Input value={form.first_name} onChange={e => updateNameField('first_name', e.target.value)} className="h-7 text-sm" />
-                  </div>
-                  <div>
-                    <p className="mb-0.5 text-xs text-muted-foreground">Last Name</p>
-                    <Input value={form.last_name} onChange={e => updateNameField('last_name', e.target.value)} className="h-7 text-sm" />
-                  </div>
+                  <Input value={form.card_name} onChange={e => setField('card_name', e.target.value)} className="h-7 text-sm font-medium" placeholder="e.g. Owner, Receivables, Chef" />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
+                    <p className="mb-0.5 text-xs text-muted-foreground">First Name</p>
+                    <Input value={form.first_name} onChange={e => setField('first_name', e.target.value)} className="h-7 text-sm" />
+                  </div>
+                  <div>
+                    <p className="mb-0.5 text-xs text-muted-foreground">Last Name</p>
+                    <Input value={form.last_name} onChange={e => setField('last_name', e.target.value)} className="h-7 text-sm" />
+                  </div>
+                  <div>
                     <p className="mb-0.5 text-xs text-muted-foreground">Job Title</p>
-                    <Input value={form.job_title} onChange={e => setField('job_title', e.target.value)} className="h-7 text-sm" />
+                    <Input value={form.job_title} onChange={e => updateCardSource('job_title', e.target.value)} className="h-7 text-sm" />
                   </div>
                   <div>
                     <p className="mb-0.5 text-xs text-muted-foreground">Department</p>
-                    <Input value={form.department} onChange={e => setField('department', e.target.value)} className="h-7 text-sm" />
+                    <Input value={form.department} onChange={e => updateCardSource('department', e.target.value)} className="h-7 text-sm" />
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <button type="button" onClick={() => setField('is_primary', !form.is_primary)} className={cn('flex items-center gap-1.5 text-xs transition-colors', form.is_primary ? 'text-amber-500' : 'text-muted-foreground hover:text-foreground')}>
+                  <button type="button" onClick={() => setField('is_primary', !form.is_primary)}
+                    className={cn('flex items-center gap-1.5 text-xs transition-colors', form.is_primary ? 'text-amber-500' : 'text-muted-foreground hover:text-foreground')}>
                     <Star className="h-3.5 w-3.5" fill={form.is_primary ? 'currentColor' : 'none'} />
                     Primary contact
                   </button>
@@ -692,7 +647,7 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
 
               <div className="border-t border-border/40" />
 
-              {/* Person contact points */}
+              {/* Contact points */}
               <div className="space-y-1.5">
                 {form.contact_points.length > 0 && (
                   <div className="grid items-center gap-2 px-0.5" style={{ gridTemplateColumns: '162px 120px 1fr auto' }}>
@@ -702,30 +657,26 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
                     <div className="w-[68px]" />
                   </div>
                 )}
-
                 {form.contact_points.map((p, i) => (
                   <div key={p.contact_point_id ?? `new-${i}`} className="grid items-start gap-2" style={{ gridTemplateColumns: '162px 120px 1fr auto' }}>
                     <Select value={p.type} onValueChange={t => updatePoint(i, { type: t as PointType })}>
                       <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {POINT_TYPES.map(t => <SelectItem key={t} value={t} className="text-xs">{TYPE_LABEL[t]}</SelectItem>)}
-                      </SelectContent>
+                      <SelectContent>{POINT_TYPES.map(t => <SelectItem key={t} value={t} className="text-xs">{TYPE_LABEL[t]}</SelectItem>)}</SelectContent>
                     </Select>
                     <Input value={p.label} onChange={e => updatePoint(i, { label: e.target.value })} className="h-7 text-xs" placeholder="e.g. Work" />
                     <div>
-                      <AutoTextarea
-                        value={p.value}
-                        onChange={e => updatePoint(i, { value: e.target.value })}
-                        className="w-full rounded border border-input bg-transparent px-2 py-1 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
-                        placeholder={p.type === 'EMAIL' ? 'email@example.com' : p.type === 'WEBSITE' ? 'https://' : p.type === 'ADDRESS' ? '123 Main St\nCity, State' : ''}
-                      />
+                      <AutoTextarea value={p.value} onChange={e => updatePoint(i, { value: e.target.value })} className={textareaClass}
+                        placeholder={p.type === 'EMAIL' ? 'email@example.com' : p.type === 'WEBSITE' ? 'https://' : p.type === 'ADDRESS' ? '123 Main St\nCity, State' : ''} />
                       {p.type === 'ADDRESS' && <GeocodeStatus status={p.geocode_status} formattedAddress={p.formatted_address} />}
+                      <Input value={p.display_name} onChange={e => updatePoint(i, { display_name: e.target.value })} className={displayNameClass} placeholder="Display name" />
                     </div>
                     <div className="flex items-center gap-0.5 pt-0.5">
-                      <button type="button" title={p.is_primary ? 'Primary' : 'Set as primary'} onClick={() => togglePointPrimary(i)} className={cn('rounded p-0.5 transition-colors', p.is_primary ? 'text-amber-500' : 'text-muted-foreground/40 hover:text-amber-400')}>
+                      <button type="button" title={p.is_primary ? 'Primary' : 'Set as primary'} onClick={() => togglePointPrimary(i)}
+                        className={cn('rounded p-0.5 transition-colors', p.is_primary ? 'text-amber-500' : 'text-muted-foreground/40 hover:text-amber-400')}>
                         <Star className="h-3.5 w-3.5" fill={p.is_primary ? 'currentColor' : 'none'} />
                       </button>
-                      <button type="button" title={p.do_not_contact ? 'Do not contact' : 'Mark as do not contact'} onClick={() => updatePoint(i, { do_not_contact: !p.do_not_contact })} className={cn('rounded p-0.5 transition-colors', p.do_not_contact ? 'text-rose-500' : 'text-muted-foreground/40 hover:text-rose-400')}>
+                      <button type="button" title={p.do_not_contact ? 'Do not contact' : 'Mark as do not contact'} onClick={() => updatePoint(i, { do_not_contact: !p.do_not_contact })}
+                        className={cn('rounded p-0.5 transition-colors', p.do_not_contact ? 'text-rose-500' : 'text-muted-foreground/40 hover:text-rose-400')}>
                         <Ban className="h-3.5 w-3.5" />
                       </button>
                       <button type="button" onClick={() => removePoint(i)} className="rounded p-0.5 text-muted-foreground/40 hover:text-destructive transition-colors">
@@ -734,14 +685,9 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
                     </div>
                   </div>
                 ))}
-
-                <button
-                  type="button"
-                  onClick={() => addPoint('PHONE')}
-                  className="mt-1 flex items-center gap-1 rounded border border-dashed border-border/50 px-2 py-1 text-xs text-muted-foreground hover:border-border hover:text-foreground transition-colors"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Add contact method
+                <button type="button" onClick={() => addPoint('PHONE')}
+                  className="mt-1 flex items-center gap-1 rounded border border-dashed border-border/50 px-2 py-1 text-xs text-muted-foreground hover:border-border hover:text-foreground transition-colors">
+                  <Plus className="h-3.5 w-3.5" />Add contact method
                 </button>
               </div>
             </div>
