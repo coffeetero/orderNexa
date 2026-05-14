@@ -297,9 +297,8 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
 
             {/* Column headers */}
             <div className="grid border-b border-border/60 bg-muted/20 px-3 py-1.5 text-xs font-semibold text-muted-foreground"
-              style={{ gridTemplateColumns: '90px 1fr 140px 36px' }}>
-              <span>Cust. No.</span>
-              <span>Customer Name</span>
+              style={{ gridTemplateColumns: '1fr 140px 36px' }}>
+              <span>Customer</span>
               <span />
               <span />
             </div>
@@ -316,26 +315,23 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
                     row.already_posted ? 'opacity-50' : 'hover:bg-muted/20',
                     isChecked && !row.already_posted ? 'bg-primary/5' : '',
                   )}
-                  style={{ gridTemplateColumns: '90px 1fr 140px 36px' }}
+                  style={{ gridTemplateColumns: '1fr 140px 36px' }}
                 >
                   {(() => {
-                    const h = hierarchyRef.current.get(row.customer_id);
+                    const h     = hierarchyRef.current.get(row.customer_id);
                     const level = h?.level ?? 0;
                     const type  = (h?.customer_type ?? '').toUpperCase();
-                    const nameClass = type === 'ACCOUNT' ? 'font-semibold text-foreground'
-                      : type === 'DEPARTMENT' ? 'text-foreground/50'
-                      : 'text-foreground';
+                    const nameClass = type === 'ACCOUNT'    ? 'font-semibold text-foreground'
+                                    : type === 'DEPARTMENT' ? 'text-foreground/50'
+                                    : 'text-foreground';
+                    const label = row.customer_number
+                      ? `${row.customer_number} — ${row.customer_name}`
+                      : row.customer_name;
                     return (
-                      <>
-                        <span className="font-mono text-xs text-muted-foreground"
-                          style={{ paddingLeft: level * 10 }}>
-                          {row.customer_number}
-                        </span>
-                        <span className={cn('truncate text-sm', nameClass)}
-                          style={{ paddingLeft: level * 10 }}>
-                          {row.customer_name}
-                        </span>
-                      </>
+                      <span className={cn('truncate text-sm', nameClass)}
+                        style={{ paddingLeft: level * 12 }}>
+                        {label}
+                      </span>
                     );
                   })()}
                   <span className={cn('text-xs', row.status ? STATUS_CLASS[row.status] : 'text-muted-foreground/60')}>
