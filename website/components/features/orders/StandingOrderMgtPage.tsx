@@ -292,6 +292,9 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
 
       </div>
 
+      {/* Row 2 + Grid — constrained to content width */}
+      <div className="w-fit">
+
       {/* Row 2: Item search + Qty */}
       <div className="flex flex-wrap items-end gap-2 border-b border-border/60 bg-muted/20 px-3 py-2">
         <div className="flex w-[346px] min-w-[346px] max-w-[346px] shrink-0 flex-col gap-1">
@@ -340,6 +343,9 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
             )}
           />
         </div>
+
+        {/* Spacer — same width as Qty */}
+        <div className="w-24 shrink-0" />
 
         {/* Save To fieldset: pills + Save */}
         <fieldset className="flex shrink-0 flex-col justify-between rounded border border-border/60 px-2 pb-1.5 pt-0.5">
@@ -436,6 +442,8 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
           </>
         )}
       </div>
+
+      </div> {/* end w-fit wrapper */}
     </div>
   );
 }
