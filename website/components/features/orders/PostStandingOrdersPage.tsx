@@ -51,8 +51,7 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
 
   // Filters
   const [productionDate, setProductionDate] = useState(defaultDate);
-  const [availableCodes, setAvailableCodes] = useState<string[]>(DEFAULT_CODES);
-  const [selectedCodes,  setSelectedCodes]  = useState<string[]>(DEFAULT_CODES);
+  const [selectedCodes, setSelectedCodes] = useState<string[]>(DEFAULT_CODES);
 
   // Grid state
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -84,11 +83,6 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
       const json = await res.json() as { data?: Candidate[]; availableCodes?: string[]; error?: string };
       if (!res.ok || json.error) { toast.error(json.error ?? 'Could not load.'); return; }
 
-      if (json.availableCodes && availableCodes.length === 0) {
-        setAvailableCodes(json.availableCodes);
-        if (selectedCodes.length === 0) setSelectedCodes(json.availableCodes);
-      }
-
       const rows = json.data ?? [];
       setCandidates(rows);
       // Pre-check all non-posted candidates
@@ -98,17 +92,14 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
     } finally {
       setIsLoading(false);
     }
-  }, [tenantId, availableCodes.length, selectedCodes.length]);
+  }, [tenantId]);
 
   // Initial load: fetch available codes first
   useEffect(() => {
     if (!tenantId) return;
     fetch(`/api/post-standing-orders?tenant_id=${tenantId}&production_date=${productionDate}`)
       .then(r => r.json())
-      .then((j: { data?: Candidate[]; availableCodes?: string[] }) => {
-        const codes = j.availableCodes ?? [];
-        setAvailableCodes(codes);
-        setSelectedCodes(codes);
+      .then((j: { data?: Candidate[] }) => {
         const rows = j.data ?? [];
         setCandidates(rows);
         setChecked(new Set(rows.filter(r => !r.already_posted).map(r => rowKey(r))));
@@ -177,7 +168,7 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
 
   // ── Grouped grid ──────────────────────────────────────────────────────────
 
-  const grouped = availableCodes
+  const grouped = DEFAULT_CODES
     .filter(c => selectedCodes.includes(c))
     .map(code => ({
       code,
@@ -212,7 +203,7 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
         <div className="flex flex-col gap-1">
           <Label className={LABEL_CLASS}>Production Time</Label>
           <div className="flex gap-1 rounded-md border border-input bg-background px-2 py-1.5">
-            {availableCodes.map(code => (
+            {DEFAULT_CODES.map(code => (
               <label key={code} className="flex cursor-pointer items-center gap-1.5 rounded px-2 py-1 text-sm hover:bg-muted select-none">
                 <Checkbox
                   checked={selectedCodes.includes(code)}
