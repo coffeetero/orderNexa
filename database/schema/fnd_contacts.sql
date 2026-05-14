@@ -26,9 +26,12 @@ CREATE TABLE IF NOT EXISTS fnd_contacts (
     contact_type        TEXT        NOT NULL DEFAULT 'PERSON',
 
     -- ── Card identity ────────────────────────────────────────
-    -- card_name: the role/title shown on the card selector (e.g. "Owner",
-    -- "Receivables Dept"). Auto-derives from department → job_title in the UI.
+    -- card_name:    role/title on the card selector ("Owner", "Receivables Dept").
+    --               Auto-derives from department → job_title in the UI.
+    -- display_name: the person's name shown as line 2 in the card selector.
+    --               Auto-derives from first_name + last_name in the UI.
     card_name           TEXT        NOT NULL,
+    display_name        TEXT,
 
     -- ── Person details (optional structured metadata) ─────
     first_name          TEXT,

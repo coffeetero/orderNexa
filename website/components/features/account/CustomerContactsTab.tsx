@@ -71,6 +71,7 @@ interface Contact {
   contact_id: number;
   contact_type: ContactType;
   card_name: string;
+  display_name: string;
   first_name: string;
   last_name: string;
   job_title: string;
@@ -84,6 +85,7 @@ interface ContactForm {
   contact_id: number | null;
   contact_type: ContactType;
   card_name: string;
+  display_name: string;
   first_name: string;
   last_name: string;
   job_title: string;
@@ -108,7 +110,7 @@ interface CustomerContactsTabProps {
 
 const EMPTY_FORM: ContactForm = {
   contact_id: null, contact_type: 'PERSON',
-  card_name: '', first_name: '', last_name: '',
+  card_name: '', display_name: '', first_name: '', last_name: '',
   job_title: '', department: '',
   is_primary: false, is_active: true, contact_points: [],
 };
@@ -126,7 +128,8 @@ function emptyPoint(type: PointType, seq: number, defaultDisplayName = ''): Cont
 function contactToForm(c: Contact): ContactForm {
   return {
     contact_id: c.contact_id, contact_type: c.contact_type,
-    card_name: c.card_name, first_name: c.first_name, last_name: c.last_name,
+    card_name: c.card_name, display_name: c.display_name ?? '',
+    first_name: c.first_name, last_name: c.last_name,
     job_title: c.job_title, department: c.department,
     is_primary: c.is_primary, is_active: c.is_active,
     contact_points: c.contact_points.map(p => ({
@@ -340,6 +343,17 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
     const setField = <K extends keyof ContactForm>(k: K, v: ContactForm[K]) =>
       setForm(f => ({ ...f, [k]: v }));
 
+    // first/last name → auto-derive display_name if not manually overridden
+    const updateNameField = (field: 'first_name' | 'last_name', value: string) =>
+      setForm(f => {
+        const prevDerived = [f.first_name, f.last_name].filter(Boolean).join(' ');
+        const newFirst    = field === 'first_name' ? value : f.first_name;
+        const newLast     = field === 'last_name'  ? value : f.last_name;
+        const newDerived  = [newFirst, newLast].filter(Boolean).join(' ');
+        const autoUpdate  = f.display_name === '' || f.display_name === prevDerived;
+        return { ...f, [field]: value, display_name: autoUpdate ? newDerived : f.display_name };
+      });
+
     // department or job_title → auto-derive card_name if not manually overridden
     const updateCardSource = (field: 'department' | 'job_title', value: string) =>
       setForm(f => {
@@ -442,10 +456,11 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
                   const usedTypes = Array.from(new Set(contact.contact_points.map(p => p.type))) as PointType[];
                   const addrCount = contact.contact_points.length;
                   const sameAsBill = contact.contact_type === 'ADDRESSES' && contact.contact_points.some(p => p.use_as_shipping);
-                  // Line 2: display_name from primary point, or first non-blank
-                  const line2 = contact.contact_points.find(p => p.is_primary && p.display_name)?.display_name
-                              ?? contact.contact_points.find(p => p.display_name)?.display_name
-                              ?? '';
+                  // Line 2: contact-level display_name (PERSON), else primary point's display_name (ADDRESSES)
+                  const line2 = contact.display_name
+                              || contact.contact_points.find(p => p.is_primary && p.display_name)?.display_name
+                              || contact.contact_points.find(p => p.display_name)?.display_name
+                              || '';
 
                   return (
                     <button key={contact.contact_id} type="button" onClick={() => applySelection(contact)}
@@ -614,14 +629,19 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
                   <p className="mb-0.5 text-xs text-muted-foreground">Card Name <span className="text-destructive">*</span></p>
                   <Input value={form.card_name} onChange={e => setField('card_name', e.target.value)} className="h-7 text-sm font-medium" placeholder="e.g. Owner, Receivables, Chef" />
                 </div>
+                {/* Display Name — auto-derives from first + last */}
+                <div>
+                  <p className="mb-0.5 text-xs text-muted-foreground">Display Name</p>
+                  <Input value={form.display_name} onChange={e => setField('display_name', e.target.value)} className="h-7 text-sm" placeholder="Full name" />
+                </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <p className="mb-0.5 text-xs text-muted-foreground">First Name</p>
-                    <Input value={form.first_name} onChange={e => setField('first_name', e.target.value)} className="h-7 text-sm" />
+                    <Input value={form.first_name} onChange={e => updateNameField('first_name', e.target.value)} className="h-7 text-sm" />
                   </div>
                   <div>
                     <p className="mb-0.5 text-xs text-muted-foreground">Last Name</p>
-                    <Input value={form.last_name} onChange={e => setField('last_name', e.target.value)} className="h-7 text-sm" />
+                    <Input value={form.last_name} onChange={e => updateNameField('last_name', e.target.value)} className="h-7 text-sm" />
                   </div>
                   <div>
                     <p className="mb-0.5 text-xs text-muted-foreground">Job Title</p>
@@ -668,7 +688,6 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
                       <AutoTextarea value={p.value} onChange={e => updatePoint(i, { value: e.target.value })} className={textareaClass}
                         placeholder={p.type === 'EMAIL' ? 'email@example.com' : p.type === 'WEBSITE' ? 'https://' : p.type === 'ADDRESS' ? '123 Main St\nCity, State' : ''} />
                       {p.type === 'ADDRESS' && <GeocodeStatus status={p.geocode_status} formattedAddress={p.formatted_address} />}
-                      <Input value={p.display_name} onChange={e => updatePoint(i, { display_name: e.target.value })} className={displayNameClass} placeholder="Display name" />
                     </div>
                     <div className="flex items-center gap-0.5 pt-0.5">
                       <button type="button" title={p.is_primary ? 'Primary' : 'Set as primary'} onClick={() => togglePointPrimary(i)}
