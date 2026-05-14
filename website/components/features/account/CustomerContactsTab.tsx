@@ -213,6 +213,33 @@ function AddressLabelInput({ value, onChange, hasShipping }: {
   );
 }
 
+// ── Auto-sizing textarea ──────────────────────────────────────────────────────
+
+function AutoTextarea({ value, onChange, className, placeholder }: {
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  className?: string;
+  placeholder?: string;
+}) {
+  const el = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (!el.current) return;
+    el.current.style.height = 'auto';
+    el.current.style.height = `${el.current.scrollHeight}px`;
+  }, [value]);
+  return (
+    <textarea
+      ref={el}
+      value={value}
+      onChange={onChange}
+      rows={1}
+      style={{ overflow: 'hidden' }}
+      className={cn('resize-none', className)}
+      placeholder={placeholder}
+    />
+  );
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, CustomerContactsTabProps>(
@@ -498,7 +525,7 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
               <div className="space-y-1.5">
                 {visiblePoints.length > 0 && (
                   <div className="grid items-center gap-2 px-0.5" style={{ gridTemplateColumns: '1fr 1fr auto' }}>
-                    <p className="text-xs text-muted-foreground">Label</p>
+                    <p className="text-xs text-muted-foreground text-center">Label</p>
                     <p className="text-xs text-muted-foreground">Address</p>
                     <div className="w-8" />
                   </div>
@@ -518,11 +545,10 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
                           hasShipping={hasUseAsShipping}
                         />
                         <div>
-                          <textarea
+                          <AutoTextarea
                             value={p.value}
                             onChange={e => updatePoint(idx, { value: e.target.value })}
-                            rows={3}
-                            className="w-full resize-none rounded border border-input bg-transparent px-2 py-1 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
+                            className="w-full rounded border border-input bg-transparent px-2 py-1 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
                             placeholder={'123 Main St\nCity, State 12345'}
                           />
                           <GeocodeStatus status={p.geocode_status} formattedAddress={p.formatted_address} />
@@ -581,9 +607,9 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
               <div className="space-y-1.5">
                 {form.contact_points.length > 0 && (
                   <div className="grid items-center gap-2 px-0.5" style={{ gridTemplateColumns: '108px 80px 1fr auto' }}>
-                    <p className="text-xs text-muted-foreground">Type</p>
-                    <p className="text-xs text-muted-foreground">Label</p>
-                    <p className="text-xs text-muted-foreground">Value</p>
+                    <p className="text-xs text-muted-foreground text-center">Type</p>
+                    <p className="text-xs text-muted-foreground text-center">Label</p>
+                    <p className="text-xs text-muted-foreground">Details</p>
                     <div className="w-8" />
                   </div>
                 )}
@@ -597,11 +623,10 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
                       </SelectContent>
                     </Select>
                     <Input value={p.label} onChange={e => updatePoint(i, { label: e.target.value })} className="h-7 text-xs" placeholder="Label" />
-                    <textarea
+                    <AutoTextarea
                       value={p.value}
                       onChange={e => updatePoint(i, { value: e.target.value })}
-                      rows={p.type === 'NOTE' || p.type === 'ADDRESS' ? 3 : 1}
-                      className="w-full resize-none rounded border border-input bg-transparent px-2 py-1 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
+                      className="w-full rounded border border-input bg-transparent px-2 py-1 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
                     />
                     <button type="button" onClick={() => removePoint(i)} className="mt-1 rounded p-0.5 text-muted-foreground/40 hover:text-destructive transition-colors">
                       <Trash2 className="h-3.5 w-3.5" />
@@ -671,9 +696,9 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
               <div className="space-y-1.5">
                 {form.contact_points.length > 0 && (
                   <div className="grid items-center gap-2 px-0.5" style={{ gridTemplateColumns: '108px 80px 1fr auto' }}>
-                    <p className="text-xs text-muted-foreground">Type</p>
-                    <p className="text-xs text-muted-foreground">Label</p>
-                    <p className="text-xs text-muted-foreground">Value</p>
+                    <p className="text-xs text-muted-foreground text-center">Type</p>
+                    <p className="text-xs text-muted-foreground text-center">Label</p>
+                    <p className="text-xs text-muted-foreground">Details</p>
                     <div className="w-[68px]" />
                   </div>
                 )}
@@ -688,11 +713,10 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
                     </Select>
                     <Input value={p.label} onChange={e => updatePoint(i, { label: e.target.value })} className="h-7 text-xs" placeholder="e.g. Work" />
                     <div>
-                      <textarea
+                      <AutoTextarea
                         value={p.value}
                         onChange={e => updatePoint(i, { value: e.target.value })}
-                        rows={p.type === 'ADDRESS' || p.type === 'NOTE' ? 3 : 1}
-                        className="w-full resize-none rounded border border-input bg-transparent px-2 py-1 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
+                        className="w-full rounded border border-input bg-transparent px-2 py-1 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
                         placeholder={p.type === 'EMAIL' ? 'email@example.com' : p.type === 'WEBSITE' ? 'https://' : p.type === 'ADDRESS' ? '123 Main St\nCity, State' : ''}
                       />
                       {p.type === 'ADDRESS' && <GeocodeStatus status={p.geocode_status} formattedAddress={p.formatted_address} />}
