@@ -357,9 +357,7 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
                     const h     = hierarchyRef.current.get(row.customer_id);
                     const level = h?.level ?? 0;
                     const type  = (h?.customer_type ?? '').toUpperCase();
-                    const nameClass = type === 'ACCOUNT'    ? 'font-semibold text-foreground'
-                                    : type === 'DEPARTMENT' ? 'text-foreground/50'
-                                    : 'text-foreground';
+                    const nameClass = type === 'DEPARTMENT' ? 'text-foreground/50' : 'text-foreground';
                     const label = row.customer_number
                       ? `${row.customer_number} - ${row.customer_name}`
                       : row.customer_name;
