@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { CheckSquare, Square, Wheat } from 'lucide-react';
+import { CheckSquare, ChevronDown, Square, Wheat } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -11,6 +11,7 @@ import {
   AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 
 const DEFAULT_CODES = ['MORNING', 'LUNCH', 'DINNER'];
@@ -199,24 +200,38 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
           />
         </div>
 
-        {/* Production Time multi-select listbox */}
+        {/* Production Time multi-select dropdown */}
         <div className="flex flex-col gap-1">
           <Label className={LABEL_CLASS}>Production Time</Label>
-          <div className="flex gap-1 rounded-md border border-input bg-background px-2 py-1.5">
-            {DEFAULT_CODES.map(code => (
-              <label key={code} className="flex cursor-pointer items-center gap-1.5 rounded px-2 py-1 text-sm hover:bg-muted select-none">
-                <Checkbox
-                  checked={selectedCodes.includes(code)}
-                  onCheckedChange={v => {
-                    setSelectedCodes(prev =>
-                      v ? [...prev, code] : prev.filter(c => c !== code)
-                    );
-                  }}
-                />
-                {code.charAt(0) + code.slice(1).toLowerCase()}
-              </label>
-            ))}
-          </div>
+          <Popover>
+            <PopoverTrigger asChild>
+              <button className="flex h-9 min-w-[180px] items-center justify-between rounded-md border border-input bg-background px-3 text-sm hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-primary">
+                <span className="truncate">
+                  {selectedCodes.length === 0
+                    ? 'None selected'
+                    : selectedCodes.length === DEFAULT_CODES.length
+                    ? 'All'
+                    : selectedCodes.map(c => c.charAt(0) + c.slice(1).toLowerCase()).join(', ')}
+                </span>
+                <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-muted-foreground" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-48 p-1.5" align="start">
+              {DEFAULT_CODES.map(code => (
+                <label key={code} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted select-none">
+                  <Checkbox
+                    checked={selectedCodes.includes(code)}
+                    onCheckedChange={v =>
+                      setSelectedCodes(prev =>
+                        v ? [...prev, code] : prev.filter(c => c !== code)
+                      )
+                    }
+                  />
+                  {code.charAt(0) + code.slice(1).toLowerCase()}
+                </label>
+              ))}
+            </PopoverContent>
+          </Popover>
         </div>
 
         {/* Actions */}
