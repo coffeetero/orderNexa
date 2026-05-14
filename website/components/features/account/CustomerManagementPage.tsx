@@ -660,34 +660,34 @@ export function CustomerManagementPage({
             <TabsList className="relative z-0 h-auto w-fit justify-start gap-0.5 rounded-none bg-transparent p-0">
               <TabsTrigger
                 value="profile"
-                className="relative z-0 -mb-px rounded-b-none rounded-t-lg border border-muted bg-muted/70 px-4 py-1.5 data-[state=active]:z-10 data-[state=active]:translate-y-[1px] data-[state=active]:border-border/60 data-[state=active]:border-b-transparent data-[state=active]:bg-card"
+                className="relative z-0 -mb-px rounded-b-none rounded-t-lg border border-muted bg-muted/70 px-4 py-1.5 data-[state=active]:z-10 data-[state=active]:translate-y-[1px] data-[state=active]:border-border/60 data-[state=active]:border-b-transparent data-[state=active]:bg-card data-[state=active]:font-semibold data-[state=active]:text-[15px]"
               >
                 Profile
               </TabsTrigger>
               {!isDepartment && (<>
               <TabsTrigger
                 value="contacts"
-                className="relative z-0 -mb-px rounded-b-none rounded-t-lg border border-muted bg-muted/70 px-4 py-1.5 data-[state=active]:z-10 data-[state=active]:translate-y-[1px] data-[state=active]:border-border/60 data-[state=active]:border-b-transparent data-[state=active]:bg-card"
+                className="relative z-0 -mb-px rounded-b-none rounded-t-lg border border-muted bg-muted/70 px-4 py-1.5 data-[state=active]:z-10 data-[state=active]:translate-y-[1px] data-[state=active]:border-border/60 data-[state=active]:border-b-transparent data-[state=active]:bg-card data-[state=active]:font-semibold data-[state=active]:text-[15px]"
               >
                 Contacts
               </TabsTrigger>
               {isAccount && (
               <TabsTrigger
                 value="pricing"
-                className="relative z-0 -mb-px rounded-b-none rounded-t-lg border border-muted bg-muted/70 px-4 py-1.5 data-[state=active]:z-10 data-[state=active]:translate-y-[1px] data-[state=active]:border-border/60 data-[state=active]:border-b-transparent data-[state=active]:bg-card"
+                className="relative z-0 -mb-px rounded-b-none rounded-t-lg border border-muted bg-muted/70 px-4 py-1.5 data-[state=active]:z-10 data-[state=active]:translate-y-[1px] data-[state=active]:border-border/60 data-[state=active]:border-b-transparent data-[state=active]:bg-card data-[state=active]:font-semibold data-[state=active]:text-[15px]"
               >
                 Pricing
               </TabsTrigger>
               )}
               <TabsTrigger
                 value="notes"
-                className="relative z-0 -mb-px rounded-b-none rounded-t-lg border border-muted bg-muted/70 px-4 py-1.5 data-[state=active]:z-10 data-[state=active]:translate-y-[1px] data-[state=active]:border-border/60 data-[state=active]:border-b-transparent data-[state=active]:bg-card"
+                className="relative z-0 -mb-px rounded-b-none rounded-t-lg border border-muted bg-muted/70 px-4 py-1.5 data-[state=active]:z-10 data-[state=active]:translate-y-[1px] data-[state=active]:border-border/60 data-[state=active]:border-b-transparent data-[state=active]:bg-card data-[state=active]:font-semibold data-[state=active]:text-[15px]"
               >
                 Notes
               </TabsTrigger>
               <TabsTrigger
                 value="settings"
-                className="relative z-0 -mb-px rounded-b-none rounded-t-lg border border-muted bg-muted/70 px-4 py-1.5 data-[state=active]:z-10 data-[state=active]:translate-y-[1px] data-[state=active]:border-border/60 data-[state=active]:border-b-transparent data-[state=active]:bg-card"
+                className="relative z-0 -mb-px rounded-b-none rounded-t-lg border border-muted bg-muted/70 px-4 py-1.5 data-[state=active]:z-10 data-[state=active]:translate-y-[1px] data-[state=active]:border-border/60 data-[state=active]:border-b-transparent data-[state=active]:bg-card data-[state=active]:font-semibold data-[state=active]:text-[15px]"
               >
                 Settings
               </TabsTrigger>
