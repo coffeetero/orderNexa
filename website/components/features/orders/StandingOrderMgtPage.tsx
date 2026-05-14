@@ -81,6 +81,8 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [selectedDow,  setSelectedDow]  = useState<string>('MON');
   const [selectedCode, setSelectedCode] = useState<string>('MORNING');
+  // Pills: days to save to — always includes selectedDow
+  const [targetDows, setTargetDows] = useState<Set<string>>(new Set(['MON']));
 
   // Grid lines
   const [lines,      setLines]      = useState<SOLine[]>([]);
@@ -176,7 +178,7 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tenant_id: tenantId, customer_id: selectedCustomer.customer_id,
-          production_dow: selectedDow, production_code: selectedCode,
+          production_dows: Array.from(targetDows), production_code: selectedCode,
           lines: lines.map(l => ({ item_id: l.item_id, quantity: l.quantity, prep_options: [] })),
         }),
       });
@@ -250,7 +252,7 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
 
         <div className="flex w-36 shrink-0 flex-col gap-1">
           <Label className={LABEL_CLASS}>Production Day</Label>
-          <Select value={selectedDow} onValueChange={setSelectedDow}>
+          <Select value={selectedDow} onValueChange={(v) => { setSelectedDow(v); setTargetDows(new Set([v])); }}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               {DOW_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
@@ -268,15 +270,6 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
           </Select>
         </div>
 
-        <div className="ml-auto flex items-end gap-2 pb-0.5">
-          <Button variant="outline" size="sm"
-            onClick={() => setLines(savedLines.map(l => ({ ...l })))}
-            disabled={!isDirty}>Cancel</Button>
-          <Button size="sm" onClick={save}
-            disabled={isSaving || !isDirty || !selectedCustomer}>
-            {isSaving ? 'Saving…' : 'Save'}
-          </Button>
-        </div>
       </div>
 
       {/* Row 2: Item search + Qty */}
@@ -326,6 +319,57 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
               '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none',
             )}
           />
+        </div>
+
+        {/* Day pills */}
+        <div className="flex shrink-0 flex-col gap-1">
+          <span className={LABEL_CLASS}>Save to</span>
+          <div className="flex h-9 items-center gap-1">
+            {DOW_OPTIONS.map(o => {
+              const isSource   = o.value === selectedDow;
+              const isSelected = targetDows.has(o.value);
+              return (
+                <button
+                  key={o.value}
+                  type="button"
+                  title={isSource ? `${o.label} (production day — always saved)` : o.label}
+                  onClick={() => {
+                    if (isSource) return;
+                    setTargetDows(prev => {
+                      const next = new Set(prev);
+                      if (next.has(o.value)) next.delete(o.value);
+                      else next.add(o.value);
+                      return next;
+                    });
+                  }}
+                  className={cn(
+                    'h-7 rounded px-1.5 text-xs font-medium transition-colors',
+                    isSelected
+                      ? isSource
+                        ? 'bg-primary text-primary-foreground opacity-90 cursor-default'
+                        : 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/70',
+                  )}
+                >
+                  {o.label.slice(0, 3)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Save / Cancel */}
+        <div className="flex shrink-0 flex-col gap-1">
+          <span className={cn(LABEL_CLASS, 'invisible')}>x</span>
+          <div className="flex h-9 items-center gap-2">
+            <Button variant="outline" size="sm"
+              onClick={() => setLines(savedLines.map(l => ({ ...l })))}
+              disabled={!isDirty}>Cancel</Button>
+            <Button size="sm" onClick={save}
+              disabled={isSaving || !isDirty || !selectedCustomer}>
+              {isSaving ? 'Saving…' : 'Save'}
+            </Button>
+          </div>
         </div>
       </div>
 

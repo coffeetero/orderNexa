@@ -44,10 +44,10 @@ export async function POST(request: Request) {
   const payload = body as Record<string, unknown>;
   const tenantId     = parseInteger(payload.tenant_id);
   const customerId   = parseInteger(payload.customer_id);
-  const productionDow  = payload.production_dow  as string | undefined;
+  const productionDows = payload.production_dows as string[] | undefined;
   const productionCode = payload.production_code as string | undefined;
 
-  if (tenantId === null || customerId === null || !productionDow || !productionCode) {
+  if (tenantId === null || customerId === null || !productionDows?.length || !productionCode) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
 
@@ -55,12 +55,12 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const supabase = createClient();
-  const { data, error } = await supabase.rpc('om_standing_orders_save', {
-    p_tenant_id:       tenantId,
-    p_customer_id:     customerId,
-    p_production_dow:  productionDow,
-    p_production_code: productionCode,
-    p_lines:           payload.lines ?? [],
+  const { data, error } = await (supabase.rpc as any)('om_standing_orders_save', {
+    p_tenant_id:        tenantId,
+    p_customer_id:      customerId,
+    p_production_dows:  productionDows,
+    p_production_code:  productionCode,
+    p_lines:            payload.lines ?? [],
   });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });

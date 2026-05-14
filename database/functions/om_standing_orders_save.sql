@@ -1,21 +1,25 @@
 -- ============================================================
 -- om_standing_orders_save
--- Replaces standing order lines for (customer, production_dow,
--- production_code). Lines in p_lines are upserted; lines
--- previously saved but absent are deleted.
+-- Saves standing order lines to one or more production days
+-- atomically. For each DOW in p_production_dows: deletes all
+-- existing lines for (customer, dow, code) then inserts fresh
+-- from p_lines. Saving an empty array clears all lines for
+-- those days.
 --
--- p_lines: [{item_id, quantity, prep_options}]
--- Saving with an empty array deletes all lines for that combo.
+-- p_production_dows: TEXT[]  e.g. '{MON,WED,FRI}'
+-- p_lines:           JSONB   [{item_id, quantity, prep_options}]
 --
 -- SECURITY DEFINER — bypasses RLS; tenant validated via JWT.
 -- ============================================================
 
+DROP FUNCTION IF EXISTS bps.om_standing_orders_save(BIGINT, BIGINT, TEXT, TEXT, JSONB);
+
 CREATE OR REPLACE FUNCTION bps.om_standing_orders_save(
-  p_tenant_id       BIGINT,
-  p_customer_id     BIGINT,
-  p_production_dow  TEXT,
-  p_production_code TEXT,
-  p_lines           JSONB
+  p_tenant_id        BIGINT,
+  p_customer_id      BIGINT,
+  p_production_dows  TEXT[],
+  p_production_code  TEXT,
+  p_lines            JSONB
 )
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -23,11 +27,9 @@ SECURITY DEFINER
 SET search_path = bps, public
 AS $$
 DECLARE
-  v_user_id   BIGINT;
-  v_line      JSONB;
-  v_item_id   BIGINT;
-  v_so_id     BIGINT;
-  v_kept_ids  BIGINT[] := '{}';
+  v_user_id BIGINT;
+  v_dow     TEXT;
+  v_line    JSONB;
 BEGIN
   IF NOT (
     p_tenant_id::text = ANY (ARRAY(
@@ -42,46 +44,33 @@ BEGIN
 
   SELECT user_id INTO v_user_id
   FROM fnd_users
-  WHERE auth_user_id = auth.uid()
-    AND tenant_id    = p_tenant_id
+  WHERE auth_user_id = auth.uid() AND tenant_id = p_tenant_id
   LIMIT 1;
 
-  FOR v_line IN
-    SELECT * FROM jsonb_array_elements(COALESCE(p_lines, '[]'::JSONB))
-  LOOP
-    v_item_id := (v_line->>'item_id')::BIGINT;
+  FOREACH v_dow IN ARRAY p_production_dows LOOP
+    DELETE FROM om_standing_orders
+    WHERE tenant_id       = p_tenant_id
+      AND customer_id     = p_customer_id
+      AND production_dow  = v_dow
+      AND production_code = p_production_code;
 
-    INSERT INTO om_standing_orders (
-      tenant_id, customer_id, production_dow, production_code,
-      item_id, quantity, prep_options, is_active,
-      created_by, updated_by
-    ) VALUES (
-      p_tenant_id, p_customer_id, p_production_dow, p_production_code,
-      v_item_id,
-      COALESCE((v_line->>'quantity')::NUMERIC, 0),
-      COALESCE((v_line->'prep_options'), '[]'::JSONB),
-      TRUE,
-      v_user_id, v_user_id
-    )
-    ON CONFLICT (tenant_id, customer_id, production_dow, production_code, item_id)
-    DO UPDATE SET
-      quantity     = EXCLUDED.quantity,
-      prep_options = EXCLUDED.prep_options,
-      is_active    = TRUE,
-      updated_by   = v_user_id
-    RETURNING standing_order_id INTO v_so_id;
-
-    v_kept_ids := v_kept_ids || v_so_id;
+    FOR v_line IN SELECT * FROM jsonb_array_elements(COALESCE(p_lines, '[]'::JSONB)) LOOP
+      INSERT INTO om_standing_orders (
+        tenant_id, customer_id, production_dow, production_code,
+        item_id, quantity, prep_options, is_active, created_by, updated_by
+      ) VALUES (
+        p_tenant_id, p_customer_id, v_dow, p_production_code,
+        (v_line->>'item_id')::BIGINT,
+        COALESCE((v_line->>'quantity')::NUMERIC, 0),
+        COALESCE(v_line->'prep_options', '[]'::JSONB),
+        TRUE, v_user_id, v_user_id
+      );
+    END LOOP;
   END LOOP;
 
-  -- Delete lines removed by the user
-  DELETE FROM om_standing_orders
-  WHERE tenant_id       = p_tenant_id
-    AND customer_id     = p_customer_id
-    AND production_dow  = p_production_dow
-    AND production_code = p_production_code
-    AND standing_order_id != ALL(v_kept_ids);
-
-  RETURN jsonb_build_object('saved', array_length(v_kept_ids, 1));
+  RETURN jsonb_build_object(
+    'days_saved',  array_length(p_production_dows, 1),
+    'lines_saved', jsonb_array_length(COALESCE(p_lines, '[]'::JSONB))
+  );
 END;
 $$;
