@@ -217,11 +217,14 @@ function AddressLabelInput({ value, onChange, hasShipping }: {
 
 // ── Auto-sizing textarea ──────────────────────────────────────────────────────
 
-function AutoTextarea({ value, onChange, className, placeholder }: {
+const MULTI_LINE_TYPES = new Set(['NOTE', 'ADDRESS', 'OTHER']);
+
+function AutoTextarea({ value, onChange, className, placeholder, minRows = 1 }: {
   value: string;
   onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   className?: string;
   placeholder?: string;
+  minRows?: number;
 }) {
   const el = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
@@ -231,7 +234,10 @@ function AutoTextarea({ value, onChange, className, placeholder }: {
   }, [value]);
   return (
     <textarea ref={el} value={value} onChange={onChange} rows={1}
-      style={{ overflow: 'hidden' }}
+      style={{
+        overflow: 'hidden',
+        minHeight: minRows > 1 ? `calc(${minRows} * 1.5em + 0.5rem)` : undefined,
+      }}
       className={cn('resize-none', className)}
       placeholder={placeholder}
     />
@@ -548,7 +554,7 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
                     <div key={p.contact_point_id ?? `new-${idx}`} className="grid items-start gap-2" style={{ gridTemplateColumns: '1fr 2fr auto' }}>
                       <AddressLabelInput value={p.label} onChange={v => updatePoint(idx, { label: v })} hasShipping={hasUseAsShipping} />
                       <div>
-                        <AutoTextarea value={p.value} onChange={e => updatePoint(idx, { value: e.target.value })} className={textareaClass} placeholder={'123 Main St\nCity, State 12345'} />
+                        <AutoTextarea value={p.value} onChange={e => updatePoint(idx, { value: e.target.value })} className={textareaClass} placeholder={'123 Main St\nCity, State 12345'} minRows={3} />
                         <GeocodeStatus status={p.geocode_status} formattedAddress={p.formatted_address} />
                         {isBillingRow && (
                           <label className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
@@ -601,7 +607,7 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
                     </Select>
                     <Input value={p.label} onChange={e => updatePoint(i, { label: e.target.value })} className="h-7 text-xs" placeholder="Label" />
                     <div>
-                      <AutoTextarea value={p.value} onChange={e => updatePoint(i, { value: e.target.value })} className={textareaClass} />
+                      <AutoTextarea value={p.value} onChange={e => updatePoint(i, { value: e.target.value })} className={textareaClass} minRows={MULTI_LINE_TYPES.has(p.type) ? 3 : 1} />
                       <Input value={p.display_name} onChange={e => updatePoint(i, { display_name: e.target.value })} className={displayNameClass} placeholder="Display name" />
                     </div>
                     <button type="button" onClick={() => removePoint(i)} className="mt-1 rounded p-0.5 text-muted-foreground/40 hover:text-destructive transition-colors">
@@ -683,7 +689,8 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
                     <Input value={p.label} onChange={e => updatePoint(i, { label: e.target.value })} className="h-7 text-xs" placeholder="e.g. Work" />
                     <div>
                       <AutoTextarea value={p.value} onChange={e => updatePoint(i, { value: e.target.value })} className={textareaClass}
-                        placeholder={p.type === 'EMAIL' ? 'email@example.com' : p.type === 'WEBSITE' ? 'https://' : p.type === 'ADDRESS' ? '123 Main St\nCity, State' : ''} />
+                        placeholder={p.type === 'EMAIL' ? 'email@example.com' : p.type === 'WEBSITE' ? 'https://' : p.type === 'ADDRESS' ? '123 Main St\nCity, State' : ''}
+                        minRows={MULTI_LINE_TYPES.has(p.type) ? 3 : 1} />
                       {p.type === 'ADDRESS' && <GeocodeStatus status={p.geocode_status} formattedAddress={p.formatted_address} />}
                     </div>
                     <div className="flex items-center gap-0.5 pt-0.5">
