@@ -15,7 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { cn } from '@/lib/utils';
 
 const DEFAULT_CODES = ['MORNING', 'LUNCH', 'DINNER'];
-const LABEL_CLASS = 'text-xs font-semibold text-muted-foreground tracking-wide';
+const LABEL_CLASS = 'text-xs font-semibold text-muted-foreground tracking-wide text-center';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
