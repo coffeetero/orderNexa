@@ -145,8 +145,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--schema",
-        default="public",
-        help="Destination PostgreSQL schema (default: public).",
+        default="bps",
+        help="Destination PostgreSQL schema (default: bps).",
     )
     parser.add_argument(
         "--tables",
