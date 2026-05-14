@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Trash2 } from 'lucide-react';
+import { RotateCcw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -169,6 +169,13 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
     }
   }, [selectedCustomer, selectedDow, selectedCode, load]);
 
+  // Refresh: discard unsaved changes and reload from current Row 1 selections
+  const refresh = useCallback(() => {
+    if (!selectedCustomer) return;
+    setTargetDows(new Set([selectedDow]));
+    void load(selectedCustomer.customer_id, selectedDow, selectedCode);
+  }, [selectedCustomer, selectedDow, selectedCode, load]);
+
   // Save
   const save = async () => {
     if (!selectedCustomer || !tenantId) return;
@@ -270,6 +277,19 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
           </Select>
         </div>
 
+        <div className="flex shrink-0 flex-col gap-1">
+          <span className={cn(LABEL_CLASS, 'invisible')}>x</span>
+          <Button
+            variant="outline" size="icon"
+            className="h-9 w-9"
+            title="Discard changes and reload"
+            disabled={!selectedCustomer}
+            onClick={refresh}
+          >
+            <RotateCcw className="h-4 w-4" />
+          </Button>
+        </div>
+
       </div>
 
       {/* Row 2: Item search + Qty */}
@@ -321,10 +341,10 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
           />
         </div>
 
-        {/* Day pills */}
-        <div className="flex shrink-0 flex-col gap-1">
-          <span className={LABEL_CLASS}>Save to</span>
-          <div className="flex h-9 items-center gap-1">
+        {/* Save To fieldset: pills + Save */}
+        <fieldset className="flex shrink-0 flex-col justify-between rounded border border-border/60 px-2 pb-1.5 pt-0.5">
+          <legend className="px-1 text-center text-xs font-medium text-muted-foreground">Save To</legend>
+          <div className="flex items-center gap-1">
             {DOW_OPTIONS.map(o => {
               const isSource   = o.value === selectedDow;
               const isSelected = targetDows.has(o.value);
@@ -346,7 +366,7 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
                     'h-7 rounded px-1.5 text-xs font-medium transition-colors',
                     isSelected
                       ? isSource
-                        ? 'bg-primary text-primary-foreground opacity-90 cursor-default'
+                        ? 'bg-primary text-primary-foreground cursor-default'
                         : 'bg-primary text-primary-foreground'
                       : 'bg-muted text-muted-foreground hover:bg-muted/70',
                   )}
@@ -355,22 +375,13 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
                 </button>
               );
             })}
-          </div>
-        </div>
-
-        {/* Save / Cancel */}
-        <div className="flex shrink-0 flex-col gap-1">
-          <span className={cn(LABEL_CLASS, 'invisible')}>x</span>
-          <div className="flex h-9 items-center gap-2">
-            <Button variant="outline" size="sm"
-              onClick={() => setLines(savedLines.map(l => ({ ...l })))}
-              disabled={!isDirty}>Cancel</Button>
             <Button size="sm" onClick={save}
+              className="ml-1"
               disabled={isSaving || !isDirty || !selectedCustomer}>
               {isSaving ? 'Saving…' : 'Save'}
             </Button>
           </div>
-        </div>
+        </fieldset>
       </div>
 
       {/* Grid */}
