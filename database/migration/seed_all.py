@@ -54,6 +54,7 @@ SEEDS: list[str] = [
     "seed_fnd_contacts.sql",
     "seed_fnd_customer_pricebooks.sql",
     "seed_fnd_items.sql",
+    "seed_om_standing_orders.sql",
     "seed_fnd_valuesets_from_legacy_item.sql",
     "seed_item_prep_options.sql",
     "seed_fnd_item_bom.sql",
