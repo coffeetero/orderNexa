@@ -30,6 +30,7 @@ const navSections: NavSection[] = [
     label: 'Order Management',
     icon: ClipboardList,
     children: [
+      { label: 'Standing Order Mgt', href: '/orders/standing-mgmt', icon: ClipboardList },
       { label: 'Post Standing Orders', href: '/orders/standing', icon: FileText },
       { label: 'Call Up List', href: '/orders/callup', icon: ClipboardList },
       { label: 'Enter Orders', href: '/orders', icon: PlusCircle },
