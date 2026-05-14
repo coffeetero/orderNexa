@@ -13,6 +13,9 @@ import {
 } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 
+const DEFAULT_CODES = ['MORNING', 'LUNCH', 'DINNER'];
+const LABEL_CLASS = 'text-xs font-semibold text-muted-foreground tracking-wide';
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface Candidate {
@@ -48,8 +51,8 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
 
   // Filters
   const [productionDate, setProductionDate] = useState(defaultDate);
-  const [availableCodes, setAvailableCodes] = useState<string[]>([]);
-  const [selectedCodes,  setSelectedCodes]  = useState<string[]>([]);
+  const [availableCodes, setAvailableCodes] = useState<string[]>(DEFAULT_CODES);
+  const [selectedCodes,  setSelectedCodes]  = useState<string[]>(DEFAULT_CODES);
 
   // Grid state
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -195,8 +198,8 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
       {/* Filter row */}
       <div className="flex flex-wrap items-end gap-4 rounded-lg border border-border/60 bg-card px-4 py-3">
         {/* Production Date */}
-        <div className="space-y-1">
-          <Label className="text-xs font-semibold text-muted-foreground tracking-wide">Production Date</Label>
+        <div className="flex flex-col gap-1">
+          <Label className={LABEL_CLASS}>Production Date</Label>
           <input
             type="date"
             value={productionDate}
@@ -205,27 +208,25 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
           />
         </div>
 
-        {/* Production Codes listbox */}
-        {availableCodes.length > 0 && (
-          <div className="space-y-1">
-            <Label className="text-xs font-semibold text-muted-foreground tracking-wide">Production Codes</Label>
-            <div className="flex gap-1 rounded-md border border-input bg-background px-2 py-1.5">
-              {availableCodes.map(code => (
-                <label key={code} className="flex cursor-pointer items-center gap-1.5 rounded px-2 py-1 text-sm hover:bg-muted">
-                  <Checkbox
-                    checked={selectedCodes.includes(code)}
-                    onCheckedChange={checked => {
-                      setSelectedCodes(prev =>
-                        checked ? [...prev, code] : prev.filter(c => c !== code)
-                      );
-                    }}
-                  />
-                  {code.charAt(0) + code.slice(1).toLowerCase()}
-                </label>
-              ))}
-            </div>
+        {/* Production Time multi-select listbox */}
+        <div className="flex flex-col gap-1">
+          <Label className={LABEL_CLASS}>Production Time</Label>
+          <div className="flex gap-1 rounded-md border border-input bg-background px-2 py-1.5">
+            {availableCodes.map(code => (
+              <label key={code} className="flex cursor-pointer items-center gap-1.5 rounded px-2 py-1 text-sm hover:bg-muted select-none">
+                <Checkbox
+                  checked={selectedCodes.includes(code)}
+                  onCheckedChange={v => {
+                    setSelectedCodes(prev =>
+                      v ? [...prev, code] : prev.filter(c => c !== code)
+                    );
+                  }}
+                />
+                {code.charAt(0) + code.slice(1).toLowerCase()}
+              </label>
+            ))}
           </div>
-        )}
+        </div>
 
         {/* Actions */}
         <div className="flex items-end gap-2 pb-0.5">
