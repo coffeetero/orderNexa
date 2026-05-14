@@ -1,15 +1,13 @@
 -- ============================================================
--- SEED ITEM PREP OPTION VALUESET + FND_ITEMS JSONB DEFAULTS
+-- SEED ITEM PREP OPTION VALUESET
 --
--- Immediate static item-prep values for Alpine Bakery:
---   SLICED, WRAPPED, COVERED
---
--- This script creates the cached valueset values and backfills item-level
--- allowed/default prep options from bps_items capabilities/defaults.
+-- Upserts the ITEMPREP valueset and its three values (SLICED, WRAPPED, COVERED).
+-- allowed_prep_options / default_prep_options on fnd_items are now seeded
+-- directly in seed_fnd_items.sql from the legacy item table.
 --
 -- Prerequisites:
 --   • fnd_valuesets.sql applied
---   • seed_fnd_items.sql and seed_bps_items.sql have run
+--   • seed_fnd_items.sql has run
 -- ============================================================
 
 DO $$
@@ -17,7 +15,6 @@ DECLARE
     v_tenant_id BIGINT;
     v_valueset_id BIGINT;
     v_values_inserted INT;
-    v_items_updated INT;
 BEGIN
     SELECT tenant_id INTO v_tenant_id
     FROM fnd_tenants
@@ -95,53 +92,8 @@ BEGIN
 
     GET DIAGNOSTICS v_values_inserted = ROW_COUNT;
 
-    WITH prep AS (
-        SELECT
-            i.item_id,
-            COALESCE(
-                (
-                    SELECT jsonb_agg(v.code ORDER BY v.sort_order)
-                    FROM (
-                        VALUES
-                            ('SLICED',  10, COALESCE(b.is_sliceable, FALSE)),
-                            ('WRAPPED', 20, COALESCE(b.is_wrappable, FALSE)),
-                            ('COVERED', 30, COALESCE(b.is_coverable, FALSE))
-                    ) AS v(code, sort_order, enabled)
-                    WHERE v.enabled
-                ),
-                '[]'::JSONB
-            ) AS allowed_prep_options,
-            COALESCE(
-                (
-                    SELECT jsonb_agg(v.code ORDER BY v.sort_order)
-                    FROM (
-                        VALUES
-                            ('SLICED',  10, COALESCE(b.default_sliced, FALSE)),
-                            ('WRAPPED', 20, COALESCE(b.default_wrapped, FALSE)),
-                            ('COVERED', 30, COALESCE(b.default_covered, FALSE))
-                    ) AS v(code, sort_order, enabled)
-                    WHERE v.enabled
-                ),
-                '[]'::JSONB
-            ) AS default_prep_options
-        FROM fnd_items i
-        LEFT JOIN bps_items b
-               ON b.tenant_id = i.tenant_id
-              AND b.item_id = i.item_id
-        WHERE i.tenant_id = v_tenant_id
-    )
-    UPDATE fnd_items i
-       SET allowed_prep_options = prep.allowed_prep_options,
-           default_prep_options = prep.default_prep_options
-      FROM prep
-     WHERE prep.item_id = i.item_id
-       AND i.tenant_id = v_tenant_id;
-
-    GET DIAGNOSTICS v_items_updated = ROW_COUNT;
-
     RAISE NOTICE 'ITEMPREP valueset_id: %', v_valueset_id;
     RAISE NOTICE 'ITEMPREP values upserted: %', v_values_inserted;
-    RAISE NOTICE 'fnd_items prep options updated: %', v_items_updated;
 END $$;
 
 SELECT

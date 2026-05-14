@@ -60,13 +60,17 @@ BEGIN
         COALESCE(item_weight_adjuster, 0)       AS weight_adjuster,
         COALESCE(item_scale_wt,        0)       AS scale_weight,
         COALESCE(item_scale_qty,       0)       AS scale_qty,
-        -- Capability flags: auto-promote if default is set
-        (item_sliceable = 'Y' OR item_sliced  = 'Y') AS is_sliceable,
-        (item_wrappable = 'Y' OR item_wrapped = 'Y') AS is_wrappable,
-        (item_coverable = 'Y' OR item_covered = 'Y') AS is_coverable,
-        (item_sliced  = 'Y') AS default_sliced,
-        (item_wrapped = 'Y') AS default_wrapped,
-        (item_covered = 'Y') AS default_covered,
+        -- allowed_prep_options: build JSONB array from legacy capability flags
+        -- (auto-promote: capability = TRUE if the default was set)
+        (CASE WHEN (item_sliceable = 'Y' OR item_sliced  = 'Y') THEN '["SLICED"]' ::JSONB ELSE '[]'::JSONB END) ||
+        (CASE WHEN (item_wrappable = 'Y' OR item_wrapped = 'Y') THEN '["WRAPPED"]'::JSONB ELSE '[]'::JSONB END) ||
+        (CASE WHEN (item_coverable = 'Y' OR item_covered = 'Y') THEN '["COVERED"]'::JSONB ELSE '[]'::JSONB END)
+            AS allowed_prep_options,
+        -- default_prep_options: what the item ships as unless overridden on the order
+        (CASE WHEN item_sliced  = 'Y' THEN '["SLICED"]' ::JSONB ELSE '[]'::JSONB END) ||
+        (CASE WHEN item_wrapped = 'Y' THEN '["WRAPPED"]'::JSONB ELSE '[]'::JSONB END) ||
+        (CASE WHEN item_covered = 'Y' THEN '["COVERED"]'::JSONB ELSE '[]'::JSONB END)
+            AS default_prep_options,
         -- Deduplicate item_no: append -item_id suffix for duplicates, generate
         -- NOID-{item_id} for nulls so the unique constraint is never violated.
         CASE
@@ -131,8 +135,7 @@ BEGIN
         preorder_days, sales_terms_apply, is_active,
         dough_type, shape, packing, machine_setting, sheeter_setting,
         weight_adjuster, scale_weight, scale_qty,
-        is_sliceable, is_wrappable, is_coverable,
-        default_sliced, default_wrapped, default_covered
+        allowed_prep_options, default_prep_options
     )
     SELECT
         v_tenant_id, t.legacy_id, t.item_number, t.item_name, t.category, t.unit_of_sale,
@@ -141,8 +144,7 @@ BEGIN
         t.preorder_days, t.sales_terms_apply, t.is_active,
         t.dough_type, t.shape, t.packing, t.machine_setting, t.sheeter_setting,
         t.weight_adjuster, t.scale_weight, t.scale_qty,
-        t.is_sliceable, t.is_wrappable, t.is_coverable,
-        t.default_sliced, t.default_wrapped, t.default_covered
+        t.allowed_prep_options, t.default_prep_options
     FROM tmp_items t;
 
     GET DIAGNOSTICS v_inserted = ROW_COUNT;

@@ -44,13 +44,6 @@ AS $$
 DECLARE
   v_item_id   BIGINT;
   v_row_count INT;
-  -- Derive capability flags from allowed_prep_options JSONB array
-  v_is_sliceable  BOOLEAN := COALESCE(p_allowed_prep_options, '[]'::JSONB) @> '["SLICED"]'::JSONB;
-  v_is_wrappable  BOOLEAN := COALESCE(p_allowed_prep_options, '[]'::JSONB) @> '["WRAPPED"]'::JSONB;
-  v_is_coverable  BOOLEAN := COALESCE(p_allowed_prep_options, '[]'::JSONB) @> '["COVERED"]'::JSONB;
-  v_def_sliced    BOOLEAN := COALESCE(p_default_prep_options,  '[]'::JSONB) @> '["SLICED"]'::JSONB;
-  v_def_wrapped   BOOLEAN := COALESCE(p_default_prep_options,  '[]'::JSONB) @> '["WRAPPED"]'::JSONB;
-  v_def_covered   BOOLEAN := COALESCE(p_default_prep_options,  '[]'::JSONB) @> '["COVERED"]'::JSONB;
 BEGIN
   IF p_tenant_id IS NULL THEN
     RAISE EXCEPTION 'p_tenant_id is required';
@@ -67,9 +60,7 @@ BEGIN
       allowed_prep_options, default_prep_options,
       dough_type, shape, packing,
       machine_setting, sheeter_setting,
-      weight_adjuster, scale_weight, scale_qty,
-      is_sliceable, is_wrappable, is_coverable,
-      default_sliced, default_wrapped, default_covered
+      weight_adjuster, scale_weight, scale_qty
     ) VALUES (
       p_tenant_id, p_item_number, p_item_name, p_item_description,
       p_category, COALESCE(p_unit_of_sale, 'PCS'),
@@ -82,9 +73,7 @@ BEGIN
       p_machine_setting, p_sheeter_setting,
       COALESCE(p_weight_adjuster, 0),
       COALESCE(p_scale_weight, 0),
-      COALESCE(p_scale_qty, 0),
-      v_is_sliceable, v_is_wrappable, v_is_coverable,
-      v_def_sliced, v_def_wrapped, v_def_covered
+      COALESCE(p_scale_qty, 0)
     )
     RETURNING item_id INTO v_item_id;
 
@@ -112,13 +101,7 @@ BEGIN
       sheeter_setting      = p_sheeter_setting,
       weight_adjuster      = COALESCE(p_weight_adjuster, 0),
       scale_weight         = COALESCE(p_scale_weight, 0),
-      scale_qty            = COALESCE(p_scale_qty, 0),
-      is_sliceable         = v_is_sliceable,
-      is_wrappable         = v_is_wrappable,
-      is_coverable         = v_is_coverable,
-      default_sliced       = v_def_sliced,
-      default_wrapped      = v_def_wrapped,
-      default_covered      = v_def_covered
+      scale_qty            = COALESCE(p_scale_qty, 0)
     WHERE tenant_id = p_tenant_id
       AND item_id   = p_item_id;
 
