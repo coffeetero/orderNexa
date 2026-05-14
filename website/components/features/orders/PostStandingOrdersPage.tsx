@@ -25,6 +25,7 @@ interface Candidate {
   customer_name:   string;
   production_code: string;
   already_posted:  boolean;
+  is_context_only?: boolean; // parent injected for display only — not postable
   // set after posting
   status?:       'POSTED' | 'FAILED';
   order_number?: string;
@@ -54,8 +55,12 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
   const [productionDate, setProductionDate] = useState(defaultDate);
   const [selectedCodes, setSelectedCodes] = useState<string[]>(DEFAULT_CODES);
 
-  // Hierarchy lookup: customer_id → {level, sort_path, customer_type}
-  const hierarchyRef = useRef<Map<number, { level: number; sort_path: string; customer_type: string }>>(new Map());
+  // Hierarchy lookup: full customer data keyed by customer_id
+  const hierarchyRef = useRef<Map<number, {
+    level: number; sort_path: string; customer_type: string;
+    customer_parent_id: number | null;
+    customer_name: string; customer_number: string | null;
+  }>>(new Map());
 
   // Grid state
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -105,9 +110,15 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
     // Load customer hierarchy for sort/indent/weight
     fetch(`/api/customers?tenant_id=${tenantId}&hierarchy=true&active=true`)
       .then(r => r.json())
-      .then((j: { data?: { customer_id: number; level: number; sort_path: string; customer_type: string }[] }) => {
-        const map = new Map<number, { level: number; sort_path: string; customer_type: string }>();
-        (j.data ?? []).forEach(c => map.set(c.customer_id, { level: c.level ?? 0, sort_path: c.sort_path ?? '', customer_type: c.customer_type ?? '' }));
+      .then((j: { data?: { customer_id: number; level: number; sort_path: string; customer_type: string; customer_parent_id: number | null; customer_name: string; customer_number: string | null }[] }) => {
+        const map = new Map<number, { level: number; sort_path: string; customer_type: string; customer_parent_id: number | null; customer_name: string; customer_number: string | null }>();
+        (j.data ?? []).forEach(c => map.set(c.customer_id, {
+          level: c.level ?? 0, sort_path: c.sort_path ?? '',
+          customer_type: c.customer_type ?? '',
+          customer_parent_id: c.customer_parent_id ?? null,
+          customer_name: c.customer_name ?? '',
+          customer_number: c.customer_number ?? null,
+        }));
         hierarchyRef.current = map;
       })
       .catch(() => {});
@@ -135,7 +146,7 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
   const rowKey = (r: Pick<Candidate, 'customer_id' | 'production_code'>) =>
     `${r.customer_id}|${r.production_code}`;
 
-  const postable = candidates.filter(r => !r.already_posted);
+  const postable = candidates.filter(r => !r.already_posted && !r.is_context_only);
   const numChecked = postable.filter(r => checked.has(rowKey(r))).length;
   const numAlready = candidates.filter(r => r.already_posted).length;
 
@@ -185,16 +196,41 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
 
   const grouped = DEFAULT_CODES
     .filter(c => selectedCodes.includes(c))
-    .map(code => ({
-      code,
-      rows: candidates
-        .filter(r => r.production_code === code)
-        .sort((a, b) => {
-          const ha = hierarchyRef.current.get(a.customer_id);
-          const hb = hierarchyRef.current.get(b.customer_id);
-          return (ha?.sort_path ?? a.customer_number).localeCompare(hb?.sort_path ?? b.customer_number);
-        }),
-    }))
+    .map(code => {
+      const groupRows = candidates.filter(r => r.production_code === code);
+      const groupIds  = new Set(groupRows.map(r => r.customer_id));
+      const ctx: Candidate[] = [];
+
+      // Recursively inject missing ancestors for display context
+      const addAncestors = (customerId: number) => {
+        const h = hierarchyRef.current.get(customerId);
+        if (!h?.customer_parent_id) return;
+        const parentId = h.customer_parent_id;
+        if (groupIds.has(parentId)) return;
+        const ph = hierarchyRef.current.get(parentId);
+        if (!ph) return;
+        groupIds.add(parentId);
+        ctx.push({
+          customer_id:     parentId,
+          customer_number: ph.customer_number ?? '',
+          customer_name:   ph.customer_name,
+          production_code: code,
+          already_posted:  false,
+          is_context_only: true,
+        });
+        addAncestors(parentId); // walk up further if needed
+      };
+
+      groupRows.forEach(r => addAncestors(r.customer_id));
+
+      const allRows = [...groupRows, ...ctx].sort((a, b) => {
+        const sa = hierarchyRef.current.get(a.customer_id)?.sort_path ?? a.customer_number;
+        const sb = hierarchyRef.current.get(b.customer_id)?.sort_path ?? b.customer_number;
+        return sa.localeCompare(sb);
+      });
+
+      return { code, rows: allRows };
+    })
     .filter(g => g.rows.length > 0);
 
   const dowLabel = (() => {
@@ -306,7 +342,7 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
             {rows.map(row => {
               const key       = rowKey(row);
               const isChecked = checked.has(key);
-              const canCheck  = !row.already_posted && !posted;
+              const canCheck  = !row.already_posted && !row.is_context_only && !posted;
 
               return (
                 <div key={key}
@@ -339,19 +375,23 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
                       ? `${STATUS_LABEL[row.status]}${row.order_number ? ` #${row.order_number}` : ''}${row.message ? ` — ${row.message}` : ''}`
                       : row.already_posted ? '— Already posted' : ''}
                   </span>
-                  <div className="flex items-center justify-center">
-                    <Checkbox
-                      checked={isChecked}
-                      disabled={!canCheck}
-                      onCheckedChange={v => {
-                        setChecked(prev => {
-                          const next = new Set(prev);
-                          if (v) next.add(key); else next.delete(key);
-                          return next;
-                        });
-                      }}
-                    />
-                  </div>
+                  {row.is_context_only ? (
+                    <div />
+                  ) : (
+                    <div className="flex items-center justify-center">
+                      <Checkbox
+                        checked={isChecked}
+                        disabled={!canCheck}
+                        onCheckedChange={v => {
+                          setChecked(prev => {
+                            const next = new Set(prev);
+                            if (v) next.add(key); else next.delete(key);
+                            return next;
+                          });
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
               );
             })}
