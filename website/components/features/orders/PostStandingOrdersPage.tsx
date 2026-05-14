@@ -103,34 +103,34 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
     }
   }, [tenantId]);
 
-  // Initial load: hierarchy + candidates in parallel
+  // Initial load: hierarchy first (sequential) so context rows inject on first render
   useEffect(() => {
     if (!tenantId) return;
+    (async () => {
+      // 1. Load hierarchy
+      const hRes  = await fetch(`/api/customers?tenant_id=${tenantId}&hierarchy=true&active=true`);
+      const hJson = await hRes.json() as { data?: { customer_id: number; level: number; sort_path: string; customer_type: string; customer_parent_id: number | null; customer_name: string; customer_number: string | null }[] };
+      const map   = new Map<number, { level: number; sort_path: string; customer_type: string; customer_parent_id: number | null; customer_name: string; customer_number: string | null }>();
+      (hJson.data ?? []).forEach(c => map.set(c.customer_id, {
+        level: c.level ?? 0, sort_path: c.sort_path ?? '',
+        customer_type: c.customer_type ?? '',
+        customer_parent_id: c.customer_parent_id ?? null,
+        customer_name: c.customer_name ?? '', customer_number: c.customer_number ?? null,
+      }));
+      hierarchyRef.current = map;
 
-    // Load customer hierarchy for sort/indent/weight
-    fetch(`/api/customers?tenant_id=${tenantId}&hierarchy=true&active=true`)
-      .then(r => r.json())
-      .then((j: { data?: { customer_id: number; level: number; sort_path: string; customer_type: string; customer_parent_id: number | null; customer_name: string; customer_number: string | null }[] }) => {
-        const map = new Map<number, { level: number; sort_path: string; customer_type: string; customer_parent_id: number | null; customer_name: string; customer_number: string | null }>();
-        (j.data ?? []).forEach(c => map.set(c.customer_id, {
-          level: c.level ?? 0, sort_path: c.sort_path ?? '',
-          customer_type: c.customer_type ?? '',
-          customer_parent_id: c.customer_parent_id ?? null,
-          customer_name: c.customer_name ?? '',
-          customer_number: c.customer_number ?? null,
-        }));
-        hierarchyRef.current = map;
-      })
-      .catch(() => {});
-
-    fetch(`/api/post-standing-orders?tenant_id=${tenantId}&production_date=${productionDate}`)
-      .then(r => r.json())
-      .then((j: { data?: Candidate[] }) => {
-        const rows = j.data ?? [];
-        setCandidates(rows);
-        setChecked(new Set(rows.filter(r => !r.already_posted).map(r => rowKey(r))));
-      })
-      .catch(() => {});
+      // 2. Load candidates with defaults
+      const params = new URLSearchParams({
+        tenant_id:        String(tenantId),
+        production_date:  productionDate,
+        production_codes: selectedCodes.join(','),
+      });
+      const cRes  = await fetch(`/api/post-standing-orders?${params}`);
+      const cJson = await cRes.json() as { data?: Candidate[] };
+      const rows  = cJson.data ?? [];
+      setCandidates(rows);
+      setChecked(new Set(rows.filter(r => !r.already_posted).map(r => rowKey(r))));
+    })().catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId]);
 
@@ -361,7 +361,7 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
                                     : type === 'DEPARTMENT' ? 'text-foreground/50'
                                     : 'text-foreground';
                     const label = row.customer_number
-                      ? `${row.customer_number} — ${row.customer_name}`
+                      ? `${row.customer_number} - ${row.customer_name}`
                       : row.customer_name;
                     return (
                       <span className={cn('truncate text-sm', nameClass)}
