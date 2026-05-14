@@ -7,13 +7,11 @@
 --
 -- contact_type is immutable after creation:
 --   PERSON         — regular person contact
---   ADDRESSES      — system contact: all entity addresses (billing,
---                    shipping, warehouse, etc.) — auto-created
+--   ADDRESSES      — system contact: all entity addresses
 --   OTHER_CONTACTS — system contact: misc / legacy contact data
 --
--- contact_name is locked for system contacts.
+-- card_name and display_name are locked for system contacts.
 -- is_primary is forced FALSE for ADDRESSES / OTHER_CONTACTS.
--- use_as_shipping is stored on ADDRESS points labelled 'Billing'.
 --
 -- SECURITY DEFINER — bypasses RLS; tenant validated via JWT.
 -- ============================================================
@@ -39,7 +37,6 @@ DECLARE
   v_pt_primary   BOOLEAN;
   v_kept_ids     BIGINT[] := '{}';
 BEGIN
-  -- JWT tenant check
   IF NOT (
     p_tenant_id::text = ANY (ARRAY(
       SELECT jsonb_array_elements_text(
@@ -53,22 +50,18 @@ BEGIN
 
   SELECT user_id INTO v_user_id
   FROM fnd_users
-  WHERE auth_user_id = auth.uid()
-    AND tenant_id    = p_tenant_id
+  WHERE auth_user_id = auth.uid() AND tenant_id = p_tenant_id
   LIMIT 1;
 
   v_contact_id := NULLIF(p_contact->>'contact_id', '')::BIGINT;
 
-  -- contact_type: read from DB for existing (immutable), from input for new (default PERSON)
   IF v_contact_id IS NOT NULL THEN
     SELECT contact_type INTO v_contact_type
-    FROM fnd_contacts
-    WHERE contact_id = v_contact_id AND tenant_id = p_tenant_id;
+    FROM fnd_contacts WHERE contact_id = v_contact_id AND tenant_id = p_tenant_id;
   ELSE
     v_contact_type := COALESCE(NULLIF(p_contact->>'contact_type', ''), 'PERSON');
   END IF;
 
-  -- System contacts are never the primary person contact
   v_is_primary := CASE
     WHEN v_contact_type IN ('ADDRESSES', 'OTHER_CONTACTS') THEN FALSE
     ELSE COALESCE((p_contact->>'is_primary')::BOOLEAN, FALSE)
@@ -78,19 +71,18 @@ BEGIN
   IF v_contact_id IS NULL THEN
     INSERT INTO fnd_contacts (
       tenant_id, entity_id, source_table, contact_type,
-      salutation, first_name, last_name, contact_name,
-      job_title, department, is_primary, is_active,
-      created_by, updated_by
+      card_name, display_name, first_name, last_name,
+      job_title, department, is_primary, is_active, created_by, updated_by
     ) VALUES (
       p_tenant_id, p_entity_id, p_source_table, v_contact_type,
-      NULLIF(p_contact->>'salutation', ''),
+      CASE v_contact_type
+        WHEN 'ADDRESSES'      THEN 'Billing & Shipping'
+        WHEN 'OTHER_CONTACTS' THEN 'Other Contacts'
+        ELSE p_contact->>'card_name'
+      END,
+      CASE WHEN v_contact_type = 'PERSON' THEN NULLIF(p_contact->>'display_name', '') ELSE NULL END,
       NULLIF(p_contact->>'first_name', ''),
       NULLIF(p_contact->>'last_name',  ''),
-      CASE v_contact_type
-        WHEN 'ADDRESSES'       THEN 'Billing & Shipping'
-        WHEN 'OTHER_CONTACTS'  THEN 'Other Contacts'
-        ELSE p_contact->>'contact_name'
-      END,
       NULLIF(p_contact->>'job_title',  ''),
       NULLIF(p_contact->>'department', ''),
       v_is_primary,
@@ -100,14 +92,14 @@ BEGIN
     RETURNING contact_id INTO v_contact_id;
   ELSE
     UPDATE fnd_contacts SET
-      salutation   = CASE WHEN v_contact_type = 'PERSON' THEN NULLIF(p_contact->>'salutation', '') ELSE salutation END,
-      first_name   = CASE WHEN v_contact_type = 'PERSON' THEN NULLIF(p_contact->>'first_name', '') ELSE first_name END,
-      last_name    = CASE WHEN v_contact_type = 'PERSON' THEN NULLIF(p_contact->>'last_name',  '') ELSE last_name  END,
-      contact_name = CASE v_contact_type
+      card_name    = CASE v_contact_type
                        WHEN 'ADDRESSES'      THEN 'Billing & Shipping'
                        WHEN 'OTHER_CONTACTS' THEN 'Other Contacts'
-                       ELSE p_contact->>'contact_name'
+                       ELSE p_contact->>'card_name'
                      END,
+      display_name = CASE WHEN v_contact_type = 'PERSON' THEN NULLIF(p_contact->>'display_name', '') ELSE display_name END,
+      first_name   = CASE WHEN v_contact_type = 'PERSON' THEN NULLIF(p_contact->>'first_name', '') ELSE first_name END,
+      last_name    = CASE WHEN v_contact_type = 'PERSON' THEN NULLIF(p_contact->>'last_name',  '') ELSE last_name  END,
       job_title    = CASE WHEN v_contact_type = 'PERSON' THEN NULLIF(p_contact->>'job_title',  '') ELSE job_title  END,
       department   = CASE WHEN v_contact_type = 'PERSON' THEN NULLIF(p_contact->>'department', '') ELSE department END,
       is_primary   = v_is_primary,
@@ -116,7 +108,6 @@ BEGIN
     WHERE contact_id = v_contact_id AND tenant_id = p_tenant_id;
   END IF;
 
-  -- Enforce one primary PERSON contact per entity
   IF v_is_primary AND v_contact_type = 'PERSON' THEN
     UPDATE fnd_contacts SET is_primary = FALSE
     WHERE tenant_id    = p_tenant_id
@@ -135,14 +126,12 @@ BEGIN
 
     IF v_point_id IS NULL THEN
       INSERT INTO fnd_contact_points (
-        tenant_id, contact_id,
-        type, value, label, sequence,
+        tenant_id, contact_id, type, value, label, sequence,
         is_primary, is_active, do_not_contact, use_as_shipping,
         country_dial_code, created_by, updated_by
       ) VALUES (
         p_tenant_id, v_contact_id,
-        v_point->>'type',
-        v_point->>'value',
+        v_point->>'type', v_point->>'value',
         NULLIF(v_point->>'label', ''),
         COALESCE(NULLIF(v_point->>'sequence', '')::SMALLINT, 1),
         v_pt_primary,
@@ -169,17 +158,19 @@ BEGIN
 
     v_kept_ids := v_kept_ids || v_point_id;
 
-    -- Enforce one primary per type per contact
     IF v_pt_primary THEN
       UPDATE fnd_contact_points SET is_primary = FALSE
-      WHERE contact_id = v_contact_id AND tenant_id = p_tenant_id
-        AND type = v_point->>'type' AND contact_point_id != v_point_id;
+      WHERE contact_id       = v_contact_id
+        AND tenant_id        = p_tenant_id
+        AND type             = v_point->>'type'
+        AND contact_point_id != v_point_id;
     END IF;
   END LOOP;
 
   -- ── Delete removed points ───────────────────────────────────
   DELETE FROM fnd_contact_points
-  WHERE contact_id = v_contact_id AND tenant_id = p_tenant_id
+  WHERE contact_id = v_contact_id
+    AND tenant_id  = p_tenant_id
     AND contact_point_id != ALL(v_kept_ids);
 
   RETURN jsonb_build_object('contact_id', v_contact_id);

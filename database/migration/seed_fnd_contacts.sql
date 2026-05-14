@@ -52,16 +52,14 @@ BEGIN
 
   -- ── Step 3: Seed billing address points ───────────────────────────────────
   INSERT INTO bps.fnd_contact_points (
-    tenant_id, contact_id, type, display_name, value, label, sequence,
+    tenant_id, contact_id, type, value, label, sequence,
     is_primary, is_active, do_not_contact, use_as_shipping
   )
   SELECT
     v_tenant_id,
     con.contact_id,
     'ADDRESS',
-    -- display_name: b_contact (person to address / attention)
-    NULLIF(TRIM(COALESCE(leg.b_contact, '')), ''),
-    -- value: address lines only (no contact name prepended)
+    -- value: address lines only
     TRIM(
       COALESCE(NULLIF(TRIM(leg.b_addr1), ''), '')
       || CASE WHEN NULLIF(TRIM(COALESCE(leg.b_addr2, '')), '') IS NOT NULL
@@ -93,15 +91,13 @@ BEGIN
 
   -- ── Step 4: Seed shipping address points ──────────────────────────────────
   INSERT INTO bps.fnd_contact_points (
-    tenant_id, contact_id, type, display_name, value, label, sequence,
+    tenant_id, contact_id, type, value, label, sequence,
     is_primary, is_active, do_not_contact, use_as_shipping
   )
   SELECT
     v_tenant_id,
     con.contact_id,
     'ADDRESS',
-    -- display_name: s_contact
-    NULLIF(TRIM(COALESCE(leg.s_contact, '')), ''),
     -- value: shipping address lines
     TRIM(
       COALESCE(NULLIF(TRIM(leg.s_addr1), ''), '')

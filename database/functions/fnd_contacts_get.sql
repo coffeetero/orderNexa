@@ -4,7 +4,7 @@
 -- for a given entity. Used by the Contacts tab.
 --
 -- Order: ADDRESSES first, OTHER_CONTACTS second, PERSON after
--- (sorted by is_primary DESC, contact_name within PERSON).
+-- (sorted by is_primary DESC, card_name within PERSON).
 --
 -- SECURITY DEFINER — bypasses RLS; tenant validated via JWT.
 -- ============================================================
@@ -35,16 +35,16 @@ BEGIN
   RETURN COALESCE((
     SELECT jsonb_agg(
       jsonb_build_object(
-        'contact_id',          c.contact_id,
-        'contact_type',        c.contact_type,
-        'salutation',          COALESCE(c.salutation, ''),
-        'first_name',          COALESCE(c.first_name, ''),
-        'last_name',           COALESCE(c.last_name, ''),
-        'contact_name',        c.contact_name,
-        'job_title',           COALESCE(c.job_title, ''),
-        'department',          COALESCE(c.department, ''),
-        'is_primary',          c.is_primary,
-        'is_active',           c.is_active,
+        'contact_id',   c.contact_id,
+        'contact_type', c.contact_type,
+        'card_name',    c.card_name,
+        'display_name', COALESCE(c.display_name, ''),
+        'first_name',   COALESCE(c.first_name, ''),
+        'last_name',    COALESCE(c.last_name, ''),
+        'job_title',    COALESCE(c.job_title, ''),
+        'department',   COALESCE(c.department, ''),
+        'is_primary',   c.is_primary,
+        'is_active',    c.is_active,
         'contact_points', COALESCE((
           SELECT jsonb_agg(
             jsonb_build_object(
@@ -78,7 +78,7 @@ BEGIN
           ELSE 2
         END,
         c.is_primary DESC,
-        c.contact_name
+        c.card_name
     )
     FROM fnd_contacts c
     WHERE c.tenant_id    = p_tenant_id

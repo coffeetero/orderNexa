@@ -52,7 +52,6 @@ const ADDRESS_LABEL_PRESETS = ['Billing', 'Shipping'];
 interface ContactPoint {
   contact_point_id: number | null;
   type: PointType;
-  display_name: string;
   value: string;
   label: string;
   sequence: number;
@@ -115,10 +114,9 @@ const EMPTY_FORM: ContactForm = {
   is_primary: false, is_active: true, contact_points: [],
 };
 
-function emptyPoint(type: PointType, seq: number, defaultDisplayName = ''): ContactPoint {
+function emptyPoint(type: PointType, seq: number): ContactPoint {
   return {
     contact_point_id: null, type,
-    display_name: defaultDisplayName,
     value: '', label: '', sequence: seq,
     is_primary: false, is_active: true, do_not_contact: false,
     use_as_shipping: false, country_dial_code: '',
@@ -134,7 +132,6 @@ function contactToForm(c: Contact): ContactForm {
     is_primary: c.is_primary, is_active: c.is_active,
     contact_points: c.contact_points.map(p => ({
       ...p,
-      display_name:    p.display_name    ?? '',
       use_as_shipping: p.use_as_shipping ?? false,
     })),
   };
@@ -382,13 +379,9 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
 
     const addPoint = (type: PointType) => {
       const seq = form.contact_points.filter(p => p.type === type).length + 1;
-      // default display_name from first + last name for PERSON contacts
-      const defaultDn = form.contact_type === 'PERSON'
-        ? [form.first_name, form.last_name].filter(Boolean).join(' ')
-        : '';
       setForm(f => ({
         ...f,
-        contact_points: [...f.contact_points, emptyPoint(type, seq, defaultDn)],
+        contact_points: [...f.contact_points, emptyPoint(type, seq)],
       }));
     };
 
@@ -462,11 +455,8 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
                   const usedTypes = Array.from(new Set(contact.contact_points.map(p => p.type))) as PointType[];
                   const addrCount = contact.contact_points.length;
                   const sameAsBill = contact.contact_type === 'ADDRESSES' && contact.contact_points.some(p => p.use_as_shipping);
-                  // Line 2: contact-level display_name (PERSON), else primary point's display_name (ADDRESSES)
-                  const line2 = contact.display_name
-                              || contact.contact_points.find(p => p.is_primary && p.display_name)?.display_name
-                              || contact.contact_points.find(p => p.display_name)?.display_name
-                              || '';
+                  // Line 2: contact-level display_name
+                  const line2 = contact.display_name || '';
 
                   return (
                     <button key={contact.contact_id} type="button" onClick={() => applySelection(contact)}
@@ -608,7 +598,6 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
                     <Input value={p.label} onChange={e => updatePoint(i, { label: e.target.value })} className="h-7 text-xs" placeholder="Label" />
                     <div>
                       <AutoTextarea value={p.value} onChange={e => updatePoint(i, { value: e.target.value })} className={textareaClass} minRows={MULTI_LINE_TYPES.has(p.type) ? 3 : 1} />
-                      <Input value={p.display_name} onChange={e => updatePoint(i, { display_name: e.target.value })} className={displayNameClass} placeholder="Display name" />
                     </div>
                     <button type="button" onClick={() => removePoint(i)} className="mt-1 rounded p-0.5 text-muted-foreground/40 hover:text-destructive transition-colors">
                       <Trash2 className="h-3.5 w-3.5" />
