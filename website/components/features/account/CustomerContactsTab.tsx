@@ -535,7 +535,7 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
               <div className="border-t border-border/40" />
               <div className="space-y-1.5">
                 {visiblePoints.length > 0 && (
-                  <div className="grid items-center gap-2 px-0.5" style={{ gridTemplateColumns: '1fr 1fr auto' }}>
+                  <div className="grid items-center gap-2 px-0.5" style={{ gridTemplateColumns: '1fr 2fr auto' }}>
                     <p className="text-xs text-muted-foreground text-center">Label</p>
                     <p className="text-xs text-muted-foreground">Address</p>
                     <div className="w-8" />
@@ -546,7 +546,7 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
                   const isBillingRow = p.label.toLowerCase() === 'billing';
                   return (
                     <div key={p.contact_point_id ?? `new-${idx}`} className="space-y-1">
-                      <div className="grid items-start gap-2" style={{ gridTemplateColumns: '1fr 1fr auto' }}>
+                      <div className="grid items-start gap-2" style={{ gridTemplateColumns: '1fr 2fr auto' }}>
                         <AddressLabelInput value={p.label} onChange={v => updatePoint(idx, { label: v })} hasShipping={hasUseAsShipping} />
                         <div>
                           <AutoTextarea value={p.value} onChange={e => updatePoint(idx, { value: e.target.value })} className={textareaClass} placeholder={'123 Main St\nCity, State 12345'} />
