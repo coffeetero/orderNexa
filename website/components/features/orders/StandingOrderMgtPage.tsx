@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { EntityComboBox } from '@/components/bps/EntityComboBox';
 import { cn } from '@/lib/utils';
@@ -26,12 +27,15 @@ const CODE_OPTIONS = [
   { value: 'DINNER',  label: 'Dinner' },
 ];
 
+const LABEL_CLASS = 'text-xs font-semibold text-muted-foreground tracking-wide';
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface Customer {
   customer_id: number;
   customer_name: string;
   customer_number: string | null;
+  customer_type: string | null;
   customer_parent_id: number | null;
   sort_path: string;
 }
@@ -68,44 +72,49 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
   const tenantId = initialTenantId ?? tenants[0]?.tenant_id ?? null;
 
   // Data
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [items, setItems]         = useState<SlimItem[]>([]);
+  const [customers,        setCustomers]        = useState<Customer[]>([]);
+  const [items,            setItems]            = useState<SlimItem[]>([]);
+  const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
+  const [isLoadingItems,   setIsLoadingItems]   = useState(false);
 
   // Selectors
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [selectedDow,  setSelectedDow]  = useState<string>('MON');
   const [selectedCode, setSelectedCode] = useState<string>('MORNING');
 
-  // Grid
-  const [lines, setLines]           = useState<SOLine[]>([]);
+  // Grid lines
+  const [lines,      setLines]      = useState<SOLine[]>([]);
   const [savedLines, setSavedLines] = useState<SOLine[]>([]);
-  const [isLoading, setIsLoading]   = useState(false);
-  const [isSaving,  setIsSaving]    = useState(false);
+  const [isLoading,  setIsLoading]  = useState(false);
+  const [isSaving,   setIsSaving]   = useState(false);
 
-  // Entry row state
+  // Entry row
   const [pendingItem, setPendingItem] = useState<SlimItem | null>(null);
   const [pendingQty,  setPendingQty]  = useState<string>('');
-  const [itemSearchKey, setItemSearchKey] = useState(0); // increment to reset combobox
 
-  // Refs
-  const customerWrapRef = useRef<HTMLDivElement>(null);
-  const itemWrapRef     = useRef<HTMLDivElement>(null);
-  const qtyInputRef     = useRef<HTMLInputElement>(null);
-  const qtyGridRefs     = useRef<Map<string, HTMLInputElement>>(new Map());
+  // Refs — direct inputRef pattern (matching Enter Orders)
+  const customerInputRef = useRef<HTMLInputElement>(null);
+  const itemInputRef     = useRef<HTMLInputElement>(null);
+  const qtyInputRef      = useRef<HTMLInputElement>(null);
 
   const isDirty = JSON.stringify(lines) !== JSON.stringify(savedLines);
 
-  // Focus helpers
-  const focusInput = (wrapRef: React.RefObject<HTMLDivElement>) =>
-    setTimeout(() => wrapRef.current?.querySelector<HTMLElement>('input')?.focus(), 30);
+  // Focus helpers using requestAnimationFrame (matching Enter Orders)
+  const focusItemSearch = useCallback(() => {
+    requestAnimationFrame(() => { itemInputRef.current?.focus(); });
+  }, []);
 
-  const focusCustomerSearch = useCallback(() => focusInput(customerWrapRef), []);
-  const focusItemSearch     = useCallback(() => focusInput(itemWrapRef), []);
-  const focusQty            = useCallback(() => setTimeout(() => qtyInputRef.current?.focus(), 30), []);
+  const focusQty = useCallback(() => {
+    requestAnimationFrame(() => {
+      if (qtyInputRef.current) { qtyInputRef.current.focus(); qtyInputRef.current.select(); }
+    });
+  }, []);
 
-  // Load customers + items on mount
+  // Load data
   useEffect(() => {
     if (!tenantId) return;
+
+    setIsLoadingCustomers(true);
     fetch(`/api/customers?tenant_id=${tenantId}&hierarchy=true&active=true`)
       .then(r => r.json())
       .then((j: { data?: Record<string, unknown>[] }) => {
@@ -115,23 +124,24 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
             customer_id:        id,
             customer_name:      String(r.customer_name ?? ''),
             customer_number:    r.customer_number != null ? String(r.customer_number) : null,
+            customer_type:      r.customer_type != null ? String(r.customer_type) : null,
             customer_parent_id: r.customer_parent_id != null ? Number(r.customer_parent_id) : null,
             sort_path:          String(r.sort_path ?? ''),
           }] : [];
         }));
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setIsLoadingCustomers(false));
 
+    setIsLoadingItems(true);
     fetch(`/api/items/profile?tenant_id=${tenantId}`)
       .then(r => r.json())
       .then((j: { data?: SlimItem[] }) => setItems((j.data ?? []).filter(i => i.is_active)))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setIsLoadingItems(false));
   }, [tenantId]);
 
-  // Focus customer search on page load
-  useEffect(() => { focusCustomerSearch(); }, [focusCustomerSearch]);
-
-  // Load standing order lines
+  // Load standing order when selectors change
   const load = useCallback(async (customerId: number, dow: string, code: string) => {
     if (!tenantId) return;
     setIsLoading(true);
@@ -177,7 +187,7 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
     } finally { setIsSaving(false); }
   };
 
-  // Entry row: commit item + qty into the grid
+  // Commit entry row → update existing line or append
   const commitEntry = useCallback(() => {
     if (!pendingItem) return;
     const qty = parseFloat(pendingQty);
@@ -194,42 +204,52 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
     }
     setPendingItem(null);
     setPendingQty('');
-    setItemSearchKey(k => k + 1);
     focusItemSearch();
   }, [pendingItem, pendingQty, lines, focusItemSearch]);
-
-  const updateGridQty = (tempId: string, qty: number) =>
-    setLines(prev => prev.map(l => l.tempId === tempId ? { ...l, quantity: qty } : l));
-
-  const removeLine = (tempId: string) =>
-    setLines(prev => prev.filter(l => l.tempId !== tempId));
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-3 p-4">
+    <div className="flex flex-col gap-0">
 
       {/* Row 1: Customer | DOW | Code | Buttons */}
-      <div className="flex flex-wrap items-end gap-3">
-        <div ref={customerWrapRef} className="min-w-[260px] flex-1 space-y-1">
-          <label className="text-xs font-medium text-muted-foreground">Customer</label>
+      <div className="flex flex-wrap items-end gap-2 border-b border-border/60 bg-card px-3 py-2">
+        <div className="flex w-[346px] min-w-[346px] max-w-[346px] shrink-0 flex-col gap-1">
+          <Label htmlFor="customer-search" className={LABEL_CLASS}>Customer</Label>
           <EntityComboBox<Customer>
             items={customers}
             value={selectedCustomer?.customer_id ?? null}
             onChange={setSelectedCustomer}
             onAfterSelect={() => focusItemSearch()}
             getId={c => c.customer_id}
-            getLabel={c => [c.customer_number, c.customer_name].filter(Boolean).join(' — ')}
+            getLabel={c => c.customer_number ? `${c.customer_number} - ${c.customer_name}` : c.customer_name}
+            getInputLabel={c => c.customer_name}
             getSearchText={c => `${c.customer_number ?? ''} ${c.customer_name}`}
             getParentId={c => c.customer_parent_id}
             getSortKey={c => c.sort_path}
-            placeholder="Search customer…"
+            getItemWeight={(c) => {
+              const t = (c.customer_type ?? '').trim().toUpperCase();
+              if (t === 'ACCOUNT')    return 'bold';
+              if (t === 'SITE')       return 'regular';
+              if (t === 'DEPARTMENT') return 'muted';
+              return undefined;
+            }}
+            placeholder="Search number or name…"
+            disabled={isLoadingCustomers}
+            loading={isLoadingCustomers}
             emptyText="No customers found."
+            clearable
+            alwaysOpen
+            collapseOnSelect
+            clearSearchOnFocus
+            autoFocus
+            inputRef={customerInputRef}
+            triggerId="customer-search"
           />
         </div>
 
-        <div className="w-36 space-y-1">
-          <label className="text-xs font-medium text-muted-foreground">Production Day</label>
+        <div className="flex w-36 shrink-0 flex-col gap-1">
+          <Label className={LABEL_CLASS}>Production Day</Label>
           <Select value={selectedDow} onValueChange={setSelectedDow}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -238,8 +258,8 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
           </Select>
         </div>
 
-        <div className="w-36 space-y-1">
-          <label className="text-xs font-medium text-muted-foreground">Production Time</label>
+        <div className="flex w-32 shrink-0 flex-col gap-1">
+          <Label className={LABEL_CLASS}>Production Time</Label>
           <Select value={selectedCode} onValueChange={setSelectedCode}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -248,48 +268,60 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
           </Select>
         </div>
 
-        <div className="flex gap-2 pb-0.5">
-          <Button variant="outline" size="sm" onClick={() => { setLines(savedLines.map(l => ({ ...l }))); }} disabled={!isDirty}>Cancel</Button>
-          <Button size="sm" onClick={save} disabled={isSaving || !isDirty || !selectedCustomer}>
+        <div className="ml-auto flex items-end gap-2 pb-0.5">
+          <Button variant="outline" size="sm"
+            onClick={() => setLines(savedLines.map(l => ({ ...l })))}
+            disabled={!isDirty}>Cancel</Button>
+          <Button size="sm" onClick={save}
+            disabled={isSaving || !isDirty || !selectedCustomer}>
             {isSaving ? 'Saving…' : 'Save'}
           </Button>
         </div>
       </div>
 
-      {/* Row 2: Item search + Qty entry */}
-      <div className="flex items-end gap-2">
-        <div ref={itemWrapRef} className="min-w-[260px] flex-1 space-y-1">
-          <label className="text-xs font-medium text-muted-foreground">Item</label>
+      {/* Row 2: Item search + Qty */}
+      <div className="flex flex-wrap items-end gap-2 border-b border-border/60 bg-muted/20 px-3 py-2">
+        <div className="flex w-[346px] min-w-[346px] max-w-[346px] shrink-0 flex-col gap-1">
+          <Label htmlFor="item-search" className={LABEL_CLASS}>Item</Label>
           <EntityComboBox<SlimItem>
-            key={itemSearchKey}
             items={items}
             value={pendingItem?.item_id ?? null}
-            onChange={(item) => { if (item) { setPendingItem(item); setPendingQty(''); focusQty(); } }}
+            onChange={(item) => setPendingItem(item)}
+            onAfterSelect={(item) => { setPendingItem(item); setPendingQty(''); focusQty(); }}
             getId={i => i.item_id}
-            getLabel={i => `${i.item_number} — ${i.item_name}`}
+            getLabel={i => `${i.item_number} ${i.item_name}`}
             getSearchText={i => `${i.item_number} ${i.item_name}`}
             getParentId={() => null}
             getSortKey={i => i.item_number}
-            placeholder={selectedCustomer ? 'Search item…' : 'Select a customer first'}
+            placeholder={selectedCustomer ? 'Search items…' : 'Select a customer first'}
+            disabled={!selectedCustomer || isLoadingItems}
+            loading={isLoadingItems}
             emptyText="No items found."
-            disabled={!selectedCustomer}
+            clearable
+            alwaysOpen
+            collapseOnSelect
+            clearSearchOnFocus
+            inputRef={itemInputRef}
+            triggerId="item-search"
           />
         </div>
 
-        <div className="w-28 space-y-1">
-          <label className="text-xs font-medium text-muted-foreground">Quantity</label>
+        <div className="flex w-24 shrink-0 flex-col gap-1">
+          <Label htmlFor="entry-qty" className={cn(LABEL_CLASS, 'text-center')}>Quantity</Label>
           <input
+            id="entry-qty"
             ref={qtyInputRef}
             type="number"
             min={0}
-            value={pendingQty}
             placeholder="0"
-            onChange={e => setPendingQty(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitEntry(); } }}
+            value={pendingQty}
             disabled={!pendingItem}
+            onChange={e => setPendingQty(e.target.value)}
+            onFocus={e => e.target.select()}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitEntry(); } }}
             className={cn(
-              'h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm',
-              'focus:outline-none focus:ring-2 focus:ring-ring',
+              'h-9 w-full rounded-md border border-input bg-background px-2 text-right text-sm font-bold tabular-nums',
+              'focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary',
               'disabled:opacity-50 disabled:cursor-not-allowed',
               '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none',
             )}
@@ -298,53 +330,57 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
       </div>
 
       {/* Grid */}
-      {selectedCustomer ? (
-        <div className="rounded-lg border border-border/60 overflow-hidden">
-          <div className="grid border-b border-border/60 bg-muted/40 px-3 py-2 text-xs font-semibold text-muted-foreground"
-            style={{ gridTemplateColumns: '100px 1fr 80px 36px' }}>
-            <span>Item No</span>
-            <span>Item Description</span>
-            <span className="text-right">Qty</span>
-            <span />
+      <div className="flex-1">
+        {!selectedCustomer ? (
+          <div className="py-16 text-center text-sm text-muted-foreground">
+            Select a customer to manage their standing order.
           </div>
-
-          {isLoading ? (
-            <p className="px-3 py-4 text-sm text-muted-foreground">Loading…</p>
-          ) : lines.length === 0 ? (
-            <p className="px-3 py-4 text-sm text-muted-foreground">No standing order yet — search an item above to add lines.</p>
-          ) : null}
-
-          {lines.map(line => (
-            <div key={line.tempId}
-              className="grid items-center border-b border-border/40 px-3 py-1.5 hover:bg-muted/20 transition-colors"
-              style={{ gridTemplateColumns: '100px 1fr 80px 36px' }}>
-              <span className="font-mono text-xs text-muted-foreground">{line.item_number}</span>
-              <span className="text-sm truncate pr-2">{line.item_name}</span>
-              <input
-                ref={el => { if (el) qtyGridRefs.current.set(line.tempId, el); else qtyGridRefs.current.delete(line.tempId); }}
-                type="number" min={0}
-                value={line.quantity === 0 ? '' : line.quantity}
-                placeholder="0"
-                onChange={e => updateGridQty(line.tempId, e.target.value === '' ? 0 : Number(e.target.value))}
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); focusItemSearch(); } }}
-                className={cn(
-                  'w-full rounded border border-transparent bg-transparent px-1 py-0.5 text-right text-sm tabular-nums',
-                  'focus:border-primary focus:bg-background focus:outline-none hover:border-border',
-                  '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none',
-                )}
-              />
-              <button type="button" onClick={() => removeLine(line.tempId)}
-                className="flex items-center justify-center rounded p-1 text-muted-foreground/40 hover:text-destructive transition-colors">
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
+        ) : (
+          <>
+            <div className="grid border-b border-border/60 bg-muted/40 px-3 py-2 text-xs font-semibold text-muted-foreground"
+              style={{ gridTemplateColumns: '110px 1fr 80px 36px' }}>
+              <span>Item No</span>
+              <span>Item Description</span>
+              <span className="text-right">Qty</span>
+              <span />
             </div>
-          ))}
-        </div>
-      ) : (
-        <div className="rounded-lg border border-dashed border-border/60 py-12 text-center text-sm text-muted-foreground">
-          Select a customer to manage their standing order.
-        </div>
-      )}
+
+            {isLoading && <p className="px-3 py-4 text-sm text-muted-foreground">Loading…</p>}
+            {!isLoading && lines.length === 0 && (
+              <p className="px-3 py-4 text-sm text-muted-foreground">
+                No standing order yet — search an item above to add lines.
+              </p>
+            )}
+
+            {lines.map(line => (
+              <div key={line.tempId}
+                className="grid items-center border-b border-border/40 px-3 py-1.5 hover:bg-muted/20 transition-colors"
+                style={{ gridTemplateColumns: '110px 1fr 80px 36px' }}>
+                <span className="font-mono text-xs text-muted-foreground">{line.item_number}</span>
+                <span className="truncate pr-2 text-sm">{line.item_name}</span>
+                <input
+                  type="number" min={0}
+                  value={line.quantity === 0 ? '' : line.quantity}
+                  placeholder="0"
+                  onChange={e => setLines(prev => prev.map(l => l.tempId === line.tempId ? { ...l, quantity: e.target.value === '' ? 0 : Number(e.target.value) } : l))}
+                  onFocus={e => e.target.select()}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); focusItemSearch(); } }}
+                  className={cn(
+                    'w-full rounded border border-transparent bg-transparent px-1 py-0.5 text-right text-sm tabular-nums font-medium',
+                    'focus:border-primary focus:bg-background focus:outline-none hover:border-border',
+                    '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none',
+                  )}
+                />
+                <button type="button"
+                  onClick={() => setLines(prev => prev.filter(l => l.tempId !== line.tempId))}
+                  className="flex items-center justify-center rounded p-1 text-muted-foreground/40 hover:text-destructive transition-colors">
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+          </>
+        )}
+      </div>
     </div>
   );
 }
