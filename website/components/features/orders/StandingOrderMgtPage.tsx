@@ -146,6 +146,7 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
   // Load standing order when selectors change
   const load = useCallback(async (customerId: number, dow: string, code: string) => {
     if (!tenantId) return;
+    setLines([]);          // clear immediately — no grid jump
     setIsLoading(true);
     try {
       const res  = await fetch(`/api/standing-orders?tenant_id=${tenantId}&customer_id=${customerId}&production_dow=${dow}&production_code=${code}`);
