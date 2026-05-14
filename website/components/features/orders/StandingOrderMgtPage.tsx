@@ -221,82 +221,84 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
   return (
     <div className="flex flex-col gap-0">
 
-      {/* Row 1: Customer | DOW | Code | Buttons */}
-      <div className="flex flex-wrap items-end justify-center gap-2 border-b border-border/60 bg-card px-3 py-2">
-        <div className="flex w-[346px] min-w-[346px] max-w-[346px] shrink-0 flex-col gap-1">
-          <Label htmlFor="customer-search" className={LABEL_CLASS}>Customer</Label>
-          <EntityComboBox<Customer>
-            items={customers}
-            value={selectedCustomer?.customer_id ?? null}
-            onChange={setSelectedCustomer}
-            onAfterSelect={() => focusItemSearch()}
-            getId={c => c.customer_id}
-            getLabel={c => c.customer_number ? `${c.customer_number} - ${c.customer_name}` : c.customer_name}
-            getInputLabel={c => c.customer_name}
-            getSearchText={c => `${c.customer_number ?? ''} ${c.customer_name}`}
-            getParentId={c => c.customer_parent_id}
-            getSortKey={c => c.sort_path}
-            getItemWeight={(c) => {
-              const t = (c.customer_type ?? '').trim().toUpperCase();
-              if (t === 'ACCOUNT')    return 'bold';
-              if (t === 'SITE')       return 'regular';
-              if (t === 'DEPARTMENT') return 'muted';
-              return undefined;
-            }}
-            placeholder="Search number or name…"
-            disabled={isLoadingCustomers}
-            loading={isLoadingCustomers}
-            emptyText="No customers found."
-            clearable
-            alwaysOpen
-            collapseOnSelect
-            clearSearchOnFocus
-            autoFocus
-            inputRef={customerInputRef}
-            triggerId="customer-search"
-          />
-        </div>
-
-        <div className="flex w-36 shrink-0 flex-col gap-1">
-          <Label className={LABEL_CLASS}>Production Day</Label>
-          <Select value={selectedDow} onValueChange={(v) => { setSelectedDow(v); setTargetDows(new Set([v])); }}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {DOW_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="flex w-32 shrink-0 flex-col gap-1">
-          <Label className={LABEL_CLASS}>Production Time</Label>
-          <Select value={selectedCode} onValueChange={setSelectedCode}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {CODE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="flex shrink-0 flex-col gap-1">
-          <span className={cn(LABEL_CLASS, 'invisible')}>x</span>
-          <Button
-            variant="outline" size="icon"
-            className="h-9 w-9"
-            title="Discard changes and reload"
-            disabled={!selectedCustomer}
-            onClick={refresh}
-          >
-            <RotateCcw className="h-4 w-4" />
-          </Button>
-        </div>
-
-      </div>
-
-      {/* Row 2 + Grid — constrained to content width, centered */}
+      {/* Combined header + grid — centered, width-constrained */}
       <div className="mx-auto w-fit">
 
-      {/* Row 2: Item search + Qty */}
-      <div className="flex flex-wrap items-end gap-2 border-b border-border/60 bg-muted/20 px-3 py-2">
+      {/* Header: Customer row above Item row, single bordered section */}
+      <div className="border-b border-border/60 bg-card px-3 py-2 space-y-2">
+
+        {/* Row 1: Customer | DOW | Code | Refresh */}
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="flex w-[346px] min-w-[346px] max-w-[346px] shrink-0 flex-col gap-1">
+            <Label htmlFor="customer-search" className={LABEL_CLASS}>Customer</Label>
+            <EntityComboBox<Customer>
+              items={customers}
+              value={selectedCustomer?.customer_id ?? null}
+              onChange={setSelectedCustomer}
+              onAfterSelect={() => focusItemSearch()}
+              getId={c => c.customer_id}
+              getLabel={c => c.customer_number ? `${c.customer_number} - ${c.customer_name}` : c.customer_name}
+              getInputLabel={c => c.customer_name}
+              getSearchText={c => `${c.customer_number ?? ''} ${c.customer_name}`}
+              getParentId={c => c.customer_parent_id}
+              getSortKey={c => c.sort_path}
+              getItemWeight={(c) => {
+                const t = (c.customer_type ?? '').trim().toUpperCase();
+                if (t === 'ACCOUNT')    return 'bold';
+                if (t === 'SITE')       return 'regular';
+                if (t === 'DEPARTMENT') return 'muted';
+                return undefined;
+              }}
+              placeholder="Search number or name…"
+              disabled={isLoadingCustomers}
+              loading={isLoadingCustomers}
+              emptyText="No customers found."
+              clearable
+              alwaysOpen
+              collapseOnSelect
+              clearSearchOnFocus
+              autoFocus
+              inputRef={customerInputRef}
+              triggerId="customer-search"
+            />
+          </div>
+
+          <div className="flex w-36 shrink-0 flex-col gap-1">
+            <Label className={LABEL_CLASS}>Production Day</Label>
+            <Select value={selectedDow} onValueChange={(v) => { setSelectedDow(v); setTargetDows(new Set([v])); }}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {DOW_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex w-32 shrink-0 flex-col gap-1">
+            <Label className={LABEL_CLASS}>Production Time</Label>
+            <Select value={selectedCode} onValueChange={setSelectedCode}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {CODE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex shrink-0 flex-col gap-1">
+            <span className={cn(LABEL_CLASS, 'invisible')}>x</span>
+            <Button
+              variant="outline" size="icon"
+              className="h-9 w-9"
+              title="Discard changes and reload"
+              disabled={!selectedCustomer}
+              onClick={refresh}
+            >
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Row 2: Item search + Qty + Save To */}
+        <div className="flex flex-wrap items-end gap-2">
         <div className="flex w-[346px] min-w-[346px] max-w-[346px] shrink-0 flex-col gap-1">
           <Label htmlFor="item-search" className={LABEL_CLASS}>Item</Label>
           <EntityComboBox<SlimItem>
@@ -389,6 +391,7 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
           </div>
         </fieldset>
       </div>
+      </div> {/* end combined header */}
 
       {/* Grid */}
       <div className="flex-1">
