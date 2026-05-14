@@ -55,7 +55,6 @@ interface SOLine {
 interface StandingOrderMgtPageProps {
   tenants: { tenant_id: number; tenant_name: string }[];
   initialTenantId: number | null;
-  initialCustomers: Customer[];
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -69,11 +68,11 @@ function linesToSaved(lines: SOLine[]): SOLine[] {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function StandingOrderMgtPage({ tenants, initialTenantId, initialCustomers }: StandingOrderMgtPageProps) {
+export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrderMgtPageProps) {
   const tenantId = initialTenantId ?? tenants[0]?.tenant_id ?? null;
 
-  const [customers]           = useState<Customer[]>(initialCustomers);
-  const [items, setItems]     = useState<SlimItem[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [items, setItems]         = useState<SlimItem[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [selectedDow,  setSelectedDow]  = useState<string>('MON');
   const [selectedCode, setSelectedCode] = useState<string>('MORNING');
@@ -94,9 +93,28 @@ export function StandingOrderMgtPage({ tenants, initialTenantId, initialCustomer
 
   const isDirty = JSON.stringify(lines) !== JSON.stringify(savedLines);
 
-  // Load items on mount
+  // Load customers and items on mount
   useEffect(() => {
     if (!tenantId) return;
+
+    fetch(`/api/customers?tenant_id=${tenantId}&hierarchy=true&active=true`)
+      .then(r => r.json())
+      .then((j: { data?: Record<string, unknown>[] }) => {
+        const rows = (j.data ?? []).flatMap((r) => {
+          const id = typeof r.customer_id === 'number' ? r.customer_id : Number(r.customer_id);
+          if (!Number.isFinite(id)) return [];
+          return [{
+            customer_id:        id,
+            customer_name:      String(r.customer_name ?? ''),
+            customer_number:    r.customer_number != null ? String(r.customer_number) : null,
+            customer_parent_id: r.customer_parent_id != null ? Number(r.customer_parent_id) : null,
+            sort_path:          String(r.sort_path ?? ''),
+          }];
+        });
+        setCustomers(rows);
+      })
+      .catch(() => {});
+
     fetch(`/api/items/profile?tenant_id=${tenantId}`)
       .then(r => r.json())
       .then((j: { data?: SlimItem[] }) => setItems((j.data ?? []).filter(i => i.is_active)))
