@@ -449,18 +449,18 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
                       <Input disabled={isFormDisabled} value={draft.item_number} onChange={(e) => set('item_number', e.target.value)} placeholder="SKU or item code" />
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-xs font-semibold text-muted-foreground">Description</Label>
-                      <Input disabled={isFormDisabled} value={draft.item_name} onChange={(e) => set('item_name', e.target.value)} placeholder="Item description" />
+                      <Label className="text-xs font-semibold text-muted-foreground">Item Name</Label>
+                      <Input disabled={isFormDisabled} value={draft.item_name} onChange={(e) => set('item_name', e.target.value)} placeholder="Item name" />
                     </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold text-muted-foreground">Status</Label>
-                      <Select disabled={isFormDisabled} value={draft.is_active ? 'active' : 'inactive'} onValueChange={(v) => set('is_active', v === 'active')}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="active">Active</SelectItem>
-                          <SelectItem value="inactive">Inactive</SelectItem>
-                        </SelectContent>
-                      </Select>
+                    <div className="flex items-end pb-1">
+                      <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+                        <Checkbox
+                          disabled={isFormDisabled}
+                          checked={draft.is_active}
+                          onCheckedChange={(v) => set('is_active', v === true)}
+                        />
+                        Active
+                      </label>
                     </div>
                   </div>
                 </fieldset>
