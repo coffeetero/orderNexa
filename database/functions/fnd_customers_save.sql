@@ -107,11 +107,9 @@ BEGIN
     )
     RETURNING customer_id INTO v_customer_id;
 
-    -- Auto-create BILLING and SHIPPING system contacts
+    -- Auto-create ADDRESSES system contact
     INSERT INTO fnd_contacts (tenant_id, entity_id, source_table, contact_name, contact_type, is_primary, is_active, created_by, updated_by)
-    VALUES
-      (p_tenant_id, v_customer_id, 'fnd_customers', 'Billing Address',  'BILLING',  FALSE, TRUE, v_app_user_id, v_app_user_id),
-      (p_tenant_id, v_customer_id, 'fnd_customers', 'Shipping Address', 'SHIPPING', FALSE, TRUE, v_app_user_id, v_app_user_id)
+    VALUES (p_tenant_id, v_customer_id, 'fnd_customers', 'Billing & Shipping', 'ADDRESSES', FALSE, TRUE, v_app_user_id, v_app_user_id)
     ON CONFLICT DO NOTHING;
 
     WITH RECURSIVE customer_tree AS (

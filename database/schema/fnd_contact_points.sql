@@ -36,6 +36,9 @@ CREATE TABLE IF NOT EXISTS fnd_contact_points (
     is_primary              BOOLEAN     NOT NULL DEFAULT FALSE,
     is_active               BOOLEAN     NOT NULL DEFAULT TRUE,
     do_not_contact          BOOLEAN     NOT NULL DEFAULT FALSE,
+    -- For ADDRESS points labelled 'Billing' on the ADDRESSES contact:
+    -- when TRUE the billing address also serves as the shipping address
+    use_as_shipping         BOOLEAN     NOT NULL DEFAULT FALSE,
 
     -- ── Verification & consent ───────────────────────────────
     is_verified             BOOLEAN     NOT NULL DEFAULT FALSE,
@@ -72,7 +75,7 @@ CREATE TABLE IF NOT EXISTS fnd_contact_points (
 
     -- ── Constraints ──────────────────────────────────────────
     CONSTRAINT chk_fnd_contact_points_type CHECK (
-        type IN ('PHONE', 'MOBILE', 'FAX', 'EMAIL', 'ADDRESS', 'WEBSITE', 'OTHER')
+        type IN ('PHONE', 'MOBILE', 'FAX', 'EMAIL', 'ADDRESS', 'WEBSITE', 'OTHER', 'NOTE')
     ),
     CONSTRAINT chk_fnd_contact_points_geocode_status CHECK (
         geocode_status IN ('PENDING', 'PROCESSING', 'OK', 'ZERO_RESULTS', 'FAILED', 'SKIPPED')

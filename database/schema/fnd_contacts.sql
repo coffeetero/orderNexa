@@ -20,9 +20,9 @@ CREATE TABLE IF NOT EXISTS fnd_contacts (
     source_table        TEXT        NOT NULL,   -- 'fnd_customers' | 'fnd_users' | 'fnd_tenants' | ...
 
     -- ── Contact role ─────────────────────────────────────────
-    -- PERSON  = regular person contact (default)
-    -- BILLING = system contact for billing addresses (auto-created, one per entity)
-    -- SHIPPING= system contact for shipping/delivery addresses (auto-created, one per entity)
+    -- PERSON         = regular person contact (default)
+    -- ADDRESSES      = system contact for all addresses: billing, shipping, etc. (auto-created, one per entity)
+    -- OTHER_CONTACTS = system contact for legacy/miscellaneous contact data (created on migration)
     contact_type        TEXT        NOT NULL DEFAULT 'PERSON',
 
     -- ── Person details ───────────────────────────────────────
@@ -64,14 +64,14 @@ CREATE INDEX IF NOT EXISTS idx_fnd_contacts_active
     ON fnd_contacts (tenant_id)
     WHERE is_active = TRUE;
 
--- One BILLING and one SHIPPING system contact per entity
-CREATE UNIQUE INDEX IF NOT EXISTS uq_fnd_contacts_billing
+-- One ADDRESSES and one OTHER_CONTACTS system contact per entity
+CREATE UNIQUE INDEX IF NOT EXISTS uq_fnd_contacts_addresses
     ON fnd_contacts (tenant_id, source_table, entity_id)
-    WHERE contact_type = 'BILLING';
+    WHERE contact_type = 'ADDRESSES';
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_fnd_contacts_shipping
+CREATE UNIQUE INDEX IF NOT EXISTS uq_fnd_contacts_other_contacts
     ON fnd_contacts (tenant_id, source_table, entity_id)
-    WHERE contact_type = 'SHIPPING';
+    WHERE contact_type = 'OTHER_CONTACTS';
 
 -- Only one primary PERSON contact per entity
 CREATE UNIQUE INDEX IF NOT EXISTS uq_fnd_contacts_primary
@@ -81,7 +81,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_fnd_contacts_primary
 -- Check: valid contact types
 ALTER TABLE fnd_contacts DROP CONSTRAINT IF EXISTS chk_fnd_contacts_contact_type;
 ALTER TABLE fnd_contacts ADD CONSTRAINT chk_fnd_contacts_contact_type
-    CHECK (contact_type IN ('PERSON', 'BILLING', 'SHIPPING'));
+    CHECK (contact_type IN ('PERSON', 'ADDRESSES', 'OTHER_CONTACTS'));
 
 -- ── Triggers ─────────────────────────────────────────────────────────────────
 

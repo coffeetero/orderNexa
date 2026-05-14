@@ -3,7 +3,7 @@
 -- Returns all active contacts (with nested contact_points)
 -- for a given entity. Used by the Contacts tab.
 --
--- Order: BILLING first, SHIPPING second, PERSON contacts after
+-- Order: ADDRESSES first, OTHER_CONTACTS second, PERSON after
 -- (sorted by is_primary DESC, contact_name within PERSON).
 --
 -- SECURITY DEFINER — bypasses RLS; tenant validated via JWT.
@@ -56,6 +56,7 @@ BEGIN
               'is_primary',        cp.is_primary,
               'is_active',         cp.is_active,
               'do_not_contact',    cp.do_not_contact,
+              'use_as_shipping',   cp.use_as_shipping,
               'country_dial_code', COALESCE(cp.country_dial_code, ''),
               'geocode_status',    cp.geocode_status,
               'formatted_address', cp.formatted_address,
@@ -71,7 +72,11 @@ BEGIN
         ), '[]'::jsonb)
       )
       ORDER BY
-        CASE c.contact_type WHEN 'BILLING' THEN 0 WHEN 'SHIPPING' THEN 1 ELSE 2 END,
+        CASE c.contact_type
+          WHEN 'ADDRESSES'       THEN 0
+          WHEN 'OTHER_CONTACTS'  THEN 1
+          ELSE 2
+        END,
         c.is_primary DESC,
         c.contact_name
     )

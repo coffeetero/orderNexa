@@ -6,7 +6,7 @@ import {
 } from 'react';
 import {
   Phone, Smartphone, Printer, Mail, MapPin, Globe, MoreHorizontal,
-  Plus, Star, Trash2, Ban, CreditCard, Truck,
+  Plus, Star, Trash2, Ban, Home, PhoneCall, StickyNote,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -16,34 +16,42 @@ import { cn } from '@/lib/utils';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-const POINT_TYPES = ['PHONE', 'MOBILE', 'FAX', 'EMAIL', 'ADDRESS', 'WEBSITE', 'OTHER'] as const;
+const POINT_TYPES = ['PHONE', 'MOBILE', 'FAX', 'EMAIL', 'ADDRESS', 'WEBSITE', 'OTHER', 'NOTE'] as const;
 type PointType = typeof POINT_TYPES[number];
-type ContactType = 'PERSON' | 'BILLING' | 'SHIPPING';
+type ContactType = 'PERSON' | 'ADDRESSES' | 'OTHER_CONTACTS';
 
 const TYPE_LABEL: Record<PointType, string> = {
-  PHONE: 'Phone', MOBILE: 'Mobile', FAX: 'Fax',
-  EMAIL: 'Email', ADDRESS: 'Address', WEBSITE: 'Website', OTHER: 'Other',
+  PHONE: 'Phone', MOBILE: 'Mobile', FAX: 'Fax', EMAIL: 'Email',
+  ADDRESS: 'Address', WEBSITE: 'Website', OTHER: 'Other', NOTE: 'Note',
 };
 
 const TYPE_ICON: Record<PointType, React.ComponentType<{ className?: string }>> = {
-  PHONE: Phone, MOBILE: Smartphone, FAX: Printer,
-  EMAIL: Mail, ADDRESS: MapPin, WEBSITE: Globe, OTHER: MoreHorizontal,
+  PHONE: Phone, MOBILE: Smartphone, FAX: Printer, EMAIL: Mail,
+  ADDRESS: MapPin, WEBSITE: Globe, OTHER: MoreHorizontal, NOTE: StickyNote,
 };
 
-const SYSTEM_ICON: Record<'BILLING' | 'SHIPPING', React.ComponentType<{ className?: string }>> = {
-  BILLING:  CreditCard,
-  SHIPPING: Truck,
+const SYSTEM_CONFIG: Record<'ADDRESSES' | 'OTHER_CONTACTS', {
+  icon: React.ComponentType<{ className?: string }>;
+  color: string;
+  label: string;
+  description: string;
+}> = {
+  ADDRESSES: {
+    icon: Home,
+    color: 'bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300',
+    label: 'Billing & Shipping',
+    description: 'Billing, shipping, and delivery addresses',
+  },
+  OTHER_CONTACTS: {
+    icon: PhoneCall,
+    color: 'bg-slate-100 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300',
+    label: 'Other Contacts',
+    description: 'Legacy contact data — review and update',
+  },
 };
 
-const SYSTEM_COLOR: Record<'BILLING' | 'SHIPPING', string> = {
-  BILLING:  'bg-violet-100 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300',
-  SHIPPING: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300',
-};
-
-const SYSTEM_DESCRIPTION: Record<'BILLING' | 'SHIPPING', string> = {
-  BILLING:  'Invoice and billing addresses',
-  SHIPPING: 'Delivery and shipping addresses',
-};
+// Address label presets for the ADDRESSES combobox
+const ADDRESS_LABEL_PRESETS = ['Billing', 'Shipping'];
 
 interface ContactPoint {
   contact_point_id: number | null;
@@ -54,6 +62,7 @@ interface ContactPoint {
   is_primary: boolean;
   is_active: boolean;
   do_not_contact: boolean;
+  use_as_shipping: boolean;
   country_dial_code: string;
   geocode_status?: string;
   formatted_address?: string | null;
@@ -100,7 +109,7 @@ interface CustomerContactsTabProps {
   onDirtyChange: (dirty: boolean) => void;
 }
 
-// ── Constants & helpers ───────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 const EMPTY_FORM: ContactForm = {
   contact_id: null, contact_type: 'PERSON',
@@ -109,13 +118,21 @@ const EMPTY_FORM: ContactForm = {
   is_primary: false, is_active: true, contact_points: [],
 };
 
+function emptyPoint(type: PointType, seq: number): ContactPoint {
+  return {
+    contact_point_id: null, type, value: '', label: '', sequence: seq,
+    is_primary: false, is_active: true, do_not_contact: false,
+    use_as_shipping: false, country_dial_code: '',
+  };
+}
+
 function contactToForm(c: Contact): ContactForm {
   return {
     contact_id: c.contact_id, contact_type: c.contact_type,
     salutation: c.salutation, first_name: c.first_name, last_name: c.last_name,
     contact_name: c.contact_name, job_title: c.job_title, department: c.department,
     is_primary: c.is_primary, is_active: c.is_active,
-    contact_points: c.contact_points.map(p => ({ ...p })),
+    contact_points: c.contact_points.map(p => ({ ...p, use_as_shipping: p.use_as_shipping ?? false })),
   };
 }
 
@@ -142,24 +159,58 @@ function avatarColor(name: string) {
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/);
-  if (parts.length === 0 || !parts[0]) return '?';
+  if (!parts[0]) return '?';
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
 function GeocodeStatus({ status, formattedAddress }: { status?: string; formattedAddress?: string | null }) {
   if (!status || status === 'SKIPPED') return null;
-  if (status === 'PENDING')
-    return <p className="mt-0.5 text-[11px] text-amber-600 dark:text-amber-400">Pending geocoding…</p>;
-  if (status === 'PROCESSING')
-    return <p className="mt-0.5 text-[11px] text-sky-600 dark:text-sky-400">Processing…</p>;
-  if (status === 'OK')
-    return <p className="mt-0.5 text-[11px] text-emerald-600 dark:text-emerald-400 truncate">{formattedAddress ?? 'Geocoded'}</p>;
-  if (status === 'ZERO_RESULTS')
-    return <p className="mt-0.5 text-[11px] text-orange-600 dark:text-orange-400">Address not found by geocoder</p>;
-  if (status === 'FAILED')
-    return <p className="mt-0.5 text-[11px] text-destructive">Geocoding failed</p>;
+  if (status === 'PENDING')      return <p className="mt-0.5 text-[11px] text-amber-600 dark:text-amber-400">Pending geocoding…</p>;
+  if (status === 'PROCESSING')   return <p className="mt-0.5 text-[11px] text-sky-600 dark:text-sky-400">Processing…</p>;
+  if (status === 'OK')           return <p className="mt-0.5 text-[11px] text-emerald-600 dark:text-emerald-400 truncate">{formattedAddress ?? 'Geocoded'}</p>;
+  if (status === 'ZERO_RESULTS') return <p className="mt-0.5 text-[11px] text-orange-600 dark:text-orange-400">Address not found</p>;
+  if (status === 'FAILED')       return <p className="mt-0.5 text-[11px] text-destructive">Geocoding failed</p>;
   return null;
+}
+
+// ── Label combobox for ADDRESSES contact ──────────────────────────────────────
+function AddressLabelInput({ value, onChange, hasShipping }: {
+  value: string;
+  onChange: (v: string) => void;
+  hasShipping: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const presets = hasShipping
+    ? ADDRESS_LABEL_PRESETS.filter(p => p !== 'Shipping')
+    : ADDRESS_LABEL_PRESETS;
+
+  return (
+    <div className="relative">
+      <Input
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        className="h-7 text-xs"
+        placeholder="Label"
+      />
+      {open && presets.length > 0 && (
+        <div className="absolute left-0 top-full z-50 mt-0.5 w-full rounded-md border border-border bg-popover shadow-md">
+          {presets.map(p => (
+            <button
+              key={p}
+              type="button"
+              onMouseDown={() => onChange(p)}
+              className="w-full px-2 py-1.5 text-left text-xs hover:bg-muted"
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -175,9 +226,9 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
     const loadedCustomerIdRef       = useRef<number | null | undefined>(undefined);
     const contactsRef               = useRef<Contact[]>([]);
 
-    const isDirty    = JSON.stringify(form) !== JSON.stringify(savedFormRef.current);
+    const isDirty     = JSON.stringify(form) !== JSON.stringify(savedFormRef.current);
     const isFormValid = form.contact_type !== 'PERSON' || form.contact_name.trim() !== '';
-    const isSystem   = form.contact_type === 'BILLING' || form.contact_type === 'SHIPPING';
+    const isSystem    = form.contact_type === 'ADDRESSES' || form.contact_type === 'OTHER_CONTACTS';
 
     useEffect(() => { contactsRef.current = contacts; }, [contacts]);
     useEffect(() => { onDirtyChange(isDirty); }, [isDirty, onDirtyChange]);
@@ -220,10 +271,7 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
         setSelection(null);
         setForm(EMPTY_FORM);
         savedFormRef.current = EMPTY_FORM;
-        load().then((loaded) => {
-          // Default to Billing Address (always first)
-          if (loaded.length > 0) applySelection(loaded[0]);
-        });
+        load().then(loaded => { if (loaded.length > 0) applySelection(loaded[0]); });
       }
     }, [customerId, load]);
 
@@ -255,8 +303,8 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
       const f = savedFormRef.current;
       setForm(f);
       if (f.contact_id !== null) {
-        const contact = contactsRef.current.find(c => c.contact_id === f.contact_id);
-        if (contact) { setSelection(contact.contact_id); return; }
+        const c = contactsRef.current.find(c => c.contact_id === f.contact_id);
+        if (c) { setSelection(c.contact_id); return; }
       }
       const list = contactsRef.current;
       if (list.length > 0) applySelection(list[0]);
@@ -291,13 +339,7 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
 
     const addPoint = (type: PointType) => {
       const seq = form.contact_points.filter(p => p.type === type).length + 1;
-      setForm(f => ({
-        ...f,
-        contact_points: [...f.contact_points, {
-          contact_point_id: null, type, value: '', label: '', sequence: seq,
-          is_primary: false, is_active: true, do_not_contact: false, country_dial_code: '',
-        }],
-      }));
+      setForm(f => ({ ...f, contact_points: [...f.contact_points, emptyPoint(type, seq)] }));
     };
 
     const togglePointPrimary = (idx: number) =>
@@ -314,108 +356,26 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
         };
       });
 
-    // ── Shared point-row renderer ─────────────────────────────────────────────
-
-    const renderPointRows = (showTypeCol: boolean) => (
-      <div className="space-y-1.5">
-        {form.contact_points.length > 0 && (
-          <div
-            className="grid items-center gap-2 px-0.5"
-            style={{ gridTemplateColumns: showTypeCol ? '108px 80px 1fr auto' : '80px 1fr auto' }}
-          >
-            {showTypeCol && <p className="text-xs text-muted-foreground">Type</p>}
-            <p className="text-xs text-muted-foreground">Label</p>
-            <p className="text-xs text-muted-foreground">{showTypeCol ? 'Value' : 'Address'}</p>
-            <div className="w-[68px]" />
-          </div>
-        )}
-
-        {form.contact_points.map((p, i) => (
-          <div
-            key={p.contact_point_id ?? `new-${i}`}
-            className="grid items-start gap-2"
-            style={{ gridTemplateColumns: showTypeCol ? '108px 80px 1fr auto' : '80px 1fr auto' }}
-          >
-            {showTypeCol && (
-              <Select value={p.type} onValueChange={(t) => updatePoint(i, { type: t as PointType })}>
-                <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {POINT_TYPES.map(t => (
-                    <SelectItem key={t} value={t} className="text-xs">{TYPE_LABEL[t]}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-
-            <Input
-              value={p.label}
-              onChange={e => updatePoint(i, { label: e.target.value })}
-              className="h-7 text-xs"
-              placeholder="e.g. Office"
-            />
-
-            <div>
-              <textarea
-                value={p.value}
-                onChange={e => updatePoint(i, { value: e.target.value })}
-                rows={!showTypeCol || p.type === 'ADDRESS' ? 3 : 1}
-                className="w-full resize-none rounded border border-input bg-transparent px-2 py-1 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
-                placeholder={
-                  !showTypeCol || p.type === 'ADDRESS' ? '123 Main St\nCity, State 12345' :
-                  p.type === 'EMAIL'   ? 'email@example.com' :
-                  p.type === 'WEBSITE' ? 'https://' :
-                  p.type === 'PHONE' || p.type === 'MOBILE' || p.type === 'FAX' ? '+1 555-1234' : ''
-                }
-              />
-              {(!showTypeCol || p.type === 'ADDRESS') && (
-                <GeocodeStatus status={p.geocode_status} formattedAddress={p.formatted_address} />
-              )}
-            </div>
-
-            <div className="flex items-center gap-0.5 pt-0.5">
-              <button
-                type="button"
-                title={p.is_primary ? 'Primary' : 'Set as primary'}
-                onClick={() => togglePointPrimary(i)}
-                className={cn('rounded p-0.5 transition-colors', p.is_primary ? 'text-amber-500' : 'text-muted-foreground/40 hover:text-amber-400')}
-              >
-                <Star className="h-3.5 w-3.5" fill={p.is_primary ? 'currentColor' : 'none'} />
-              </button>
-              <button
-                type="button"
-                title={p.do_not_contact ? 'Do not contact' : 'Mark as do not contact'}
-                onClick={() => updatePoint(i, { do_not_contact: !p.do_not_contact })}
-                className={cn('rounded p-0.5 transition-colors', p.do_not_contact ? 'text-rose-500' : 'text-muted-foreground/40 hover:text-rose-400')}
-              >
-                <Ban className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => removePoint(i)}
-                className="rounded p-0.5 text-muted-foreground/40 hover:text-destructive transition-colors"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          </div>
-        ))}
-
-        <button
-          type="button"
-          onClick={() => addPoint(isSystem ? 'ADDRESS' : 'PHONE')}
-          className="mt-1 flex items-center gap-1 rounded border border-dashed border-border/50 px-2 py-1 text-xs text-muted-foreground hover:border-border hover:text-foreground transition-colors"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          {isSystem ? 'Add address' : 'Add contact method'}
-        </button>
-      </div>
-    );
+    const setUseAsShipping = (idx: number, checked: boolean) =>
+      setForm(f => ({
+        ...f,
+        contact_points: f.contact_points
+          .map((p, i) => i === idx ? { ...p, use_as_shipping: checked } : p)
+          // When checked, drop any Shipping-labelled rows
+          .filter((p, i) => i === idx || !checked || p.label.toLowerCase() !== 'shipping'),
+      }));
 
     // ── Early exit ────────────────────────────────────────────────────────────
 
     if (!customerId) {
       return <p className="py-4 text-sm text-muted-foreground">Select a customer to view contacts.</p>;
     }
+
+    // Derived state for ADDRESSES rendering
+    const hasUseAsShipping = form.contact_points.some(p => p.use_as_shipping);
+    const visiblePoints    = form.contact_type === 'ADDRESSES'
+      ? form.contact_points.filter(p => !hasUseAsShipping || p.label.toLowerCase() !== 'shipping')
+      : form.contact_points;
 
     // ── Render ────────────────────────────────────────────────────────────────
 
@@ -441,19 +401,20 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
           </Button>
         </div>
 
-        {/* Body: left list + right form */}
+        {/* Body */}
         <div className="flex flex-1 overflow-hidden divide-x divide-border/60">
 
-          {/* Left panel — contact cards */}
+          {/* Left panel */}
           <div className="flex w-60 shrink-0 flex-col overflow-hidden">
             <div className="flex-1 overflow-y-auto">
               {isLoading ? (
                 <p className="p-3 text-xs text-muted-foreground">Loading…</p>
               ) : (
                 contacts.map(contact => {
-                  const isSystemCard = contact.contact_type !== 'PERSON';
-                  const addrCount    = contact.contact_points.length;
-                  const usedTypes    = Array.from(new Set(contact.contact_points.map(p => p.type))) as PointType[];
+                  const cfg        = contact.contact_type !== 'PERSON' ? SYSTEM_CONFIG[contact.contact_type] : null;
+                  const usedTypes  = Array.from(new Set(contact.contact_points.map(p => p.type))) as PointType[];
+                  const addrCount  = contact.contact_points.length;
+                  const sameAsBill = contact.contact_type === 'ADDRESSES' && contact.contact_points.some(p => p.use_as_shipping);
 
                   return (
                     <button
@@ -467,23 +428,12 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
                       )}
                     >
                       <div className="flex items-center gap-2.5">
-                        {isSystemCard ? (
-                          // System contact: colored icon square
-                          <div className={cn(
-                            'h-9 w-9 shrink-0 rounded-lg flex items-center justify-center',
-                            SYSTEM_COLOR[contact.contact_type as 'BILLING' | 'SHIPPING'],
-                          )}>
-                            {(() => {
-                              const Icon = SYSTEM_ICON[contact.contact_type as 'BILLING' | 'SHIPPING'];
-                              return <Icon className="h-4 w-4" />;
-                            })()}
+                        {cfg ? (
+                          <div className={cn('h-9 w-9 shrink-0 rounded-lg flex items-center justify-center', cfg.color)}>
+                            <cfg.icon className="h-4 w-4" />
                           </div>
                         ) : (
-                          // Person contact: initials avatar
-                          <div className={cn(
-                            'relative h-9 w-9 shrink-0 rounded-full flex items-center justify-center text-sm font-semibold select-none',
-                            avatarColor(contact.contact_name || '?'),
-                          )}>
+                          <div className={cn('relative h-9 w-9 shrink-0 rounded-full flex items-center justify-center text-sm font-semibold select-none', avatarColor(contact.contact_name || '?'))}>
                             {initials(contact.contact_name || '?')}
                             {contact.is_primary && (
                               <div className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-background shadow-sm">
@@ -492,24 +442,24 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
                             )}
                           </div>
                         )}
-
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-medium leading-tight">{contact.contact_name}</p>
-                          {isSystemCard ? (
+                          {cfg ? (
                             <p className="text-xs text-muted-foreground">
-                              {addrCount === 0 ? 'No addresses' : `${addrCount} address${addrCount > 1 ? 'es' : ''}`}
+                              {contact.contact_type === 'ADDRESSES'
+                                ? addrCount === 0
+                                  ? 'No addresses'
+                                  : sameAsBill
+                                  ? 'Billing · Shipping same'
+                                  : `${addrCount} address${addrCount > 1 ? 'es' : ''}`
+                                : `${addrCount} item${addrCount !== 1 ? 's' : ''}`}
                             </p>
                           ) : (
                             <>
-                              {contact.job_title && (
-                                <p className="truncate text-xs text-muted-foreground leading-tight">{contact.job_title}</p>
-                              )}
+                              {contact.job_title && <p className="truncate text-xs text-muted-foreground">{contact.job_title}</p>}
                               {usedTypes.length > 0 && (
                                 <div className="mt-0.5 flex gap-1">
-                                  {usedTypes.map(t => {
-                                    const Icon = TYPE_ICON[t];
-                                    return <Icon key={t} className="h-3 w-3 text-muted-foreground/50" />;
-                                  })}
+                                  {usedTypes.map(t => { const Icon = TYPE_ICON[t]; return <Icon key={t} className="h-3 w-3 text-muted-foreground/50" />; })}
                                 </div>
                               )}
                             </>
@@ -523,36 +473,157 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
             </div>
           </div>
 
-          {/* Right panel — form */}
+          {/* Right panel */}
           {selection === null ? (
             <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
               Select a contact or click + Contact
             </div>
-          ) : isSystem ? (
+          ) : form.contact_type === 'ADDRESSES' ? (
 
-            /* ── System contact (BILLING / SHIPPING) ── */
+            /* ── Billing & Shipping ── */
             <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
               <div className="flex items-center gap-2.5">
-                <div className={cn('h-9 w-9 shrink-0 rounded-lg flex items-center justify-center', SYSTEM_COLOR[form.contact_type as 'BILLING' | 'SHIPPING'])}>
-                  {(() => { const Icon = SYSTEM_ICON[form.contact_type as 'BILLING' | 'SHIPPING']; return <Icon className="h-4 w-4" />; })()}
+                <div className={cn('h-9 w-9 shrink-0 rounded-lg flex items-center justify-center', SYSTEM_CONFIG.ADDRESSES.color)}>
+                  <Home className="h-4 w-4" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold leading-tight">{form.contact_name}</p>
-                  <p className="text-xs text-muted-foreground">{SYSTEM_DESCRIPTION[form.contact_type as 'BILLING' | 'SHIPPING']}</p>
+                  <p className="text-sm font-semibold leading-tight">Billing &amp; Shipping</p>
+                  <p className="text-xs text-muted-foreground">{SYSTEM_CONFIG.ADDRESSES.description}</p>
                 </div>
               </div>
 
               <div className="border-t border-border/40" />
 
-              {renderPointRows(false)}
+              {/* Address rows */}
+              <div className="space-y-1.5">
+                {visiblePoints.length > 0 && (
+                  <div className="grid items-center gap-2 px-0.5" style={{ gridTemplateColumns: '1fr 1fr auto' }}>
+                    <p className="text-xs text-muted-foreground">Label</p>
+                    <p className="text-xs text-muted-foreground">Address</p>
+                    <div className="w-8" />
+                  </div>
+                )}
+
+                {visiblePoints.map((p) => {
+                  // Find real index in form.contact_points
+                  const idx = form.contact_points.findIndex(fp => fp === p || (fp.contact_point_id !== null && fp.contact_point_id === p.contact_point_id) || (fp.contact_point_id === null && fp.sequence === p.sequence && fp.label === p.label && fp.value === p.value));
+                  const isBillingRow = p.label.toLowerCase() === 'billing';
+
+                  return (
+                    <div key={p.contact_point_id ?? `new-${idx}`} className="space-y-1">
+                      <div className="grid items-start gap-2" style={{ gridTemplateColumns: '1fr 1fr auto' }}>
+                        <AddressLabelInput
+                          value={p.label}
+                          onChange={v => updatePoint(idx, { label: v })}
+                          hasShipping={hasUseAsShipping}
+                        />
+                        <div>
+                          <textarea
+                            value={p.value}
+                            onChange={e => updatePoint(idx, { value: e.target.value })}
+                            rows={3}
+                            className="w-full resize-none rounded border border-input bg-transparent px-2 py-1 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
+                            placeholder={'123 Main St\nCity, State 12345'}
+                          />
+                          <GeocodeStatus status={p.geocode_status} formattedAddress={p.formatted_address} />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removePoint(idx)}
+                          className="mt-1 rounded p-0.5 text-muted-foreground/40 hover:text-destructive transition-colors"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      {isBillingRow && (
+                        <label className="flex items-center gap-1.5 pl-0 text-xs text-muted-foreground cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={p.use_as_shipping}
+                            onChange={e => setUseAsShipping(idx, e.target.checked)}
+                            className="h-3.5 w-3.5 rounded border-input"
+                          />
+                          Shipping: Same as Billing
+                        </label>
+                      )}
+                    </div>
+                  );
+                })}
+
+                <button
+                  type="button"
+                  onClick={() => addPoint('ADDRESS')}
+                  className="mt-1 flex items-center gap-1 rounded border border-dashed border-border/50 px-2 py-1 text-xs text-muted-foreground hover:border-border hover:text-foreground transition-colors"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add address
+                </button>
+              </div>
+            </div>
+
+          ) : form.contact_type === 'OTHER_CONTACTS' ? (
+
+            /* ── Other Contacts ── */
+            <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
+              <div className="flex items-center gap-2.5">
+                <div className={cn('h-9 w-9 shrink-0 rounded-lg flex items-center justify-center', SYSTEM_CONFIG.OTHER_CONTACTS.color)}>
+                  <PhoneCall className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold leading-tight">Other Contacts</p>
+                  <p className="text-xs text-muted-foreground">{SYSTEM_CONFIG.OTHER_CONTACTS.description}</p>
+                </div>
+              </div>
+
+              <div className="border-t border-border/40" />
+
+              {/* Mixed point rows — show type select */}
+              <div className="space-y-1.5">
+                {form.contact_points.length > 0 && (
+                  <div className="grid items-center gap-2 px-0.5" style={{ gridTemplateColumns: '108px 80px 1fr auto' }}>
+                    <p className="text-xs text-muted-foreground">Type</p>
+                    <p className="text-xs text-muted-foreground">Label</p>
+                    <p className="text-xs text-muted-foreground">Value</p>
+                    <div className="w-8" />
+                  </div>
+                )}
+
+                {form.contact_points.map((p, i) => (
+                  <div key={p.contact_point_id ?? `new-${i}`} className="grid items-start gap-2" style={{ gridTemplateColumns: '108px 80px 1fr auto' }}>
+                    <Select value={p.type} onValueChange={t => updatePoint(i, { type: t as PointType })}>
+                      <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {POINT_TYPES.map(t => <SelectItem key={t} value={t} className="text-xs">{TYPE_LABEL[t]}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <Input value={p.label} onChange={e => updatePoint(i, { label: e.target.value })} className="h-7 text-xs" placeholder="Label" />
+                    <textarea
+                      value={p.value}
+                      onChange={e => updatePoint(i, { value: e.target.value })}
+                      rows={p.type === 'NOTE' || p.type === 'ADDRESS' ? 3 : 1}
+                      className="w-full resize-none rounded border border-input bg-transparent px-2 py-1 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
+                    />
+                    <button type="button" onClick={() => removePoint(i)} className="mt-1 rounded p-0.5 text-muted-foreground/40 hover:text-destructive transition-colors">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={() => addPoint('NOTE')}
+                  className="mt-1 flex items-center gap-1 rounded border border-dashed border-border/50 px-2 py-1 text-xs text-muted-foreground hover:border-border hover:text-foreground transition-colors"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add contact method
+                </button>
+              </div>
             </div>
 
           ) : (
 
             /* ── Person contact ── */
             <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
-
-              {/* Contact details */}
               <div className="space-y-2.5">
                 <div className="grid grid-cols-[76px_1fr_1fr] gap-2">
                   <div>
@@ -583,11 +654,7 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <button
-                    type="button"
-                    onClick={() => setField('is_primary', !form.is_primary)}
-                    className={cn('flex items-center gap-1.5 text-xs transition-colors', form.is_primary ? 'text-amber-500' : 'text-muted-foreground hover:text-foreground')}
-                  >
+                  <button type="button" onClick={() => setField('is_primary', !form.is_primary)} className={cn('flex items-center gap-1.5 text-xs transition-colors', form.is_primary ? 'text-amber-500' : 'text-muted-foreground hover:text-foreground')}>
                     <Star className="h-3.5 w-3.5" fill={form.is_primary ? 'currentColor' : 'none'} />
                     Primary contact
                   </button>
@@ -600,7 +667,59 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
 
               <div className="border-t border-border/40" />
 
-              {renderPointRows(true)}
+              {/* Person contact points */}
+              <div className="space-y-1.5">
+                {form.contact_points.length > 0 && (
+                  <div className="grid items-center gap-2 px-0.5" style={{ gridTemplateColumns: '108px 80px 1fr auto' }}>
+                    <p className="text-xs text-muted-foreground">Type</p>
+                    <p className="text-xs text-muted-foreground">Label</p>
+                    <p className="text-xs text-muted-foreground">Value</p>
+                    <div className="w-[68px]" />
+                  </div>
+                )}
+
+                {form.contact_points.map((p, i) => (
+                  <div key={p.contact_point_id ?? `new-${i}`} className="grid items-start gap-2" style={{ gridTemplateColumns: '108px 80px 1fr auto' }}>
+                    <Select value={p.type} onValueChange={t => updatePoint(i, { type: t as PointType })}>
+                      <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {POINT_TYPES.map(t => <SelectItem key={t} value={t} className="text-xs">{TYPE_LABEL[t]}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <Input value={p.label} onChange={e => updatePoint(i, { label: e.target.value })} className="h-7 text-xs" placeholder="e.g. Work" />
+                    <div>
+                      <textarea
+                        value={p.value}
+                        onChange={e => updatePoint(i, { value: e.target.value })}
+                        rows={p.type === 'ADDRESS' || p.type === 'NOTE' ? 3 : 1}
+                        className="w-full resize-none rounded border border-input bg-transparent px-2 py-1 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
+                        placeholder={p.type === 'EMAIL' ? 'email@example.com' : p.type === 'WEBSITE' ? 'https://' : p.type === 'ADDRESS' ? '123 Main St\nCity, State' : ''}
+                      />
+                      {p.type === 'ADDRESS' && <GeocodeStatus status={p.geocode_status} formattedAddress={p.formatted_address} />}
+                    </div>
+                    <div className="flex items-center gap-0.5 pt-0.5">
+                      <button type="button" title={p.is_primary ? 'Primary' : 'Set as primary'} onClick={() => togglePointPrimary(i)} className={cn('rounded p-0.5 transition-colors', p.is_primary ? 'text-amber-500' : 'text-muted-foreground/40 hover:text-amber-400')}>
+                        <Star className="h-3.5 w-3.5" fill={p.is_primary ? 'currentColor' : 'none'} />
+                      </button>
+                      <button type="button" title={p.do_not_contact ? 'Do not contact' : 'Mark as do not contact'} onClick={() => updatePoint(i, { do_not_contact: !p.do_not_contact })} className={cn('rounded p-0.5 transition-colors', p.do_not_contact ? 'text-rose-500' : 'text-muted-foreground/40 hover:text-rose-400')}>
+                        <Ban className="h-3.5 w-3.5" />
+                      </button>
+                      <button type="button" onClick={() => removePoint(i)} className="rounded p-0.5 text-muted-foreground/40 hover:text-destructive transition-colors">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={() => addPoint('PHONE')}
+                  className="mt-1 flex items-center gap-1 rounded border border-dashed border-border/50 px-2 py-1 text-xs text-muted-foreground hover:border-border hover:text-foreground transition-colors"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add contact method
+                </button>
+              </div>
             </div>
           )}
         </div>
