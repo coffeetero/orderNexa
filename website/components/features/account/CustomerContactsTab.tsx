@@ -650,6 +650,10 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
             /* ── Person contact ── */
             <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
               <div className="space-y-2.5">
+                <div>
+                  <p className="mb-0.5 text-xs text-muted-foreground">Card Name <span className="text-destructive">*</span></p>
+                  <Input value={form.contact_name} onChange={e => setField('contact_name', e.target.value)} className="h-7 text-sm" placeholder="Full name or company" />
+                </div>
                 <div className="grid grid-cols-[76px_1fr_1fr] gap-2">
                   <div>
                     <p className="mb-0.5 text-xs text-muted-foreground">Salutation</p>
@@ -663,10 +667,6 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
                     <p className="mb-0.5 text-xs text-muted-foreground">Last Name</p>
                     <Input value={form.last_name} onChange={e => updateNameField('last_name', e.target.value)} className="h-7 text-sm" />
                   </div>
-                </div>
-                <div>
-                  <p className="mb-0.5 text-xs text-muted-foreground">Display Name <span className="text-destructive">*</span></p>
-                  <Input value={form.contact_name} onChange={e => setField('contact_name', e.target.value)} className="h-7 text-sm" placeholder="Full name or company" />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
