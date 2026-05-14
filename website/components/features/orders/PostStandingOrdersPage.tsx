@@ -54,6 +54,9 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
   const [productionDate, setProductionDate] = useState(defaultDate);
   const [selectedCodes, setSelectedCodes] = useState<string[]>(DEFAULT_CODES);
 
+  // Hierarchy lookup: customer_id → {level, sort_path, customer_type}
+  const hierarchyRef = useRef<Map<number, { level: number; sort_path: string; customer_type: string }>>(new Map());
+
   // Grid state
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [checked,    setChecked]    = useState<Set<string>>(new Set()); // key = customer_id|code
@@ -95,9 +98,20 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
     }
   }, [tenantId]);
 
-  // Initial load: fetch available codes first
+  // Initial load: hierarchy + candidates in parallel
   useEffect(() => {
     if (!tenantId) return;
+
+    // Load customer hierarchy for sort/indent/weight
+    fetch(`/api/customers?tenant_id=${tenantId}&hierarchy=true&active=true`)
+      .then(r => r.json())
+      .then((j: { data?: { customer_id: number; level: number; sort_path: string; customer_type: string }[] }) => {
+        const map = new Map<number, { level: number; sort_path: string; customer_type: string }>();
+        (j.data ?? []).forEach(c => map.set(c.customer_id, { level: c.level ?? 0, sort_path: c.sort_path ?? '', customer_type: c.customer_type ?? '' }));
+        hierarchyRef.current = map;
+      })
+      .catch(() => {});
+
     fetch(`/api/post-standing-orders?tenant_id=${tenantId}&production_date=${productionDate}`)
       .then(r => r.json())
       .then((j: { data?: Candidate[] }) => {
@@ -173,7 +187,13 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
     .filter(c => selectedCodes.includes(c))
     .map(code => ({
       code,
-      rows: candidates.filter(r => r.production_code === code),
+      rows: candidates
+        .filter(r => r.production_code === code)
+        .sort((a, b) => {
+          const ha = hierarchyRef.current.get(a.customer_id);
+          const hb = hierarchyRef.current.get(b.customer_id);
+          return (ha?.sort_path ?? a.customer_number).localeCompare(hb?.sort_path ?? b.customer_number);
+        }),
     }))
     .filter(g => g.rows.length > 0);
 
@@ -298,8 +318,26 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
                   )}
                   style={{ gridTemplateColumns: '90px 1fr 140px 36px' }}
                 >
-                  <span className="font-mono text-xs text-muted-foreground">{row.customer_number}</span>
-                  <span className="truncate text-sm">{row.customer_name}</span>
+                  {(() => {
+                    const h = hierarchyRef.current.get(row.customer_id);
+                    const level = h?.level ?? 0;
+                    const type  = (h?.customer_type ?? '').toUpperCase();
+                    const nameClass = type === 'ACCOUNT' ? 'font-semibold text-foreground'
+                      : type === 'DEPARTMENT' ? 'text-foreground/50'
+                      : 'text-foreground';
+                    return (
+                      <>
+                        <span className="font-mono text-xs text-muted-foreground"
+                          style={{ paddingLeft: level * 10 }}>
+                          {row.customer_number}
+                        </span>
+                        <span className={cn('truncate text-sm', nameClass)}
+                          style={{ paddingLeft: level * 10 }}>
+                          {row.customer_name}
+                        </span>
+                      </>
+                    );
+                  })()}
                   <span className={cn('text-xs', row.status ? STATUS_CLASS[row.status] : 'text-muted-foreground/60')}>
                     {row.status
                       ? `${STATUS_LABEL[row.status]}${row.order_number ? ` #${row.order_number}` : ''}${row.message ? ` — ${row.message}` : ''}`
