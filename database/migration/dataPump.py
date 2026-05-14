@@ -61,6 +61,7 @@ DEFAULT_TABLES = [
     "route",
     "route_stop",
     "box",
+    "sordr",
     "ordr",
     "ordr_detail",
     "ar",
