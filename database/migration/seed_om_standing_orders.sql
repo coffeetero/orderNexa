@@ -7,7 +7,7 @@
 -- Mapping:
 --   cus_id        → customer_id   (via fnd_customers.legacy_id)
 --   item_id       → item_id       (via fnd_items.legacy_id)
---   so_prdctn_pd  → production_day
+--   so_prdctn_pd  → production_dow
 --   so_prdctn_cd  → production_code
 --   so_qty_sold   → quantity      (0 is valid — reminder lines)
 --
@@ -55,7 +55,7 @@ BEGIN
     INSERT INTO bps.om_standing_orders (
         tenant_id,
         customer_id,
-        production_day,
+        production_dow,
         production_code,
         item_id,
         quantity,

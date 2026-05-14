@@ -2,10 +2,10 @@
 -- OM_STANDING_ORDERS  –  Customer standing order lines
 -- Target: Supabase (PostgreSQL 15+)
 --
--- One row per (customer, production_day, production_code, item).
+-- One row per (customer, production_dow, production_code, item).
 -- This is the natural key from the legacy sordr table.
 --
--- production_day:  MON|TUE|WED|THU|FRI|SAT|SUN
+-- production_dow:  MON|TUE|WED|THU|FRI|SAT|SUN
 -- production_code: MORNING|LUNCH|DINNER (tenant-defined shift)
 --
 -- quantity = 0 is valid and meaningful: a 0-qty line is a
@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS om_standing_orders (
     standing_order_id   BIGINT          PRIMARY KEY DEFAULT nextval('fnd_entity_id_seq'::regclass),
 
     customer_id         BIGINT          NOT NULL REFERENCES fnd_customers(customer_id) ON DELETE CASCADE,
-    production_day      TEXT            NOT NULL,   -- MON|TUE|WED|THU|FRI|SAT|SUN
+    production_dow      TEXT            NOT NULL,   -- MON|TUE|WED|THU|FRI|SAT|SUN
     production_code     TEXT            NOT NULL,   -- tenant-defined shift name
     item_id             BIGINT          NOT NULL REFERENCES fnd_items(item_id) ON DELETE RESTRICT,
 
@@ -47,14 +47,14 @@ CREATE TABLE IF NOT EXISTS om_standing_orders (
     updated_by          BIGINT,
 
     CONSTRAINT uq_om_standing_orders_line
-        UNIQUE (tenant_id, customer_id, production_day, production_code, item_id)
+        UNIQUE (tenant_id, customer_id, production_dow, production_code, item_id)
 );
 
 -- ── Indexes ──────────────────────────────────────────────────────────────────
 
 -- Posting job: find all active lines for a given day + shift
 CREATE INDEX IF NOT EXISTS idx_om_standing_orders_posting
-    ON om_standing_orders (tenant_id, production_day, production_code)
+    ON om_standing_orders (tenant_id, production_dow, production_code)
     WHERE is_active = TRUE;
 
 -- Customer view / order-entry pre-population
