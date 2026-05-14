@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { RotateCcw, Trash2 } from 'lucide-react';
+import { Loader2, RotateCcw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -409,7 +409,11 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
               <span />
             </div>
 
-            {isLoading && <p className="px-3 py-4 text-sm text-muted-foreground">Loading…</p>}
+            {isLoading && (
+              <div className="flex items-center justify-center py-6">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            )}
             {!isLoading && lines.length === 0 && (
               <p className="px-3 py-4 text-sm text-muted-foreground">
                 No standing order yet — search an item above to add lines.
