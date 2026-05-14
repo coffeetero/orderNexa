@@ -30,6 +30,10 @@ CREATE TABLE IF NOT EXISTS fnd_customers (
 
     customer_type          TEXT        NOT NULL,
 
+    billing_type               TEXT,                   -- ACCOUNT | COD
+    billing_period             TEXT,                   -- DAILY | WEEKLY | MONTHLY
+    credit_limit               NUMERIC(12,2),          -- NULL = no limit
+
     invoice_copy_count         INT     NOT NULL DEFAULT 1  CHECK (invoice_copy_count >= 1),
     is_standing_order          BOOLEAN NOT NULL DEFAULT FALSE,
     is_signature_required      BOOLEAN NOT NULL DEFAULT FALSE,

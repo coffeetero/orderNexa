@@ -53,6 +53,9 @@ BEGIN
         customer_name,
         customer_number,
         customer_type,
+        billing_type,
+        billing_period,
+        credit_limit,
         invoice_copy_count,
         is_standing_order,
         is_signature_required,
@@ -85,6 +88,9 @@ BEGIN
         END,
 
         -- Guard against 0 or negative values
+        NULLIF(TRIM(c.blng_type),  ''),
+        NULLIF(TRIM(c.blng_period), ''),
+        c.cus_credit_limit,
         GREATEST(COALESCE(c.cus_invc_copies::integer, 1), 1),
 
         COALESCE(c.cus_standing_ordr  = 'Y', FALSE),
