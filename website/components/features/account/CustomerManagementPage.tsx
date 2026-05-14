@@ -695,7 +695,7 @@ export function CustomerManagementPage({
             </TabsList>
 
             <Card className="rounded-b-lg border border-border/60 border-t-0">
-              <CardContent className="pt-2">
+              <CardContent className="p-[3px]">
 <TabsContent value="profile" className="space-y-4">
                 <div className="flex flex-wrap justify-end items-center gap-2">
                   {(selectedOriginal?.customer_type === 'ACCOUNT' || selectedOriginal?.customer_type === 'SITE') && (
