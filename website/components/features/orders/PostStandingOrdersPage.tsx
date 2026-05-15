@@ -15,9 +15,11 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { cn } from '@/lib/utils';
 
 const DEFAULT_CODES = [
-  { value: 'MORNING', label: 'AM'  },
-  { value: 'LUNCH',   label: 'PM'  },
-  { value: 'DINNER',  label: 'PM2' },
+  { value: 'MORNING',  label: 'AM'        },
+  { value: 'LUNCH',    label: 'PM'        },
+  { value: 'DINNER',   label: 'PM2'       },
+  { value: 'SPECIAL1', label: 'Special 1' },
+  { value: 'SPECIAL2', label: 'Special 2' },
 ];
 const LABEL_CLASS = 'text-xs font-semibold text-muted-foreground tracking-wide text-center';
 
@@ -285,9 +287,11 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
                 <span className="truncate">
                   {selectedCodes.length === 0
                     ? 'None selected'
-                    : selectedCodes.length === DEFAULT_CODES.length
+                    : selectedCodes.length === availableCodes.length
                     ? 'All'
-                    : selectedCodes.map(c => c.charAt(0) + c.slice(1).toLowerCase()).join(', ')}
+                    : selectedCodes
+                        .map(c => availableCodes.find(a => a.value === c)?.label ?? c)
+                        .join(', ')}
                 </span>
                 <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-muted-foreground" />
               </button>

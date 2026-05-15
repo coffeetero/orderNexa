@@ -22,9 +22,11 @@ const DOW_OPTIONS = [
 ];
 
 const CODE_OPTIONS_FALLBACK = [
-  { value: 'MORNING', label: 'Morning' },
-  { value: 'LUNCH',   label: 'Lunch' },
-  { value: 'DINNER',  label: 'Dinner' },
+  { value: 'MORNING',  label: 'AM'        },
+  { value: 'LUNCH',    label: 'PM'        },
+  { value: 'DINNER',   label: 'PM2'       },
+  { value: 'SPECIAL1', label: 'Special 1' },
+  { value: 'SPECIAL2', label: 'Special 2' },
 ];
 
 const LABEL_CLASS = 'text-xs font-semibold text-muted-foreground tracking-wide';
