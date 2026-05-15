@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { CheckSquare, ChevronDown, Square, Wheat } from 'lucide-react';
+import { CheckSquare, ChevronDown, RotateCcw, Square, Wheat } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -102,7 +102,7 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
       const rows = json.data ?? [];
       setCandidates(rows);
       // Pre-check all non-posted candidates
-      setChecked(new Set(rows.filter(r => !r.already_posted).map(r => rowKey(r))));
+      setChecked(new Set());
     } catch (err) {
       if ((err as Error).name !== 'AbortError') toast.error('Failed to load candidates.');
     } finally {
@@ -151,17 +151,12 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
       const cJson = await cRes.json() as { data?: Candidate[] };
       const rows  = cJson.data ?? [];
       setCandidates(rows);
-      setChecked(new Set(rows.filter(r => !r.already_posted).map(r => rowKey(r))));
+      setChecked(new Set());
     })().catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId]);
 
   // Auto-retrieve when date or codes change (after initial load)
-  const isFirstLoad = useRef(true);
-  useEffect(() => {
-    if (isFirstLoad.current) { isFirstLoad.current = false; return; }
-    void load(productionDate, selectedCodes);
-  }, [productionDate, selectedCodes, load]);
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -316,6 +311,12 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
 
         {/* Actions */}
         <div className="flex items-end gap-2 pb-0.5">
+          <Button variant="outline" size="icon" className="h-9 w-9"
+            title="Retrieve"
+            disabled={isLoading || isPosting || selectedCodes.length === 0}
+            onClick={() => void load(productionDate, selectedCodes)}>
+            <RotateCcw className="h-4 w-4" />
+          </Button>
           <Button variant="outline" size="sm"
             onClick={() => setChecked(new Set())}
             disabled={isLoading || isPosting || numChecked === 0}>
