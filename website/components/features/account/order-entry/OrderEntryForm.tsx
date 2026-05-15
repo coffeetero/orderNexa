@@ -477,15 +477,17 @@ export function OrderEntryForm({
   ]);
 
   const fetchOrderHeaders = useCallback(
-    async (customerId: number | null): Promise<OrderHeaderListRow[]> => {
+    async (customerId: number | null, productionCode?: string): Promise<OrderHeaderListRow[]> => {
       if (!tenantId || !draft.production_date) return [];
 
       const qs = new URLSearchParams({
         tenant_id: String(tenantId),
         production_date: draft.production_date,
-        production_code: draft.production_code,
         headers_only: 'true',
       });
+      // Only filter by production_code when explicitly provided (omit for broad searches)
+      const code = productionCode ?? draft.production_code;
+      if (code) qs.set('production_code', code);
       if (customerId !== null) {
         qs.set('customer_id', String(customerId));
       }
@@ -633,7 +635,8 @@ export function OrderEntryForm({
     setOrderPickOpen(true);
     setIsLoadingOrderPickCandidates(true);
     try {
-      const rows = await fetchOrderHeaders(draft.customer_id);
+      // No production_code filter — show all orders for this customer + date
+      const rows = await fetchOrderHeaders(draft.customer_id, '');
       if (generation !== orderPickLookupGenerationRef.current) return;
       if (rows.length === 0) {
         setOrderPickCandidates([]);
