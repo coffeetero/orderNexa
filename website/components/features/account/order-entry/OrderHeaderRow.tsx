@@ -41,6 +41,7 @@ interface OrderHeaderRowProps {
   draft: OrderEntryDraft;
   customers: CustomerOption[];
   isLoadingCustomers: boolean;
+  productionCodes: { value: string; label: string }[];
   /** External ref for the customer search <input> (used by useOrderFocus, alwaysOpen mode). */
   customerInputRef: React.RefObject<HTMLInputElement>;
   departmentEventInputRef: React.RefObject<HTMLInputElement>;
@@ -93,6 +94,7 @@ export function OrderHeaderRow({
   draft,
   customers,
   isLoadingCustomers,
+  productionCodes,
   customerInputRef,
   departmentEventInputRef,
   productionDateInputRef,
@@ -281,9 +283,9 @@ export function OrderHeaderRow({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="AM">AM</SelectItem>
-              <SelectItem value="PM">PM</SelectItem>
-              <SelectItem value="SPECIAL">Special</SelectItem>
+              {productionCodes.map((c) => (
+                <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

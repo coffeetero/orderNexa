@@ -14,7 +14,11 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 
-const DEFAULT_CODES = ['MORNING', 'LUNCH', 'DINNER'];
+const DEFAULT_CODES = [
+  { value: 'MORNING', label: 'AM'  },
+  { value: 'LUNCH',   label: 'PM'  },
+  { value: 'DINNER',  label: 'PM2' },
+];
 const LABEL_CLASS = 'text-xs font-semibold text-muted-foreground tracking-wide text-center';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -53,7 +57,8 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
 
   // Filters
   const [productionDate, setProductionDate] = useState(defaultDate);
-  const [selectedCodes, setSelectedCodes] = useState<string[]>(DEFAULT_CODES);
+  const [availableCodes, setAvailableCodes] = useState(DEFAULT_CODES);
+  const [selectedCodes, setSelectedCodes]  = useState<string[]>(DEFAULT_CODES.map(c => c.value));
 
   // Hierarchy lookup: full customer data keyed by customer_id
   const hierarchyRef = useRef<Map<number, {
@@ -101,6 +106,21 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
     } finally {
       setIsLoading(false);
     }
+  }, [tenantId]);
+
+  // Load production codes from valueset
+  useEffect(() => {
+    if (!tenantId) return;
+    fetch(`/api/valuesets?tenant_id=${tenantId}&code=PRODUCTIONCODE`)
+      .then(r => r.json())
+      .then((j: { data?: { value: string; label: string }[] }) => {
+        const codes = j.data ?? [];
+        if (codes.length > 0) {
+          setAvailableCodes(codes);
+          setSelectedCodes(codes.map(c => c.value));
+        }
+      })
+      .catch(() => {});
   }, [tenantId]);
 
   // Initial load: hierarchy first (sequential) so context rows inject on first render
@@ -194,9 +214,9 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
 
   // ── Grouped grid ──────────────────────────────────────────────────────────
 
-  const grouped = DEFAULT_CODES
-    .filter(c => selectedCodes.includes(c))
-    .map(code => {
+  const grouped = availableCodes
+    .filter(({ value }) => selectedCodes.includes(value))
+    .map(({ value: code }) => {
       const groupRows = candidates.filter(r => r.production_code === code);
       const groupIds  = new Set(groupRows.map(r => r.customer_id));
       const ctx: Candidate[] = [];
@@ -273,7 +293,7 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
               </button>
             </PopoverTrigger>
             <PopoverContent className="w-48 p-1.5" align="start">
-              {DEFAULT_CODES.map(code => (
+              {availableCodes.map(({ value: code, label: codeLabel }) => (
                 <label key={code} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted select-none">
                   <Checkbox
                     checked={selectedCodes.includes(code)}
@@ -283,7 +303,7 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
                       )
                     }
                   />
-                  {code.charAt(0) + code.slice(1).toLowerCase()}
+                  {codeLabel}
                 </label>
               ))}
             </PopoverContent>
@@ -328,7 +348,7 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
           <div key={code}>
             {/* Group header */}
             <div className="bg-emerald-100 dark:bg-emerald-950/50 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-emerald-800 dark:text-emerald-300 border-b border-emerald-200 dark:border-emerald-800">
-              {code.charAt(0) + code.slice(1).toLowerCase()}
+              {availableCodes.find(c => c.value === code)?.label ?? code}
             </div>
 
             {/* Column headers */}

@@ -55,7 +55,7 @@ function emptyDraft(): OrderEntryDraft {
     customer_credit: 0,
     order_date: today(),
     production_date: tomorrow(),
-    production_code: 'AM',
+    production_code: '',
     delivery_amount: 0,
     total_amount: 0,
     lines: [],

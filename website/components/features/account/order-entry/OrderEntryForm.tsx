@@ -174,6 +174,7 @@ export function OrderEntryForm({
   const [departmentEventOptions, setDepartmentEventOptions] = useState<DepartmentEventOption[]>([]);
   const [selectedDepartmentEventId, setSelectedDepartmentEventId] = useState<string | null>(null);
   const [isLoadingDepartmentEvents, setIsLoadingDepartmentEvents] = useState(false);
+  const [productionCodes, setProductionCodes] = useState<{ value: string; label: string }[]>([]);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
   const [isLoadingItems, setIsLoadingItems] = useState(false);
   const [itemsError, setItemsError] = useState<string | null>(null);
@@ -264,7 +265,7 @@ export function OrderEntryForm({
       customer_credit: 0,
       order_date: (data.order_date as string) ?? new Date().toISOString().slice(0, 10),
       production_date: (data.production_date as string) ?? new Date().toISOString().slice(0, 10),
-      production_code: (data.production_code as 'AM' | 'PM' | 'SPECIAL') ?? 'AM',
+      production_code: (data.production_code as string) ?? '',
       delivery_amount: Number(data.delivery_amount ?? 0),
       total_amount: totalAmount,
       lines,
@@ -406,6 +407,22 @@ export function OrderEntryForm({
     },
     [tenantId, draft.customer_id, draft.customer_name, loadOrder, mapOrderToDraft, showStatusMessage],
   );
+
+  // ── Load PRODUCTIONCODE valueset, default draft.production_code ───────────
+  useEffect(() => {
+    if (tenantId === null) return;
+    fetch(`/api/valuesets?tenant_id=${tenantId}&code=PRODUCTIONCODE`)
+      .then((r) => r.json())
+      .then(({ data }: { data?: { value: string; label: string }[] }) => {
+        const codes = data ?? [];
+        setProductionCodes(codes);
+        if (codes.length > 0) {
+          setField('production_code', codes[0].value);
+        }
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId]);
 
   // ── Fetch customers when tenantId is ready ─────────────────────────────
   // Skip only if the server already returned a non-empty list; an empty array may mean the RSC
@@ -972,6 +989,7 @@ export function OrderEntryForm({
             draft={draft}
             customers={customers}
             isLoadingCustomers={isLoadingCustomers}
+            productionCodes={productionCodes}
             customerInputRef={customerInputRef}
             departmentEventInputRef={departmentEventInputRef}
             productionDateInputRef={productionDateInputRef}

@@ -139,8 +139,8 @@ export interface InvoiceLookupResult {
   orders: { order_id: number; order_number: string }[];
 }
 
-/** Production slot code on om_orders.production_code (legacy: ordr_prdctn_cd). */
-export type ProductionCode = 'AM' | 'PM' | 'SPECIAL';
+/** Production slot code stored in om_orders.production_code. Driven by PRODUCTIONCODE valueset. */
+export type ProductionCode = string;
 
 /** Header row from om_orders_get list mode — Enter Orders slot lookup + multi-order picker. */
 export interface OrderHeaderListRow {

@@ -21,7 +21,7 @@ const DOW_OPTIONS = [
   { value: 'SUN', label: 'Sunday' },
 ];
 
-const CODE_OPTIONS = [
+const CODE_OPTIONS_FALLBACK = [
   { value: 'MORNING', label: 'Morning' },
   { value: 'LUNCH',   label: 'Lunch' },
   { value: 'DINNER',  label: 'Dinner' },
@@ -79,8 +79,9 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
 
   // Selectors
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [codeOptions,  setCodeOptions]  = useState(CODE_OPTIONS_FALLBACK);
   const [selectedDow,  setSelectedDow]  = useState<string>('MON');
-  const [selectedCode, setSelectedCode] = useState<string>('MORNING');
+  const [selectedCode, setSelectedCode] = useState<string>('');
   // Pills: days to save to — always includes selectedDow
   const [targetDows, setTargetDows] = useState<Set<string>>(new Set(['MON']));
 
@@ -112,7 +113,22 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
     });
   }, []);
 
-  // Load data
+  // Load production codes from valueset on mount
+  useEffect(() => {
+    if (!tenantId) return;
+    fetch(`/api/valuesets?tenant_id=${tenantId}&code=PRODUCTIONCODE`)
+      .then(r => r.json())
+      .then((j: { data?: { value: string; label: string }[] }) => {
+        const codes = j.data ?? [];
+        if (codes.length > 0) {
+          setCodeOptions(codes);
+          setSelectedCode(codes[0].value);
+        }
+      })
+      .catch(() => {});
+  }, [tenantId]);
+
+  // Load customers and items on mount
   useEffect(() => {
     if (!tenantId) return;
 
@@ -279,7 +295,7 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
             <Select value={selectedCode} onValueChange={setSelectedCode}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {CODE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                {codeOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
