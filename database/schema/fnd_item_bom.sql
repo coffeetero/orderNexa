@@ -31,6 +31,9 @@ CREATE TABLE IF NOT EXISTS fnd_item_bom (
     CONSTRAINT chk_no_self_reference CHECK (parent_item_id != item_id)
 );
 
+-- Ownership: application tables are owned by bps_owner; runtime access is via grants + RLS.
+ALTER TABLE fnd_item_bom OWNER TO bps_owner;
+
 CREATE INDEX IF NOT EXISTS idx_fnd_item_bom_tenant
     ON fnd_item_bom (tenant_id);
 

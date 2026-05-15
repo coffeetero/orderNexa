@@ -82,6 +82,9 @@ CREATE TABLE IF NOT EXISTS fnd_contact_points (
     )
 );
 
+-- Ownership: application tables are owned by bps_owner; runtime access is via grants + RLS.
+ALTER TABLE fnd_contact_points OWNER TO bps_owner;
+
 -- ── Legacy cleanup ────────────────────────────────────────────────────────────
 
 ALTER TABLE fnd_contact_points DROP COLUMN IF EXISTS entity_id;

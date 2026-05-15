@@ -30,6 +30,9 @@ CREATE TABLE IF NOT EXISTS fnd_tenant_options (
     CONSTRAINT uq_fnd_tenant_options_tenant_option_code UNIQUE (tenant_id, option_code)
 );
 
+-- Ownership: application tables are owned by bps_owner; runtime access is via grants + RLS.
+ALTER TABLE fnd_tenant_options OWNER TO bps_owner;
+
 ALTER TABLE fnd_tenant_options ADD COLUMN IF NOT EXISTS created_by BIGINT;
 ALTER TABLE fnd_tenant_options ADD COLUMN IF NOT EXISTS updated_by BIGINT;
 

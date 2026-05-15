@@ -27,6 +27,9 @@ CREATE TABLE IF NOT EXISTS ar_payments (
     updated_by              BIGINT
 );
 
+-- Ownership: application tables are owned by bps_owner; runtime access is via grants + RLS.
+ALTER TABLE ar_payments OWNER TO bps_owner;
+
 CREATE INDEX IF NOT EXISTS idx_ar_payments_tenant_customer_date
     ON ar_payments (tenant_id, customer_id, payment_date DESC);
 

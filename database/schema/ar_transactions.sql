@@ -38,6 +38,9 @@ CREATE TABLE IF NOT EXISTS ar_transactions (
         UNIQUE (tenant_id, customer_id, document_number)
 );
 
+-- Ownership: application tables are owned by bps_owner; runtime access is via grants + RLS.
+ALTER TABLE ar_transactions OWNER TO bps_owner;
+
 CREATE INDEX IF NOT EXISTS idx_ar_transactions_tenant_customer_date
     ON ar_transactions (tenant_id, customer_id, transaction_date DESC);
 

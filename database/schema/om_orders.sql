@@ -38,6 +38,9 @@ CREATE TABLE IF NOT EXISTS om_orders (
     UNIQUE (tenant_id, order_number)
 );
 
+-- Ownership: application tables are owned by bps_owner; runtime access is via grants + RLS.
+ALTER TABLE om_orders OWNER TO bps_owner;
+
 CREATE INDEX IF NOT EXISTS idx_om_orders_tenant_id
     ON om_orders (tenant_id);
 

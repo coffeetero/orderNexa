@@ -34,6 +34,9 @@ CREATE TABLE IF NOT EXISTS om_order_lines (
     updated_by          BIGINT
 );
 
+-- Ownership: application tables are owned by bps_owner; runtime access is via grants + RLS.
+ALTER TABLE om_order_lines OWNER TO bps_owner;
+
 ALTER TABLE om_order_lines
     ADD COLUMN IF NOT EXISTS prep_options JSONB NOT NULL DEFAULT '[]'::JSONB;
 

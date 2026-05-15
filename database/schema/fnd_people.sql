@@ -23,6 +23,9 @@ CREATE TABLE IF NOT EXISTS fnd_people (
     updated_by        BIGINT
 );
 
+-- Ownership: application tables are owned by bps_owner; runtime access is via grants + RLS.
+ALTER TABLE fnd_people OWNER TO bps_owner;
+
 CREATE INDEX IF NOT EXISTS idx_fnd_people_tenant_id
     ON fnd_people (tenant_id);
 

@@ -55,6 +55,9 @@ CREATE TABLE IF NOT EXISTS fnd_customers (
     UNIQUE (tenant_id, customer_number)
 );
 
+-- Ownership: application tables are owned by bps_owner; runtime access is via grants + RLS.
+ALTER TABLE fnd_customers OWNER TO bps_owner;
+
 -- FK fnd_customers.tenant_id -> fnd_tenants.tenant_id
 DO $$ BEGIN
     ALTER TABLE fnd_customers

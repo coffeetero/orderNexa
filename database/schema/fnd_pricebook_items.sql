@@ -37,6 +37,9 @@ CREATE TABLE IF NOT EXISTS fnd_pricebook_items (
         UNIQUE (tenant_id, pricebook_id, item_id, min_quantity)
 );
 
+-- Ownership: application tables are owned by bps_owner; runtime access is via grants + RLS.
+ALTER TABLE fnd_pricebook_items OWNER TO bps_owner;
+
 CREATE INDEX IF NOT EXISTS idx_fnd_pricebook_items_tenant_book
     ON fnd_pricebook_items (tenant_id, pricebook_id);
 

@@ -631,26 +631,24 @@ export function OrderEntryForm({
     const generation = ++orderPickLookupGenerationRef.current;
     showStatusMessage(null);
     setOrderPickCandidates([]);
-    setOrderPickMode(draft.customer_id === null ? 'global-search' : 'customer-scoped');
+    setOrderPickMode('global-search');
     setOrderPickOpen(true);
     setIsLoadingOrderPickCandidates(true);
     try {
-      // No production_code filter — show all orders for this customer + date
-      const rows = await fetchOrderHeaders(draft.customer_id, '');
+      // Search uses the selected production slot: date + production code.
+      const rows = await fetchOrderHeaders(null);
       if (generation !== orderPickLookupGenerationRef.current) return;
       if (rows.length === 0) {
         setOrderPickCandidates([]);
-        setOrderPickOpen(false);
         showStatusMessage({ text: 'No existing orders found for this production slot.', type: 'error' });
         return;
       }
 
-      setOrderPickMode(draft.customer_id === null ? 'global-search' : 'customer-scoped');
+      setOrderPickMode('global-search');
       setOrderPickCandidates(rows);
       setOrderPickOpen(true);
     } catch (error) {
       if (generation !== orderPickLookupGenerationRef.current) return;
-      setOrderPickOpen(false);
       showStatusMessage({
         text: error instanceof Error ? error.message : 'Could not find existing orders.',
         type: 'error',
@@ -660,7 +658,7 @@ export function OrderEntryForm({
         setIsLoadingOrderPickCandidates(false);
       }
     }
-  }, [tenantId, draft.production_date, draft.customer_id, fetchOrderHeaders, showStatusMessage]);
+  }, [tenantId, draft.production_date, fetchOrderHeaders, showStatusMessage]);
 
   const handleOrderPickOpenChange = useCallback((nextOpen: boolean) => {
     if (!nextOpen) {
@@ -1148,4 +1146,3 @@ export function OrderEntryForm({
     </div>
   );
 }
-

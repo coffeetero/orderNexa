@@ -25,6 +25,9 @@ CREATE TABLE IF NOT EXISTS fnd_user_tenants (
     CONSTRAINT uq_fnd_user_tenants_tenant_user UNIQUE (tenant_id, user_id)
 );
 
+-- Ownership: application tables are owned by bps_owner; runtime access is via grants + RLS.
+ALTER TABLE fnd_user_tenants OWNER TO bps_owner;
+
 COMMENT ON COLUMN fnd_user_tenants.is_customer_restricted IS
     'When true, user access to customers is limited to rows in fnd_user_customers for this tenant.';
 

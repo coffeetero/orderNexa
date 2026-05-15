@@ -35,6 +35,9 @@ CREATE TABLE IF NOT EXISTS om_order_shipments (
     updated_by             BIGINT
 );
 
+-- Ownership: application tables are owned by bps_owner; runtime access is via grants + RLS.
+ALTER TABLE om_order_shipments OWNER TO bps_owner;
+
 CREATE INDEX IF NOT EXISTS idx_om_order_shipments_tenant_order
     ON om_order_shipments (tenant_id, order_id, shipment_date DESC);
 

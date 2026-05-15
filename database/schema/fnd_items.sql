@@ -71,6 +71,9 @@ CREATE TABLE IF NOT EXISTS fnd_items (
     UNIQUE (tenant_id, legacy_id)
 );
 
+-- Ownership: application tables are owned by bps_owner; runtime access is via grants + RLS.
+ALTER TABLE fnd_items OWNER TO bps_owner;
+
 ALTER TABLE fnd_items
     ADD COLUMN IF NOT EXISTS allowed_prep_options JSONB NOT NULL DEFAULT '[]'::JSONB;
 

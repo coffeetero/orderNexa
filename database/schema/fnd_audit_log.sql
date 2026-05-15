@@ -23,6 +23,9 @@ CREATE TABLE IF NOT EXISTS fnd_audit_log (
     changed_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Ownership: application tables are owned by bps_owner; runtime access is via grants + RLS.
+ALTER TABLE fnd_audit_log OWNER TO bps_owner;
+
 CREATE INDEX IF NOT EXISTS idx_audit_log_table_record
     ON fnd_audit_log (table_name, record_id);
 

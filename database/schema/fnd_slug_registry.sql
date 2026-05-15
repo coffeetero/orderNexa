@@ -13,5 +13,8 @@ CREATE TABLE IF NOT EXISTS fnd_slug_registry (
     entity_type  TEXT
 );
 
+-- Ownership: application tables are owned by bps_owner; runtime access is via grants + RLS.
+ALTER TABLE fnd_slug_registry OWNER TO bps_owner;
+
 COMMENT ON TABLE fnd_slug_registry IS
     'Optional slug registry keyed by slug and entity classification.';

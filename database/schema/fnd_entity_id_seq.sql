@@ -26,5 +26,8 @@ CREATE SEQUENCE IF NOT EXISTS fnd_entity_id_seq
     NO MAXVALUE
     CACHE 1;
 
+-- Ownership: application objects are owned by bps_owner; runtime access is via grants + RLS.
+ALTER SEQUENCE fnd_entity_id_seq OWNER TO bps_owner;
+
 COMMENT ON SEQUENCE fnd_entity_id_seq IS
     'Global sequence for entity-style primary keys; nextval shared across tables that adopt it.';

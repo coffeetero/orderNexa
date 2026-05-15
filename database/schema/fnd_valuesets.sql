@@ -45,6 +45,9 @@ CREATE TABLE IF NOT EXISTS fnd_valuesets (
     )
 );
 
+-- Ownership: application tables are owned by bps_owner; runtime access is via grants + RLS.
+ALTER TABLE fnd_valuesets OWNER TO bps_owner;
+
 CREATE INDEX IF NOT EXISTS idx_fnd_valuesets_tenant
     ON fnd_valuesets (tenant_id);
 
@@ -92,6 +95,9 @@ CREATE TABLE IF NOT EXISTS fnd_valueset_values (
     CONSTRAINT uq_fnd_valueset_values_tenant_valueset_value UNIQUE (tenant_id, valueset_id, value),
     CONSTRAINT chk_fnd_valueset_values_value_not_blank CHECK (NULLIF(TRIM(value), '') IS NOT NULL)
 );
+
+-- Ownership: application tables are owned by bps_owner; runtime access is via grants + RLS.
+ALTER TABLE fnd_valueset_values OWNER TO bps_owner;
 
 CREATE INDEX IF NOT EXISTS idx_fnd_valueset_values_tenant_valueset
     ON fnd_valueset_values (tenant_id, valueset_id);

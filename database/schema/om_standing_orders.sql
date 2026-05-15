@@ -50,6 +50,9 @@ CREATE TABLE IF NOT EXISTS om_standing_orders (
         UNIQUE (tenant_id, customer_id, production_dow, production_code, item_id)
 );
 
+-- Ownership: application tables are owned by bps_owner; runtime access is via grants + RLS.
+ALTER TABLE om_standing_orders OWNER TO bps_owner;
+
 -- ── Indexes ──────────────────────────────────────────────────────────────────
 
 -- Posting job: find all active lines for a given day + shift
@@ -73,3 +76,5 @@ DROP TRIGGER IF EXISTS trg_om_standing_orders_audit ON om_standing_orders;
 CREATE TRIGGER trg_om_standing_orders_audit
     AFTER INSERT OR UPDATE OR DELETE ON om_standing_orders
     FOR EACH ROW EXECUTE FUNCTION fn_audit_log('standing_order_id');
+
+-- RLS policies: om_standing_orders_policies.sql

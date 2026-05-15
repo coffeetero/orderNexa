@@ -52,6 +52,9 @@ CREATE TABLE IF NOT EXISTS fnd_user_customers (
         ON DELETE CASCADE
 );
 
+-- Ownership: application tables are owned by bps_owner; runtime access is via grants + RLS.
+ALTER TABLE fnd_user_customers OWNER TO bps_owner;
+
 CREATE INDEX IF NOT EXISTS idx_fnd_user_customers_tenant_id
     ON fnd_user_customers (tenant_id);
 

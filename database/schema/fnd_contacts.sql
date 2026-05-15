@@ -57,6 +57,9 @@ CREATE TABLE IF NOT EXISTS fnd_contacts (
     updated_by          BIGINT
 );
 
+-- Ownership: application tables are owned by bps_owner; runtime access is via grants + RLS.
+ALTER TABLE fnd_contacts OWNER TO bps_owner;
+
 -- ── Indexes ──────────────────────────────────────────────────────────────────
 
 -- Primary lookup: all contacts for an entity

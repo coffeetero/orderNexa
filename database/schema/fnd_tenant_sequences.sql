@@ -30,6 +30,9 @@ CREATE TABLE IF NOT EXISTS fnd_tenant_sequences (
     CHECK (increment_by > 0)
 );
 
+-- Ownership: application tables are owned by bps_owner; runtime access is via grants + RLS.
+ALTER TABLE fnd_tenant_sequences OWNER TO bps_owner;
+
 COMMENT ON TABLE fnd_tenant_sequences IS
     'Tenant-scoped sequence definitions. Rows are locked individually during allocation.';
 COMMENT ON COLUMN fnd_tenant_sequences.mask IS
@@ -215,17 +218,5 @@ DROP TRIGGER IF EXISTS trg_fnd_tenant_sequences_audit ON fnd_tenant_sequences;
 CREATE TRIGGER trg_fnd_tenant_sequences_audit
     AFTER INSERT OR UPDATE OR DELETE ON fnd_tenant_sequences
     FOR EACH ROW EXECUTE FUNCTION fn_audit_log('sequence_name');
-
-DO $$
-BEGIN
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'bps_dev') THEN
-        GRANT USAGE ON SCHEMA bps TO bps_dev;
-        GRANT SELECT, INSERT, UPDATE, DELETE ON fnd_tenant_sequences TO bps_dev;
-        GRANT EXECUTE ON FUNCTION fnd_tenant_sequence_format(TEXT, BIGINT, DATE) TO bps_dev;
-        GRANT EXECUTE ON FUNCTION fnd_tenant_sequence_reset_key(TEXT, DATE) TO bps_dev;
-        GRANT EXECUTE ON FUNCTION fnd_tenant_sequence_next(BIGINT, TEXT, DATE) TO bps_dev;
-    END IF;
-END;
-$$;
 
 -- RLS policies: fnd_tenant_sequences_policies.sql

@@ -39,6 +39,9 @@ CREATE TABLE IF NOT EXISTS fnd_users (
     time_format       TEXT
 );
 
+-- Ownership: application tables are owned by bps_owner; runtime access is via grants + RLS.
+ALTER TABLE fnd_users OWNER TO bps_owner;
+
 ALTER TABLE fnd_users
     ADD COLUMN IF NOT EXISTS time_zone TEXT,
     ADD COLUMN IF NOT EXISTS language TEXT,

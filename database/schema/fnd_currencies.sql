@@ -25,6 +25,9 @@ CREATE TABLE IF NOT EXISTS fnd_currencies (
     updated_by      BIGINT
 );
 
+-- Ownership: application tables are owned by bps_owner; runtime access is via grants + RLS.
+ALTER TABLE fnd_currencies OWNER TO bps_owner;
+
 -- Existing DBs created before created_by / updated_by
 ALTER TABLE fnd_currencies ADD COLUMN IF NOT EXISTS created_by BIGINT;
 ALTER TABLE fnd_currencies ADD COLUMN IF NOT EXISTS updated_by BIGINT;

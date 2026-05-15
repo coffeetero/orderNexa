@@ -40,6 +40,9 @@ CREATE TABLE IF NOT EXISTS fnd_customer_pricebooks (
         CHECK (effective_end_date IS NULL OR effective_end_date >= effective_start_date)
 );
 
+-- Ownership: application tables are owned by bps_owner; runtime access is via grants + RLS.
+ALTER TABLE fnd_customer_pricebooks OWNER TO bps_owner;
+
 ALTER TABLE fnd_customer_pricebooks ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;
 
 CREATE INDEX IF NOT EXISTS idx_fnd_customer_pricebooks_tenant_id

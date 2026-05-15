@@ -117,6 +117,9 @@ CREATE TABLE IF NOT EXISTS fnd_tenants (
     tenant_slug      TEXT
 );
 
+-- Ownership: application tables are owned by bps_owner; runtime access is via grants + RLS.
+ALTER TABLE fnd_tenants OWNER TO bps_owner;
+
 CREATE INDEX IF NOT EXISTS idx_fnd_tenants_active
     ON fnd_tenants (is_active);
 
