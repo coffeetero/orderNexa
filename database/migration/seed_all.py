@@ -57,6 +57,7 @@ SEEDS: list[str] = [
     "seed_om_standing_orders.sql",
     "seed_fnd_valuesets_from_legacy_item.sql",
     "seed_item_prep_options.sql",
+    "seed_fnd_valueset_production_codes.sql",
     "seed_fnd_item_bom.sql",
     "seed_fnd_pricebook_items.sql",
     "seed_om_orders.sql",
