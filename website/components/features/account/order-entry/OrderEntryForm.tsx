@@ -509,7 +509,7 @@ export function OrderEntryForm({
     [tenantId, draft.production_date, draft.production_code],
   );
 
-  const handleDepartmentEventListRequest = useCallback(() => {
+  const handleDepartmentEventListRequest = useCallback(async () => {
     if (!tenantId || !draft.customer_id || !draft.production_date) {
       setDepartmentEventOptions([]);
       setSelectedDepartmentEventId(null);
@@ -525,10 +525,11 @@ export function OrderEntryForm({
     setIsLoadingDepartmentEvents(true);
     showStatusMessage(null);
 
-    const options = buildDepartmentEventOptions(draft.customer_id);
+    // Build local stubs first (ORDER + dept names)
+    const localOptions = buildDepartmentEventOptions(draft.customer_id);
     if (generation !== slotLookupGenerationRef.current) return;
 
-    setDepartmentEventOptions(options);
+    setDepartmentEventOptions(localOptions);
     setSelectedDepartmentEventId(null);
     setField('order_number', 'New Order');
     setField('order_ref', 'New Order');
@@ -536,12 +537,46 @@ export function OrderEntryForm({
     setField('lines', []);
     setField('total_amount', 0);
     setOrderPickOpen(false);
-    setIsLoadingDepartmentEvents(false);
+
+    // Also fetch existing orders from DB and merge as non-new entries
+    try {
+      const existingRows = await fetchOrderHeaders(draft.customer_id);
+      if (generation !== slotLookupGenerationRef.current) return;
+      if (existingRows.length > 0) {
+        const seenEvents = new Set(localOptions.map(o => o.department_event));
+        const existingOptions: DepartmentEventOption[] = existingRows
+          .filter(r => r.department_event)
+          .map(r => ({
+            id: String(r.order_id),
+            order_id: r.order_id,
+            order_number: r.order_number ?? null,
+            department_event: (r.department_event ?? '').toUpperCase(),
+            total_quantity: r.total_quantity ?? 0,
+            amount: r.amount ?? 0,
+            is_new: false,
+          }));
+        // Merge: existing entries replace matching local stubs; new dept events are appended
+        const merged = localOptions.map(local =>
+          existingOptions.find(e => e.department_event === local.department_event) ?? local
+        );
+        existingOptions.forEach(e => {
+          if (!seenEvents.has(e.department_event)) merged.push(e);
+        });
+        setDepartmentEventOptions(merged);
+      }
+    } catch {
+      // silently ignore — local options remain
+    } finally {
+      if (generation === slotLookupGenerationRef.current) {
+        setIsLoadingDepartmentEvents(false);
+      }
+    }
   }, [
     tenantId,
     draft.customer_id,
     draft.production_date,
     buildDepartmentEventOptions,
+    fetchOrderHeaders,
     mode,
     orderId,
     setField,
