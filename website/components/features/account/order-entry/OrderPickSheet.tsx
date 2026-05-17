@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import {
   Sheet,
@@ -10,7 +9,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { Button } from '@/components/ui/button';
 import type { OrderHeaderListRow } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -30,25 +28,14 @@ export function OrderPickSheet({
   loading = false,
   onSelect,
 }: OrderPickSheetProps) {
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [activeIndex, setActiveIndex] = useState(-1);
   const [customerSearch, setCustomerSearch] = useState('');
-  const [isDesktop, setIsDesktop] = useState(() =>
-    typeof window === 'undefined' ? false : window.matchMedia('(min-width: 1024px)').matches,
-  );
   const containerRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    const query = window.matchMedia('(min-width: 1024px)');
-    const handleChange = () => setIsDesktop(query.matches);
-    handleChange();
-    query.addEventListener('change', handleChange);
-    return () => query.removeEventListener('change', handleChange);
-  }, []);
-
-  useEffect(() => {
     if (!open) return;
-    setActiveIndex(0);
+    setActiveIndex(-1);
     setCustomerSearch('');
     requestAnimationFrame(() => searchInputRef.current?.focus());
   }, [open, candidates.length]);
@@ -106,22 +93,33 @@ export function OrderPickSheet({
     (event: React.KeyboardEvent<HTMLDivElement>) => {
       if (event.key === 'ArrowDown') {
         event.preventDefault();
+        if (optionCount === 0) {
+          setActiveIndex(-1);
+          return;
+        }
         setActiveIndex((current) => Math.min(current + 1, Math.max(optionCount - 1, 0)));
         return;
       }
       if (event.key === 'ArrowUp') {
         event.preventDefault();
-        setActiveIndex((current) => Math.max(current - 1, 0));
+        if (optionCount === 0) {
+          setActiveIndex(-1);
+          return;
+        }
+        setActiveIndex((current) => {
+          if (current < 0) return Math.max(optionCount - 1, 0);
+          return Math.max(current - 1, 0);
+        });
         return;
       }
       if (event.key === 'Home') {
         event.preventDefault();
-        setActiveIndex(0);
+        setActiveIndex(optionCount > 0 ? 0 : -1);
         return;
       }
       if (event.key === 'End') {
         event.preventDefault();
-        setActiveIndex(Math.max(optionCount - 1, 0));
+        setActiveIndex(optionCount > 0 ? optionCount - 1 : -1);
         return;
       }
       if (event.key === 'Enter') {
@@ -140,7 +138,7 @@ export function OrderPickSheet({
           value={customerSearch}
           onChange={(event) => {
             setCustomerSearch(event.target.value);
-            setActiveIndex(0);
+            setActiveIndex(-1);
           }}
           placeholder="Search Customer, Department/Event or Order.."
           className="h-8 text-sm"
@@ -159,7 +157,7 @@ export function OrderPickSheet({
           tabIndex={0}
           role="listbox"
           aria-label="Existing orders"
-          aria-activedescendant={`order-pick-${activeIndex}`}
+          aria-activedescendant={activeIndex >= 0 ? `order-pick-${activeIndex}` : undefined}
           className="overflow-hidden rounded-md border border-border/80 bg-card divide-y divide-border/60 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           onKeyDown={handleKeyDown}
         >
@@ -175,7 +173,7 @@ export function OrderPickSheet({
           )}
           {!loading && groupedRows.map((group) => (
             <div key={group.customerName}>
-              <div className="bg-muted/70 px-3 py-1 text-[0.7rem] font-semibold uppercase tracking-normal text-muted-foreground">
+              <div className="bg-background px-3 py-1 text-sm font-semibold uppercase tracking-normal text-foreground">
                 {group.customerName}
               </div>
               {group.rows.map(({ row, optionIndex }) => {
@@ -188,17 +186,17 @@ export function OrderPickSheet({
                     role="option"
                     aria-selected={active}
                     className={cn(
-                      'w-full px-3 py-0.5 text-left text-sm transition-colors',
+                      'w-full py-0.5 pl-6 pr-3 text-left text-sm transition-colors',
                       active ? 'bg-primary text-primary-foreground' : 'hover:bg-accent/80',
                       'focus:outline-none',
                     )}
                     tabIndex={-1}
-                    onMouseEnter={() => setActiveIndex(optionIndex)}
                     onClick={() => onSelect(row)}
                   >
                     <div className="grid grid-cols-[minmax(0,1fr)_5.5rem] items-center gap-2">
-                      <span className="truncate font-medium">
-                        {row.department_event || `Order #${row.order_id}`}
+                      <span className="truncate text-xs font-medium">
+                        {row.order_number || `Order #${row.order_id}`}
+                        {row.department_event ? ` · ${row.department_event}` : ''}
                       </span>
                       <span className="text-right text-sm font-semibold tabular-nums">
                         $
@@ -219,47 +217,19 @@ export function OrderPickSheet({
   );
 
   return (
-    <>
-      {!isDesktop && (
-        <Sheet open={open} onOpenChange={onOpenChange}>
-          <SheetContent
-            side="right"
-            className="flex w-[min(420px,100vw)] max-w-none flex-col gap-0 overflow-hidden p-0"
-          >
-            <SheetHeader className="space-y-1 px-4 pb-3 pt-5 pr-10">
-              <SheetTitle className="text-base">Existing Orders</SheetTitle>
-              <SheetDescription>
-                Select an existing order.
-              </SheetDescription>
-            </SheetHeader>
-            {panelContent}
-          </SheetContent>
-        </Sheet>
-      )}
-
-      {isDesktop && open && (
-        <aside className="flex h-full w-[420px] shrink-0 flex-col overflow-hidden border-l border-border/60 bg-card">
-          <div className="flex items-start justify-between gap-3 px-3 pb-3 pt-3">
-            <div className="min-w-0 space-y-1">
-              <h3 className="text-base font-semibold text-foreground">Existing Orders</h3>
-              <p className="text-sm text-muted-foreground">
-                Select an existing order.
-              </p>
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 shrink-0"
-              onClick={() => onOpenChange(false)}
-              aria-label="Close existing orders"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-          {panelContent}
-        </aside>
-      )}
-    </>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="right"
+        className="flex w-[min(420px,100vw)] max-w-none flex-col gap-0 overflow-hidden p-0"
+      >
+        <SheetHeader className="space-y-1 px-4 pb-3 pt-5 pr-10">
+          <SheetTitle className="text-base">Existing Orders</SheetTitle>
+          <SheetDescription>
+            Select an existing order.
+          </SheetDescription>
+        </SheetHeader>
+        {panelContent}
+      </SheetContent>
+    </Sheet>
   );
 }

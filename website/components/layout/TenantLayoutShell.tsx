@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { TenantSidebar } from '@/components/layout/TenantSidebar';
 import { DashboardHeader } from '@/components/layout/DashboardHeader';
 import { createClient } from '@/lib/supabase/client';
+import { cn } from '@/lib/utils';
 
 const breadcrumbMap: Record<string, string> = {
   '/': 'Home',
@@ -37,9 +38,15 @@ type TenantLayoutShellProps = {
   children: React.ReactNode;
   /** Logo / home target for tenancy staff vs customer-in-tenant shell */
   sidebarHomeHref?: string;
+  /** Optional page-shell override. Default centers content at the standard app width. */
+  contentClassName?: string;
 };
 
-export function TenantLayoutShell({ children, sidebarHomeHref = '/dashboard' }: TenantLayoutShellProps) {
+export function TenantLayoutShell({
+  children,
+  sidebarHomeHref = '/dashboard',
+  contentClassName,
+}: TenantLayoutShellProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
@@ -98,8 +105,10 @@ export function TenantLayoutShell({ children, sidebarHomeHref = '/dashboard' }: 
           userRole="Bakery Admin"
         />
 
-        <main className="flex-1 overflow-y-auto bg-background pb-[1px] px-[10px] scrollbar-thin">
-          {children}
+        <main className="flex-1 overflow-y-auto bg-background px-[10px] pb-[1px] scrollbar-thin">
+          <div className={cn('mx-auto h-full w-full max-w-[1280px]', contentClassName)}>
+            {children}
+          </div>
         </main>
       </div>
     </div>

@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS om_orders (
     tenant_id               BIGINT        NOT NULL REFERENCES fnd_tenants(tenant_id) ON DELETE CASCADE,
     order_id                BIGINT      PRIMARY KEY DEFAULT nextval('fnd_entity_id_seq'::regclass),
     order_number            TEXT        NOT NULL,   -- app-facing, source: ordr.ordr_no
+    po_number               TEXT,                   -- optional customer purchase order/reference number
     order_date              DATE,                   -- source: ordr.ordr_dt
     order_source            TEXT,                   -- Web, Clerk, Fax, Electronic, SORDER (set by app / later migration)
     quantity                NUMERIC(14,4) NOT NULL,   -- ordr_qty_sold
@@ -49,6 +50,9 @@ CREATE INDEX IF NOT EXISTS idx_om_orders_customer
 
 ALTER TABLE om_orders
     ADD COLUMN IF NOT EXISTS customer_name TEXT;
+
+ALTER TABLE om_orders
+    ADD COLUMN IF NOT EXISTS po_number TEXT;
 
 UPDATE om_orders o
    SET customer_name = COALESCE(c.customer_name, o.snapshot_data->>'cus_name')

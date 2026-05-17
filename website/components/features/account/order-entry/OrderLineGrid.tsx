@@ -21,6 +21,7 @@ interface OrderLineGridProps {
 function CellInput({
   value,
   decimals = 2,
+  blankZero = true,
   onChange,
   onEnter,
   onTab,
@@ -28,6 +29,7 @@ function CellInput({
 }: {
   value: number;
   decimals?: number;
+  blankZero?: boolean;
   onChange: (n: number) => void;
   onEnter?: () => void;
   onTab?: () => void;
@@ -57,8 +59,8 @@ function CellInput({
         'hover:border-border',
         '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none',
       )}
-      value={value === 0 ? '' : value}
-      placeholder="0"
+      value={blankZero && Number(value) === 0 ? '' : value}
+      placeholder=""
       step={decimals === 0 ? 1 : 0.01}
       min={0}
       onFocus={(e) => e.target.select()}
@@ -82,6 +84,7 @@ function PrepOptionsDropdown({
   selectedOptions: PrepOption[];
   onChange: (next: PrepOption[]) => void;
 }) {
+  const disabled = allowedOptions.length === 0;
   const selectedValues = new Set(selectedOptions.map((option) => option.value));
   const summary = selectedOptions.length > 0
     ? selectedOptions.map((option) => option.label).join(', ')
@@ -104,7 +107,9 @@ function PrepOptionsDropdown({
             'flex h-7 w-36 max-w-36 min-w-36 items-center justify-between gap-1 rounded border border-input bg-background px-2',
             'text-left text-xs text-foreground shadow-sm transition-colors hover:bg-muted/40',
             'focus:outline-none focus:ring-1 focus:ring-primary',
+            disabled && 'cursor-not-allowed bg-muted/40 text-muted-foreground opacity-60 hover:bg-muted/40',
           )}
+          disabled={disabled}
           title={summary}
         >
           <span className="min-w-0 truncate">{summary}</span>
@@ -166,7 +171,7 @@ export function OrderLineGrid({
           <tr className="bg-muted/50 border-b border-border/60">
             <th className="px-2 py-1.5 text-left font-semibold text-muted-foreground whitespace-nowrap w-20">Item No.</th>
             <th className="px-2 py-1.5 text-left font-semibold text-muted-foreground">Item Description</th>
-            <th className="px-2 py-1.5 text-left font-semibold text-muted-foreground w-40 min-w-40 max-w-40">Prep</th>
+            <th className="px-2 py-1.5 text-left font-semibold text-muted-foreground w-40 min-w-40 max-w-40">Prep Options</th>
             <th className="px-2 py-1.5 text-right font-semibold text-muted-foreground w-20">Quantity</th>
             <th className="px-2 py-1.5 text-right font-semibold text-muted-foreground w-20">Price</th>
             <th className="px-2 py-1.5 text-right font-semibold text-muted-foreground w-20">Discnt</th>

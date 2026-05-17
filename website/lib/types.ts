@@ -146,6 +146,7 @@ export type ProductionCode = string;
 export interface OrderHeaderListRow {
   order_id: number;
   order_number: string;
+  po_number?: string | null;
   order_date?: string;
   production_date: string;
   production_code: string;
@@ -205,6 +206,7 @@ export interface OrderEntryLine {
 export interface OrderEntryDraft {
   order_id?: number;
   order_number: string;
+  po_number: string;
   customer_id: number | null;
   customer_name: string;
   department_event: string;
@@ -236,6 +238,7 @@ export interface OrderSavePayloadLine {
 export interface OrderSavePayload {
   customer_id: number | null;
   order_number: string;
+  po_number?: string;
   order_date: string;
   production_date: string;
   production_code: ProductionCode;
@@ -248,6 +251,7 @@ export interface OrderSaveResult {
   success: boolean;
   order_id: number;
   order_number: string | null;
+  po_number?: string | null;
   department_event?: string | null;
   mode?: 'created' | 'updated';
   line_refs?: Array<{

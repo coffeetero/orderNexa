@@ -52,6 +52,7 @@ BEGIN
             SELECT jsonb_build_object(
                 'order_id',         o.order_id,
                 'order_number',     o.order_number,
+                'po_number',        o.po_number,
                 'order_date',       o.order_date,
                 'production_date',  o.production_date,
                 'production_code',  o.production_code,
@@ -77,6 +78,7 @@ BEGIN
             SELECT jsonb_build_object(
                 'order_id',         o.order_id,
                 'order_number',     o.order_number,
+                'po_number',        o.po_number,
                 'order_date',       o.order_date,
                 'production_date',  o.production_date,
                 'production_code',  o.production_code,
@@ -182,6 +184,7 @@ BEGIN
         SELECT jsonb_build_object(
             'order_id',         o.order_id,
             'order_number',     o.order_number,
+            'po_number',        o.po_number,
             'order_date',       o.order_date,
             'production_date',  o.production_date,
             'production_code',  o.production_code,

@@ -41,6 +41,10 @@ function normalizeOrderHeaderRow(raw: Record<string, unknown>): OrderHeaderListR
   return {
     order_id,
     order_number: String(raw.order_number ?? ''),
+    po_number:
+      raw.po_number !== undefined && raw.po_number !== null
+        ? String(raw.po_number)
+        : null,
     production_date: String(raw.production_date ?? ''),
     production_code: String(raw.production_code ?? ''),
     department_event:
@@ -259,6 +263,7 @@ export function OrderEntryForm({
     return {
       order_id: data.order_id as number,
       order_number: (data.order_number as string) ?? '',
+      po_number: (data.po_number as string) ?? '',
       customer_id: (data.customer_id as number) ?? null,
       customer_name: (data.customer_name as string) ?? '',
       department_event: (data.department_event as string) ?? '',
@@ -534,6 +539,7 @@ export function OrderEntryForm({
     setDepartmentEventOptions(localOptions);
     setSelectedDepartmentEventId(null);
     setField('order_number', 'New Order');
+    setField('po_number', '');
     setField('order_ref', 'New Order');
     setField('order_id', undefined);
     setField('lines', []);
@@ -678,6 +684,7 @@ export function OrderEntryForm({
       setSelectedDepartmentEventId(null);
       setIsLoadingDepartmentEvents(false);
       setField('order_number', '');
+      setField('po_number', '');
       setField('order_ref', '');
       setField('order_id', undefined);
       setField('lines', []);
@@ -733,6 +740,7 @@ export function OrderEntryForm({
       setField('department_event', value.toUpperCase());
       setField('order_id', undefined);
       setField('order_number', 'New Order');
+      setField('po_number', '');
       setField('order_ref', 'New Order');
       setShouldFocusItemWhenReady(true);
     },
@@ -746,6 +754,7 @@ export function OrderEntryForm({
         setField('department_event', '');
         setField('order_id', undefined);
         setField('order_number', 'New Order');
+        setField('po_number', '');
         setField('order_ref', 'New Order');
         setField('lines', []);
         setField('total_amount', 0);
@@ -758,6 +767,7 @@ export function OrderEntryForm({
       if (option.is_new || option.order_id === null) {
         setField('order_id', undefined);
         setField('order_number', 'New Order');
+        setField('po_number', '');
         setField('order_ref', 'New Order');
         setField('lines', []);
         setField('total_amount', 0);
@@ -768,6 +778,7 @@ export function OrderEntryForm({
       suppressNextSlotLookupRef.current = true;
       setField('order_id', option.order_id);
       setField('order_number', option.order_number ?? '');
+      setField('po_number', '');
       setField('order_ref', option.order_number ?? '');
       void loadOrderById(option.order_id, {
         preserveSelectedCustomer: true,
@@ -805,6 +816,21 @@ export function OrderEntryForm({
     focusCustomer();
   }, [reset, focusCustomer]);
 
+  const handleRefreshOrder = useCallback(() => {
+    setActiveLineIndex(null);
+    setField('lines', []);
+    setField('total_amount', 0);
+
+    if (draft.order_id) {
+      void loadOrderById(draft.order_id, {
+        preserveSelectedCustomer: true,
+      });
+      return;
+    }
+
+    requestAnimationFrame(() => focusItem());
+  }, [draft.order_id, focusItem, loadOrderById, setField]);
+
   const handleSample = useCallback(() => {
     zeroLinePrices();
   }, [zeroLinePrices]);
@@ -813,6 +839,7 @@ export function OrderEntryForm({
     setOrderPickOpen(false);
     setField('order_id', undefined);
     setField('order_number', 'New Order');
+    setField('po_number', '');
     setField('order_ref', 'New Order');
     setField('department_event', getDefaultDepartmentEvent(draft.customer_id));
     setField('lines', []);
@@ -826,6 +853,7 @@ export function OrderEntryForm({
       suppressNextSlotLookupRef.current = true;
       setField('order_id', row.order_id);
       setField('order_number', row.order_number);
+      setField('po_number', row.po_number ?? '');
       setField('order_ref', row.order_number);
       void loadOrderById(row.order_id, {
         preserveSelectedCustomer: orderPickMode === 'customer-scoped',
@@ -858,6 +886,7 @@ export function OrderEntryForm({
       const payload: OrderSavePayload = {
         customer_id: draft.customer_id,
         order_number: orderNumber,
+        po_number: draft.po_number,
         order_date: draft.order_date,
         production_date: draft.production_date,
         production_code: draft.production_code,
@@ -1050,7 +1079,7 @@ export function OrderEntryForm({
         </div>
 
         {/* ── ROW 2: Item Entry Loop ────────────────────────────────────── */}
-        <div className="shrink-0">
+        <div className="shrink-0 mt-2">
           <ItemEntryRow
             items={items}
             isLoadingItems={isLoadingItems}
@@ -1058,6 +1087,9 @@ export function OrderEntryForm({
             itemInputRef={itemInputRef}
             qtyRef={qtyRef}
             onCommit={handleItemCommit}
+            orderNumber={draft.order_number}
+            poNumber={draft.po_number}
+            onPoNumberChange={(value) => setField('po_number', value)}
             orderTotal={draft.total_amount + draft.delivery_amount}
             entryToolbar={
               <>
@@ -1074,12 +1106,12 @@ export function OrderEntryForm({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-9 gap-1 px-3 text-xs"
-                  onClick={handleClear}
-                  title="Clear form"
+                  className="h-9 w-9 p-0"
+                  onClick={handleRefreshOrder}
+                  title="Refresh"
+                  aria-label="Refresh"
                 >
-                  <RotateCcw className="h-3 w-3" />
-                  Clear
+                  <RotateCcw className="h-4 w-4" />
                 </Button>
               </>
             }

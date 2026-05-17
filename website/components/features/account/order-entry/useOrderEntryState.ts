@@ -48,6 +48,7 @@ function tomorrow(): string {
 function emptyDraft(): OrderEntryDraft {
   return {
     order_number: '',
+    po_number: '',
     order_ref: '',
     customer_id: null,
     customer_name: '',

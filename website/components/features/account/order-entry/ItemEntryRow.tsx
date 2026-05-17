@@ -20,6 +20,11 @@ interface ItemEntryRowProps {
   qtyRef: React.RefObject<HTMLInputElement>;
   /** Called when Enter is pressed in the Qty field with a valid quantity. */
   onCommit: (item: OrderEntryItem, quantity: number) => void;
+  /** Display-only current order number/reference. */
+  orderNumber: string;
+  /** Customer purchase order number for this order. */
+  poNumber: string;
+  onPoNumberChange: (value: string) => void;
   /** Header total (lines + delivery). */
   orderTotal: number;
   /** Placed to the right of Total Order (e.g. Sample, Clear). */
@@ -33,6 +38,9 @@ export function ItemEntryRow({
   itemInputRef,
   qtyRef,
   onCommit,
+  orderNumber,
+  poNumber,
+  onPoNumberChange,
   orderTotal,
   entryToolbar,
 }: ItemEntryRowProps) {
@@ -85,7 +93,7 @@ export function ItemEntryRow({
   return (
     <div className="flex flex-wrap items-start gap-x-2 gap-y-1.5 px-3 py-2 border-b border-border/60 bg-muted/20">
       {/* Item Search */}
-      <div className="flex min-h-0 w-[346px] min-w-[346px] max-w-[346px] shrink-0 flex-col gap-1">
+      <div className="flex min-h-0 flex-[1.2_1_346px] min-w-[260px] flex-col gap-1">
         <Label htmlFor="item-search" className={CONTROL_LABEL}>
           Item
         </Label>
@@ -148,6 +156,30 @@ export function ItemEntryRow({
         />
       </div>
 
+      {/* PO Number */}
+      <div className="flex w-36 shrink-0 flex-col gap-1">
+        <Label
+          htmlFor="po-number"
+          className={cn(CONTROL_LABEL, 'w-full justify-center text-center !items-center')}
+        >
+          PO Number
+        </Label>
+        <input
+          id="po-number"
+          type="text"
+          className={[
+            'h-9 w-full rounded-md border border-input bg-background px-2 text-sm',
+            'text-foreground leading-none',
+            'focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary',
+            disabled ? 'opacity-50 cursor-not-allowed' : '',
+          ].join(' ')}
+          value={poNumber}
+          disabled={disabled}
+          onChange={(e) => onPoNumberChange(e.target.value)}
+          aria-label="PO Number"
+        />
+      </div>
+
       {/* Total Order */}
       <div className="flex w-24 shrink-0 flex-col gap-1">
         <span
@@ -171,6 +203,26 @@ export function ItemEntryRow({
         >
           ${orderTotal.toFixed(2)}
         </span>
+      </div>
+
+      {/* Order Number */}
+      <div className="flex w-[173px] min-w-0 shrink-0 flex-col gap-1">
+        <Label
+          htmlFor="order-number-display"
+          className={cn(CONTROL_LABEL, 'w-full justify-center text-center !items-center')}
+        >
+          Order Number
+        </Label>
+        <div
+          id="order-number-display"
+          className={cn(
+            'flex h-9 w-full items-center justify-center rounded-md border border-input bg-background px-3 text-center text-sm text-foreground',
+            !orderNumber && 'text-muted-foreground',
+          )}
+          aria-label="Order number"
+        >
+          <span className="truncate">{orderNumber || 'New Order'}</span>
+        </div>
       </div>
 
       {entryToolbar != null && (

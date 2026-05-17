@@ -40,7 +40,7 @@ export default async function EnterOrdersPage() {
   }
 
   return (
-    <div className="h-full overflow-hidden -mx-[10px] -my-[1px]">
+    <div className="h-full overflow-hidden">
       <OrderEntryForm
         mode="new"
         serverTenantId={tenantId ?? undefined}
