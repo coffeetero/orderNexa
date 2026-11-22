@@ -33,11 +33,11 @@ describe('tenantNav matches the real routes', () => {
     for (const href of [
       '/dashboard', '/orders', '/orders/standing', '/orders/standing-mgmt', '/manage-orders',
       '/customers', '/inventory/item-profile', '/production/analysis', '/financials/ar',
-      '/inventory/nutrition', '/orders/callup', '/orders/import', '/orders/returns', '/admin/appearance', '/admin/production', '/production/process',
+      '/inventory/nutrition', '/orders/callup', '/orders/import', '/orders/returns', '/admin/appearance', '/admin/production', '/production/process', '/production/report', '/production/labels', '/production/packaging', '/production/routes',
     ]) {
       expect(hrefs.has(href), href).toBe(true);
     }
-    expect(items.length).toBe(1 + 7 + 6 + 4 + 10 + 9 + 3); // Dashboard + old sidebar sections + Admin > Appearance, Production Settings, Production > Process Run, Process Run
+    expect(items.length).toBe(1 + 7 + 6 + 4 + 10 + 9 + 4); // Dashboard + old sidebar sections + Admin > Appearance, Production Settings, Production > Process Run, Process Run
   });
 });
 
@@ -69,7 +69,7 @@ describe('findActiveHref', () => {
     expect(normalizePath('/tenant/orders/')).toBe('/orders');
   });
   it('never marks a "soon" item active, and returns null for unknown paths', () => {
-    expect(findActiveHref('/production/report', tenantNav)).toBeNull();
+    expect(findActiveHref('/production/mixing', tenantNav)).toBeNull();
     expect(findActiveHref('/profile', tenantNav)).toBeNull();
   });
   it('does not confuse /orders with a sibling like /orders-archive', () => {

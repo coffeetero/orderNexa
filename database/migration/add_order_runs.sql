@@ -734,58 +734,6 @@ AS $function$
        AND (NOT p_upcoming_only OR r.production_date >= ((now() AT TIME ZONE t.time_zone)::date - 1));
 $function$;
 
--- ============================================================
--- om_production_runs_get  –  runs in a production-date range with their order counts (newest first).
--- cutoff_local is the cutoff in the tenant's time zone ('YYYY-MM-DDTHH:MI') for editing.
--- ============================================================
-CREATE OR REPLACE FUNCTION bps.om_production_runs_get(p_tenant_id bigint, p_from date, p_to date)
-RETURNS jsonb
-LANGUAGE sql
-STABLE
-SECURITY INVOKER
-SET search_path TO 'bps', 'public'
-AS $function$
-    SELECT COALESCE(jsonb_agg(jsonb_build_object(
-               'production_run_id', r.production_run_id,
-               'production_date',   r.production_date,
-               'production_code',   r.production_code,
-               'delivery_date',     r.delivery_date,
-               'cutoff_at',         r.cutoff_at,
-               'cutoff_local',      to_char(r.cutoff_at AT TIME ZONE t.time_zone, 'YYYY-MM-DD"T"HH24:MI'),
-               'time_zone',         t.time_zone,
-               'run_status',        r.run_status,
-               'order_count',       (SELECT COUNT(*) FROM om_orders o WHERE o.production_run_id = r.production_run_id)
-           ) ORDER BY r.production_date DESC, r.production_code), '[]'::jsonb)
-      FROM om_production_runs r
-      JOIN fnd_tenants t ON t.tenant_id = r.tenant_id
-     WHERE r.tenant_id = p_tenant_id
-       AND r.production_date BETWEEN COALESCE(p_from, DATE '0001-01-01') AND COALESCE(p_to, DATE '9999-12-31');
-$function$;
-
--- ============================================================
--- om_production_runs_get  –  runs in a production-date range with their order counts (newest first)
--- ============================================================
-CREATE OR REPLACE FUNCTION bps.om_production_runs_get(p_tenant_id bigint, p_from date, p_to date)
-RETURNS jsonb
-LANGUAGE sql
-STABLE
-SECURITY INVOKER
-SET search_path TO 'bps', 'public'
-AS $function$
-    SELECT COALESCE(jsonb_agg(jsonb_build_object(
-               'production_run_id', r.production_run_id,
-               'production_date',   r.production_date,
-               'production_code',   r.production_code,
-               'delivery_date',     r.delivery_date,
-               'cutoff_at',         r.cutoff_at,
-               'run_status',        r.run_status,
-               'order_count',       (SELECT COUNT(*) FROM om_orders o WHERE o.production_run_id = r.production_run_id)
-           ) ORDER BY r.production_date DESC, r.production_code), '[]'::jsonb)
-      FROM om_production_runs r
-     WHERE r.tenant_id = p_tenant_id
-       AND r.production_date BETWEEN COALESCE(p_from, DATE '0001-01-01') AND COALESCE(p_to, DATE '9999-12-31');
-$function$;
-
 -- ===== functions/om_production_run_cutoff_save.sql =====
 -- ============================================================
 -- om_production_run_cutoff_save  –  staff change one run's cutoff (holidays, special runs). OPEN runs only.
@@ -806,29 +754,6 @@ BEGIN
     UPDATE om_production_runs r
        SET cutoff_at = p_cutoff_local AT TIME ZONE (SELECT t.time_zone FROM fnd_tenants t WHERE t.tenant_id = p_tenant_id)
      WHERE r.tenant_id = p_tenant_id AND r.production_run_id = p_production_run_id AND r.run_status = 'OPEN';
-    IF NOT FOUND THEN
-        RAISE EXCEPTION 'Run % not found, not open, or you are not allowed to change it', p_production_run_id;
-    END IF;
-    RETURN jsonb_build_object('success', TRUE, 'production_run_id', p_production_run_id);
-END;
-$function$;
-
--- ============================================================
--- om_production_run_cutoff_save  –  staff change one run's cutoff (holidays, special runs). OPEN runs only.
--- ============================================================
-CREATE OR REPLACE FUNCTION bps.om_production_run_cutoff_save(p_tenant_id bigint, p_production_run_id bigint, p_cutoff_at timestamptz)
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY INVOKER
-SET search_path TO 'bps', 'public'
-AS $function$
-BEGIN
-    IF p_tenant_id IS NULL OR p_production_run_id IS NULL OR p_cutoff_at IS NULL THEN
-        RAISE EXCEPTION 'p_tenant_id, p_production_run_id and p_cutoff_at are required';
-    END IF;
-    UPDATE om_production_runs
-       SET cutoff_at = p_cutoff_at
-     WHERE tenant_id = p_tenant_id AND production_run_id = p_production_run_id AND run_status = 'OPEN';
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Run % not found, not open, or you are not allowed to change it', p_production_run_id;
     END IF;

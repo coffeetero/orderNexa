@@ -101,6 +101,14 @@ BEGIN
          FROM om_shipments WHERE production_run_id = v_run));
   INSERT INTO _t VALUES ('shipment lines mirror order lines (6 lines)', (SELECT COUNT(*) FROM om_shipment_lines l JOIN om_shipments s USING (shipment_id) WHERE s.production_run_id = v_run) = 6);
 
+  -- a zero-quantity order line is neither shipped nor billed
+  PERFORM om_orders_save(200000000002, NULL, (SELECT v FROM _id WHERE k='o2'), jsonb_build_object('customer_id', d1, 'production_date', '2031-05-10', 'production_code', 'MORNING',
+        'lines', jsonb_build_array(jsonb_build_object('item_id', 200000001619, 'item_description','Bun','quantity',1,'unit_price',10),
+                                   jsonb_build_object('item_id', 200000001619, 'item_description','Zero','quantity',0,'unit_price',7))));
+  PERFORM om_production_runs_process(200000000002, DATE '2031-05-10', DATE '2031-05-10', NULL);
+  INSERT INTO _t VALUES ('zero-quantity lines are not billed or shipped',
+      NOT EXISTS (SELECT 1 FROM ar_transaction_lines WHERE item_description = 'Zero') AND NOT EXISTS (SELECT 1 FROM om_shipment_lines sl JOIN om_order_lines ol USING (order_line_id) WHERE ol.item_description = 'Zero'));
+
   -- reprocess is idempotent: same invoices, same shipment numbers
   SELECT string_agg(shipment_number, ',' ORDER BY shipment_number) INTO ship_nums FROM om_shipments WHERE production_run_id = v_run;
   ia := inv_a.ar_transaction_id;

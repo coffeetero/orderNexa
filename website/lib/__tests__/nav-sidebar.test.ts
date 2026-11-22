@@ -49,7 +49,7 @@ describe('selectQuickAccess', () => {
     expect(selectQuickAccess(rows, allowed, NOW)).toEqual(['/orders', '/customers', '/inventory/item-profile']);
   });
   it('never returns unbuilt or unknown actions, even if pinned', () => {
-    const rows = [row('/production/report', 50, 1, 1), row('/nope', 50, 1)];
+    const rows = [row('/production/mixing', 50, 1, 1), row('/nope', 50, 1)];
     expect(selectQuickAccess(rows, allowed, NOW)).toEqual(['/orders', '/customers', '/inventory/item-profile']);
   });
   it('returns at most 3 with no duplicates', () => {
@@ -68,7 +68,7 @@ describe('normalizePins', () => {
   it('rejects too many, duplicates, unbuilt, and non-arrays', () => {
     expect(normalizePins(['/orders', '/customers', '/manage-orders', '/dashboard'], allowed)).toBeNull();
     expect(normalizePins(['/orders', '/orders'], allowed)).toBeNull();
-    expect(normalizePins(['/production/report'], allowed)).toBeNull();
+    expect(normalizePins(['/production/mixing'], allowed)).toBeNull();
     expect(normalizePins('/orders', allowed)).toBeNull();
     expect(normalizePins([42], allowed)).toBeNull();
   });

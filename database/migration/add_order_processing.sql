@@ -507,7 +507,7 @@ $function$;
 --   2. Shipments: one PLANNED shipment per ship-to customer (the order's customer) and delivery method; one shipment
 --      line per order line (quantity > 0). Shipment numbers come from the tenant sequence 'shipment_number'.
 --   3. Invoices: one per invoice owner (om_customer_invoice_owner) per run, DRAFT until the Packaging print numbers it.
---      Lines: each order line (ITEM, net of discount) and each order's delivery charge (DELIVERY), ordered by
+--      Lines: each order line with a quantity above zero (ITEM, net of discount) and each order's delivery charge (DELIVERY), ordered by
 --      department/event, order number, line. Invoices whose orders are gone are deleted (DRAFT) or CANCELLED (numbered).
 --   4. Invoice amounts = sum of lines.
 -- Returns { production_run_id, orders, shipments, invoices }.
@@ -619,7 +619,7 @@ BEGIN
             ON inv.tenant_id = o.tenant_id AND inv.production_run_id = o.production_run_id
            AND inv.transaction_type = 'INV' AND inv.status <> 'CANCELLED'
            AND inv.customer_id = bps.om_customer_invoice_owner(o.tenant_id, o.customer_id)
-         WHERE o.tenant_id = p_tenant_id AND o.production_run_id = p_production_run_id
+         WHERE o.tenant_id = p_tenant_id AND o.production_run_id = p_production_run_id AND ol.quantity > 0
         UNION ALL
         SELECT inv.ar_transaction_id, o.order_id, o.order_number, o.department_event, o.customer_id, o.customer_name, o.po_number,
                NULL::bigint, 2, 'DELIVERY', NULL::bigint, 'Delivery', 1, o.delivery_charge, o.delivery_charge, NULL::bigint
