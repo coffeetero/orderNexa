@@ -33,6 +33,8 @@ DROP TABLE IF EXISTS fnd_tenant_options CASCADE;
 DROP TABLE IF EXISTS fnd_tenant_sequences CASCADE;
 
 -- --- App users & people (FK to tenants / customers) ---
+DROP TABLE IF EXISTS fnd_user_menu_actions CASCADE;
+DROP TABLE IF EXISTS fnd_user_recent_records CASCADE;
 DROP TABLE IF EXISTS fnd_user_customers CASCADE;
 DROP TABLE IF EXISTS fnd_user_tenants CASCADE;
 DROP TABLE IF EXISTS fnd_contact_points CASCADE;

@@ -54,6 +54,8 @@ DDL_SCRIPTS: list[str] = [
     "ar_payments.sql",
     "ar_payment_applications.sql",
     "fnd_item_bom.sql",
+    "fnd_user_menu_actions.sql",
+    "fnd_user_recent_records.sql",
     "grants.sql",
 ]
 
