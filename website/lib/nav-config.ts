@@ -5,7 +5,14 @@
  * clickable (instead of linking to a bare 404). When you build a page, remove its `soon` flag —
  * lib/__tests__/nav-config.test.ts fails if a flag is stale in either direction.
  */
-export type NavItem = { label: string; href: string; soon?: boolean };
+export type UserType = 'TENANCY_USER' | 'CUSTOMER_USER';
+export type NavItem = {
+  label: string;
+  href: string;
+  soon?: boolean;
+  /** Restrict to these user types. Omit = every staff user. Hook for real permissions later. */
+  requires?: UserType[];
+};
 export type NavGroup = { heading?: string; items: NavItem[] };
 export type NavMenu = {
   label: string;
@@ -228,4 +235,27 @@ export function findActiveMenu(pathname: string, menus: NavMenu[]): NavMenu | nu
   const active = findActiveHref(pathname, menus);
   if (!active) return null;
   return menus.find((m) => menuItems(m).some((i) => i.href === active)) ?? null;
+}
+
+/** Top-level menu label + item for every built (non-"soon") entry the user may open. */
+export type BuiltAction = { href: string; label: string; module: string };
+
+export function isAuthorized(item: NavItem, userType: UserType | null | undefined): boolean {
+  return !item.requires || (!!userType && item.requires.includes(userType));
+}
+
+export function builtActions(menus: NavMenu[], userType: UserType | null | undefined = 'TENANCY_USER'): BuiltAction[] {
+  const out: BuiltAction[] = [];
+  for (const menu of menus) {
+    for (const item of menuItems(menu)) {
+      if (item.soon || !isAuthorized(item, userType)) continue;
+      out.push({ href: item.href, label: item.label, module: menu.label });
+    }
+  }
+  return out;
+}
+
+/** First built entry of a menu (where a "Module" breadcrumb leads). */
+export function firstBuiltHref(menu: NavMenu): string | null {
+  return menuItems(menu).find((i) => !i.soon)?.href ?? null;
 }
