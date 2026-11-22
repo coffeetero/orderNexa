@@ -1,6 +1,7 @@
 import { headers } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 import { createClient, getSessionUser } from '@/lib/supabase/server';
+import { getUserAccess } from '@/lib/supabase/access';
 import { CustomerLayoutShell } from '@/components/layout/CustomerLayoutShell';
 import { parseTenantSubdomain } from '@/lib/tenant-subdomain';
 
@@ -37,22 +38,18 @@ export default async function AccountSlugLayout({
   }
 
   const supabase = createClient();
-  const { data: profile } = await supabase
-    .from('fnd_users')
-    .select('user_type, account_slug')
-    .eq('auth_user_id', user.id)
-    .maybeSingle();
+  const access = await getUserAccess(user.id);
 
-  if (profile?.user_type === 'TENANCY_USER') {
+  if (access.userType === 'TENANCY_USER') {
     redirect('/dashboard');
   }
 
-  if (profile?.user_type === 'CUSTOMER_USER') {
-    if (!profile.account_slug) {
+  if (access.userType === 'CUSTOMER_USER') {
+    if (!access.accountSlug) {
       notFound();
     }
-    if (profile.account_slug !== account_slug) {
-      redirect(`/${profile.account_slug}`);
+    if (access.accountSlug !== account_slug) {
+      redirect(`/${access.accountSlug}`);
     }
   }
 

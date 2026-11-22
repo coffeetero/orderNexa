@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { TenantLayoutShell } from '@/components/layout/TenantLayoutShell';
-import { createClient, getSessionUser } from '@/lib/supabase/server';
+import { getSessionUser } from '@/lib/supabase/server';
+import { getUserAccess } from '@/lib/supabase/access';
 
 export default async function TenantLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
@@ -9,16 +10,19 @@ export default async function TenantLayout({ children }: { children: React.React
     redirect('/login');
   }
 
-  const supabase = createClient();
-  const { data: profile } = await supabase
-    .from('fnd_users')
-    .select('user_type, account_slug')
-    .eq('auth_user_id', user.id)
-    .maybeSingle();
+  const access = await getUserAccess(user.id);
 
-  if (profile?.user_type === 'CUSTOMER_USER' && profile.account_slug) {
-    redirect(`/${profile.account_slug}`);
+  if (access.userType === 'CUSTOMER_USER' && access.accountSlug) {
+    redirect(`/${access.accountSlug}`);
   }
 
-  return <TenantLayoutShell sidebarHomeHref="/dashboard">{children}</TenantLayoutShell>;
+  return (
+    <TenantLayoutShell
+      sidebarHomeHref="/dashboard"
+      userName={access.userName}
+      userRole={access.userType === 'TENANCY_USER' ? 'Staff' : null}
+    >
+      {children}
+    </TenantLayoutShell>
+  );
 }

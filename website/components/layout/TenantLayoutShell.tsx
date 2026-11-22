@@ -40,12 +40,17 @@ type TenantLayoutShellProps = {
   sidebarHomeHref?: string;
   /** Optional page-shell override. Default centers content at the standard app width. */
   contentClassName?: string;
+  /** Signed-in user shown in the header (from fnd_users.user_name). */
+  userName?: string | null;
+  userRole?: string | null;
 };
 
 export function TenantLayoutShell({
   children,
   sidebarHomeHref = '/dashboard',
   contentClassName,
+  userName,
+  userRole,
 }: TenantLayoutShellProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -101,8 +106,8 @@ export function TenantLayoutShell({
           title="Bakery Dashboard"
           breadcrumb={breadcrumb}
           onMobileMenuOpen={() => setMobileOpen(true)}
-          userName="Jacques Moreaux"
-          userRole="Bakery Admin"
+          userName={userName ?? undefined}
+          userRole={userRole ?? undefined}
         />
 
         <main className="flex-1 overflow-y-auto bg-background px-[10px] pb-[1px] scrollbar-thin">

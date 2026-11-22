@@ -32,8 +32,8 @@ export function DashboardHeader({
   onMobileMenuOpen,
   onSidebarToggle,
   isSidebarCollapsed = false,
-  userName = 'Jacques Moreaux',
-  userRole = 'Admin',
+  userName = 'Signed-in user',
+  userRole = '',
 }: DashboardHeaderProps) {
   const router = useRouter();
   const [session, setSession] = useState<any>(null);
