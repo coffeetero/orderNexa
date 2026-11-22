@@ -63,6 +63,7 @@ export const tenantNav: NavMenu[] = [
         heading: 'Floor',
         items: [
           { label: 'Process Run', href: '/production/process' },
+          { label: 'Confirm Deliveries', href: '/production/deliveries' },
           { label: "Baker's Report", href: '/production/report' },
           { label: 'Mixing Sheets', href: '/production/mixing', soon: true },
           { label: 'Packing Labels', href: '/production/labels' },
@@ -147,7 +148,7 @@ export const tenantNav: NavMenu[] = [
       {
         heading: 'Adjustments',
         items: [
-          { label: 'Enter Credits', href: '/financials/credits', soon: true },
+          { label: 'Enter Credits', href: '/financials/credits' },
           { label: 'Enter Returns', href: '/financials/returns', soon: true },
         ],
       },

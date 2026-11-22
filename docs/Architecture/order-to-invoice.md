@@ -1,6 +1,6 @@
 # Order to production, packaging, labels and delivery (spec, draft for approval)
 
-Status: **Phase 1 built locally (branch bps-order-runs); later phases are proposals.** Scope: order entry through delivery confirmation and AR recognition.
+Status: **Phases 1-4 built locally** (Phase 1 on branch bps-order-runs; Phases 2-4 on bps-order-to-invoice). Nothing is applied to the cloud. Scope: order entry through delivery confirmation and AR recognition.
 Out of scope: standing orders, inventory (usage, spoilage, consumables), payments.
 
 ## Flow
@@ -106,3 +106,30 @@ Rule: every computation (dates, cutoffs, totals, validation) lives in `bps.*` da
 - COD-style tenants: does `ar_recognition = INVOICE` cover them, or is "at order entry" a third option?
 - Where tenant-level options live (`fnd_tenants` column or a settings table).
 - Print technology: HTML print pages through the browser (assumed).
+
+## As built (differences and decisions recorded during the build)
+
+- **Customer types:** an ACCOUNT or DEPARTMENT order is stored under that customer's own `customer_id` (own order number).
+  Only a SITE order is stored under its parent customer, with the site name as the default `department_event` (overridable).
+  `department_event` now defaults to the selected customer's own name (the old `ORDER` default is gone).
+  Invoice owner = nearest ancestor-or-self that is an ACCOUNT or a DEPARTMENT with `is_invoice_required`.
+  The statement owner is the nearest ACCOUNT; `ar_customer_balance_get` rolls up everything beneath a paying customer
+  that is not itself an ACCOUNT.
+- **Statuses:** ar_transactions uses the existing OPEN/PARTIAL/CLOSED/CANCELLED plus DRAFT (no number yet); CANCELLED is void.
+  A DRAFT invoice is numbered (`invoice_number` sequence) and becomes OPEN at the first Packaging print.
+- **Process run:** `om_production_runs_process` (Production > Process Run). Re-runnable until a delivery has shipped.
+  Zero-quantity order lines are neither shipped nor billed.
+- **Reports** (PDF, `pdf-lib`): Baker's Report, Packing Labels (4"x2"), Packaging List (invoice, one page set per copy in
+  `fnd_customers.invoice_copy_count`), Route Delivery Report (own-fleet only). Run pickers use a from/to production date and
+  code; Labels and Packaging list customers with unchecked boxes and a select-all header. `is_cost_on_invoice` is not used:
+  every customer's invoice shows prices. Printing stamps `*_printed_at` on the runs.
+- **Delivery confirmation** (Production > Confirm Deliveries): shipped quantities per line (default planned, never above
+  planned), carrier/tracking/route/cost; carrier methods need tracking. Rolls up to `om_order_lines.fulfilled_quantity`.
+- **AR recognition:** a line counts toward the balance at shipped quantity x unit price once its shipment is SHIPPED or
+  DELIVERED; the delivery-charge line counts once any item of that order shipped. The invoice document itself is not
+  changed after printing.
+- **Credits** (Financials > Enter Credits): lookup by invoice or order number; a numbered CM document (`credit_memo_number`)
+  with negative ADJUSTMENT lines, capped at the delivered quantity less earlier credits.
+- **Numbering settings:** order, invoice, shipment and credit memo sequences are editable in Admin > Production Settings.
+- **Not done:** customer-portal ordering UI, standing-order rework, COD recognition at order entry, emailing or texting
+  invoices, dot-matrix output formats, inventory/spoilage, statements, and the cloud migrations.
