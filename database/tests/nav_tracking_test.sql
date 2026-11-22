@@ -35,7 +35,7 @@ END $$;
 SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claims', json_build_object('role','authenticated','app_metadata',
   json_build_object('app_user_id', current_setting('nav.user_a')::bigint,
-                    'allowed_tenant_ids', json_build_array(current_setting('nav.tenant_a')::bigint)))::text, true);
+                    'tenant_id', current_setting('nav.tenant_a')::bigint, 'allowed_tenant_ids', json_build_array(current_setting('nav.tenant_a')::bigint)))::text, true);
 
 DO $$
 DECLARE ta bigint := current_setting('nav.tenant_a')::bigint; tx bigint := current_setting('nav.tenant_x')::bigint;
@@ -107,7 +107,7 @@ END $$;
 -- ---------- act as user B (a different user, same tenant) ----------
 SELECT set_config('request.jwt.claims', json_build_object('role','authenticated','app_metadata',
   json_build_object('app_user_id', current_setting('nav.user_b')::bigint,
-                    'allowed_tenant_ids', json_build_array(current_setting('nav.tenant_a')::bigint)))::text, true);
+                    'tenant_id', current_setting('nav.tenant_a')::bigint, 'allowed_tenant_ids', json_build_array(current_setting('nav.tenant_a')::bigint)))::text, true);
 DO $$
 DECLARE ta bigint := current_setting('nav.tenant_a')::bigint; n int; r jsonb; denied boolean;
 BEGIN

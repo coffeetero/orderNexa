@@ -44,8 +44,11 @@ BEGIN
   IF v_tenant IS NOT NULL THEN SELECT tenant_slug INTO v_slug FROM fnd_tenants WHERE tenant_id = v_tenant; END IF;
 
   claims := jsonb_set(claims, '{app_metadata,app_user_id}', to_jsonb(v_app_user_id), true);
-  claims := jsonb_set(claims, '{app_metadata,allowed_tenant_ids}', to_jsonb(v_allowed), true);
-  claims := jsonb_set(claims, '{app_metadata,restricted_tenant_ids}', to_jsonb(v_restricted), true);
+  -- The lists carry ONLY the active tenancy (empty until one is chosen), so every older check that tests a tenant id
+  -- against allowed_tenant_ids / restricted_tenant_ids is confined to the one active tenancy. The picker uses
+  -- fnd_user_tenancies_get(), not these claims.
+  claims := jsonb_set(claims, '{app_metadata,allowed_tenant_ids}', CASE WHEN v_tenant IS NULL THEN '[]'::jsonb ELSE to_jsonb(ARRAY[v_tenant]) END, true);
+  claims := jsonb_set(claims, '{app_metadata,restricted_tenant_ids}', CASE WHEN v_tenant IS NOT NULL AND v_tenant = ANY (v_restricted) THEN to_jsonb(ARRAY[v_tenant]) ELSE '[]'::jsonb END, true);
   claims := jsonb_set(claims, '{app_metadata,allowed_customer_ids}', to_jsonb(v_customers), true);
   claims := jsonb_set(claims, '{app_metadata}', (claims->'app_metadata') - 'tenant_id' - 'tenant_slug', true);
   IF v_tenant IS NOT NULL THEN

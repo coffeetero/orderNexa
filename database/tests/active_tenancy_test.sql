@@ -20,12 +20,12 @@ BEGIN
   ev := bps.bps_access_token_hook(jsonb_build_object('user_id', aOne, 'claims', jsonb_build_object('session_id', s1, 'app_metadata', '{}'::jsonb)));
   c := ev->'claims'->'app_metadata';
   INSERT INTO _t VALUES ('single tenancy: tenant_id claim set automatically', (c->>'tenant_id')::bigint = 200000000002 AND c->>'tenant_slug' = 'alpine-bakery');
-  INSERT INTO _t VALUES ('claim keeps app_user_id', (c->>'app_user_id')::bigint = uOne);
+  INSERT INTO _t VALUES ('claim keeps app_user_id and the tenant lists carry only the active tenancy', (c->>'app_user_id')::bigint = uOne AND c->'allowed_tenant_ids' = to_jsonb(ARRAY[200000000002::bigint]));
 
   -- two tenancies, nothing chosen: no tenant_id claim
   ev := bps.bps_access_token_hook(jsonb_build_object('user_id', aTwo, 'claims', jsonb_build_object('session_id', s2, 'app_metadata', '{"tenant_id": 999}'::jsonb)));
   c := ev->'claims'->'app_metadata';
-  INSERT INTO _t VALUES ('two tenancies, none chosen: no tenant_id (and a stale one is stripped)', NOT (c ? 'tenant_id') AND jsonb_array_length(c->'allowed_tenant_ids') = 2);
+  INSERT INTO _t VALUES ('two tenancies, none chosen: no tenant_id (and a stale one is stripped)', NOT (c ? 'tenant_id') AND jsonb_array_length(c->'allowed_tenant_ids') = 0);
 
   -- choose via the function as the signed-in user
   PERFORM set_config('request.jwt.claims', jsonb_build_object('role','authenticated','session_id', s2, 'app_metadata', jsonb_build_object('app_user_id', uTwo))::text, true);
@@ -37,7 +37,7 @@ BEGIN
   PERFORM fnd_user_select_tenant(t2, 'zz-login');
   RESET ROLE;
   ev := bps.bps_access_token_hook(jsonb_build_object('user_id', aTwo, 'claims', jsonb_build_object('session_id', s2, 'app_metadata', '{}'::jsonb)));
-  INSERT INTO _t VALUES ('after choosing, the claim follows the session', (ev->'claims'->'app_metadata'->>'tenant_id')::bigint = t2);
+  INSERT INTO _t VALUES ('after choosing, the claim follows the session and the lists narrow to it', (ev->'claims'->'app_metadata'->>'tenant_id')::bigint = t2 AND ev->'claims'->'app_metadata'->'allowed_tenant_ids' = to_jsonb(ARRAY[t2]));
   ev := bps.bps_access_token_hook(jsonb_build_object('user_id', aTwo, 'claims', jsonb_build_object('session_id', gen_random_uuid(), 'app_metadata', '{}'::jsonb)));
   INSERT INTO _t VALUES ('another session of the same user is NOT affected (multi-tab / multi-browser safe)', NOT (ev->'claims'->'app_metadata' ? 'tenant_id'));
 

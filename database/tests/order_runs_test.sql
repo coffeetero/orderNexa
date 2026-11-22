@@ -10,6 +10,19 @@ SET search_path = bps, public;
 CREATE TEMP TABLE _t (name text, ok boolean);
 GRANT ALL ON _t TO PUBLIC;
 
+-- A customer-side user attached to account 200000000040 (Customer Administrator role), used for the customer-restricted claims below.
+DO $$
+DECLARE u bigint;
+BEGIN
+  INSERT INTO fnd_users (tenant_id, auth_user_id, user_name, user_type) VALUES (200000000002, gen_random_uuid(), 'zz test customer user', 'CUSTOMER_USER') RETURNING user_id INTO u;
+  INSERT INTO fnd_user_tenants (tenant_id, user_id) VALUES (200000000002, u);
+  INSERT INTO fnd_user_customers (tenant_id, user_id, customer_id) VALUES (200000000002, u, 200000000040);
+  INSERT INTO fnd_user_roles (tenant_id, user_id, role_id)
+    SELECT 200000000002, u, role_id FROM fnd_roles WHERE tenant_id = 200000000002 AND role_name = 'Customer Administrator' AND owner_customer_id IS NULL;
+  PERFORM set_config('t.cust_user', u::text, false);
+END $$;
+
+
 -- ── Part A: pure functions as a trusted connection (no JWT claims) ───────────
 DO $$
 DECLARE v_c timestamptz; v_id1 bigint; v_id2 bigint; v_run om_production_runs%ROWTYPE; v_raised boolean;
@@ -46,7 +59,7 @@ END $$;
 -- ── Part B: staff caller (not restricted) ────────────────────────────────────
 SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claims', json_build_object('role','authenticated','app_metadata',
-  json_build_object('allowed_tenant_ids', json_build_array(200000000002), 'restricted_tenant_ids', json_build_array()))::text, true);
+  json_build_object('tenant_id', 200000000002, 'allowed_tenant_ids', json_build_array(200000000002), 'app_user_id', 200000174045))::text, true);
 
 DO $$
 DECLARE r jsonb; v_id bigint; v_raised boolean; g jsonb;
@@ -78,8 +91,7 @@ END $$;
 
 -- ── Part C: restricted (customer) caller ─────────────────────────────────────
 SELECT set_config('request.jwt.claims', json_build_object('role','authenticated','app_metadata',
-  json_build_object('allowed_tenant_ids', json_build_array(200000000002), 'restricted_tenant_ids', json_build_array(200000000002),
-                    'allowed_customer_ids', json_build_array(200000000040, 200000000042)))::text, true);
+  json_build_object('tenant_id', 200000000002, 'allowed_tenant_ids', json_build_array(200000000002), 'app_user_id', current_setting('t.cust_user')::bigint))::text, true);
 
 DO $$
 DECLARE r jsonb; v_raised boolean; n int; v_order bigint := current_setting('t.order_id')::bigint; v_info jsonb;
@@ -143,7 +155,7 @@ END $$;
 
 -- staff are never blocked
 SELECT set_config('request.jwt.claims', json_build_object('role','authenticated','app_metadata',
-  json_build_object('allowed_tenant_ids', json_build_array(200000000002), 'restricted_tenant_ids', json_build_array()))::text, true);
+  json_build_object('tenant_id', 200000000002, 'allowed_tenant_ids', json_build_array(200000000002), 'app_user_id', 200000174045))::text, true);
 DO $$
 DECLARE v_raised boolean; v_order bigint := current_setting('t.order_id')::bigint;
 BEGIN
@@ -155,8 +167,7 @@ END $$;
 
 -- ── Regression: claims carry allowed_tenant_ids only (no tenant_id); tenant time zone must still resolve ──
 SELECT set_config('request.jwt.claims', json_build_object('role','authenticated','app_metadata',
-  json_build_object('allowed_tenant_ids', json_build_array(200000000002), 'restricted_tenant_ids', json_build_array(200000000002),
-                    'allowed_customer_ids', json_build_array(200000000040)))::text, true);
+  json_build_object('tenant_id', 200000000002, 'allowed_tenant_ids', json_build_array(200000000002), 'app_user_id', current_setting('t.cust_user')::bigint))::text, true);
 DO $$
 DECLARE v_info jsonb; v_raised boolean;
 BEGIN
