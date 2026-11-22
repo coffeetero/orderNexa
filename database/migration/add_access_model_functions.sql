@@ -185,7 +185,7 @@ CREATE TRIGGER trg_fnd_customers_group_upd AFTER UPDATE OF customer_parent_id ON
 CREATE OR REPLACE FUNCTION bps.fnd_groups_guard() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   IF TG_OP = 'DELETE' THEN
-    IF OLD.is_all_customers THEN RAISE EXCEPTION 'The All Customers group cannot be deleted'; END IF;
+    IF OLD.is_all_customers AND EXISTS (SELECT 1 FROM bps.fnd_tenants WHERE tenant_id = OLD.tenant_id) THEN RAISE EXCEPTION 'The All Customers group cannot be deleted'; END IF;
     RETURN OLD;
   END IF;
   IF NEW.is_all_customers IS DISTINCT FROM OLD.is_all_customers OR NEW.tenant_id IS DISTINCT FROM OLD.tenant_id THEN
@@ -198,7 +198,7 @@ CREATE TRIGGER trg_fnd_groups_guard BEFORE UPDATE OR DELETE ON bps.fnd_customer_
 CREATE OR REPLACE FUNCTION bps.fnd_roles_guard() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   IF TG_OP = 'DELETE' THEN
-    IF OLD.is_system THEN RAISE EXCEPTION 'System roles cannot be deleted'; END IF;
+    IF OLD.is_system AND EXISTS (SELECT 1 FROM bps.fnd_tenants WHERE tenant_id = OLD.tenant_id) THEN RAISE EXCEPTION 'System roles cannot be deleted'; END IF;
     RETURN OLD;
   END IF;
   IF TG_OP = 'UPDATE' AND (NEW.tenant_id IS DISTINCT FROM OLD.tenant_id OR NEW.role_audience IS DISTINCT FROM OLD.role_audience

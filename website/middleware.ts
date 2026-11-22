@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { parseTenantSubdomain } from '@/lib/tenant-subdomain';
 import { resolveTenantRoute } from '@/lib/tenant-routing';
+import { checkTenantSession, decodeTenantClaims, isTenantFreePath } from '@/lib/tenant-session';
 
 function copyAuthCookies(from: NextResponse, to: NextResponse) {
   for (const cookie of from.cookies.getAll()) {
@@ -58,8 +59,10 @@ export async function middleware(request: NextRequest) {
     }
   );
 
+  let signedIn = false;
   try {
-    await supabase.auth.getUser();
+    const { data } = await supabase.auth.getUser();
+    signedIn = !!data?.user;
   } catch {
     // Stale or revoked refresh token — avoid failing the whole request; RSC uses getSessionUser() too.
   }
@@ -67,6 +70,22 @@ export async function middleware(request: NextRequest) {
   // Tenant host routing (e.g. alpine.localhost or alpine.ordernexa.com). Staff routes are also served on
   // bare hosts (localhost, 127.0.0.1) — see lib/tenant-routing.ts.
   const subdomain = parseTenantSubdomain(host);
+
+  // One active tenancy per session: a signed-in user without a tenancy claim, or on another tenant's address,
+  // must pick one first (the picker is skipped automatically when there is nothing to choose).
+  if (signedIn && !isTenantFreePath(pathname)) {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const claims = decodeTenantClaims(sessionData.session?.access_token);
+    if (checkTenantSession(claims, subdomain) === 'select') {
+      const pickUrl = request.nextUrl.clone();
+      pickUrl.pathname = '/select-tenant';
+      pickUrl.search = `?next=${encodeURIComponent(pathname + request.nextUrl.search)}`;
+      const pickResponse = NextResponse.redirect(pickUrl);
+      copyAuthCookies(response, pickResponse);
+      return pickResponse;
+    }
+  }
+
   const route = resolveTenantRoute(pathname, subdomain);
 
   if (route.type === 'redirect') {

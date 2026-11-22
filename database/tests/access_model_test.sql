@@ -242,6 +242,13 @@ BEGIN
      AND (SELECT count(*) FROM fnd_roles WHERE tenant_id = (SELECT v FROM _ids WHERE k='t2') AND is_system) = 2);
 END $$;
 
+DO $$
+DECLARE t2 bigint := (SELECT v FROM _ids WHERE k='t2'); r boolean;
+BEGIN
+  BEGIN DELETE FROM fnd_tenants WHERE tenant_id = t2; r := true; EXCEPTION WHEN OTHERS THEN r := false; END;
+  INSERT INTO _t VALUES ('deleting a tenant cascades through the system group and roles', r AND NOT EXISTS (SELECT 1 FROM fnd_roles WHERE tenant_id = t2));
+END $$;
+
 SELECT name, CASE WHEN ok THEN 'ok' ELSE 'FAIL' END AS result FROM _t WHERE NOT ok;
 SELECT count(*) FILTER (WHERE ok) AS passed, count(*) FILTER (WHERE NOT ok) AS failed FROM _t;
 ROLLBACK;
