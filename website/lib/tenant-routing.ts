@@ -20,6 +20,7 @@ export const TENANT_KEYWORDS = [
   'customers',
   'production',
   'financials',
+  'admin',
 ] as const;
 
 export type TenantRoute =

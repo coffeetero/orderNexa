@@ -1,6 +1,10 @@
 import './globals.css';
 import type { Metadata } from 'next';
-import { ThemeProvider } from '@/lib/theme-provider';
+import { cookies } from 'next/headers';
+import { AppearanceProvider } from '@/components/theme/AppearanceProvider';
+import { htmlMode, SYSTEM_MODE_SCRIPT, themeCss } from '@/lib/theme/apply';
+import { APPEARANCE_COOKIE, DEFAULT_MODE, readCookie, toLocal } from '@/lib/theme/prefs';
+import { DEFAULT_THEME } from '@/lib/theme/themes';
 import { TenantProvider } from '@/lib/tenant-context';
 import { Navbar } from '@/components/layout/Navbar';
 import { Toaster } from '@/components/ui/sonner';
@@ -14,9 +18,16 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
 
+  // The theme last applied on this device (cookie), painted into the first HTML so there is no flash of the default colours.
+  const saved = readCookie(cookies().get(APPEARANCE_COOKIE)?.value);
+  const initial = saved ?? { mode: DEFAULT_MODE, theme: DEFAULT_THEME };
+  const mode = htmlMode(initial.theme, initial.mode);
+
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className={mode === 'dark' ? 'dark' : undefined} data-bps-theme={initial.theme.id} suppressHydrationWarning>
       <head>
+        <style id="bps-theme" dangerouslySetInnerHTML={{ __html: themeCss(initial.theme, initial.mode) }} />
+        {mode === 'system' && <script dangerouslySetInnerHTML={{ __html: SYSTEM_MODE_SCRIPT }} />}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
@@ -25,13 +36,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         />
       </head>
       <body className="min-h-screen antialiased">
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
+        <AppearanceProvider initial={saved ? toLocal(saved) : null}>
           <TenantProvider>
             {!user && <Navbar />}
             <main>{children}</main>
             <Toaster position="top-right" duration={3000} closeButton />
           </TenantProvider>
-        </ThemeProvider>
+        </AppearanceProvider>
       </body>
     </html>
   );
