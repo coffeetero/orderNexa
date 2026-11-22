@@ -35,12 +35,12 @@ export default function TenantDashboardPage() {
         <MetricCard
           metric={mockTenantMetrics.totalRevenue}
           icon={DollarSign}
-          accentColor="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+          accentColor="bg-success/10 text-success"
         />
         <MetricCard
           metric={mockTenantMetrics.totalOrders}
           icon={ShoppingCart}
-          accentColor="bg-sky-500/10 text-sky-600 dark:text-sky-400"
+          accentColor="bg-info/10 text-info"
         />
         <MetricCard
           metric={mockTenantMetrics.activeCustomers}
@@ -50,7 +50,7 @@ export default function TenantDashboardPage() {
         <MetricCard
           metric={mockTenantMetrics.productionToday}
           icon={ChefHat}
-          accentColor="bg-amber-500/10 text-amber-600 dark:text-amber-400"
+          accentColor="bg-warning/10 text-warning"
         />
         <MetricCard
           metric={mockTenantMetrics.outstandingAR}
@@ -151,10 +151,10 @@ export default function TenantDashboardPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {[
-              { label: 'Current (0–30 days)', amount: 8940, color: 'bg-emerald-500' },
-              { label: '31–60 days', amount: 5460, color: 'bg-amber-500' },
+              { label: 'Current (0–30 days)', amount: 8940, color: 'bg-success' },
+              { label: '31–60 days', amount: 5460, color: 'bg-warning' },
               { label: '61–90 days', amount: 3800, color: 'bg-orange-500' },
-              { label: 'Over 90 days', amount: 3140, color: 'bg-red-500' },
+              { label: 'Over 90 days', amount: 3140, color: 'bg-destructive' },
             ].map((bucket) => (
               <div key={bucket.label} className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">

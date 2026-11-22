@@ -6,6 +6,7 @@ import { TopNav } from '@/components/layout/TopNav';
 import { Breadcrumbs } from '@/components/layout/Breadcrumbs';
 import { ContextSidebar } from '@/components/layout/ContextSidebar';
 import { NavProvider } from '@/components/layout/nav-context';
+import { AccountAppearanceLoader } from '@/components/theme/AppearanceProvider';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import { createClient } from '@/lib/supabase/client';
 import { tenantNav } from '@/lib/nav-config';
@@ -106,6 +107,7 @@ export function TenantLayoutShell({
 
   return (
     <NavProvider tenantId={tenantId}>
+      <AccountAppearanceLoader />
       <div className="flex h-screen flex-col overflow-hidden">
         <TopNav
           menus={tenantNav}

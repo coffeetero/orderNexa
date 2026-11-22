@@ -10,13 +10,13 @@ import type { Order, OrderStatus } from '@/lib/types';
 import { mockOrders } from '@/lib/mock-data';
 
 const statusConfig: Record<OrderStatus, { label: string; className: string }> = {
-  pending:       { label: 'Pending',       className: 'bg-amber-500/12 text-amber-700 dark:text-amber-400 border-amber-500/25' },
-  confirmed:     { label: 'Confirmed',     className: 'bg-sky-500/12 text-sky-700 dark:text-sky-400 border-sky-500/25' },
+  pending:       { label: 'Pending',       className: 'bg-warning/12 text-warning border-warning/25' },
+  confirmed:     { label: 'Confirmed',     className: 'bg-info/12 text-info border-info/25' },
   in_production: { label: 'In Production', className: 'bg-primary/12 text-primary border-primary/25' },
   packed:        { label: 'Packed',        className: 'bg-violet-500/12 text-violet-700 dark:text-violet-400 border-violet-500/25' },
   dispatched:    { label: 'Dispatched',    className: 'bg-orange-500/12 text-orange-700 dark:text-orange-400 border-orange-500/25' },
-  delivered:     { label: 'Delivered',     className: 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-400 border-emerald-500/25' },
-  cancelled:     { label: 'Cancelled',     className: 'bg-red-500/12 text-red-700 dark:text-red-400 border-red-500/25' },
+  delivered:     { label: 'Delivered',     className: 'bg-success/12 text-success border-success/25' },
+  cancelled:     { label: 'Cancelled',     className: 'bg-destructive/12 text-destructive border-destructive/25' },
 };
 
 export default function ManageOrdersPage() {
@@ -48,10 +48,10 @@ export default function ManageOrdersPage() {
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
-          { label: 'Pending',        value: 1, color: 'text-amber-600 dark:text-amber-400' },
+          { label: 'Pending',        value: 1, color: 'text-warning' },
           { label: 'In Production',  value: 1, color: 'text-primary' },
           { label: 'Dispatched',     value: 1, color: 'text-orange-600 dark:text-orange-400' },
-          { label: 'Delivered Today',value: 1, color: 'text-emerald-600 dark:text-emerald-400' },
+          { label: 'Delivered Today',value: 1, color: 'text-success' },
         ].map((stat) => (
           <Card key={stat.label} className="border-border/60">
             <CardContent className="p-4 text-center">

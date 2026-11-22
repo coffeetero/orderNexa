@@ -116,7 +116,7 @@ export default function TenantProfilePage() {
       </div>
 
       {statusMessage && (
-        <p className={statusMessage.type === 'success' ? 'text-sm text-emerald-600' : 'text-sm text-destructive'}>
+        <p className={statusMessage.type === 'success' ? 'text-sm text-success' : 'text-sm text-destructive'}>
           {statusMessage.text}
         </p>
       )}

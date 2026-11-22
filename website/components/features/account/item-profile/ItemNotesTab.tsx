@@ -277,10 +277,10 @@ export function ItemNotesTab({ tenantId, itemId }: ItemNotesTabProps) {
                   >
                     <div className="mb-0.5 flex items-start gap-1.5">
                       {note.is_pinned && (
-                        <Pin className="mt-0.5 h-3 w-3 shrink-0 text-sky-500" fill="currentColor" />
+                        <Pin className="mt-0.5 h-3 w-3 shrink-0 text-info" fill="currentColor" />
                       )}
                       {note.is_important && !note.is_pinned && (
-                        <Star className="mt-0.5 h-3 w-3 shrink-0 text-amber-500" fill="currentColor" />
+                        <Star className="mt-0.5 h-3 w-3 shrink-0 text-warning" fill="currentColor" />
                       )}
                       <span className={cn(
                         'line-clamp-2 text-sm leading-snug',
@@ -344,7 +344,7 @@ export function ItemNotesTab({ tenantId, itemId }: ItemNotesTabProps) {
               <ToggleBtn
                 active={form.visibility === 'shared'}
                 onClick={() => setField('visibility', form.visibility === 'shared' ? 'tenant_only' : 'shared')}
-                activeClass="bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-400"
+                activeClass="bg-success-soft text-success"
               >
                 {form.visibility === 'shared'
                   ? <><Globe className="h-3.5 w-3.5" />Shared</>
@@ -354,7 +354,7 @@ export function ItemNotesTab({ tenantId, itemId }: ItemNotesTabProps) {
               <ToggleBtn
                 active={form.is_important}
                 onClick={() => setField('is_important', !form.is_important)}
-                activeClass="bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400"
+                activeClass="bg-warning-soft text-warning"
               >
                 <Star className="h-3.5 w-3.5" fill={form.is_important ? 'currentColor' : 'none'} />
                 Important
@@ -363,7 +363,7 @@ export function ItemNotesTab({ tenantId, itemId }: ItemNotesTabProps) {
               <ToggleBtn
                 active={form.is_pinned}
                 onClick={() => setField('is_pinned', !form.is_pinned)}
-                activeClass="bg-sky-50 text-sky-600 dark:bg-sky-950/40 dark:text-sky-400"
+                activeClass="bg-info-soft text-info"
               >
                 <Pin className="h-3.5 w-3.5" fill={form.is_pinned ? 'currentColor' : 'none'} />
                 Pin

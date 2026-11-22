@@ -32,6 +32,17 @@
     --input: 36 20% 84%;
     --ring: 24 55% 32%;
 
+    /* Status tokens (themeable; Bakery values) */
+    --success: 161 94% 30%;
+    --success-foreground: 36 30% 97%;
+    --success-soft: 160 50% 92%;
+    --warning: 32 95% 44%;
+    --warning-foreground: 24 20% 12%;
+    --warning-soft: 40 90% 92%;
+    --info: 200 98% 39%;
+    --info-foreground: 36 30% 97%;
+    --info-soft: 200 80% 92%;
+
     --chart-1: 24 55% 35%;
     --chart-2: 38 60% 55%;
     --chart-3: 16 45% 42%;
@@ -69,6 +80,16 @@
     --border: 24 14% 22%;
     --input: 24 14% 22%;
     --ring: 38 52% 58%;
+
+    --success: 158 64% 52%;
+    --success-foreground: 24 18% 10%;
+    --success-soft: 160 40% 15%;
+    --warning: 43 96% 56%;
+    --warning-foreground: 24 18% 10%;
+    --warning-soft: 40 50% 15%;
+    --info: 199 95% 60%;
+    --info-foreground: 24 18% 10%;
+    --info-soft: 200 50% 17%;
 
     --chart-1: 38 55% 60%;
     --chart-2: 24 55% 50%;

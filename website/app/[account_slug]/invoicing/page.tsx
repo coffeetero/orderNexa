@@ -14,10 +14,10 @@ import { Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const statusConfig = {
-  open: { label: 'Open', className: 'bg-sky-500/12 text-sky-700 dark:text-sky-400 border-sky-500/25' },
-  partial: { label: 'Partial', className: 'bg-amber-500/12 text-amber-700 dark:text-amber-400 border-amber-500/25' },
-  paid: { label: 'Paid', className: 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-400 border-emerald-500/25' },
-  overdue: { label: 'Overdue', className: 'bg-red-500/12 text-red-700 dark:text-red-400 border-red-500/25' },
+  open: { label: 'Open', className: 'bg-info/12 text-info border-info/25' },
+  partial: { label: 'Partial', className: 'bg-warning/12 text-warning border-warning/25' },
+  paid: { label: 'Paid', className: 'bg-success/12 text-success border-success/25' },
+  overdue: { label: 'Overdue', className: 'bg-destructive/12 text-destructive border-destructive/25' },
 };
 
 export default function AccountInvoicingPage() {

@@ -11,13 +11,13 @@ import type { Order, OrderStatus } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 const statusConfig: Record<OrderStatus, { label: string; className: string }> = {
-  pending: { label: 'Pending', className: 'bg-amber-500/12 text-amber-700 dark:text-amber-400 border-amber-500/25' },
-  confirmed: { label: 'Confirmed', className: 'bg-sky-500/12 text-sky-700 dark:text-sky-400 border-sky-500/25' },
+  pending: { label: 'Pending', className: 'bg-warning/12 text-warning border-warning/25' },
+  confirmed: { label: 'Confirmed', className: 'bg-info/12 text-info border-info/25' },
   in_production: { label: 'In Production', className: 'bg-primary/12 text-primary border-primary/25' },
   packed: { label: 'Packed', className: 'bg-violet-500/12 text-violet-700 dark:text-violet-400 border-violet-500/25' },
   dispatched: { label: 'Dispatched', className: 'bg-orange-500/12 text-orange-700 dark:text-orange-400 border-orange-500/25' },
-  delivered: { label: 'Delivered', className: 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-400 border-emerald-500/25' },
-  cancelled: { label: 'Cancelled', className: 'bg-red-500/12 text-red-700 dark:text-red-400 border-red-500/25' },
+  delivered: { label: 'Delivered', className: 'bg-success/12 text-success border-success/25' },
+  cancelled: { label: 'Cancelled', className: 'bg-destructive/12 text-destructive border-destructive/25' },
 };
 
 interface OrdersTableProps {

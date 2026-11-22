@@ -137,6 +137,31 @@ Add a setting-driven debug mode that opens a panel on the right side of the app 
 
 ## Issue Backlog
 
+### IS-003 legacy_* Columns Referenced Inside The Database
+
+- **Status:** `todo`
+- **Priority:** `P2`
+- **Area:** Database design / data migration
+
+#### Summary
+
+Rule: the `legacy_*` columns (permanent; they let a tenant cross-reference a record to ids in their old system) must be referenced only by the Python migration scripts. Nothing in the database or application logic should depend on them. Today several things do (found 2026-11-22, local `bps`):
+
+- **Function:** `fnd_customers_save` reads and writes `legacy_id` (insert and update branches). The orphan `get_customers` also mentions it.
+- **Constraints and indexes:** `UNIQUE (tenant_id, legacy_id)` on `fnd_customers` and `fnd_items`, `idx_fnd_customers_legacy_id`, `uq_ar_payments_legacy_ar_trn`, `idx_ar_transactions_legacy_ar_id`.
+- **Schema comments:** `om_orders.sql` and `om_order_lines.sql` document the migration mapping through `legacy_id`.
+- **Website (open question):** the Customers page shows and edits `legacy_id` (`app/tenant/customers/page.tsx`, `CustomerManagementPage.tsx`).
+
+#### Follow-up
+
+- Decide whether the constraints and indexes count as database references (they enforce uniqueness during migration) or are acceptable on the columns themselves.
+- Remove `legacy_id` handling from `fnd_customers_save` so only migration scripts write it.
+- Decide whether the Customers screen may show it read-only (the tenant-facing cross-reference) and whether editing it is allowed.
+- Move the migration-mapping comments out of the schema files into the migration scripts.
+- Related naming work: see the database naming review (`legacy_id` as the standard column name; AR tables currently use `legacy_ar_id` and `legacy_ar_trn_id`).
+
+---
+
 ### IS-002 fnd_tenant_sequences RLS Visibility For bps_dev
 
 - **Status:** `todo`

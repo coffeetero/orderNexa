@@ -158,6 +158,11 @@ export const tenantNav: NavMenu[] = [
       },
     ],
   },
+  // Visible to all staff for now. Add `requires` to an entry to restrict it once roles exist.
+  {
+    label: 'Admin',
+    groups: [{ heading: 'Preferences', items: [{ label: 'Appearance', href: '/admin/appearance' }] }],
+  },
 ];
 
 /** Customer-portal navigation under `/<account_slug>`. */

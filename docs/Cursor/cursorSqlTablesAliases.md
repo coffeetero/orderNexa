@@ -29,6 +29,9 @@ Use this file as the default alias reference when writing SQL in this repo.
 | `fnd_pricebook_items` | `prcBkItm` |
 | `fnd_tenants` | `tnt` |
 | `fnd_user_customers` | `usrCus` |
+| `fnd_user_menu_actions` | `usrMnuAct` |
+| `fnd_user_preferences` | `usrPref` |
+| `fnd_user_recent_records` | `usrRcntRec` |
 | `fnd_user_tenants` | `usrTnt` |
 | `fnd_users` | `usr` |
 | `om_order_lines` | `ordrLn` |

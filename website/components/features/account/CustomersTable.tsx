@@ -11,9 +11,9 @@ import type { Customer } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 const statusConfig = {
-  active: { label: 'Active', className: 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-400 border-emerald-500/25' },
+  active: { label: 'Active', className: 'bg-success/12 text-success border-success/25' },
   inactive: { label: 'Inactive', className: 'bg-muted text-muted-foreground border-border' },
-  suspended: { label: 'Suspended', className: 'bg-red-500/12 text-red-700 dark:text-red-400 border-red-500/25' },
+  suspended: { label: 'Suspended', className: 'bg-destructive/12 text-destructive border-destructive/25' },
 };
 
 interface CustomersTableProps {
