@@ -55,7 +55,7 @@ export default async function AccountSlugLayout({
 
   const { data: customer, error: customerError } = await supabase
     .from('fnd_customers')
-    .select('customer_id')
+    .select('customer_id, customer_name')
     .eq('account_slug', account_slug)
     .maybeSingle();
 
@@ -78,7 +78,12 @@ export default async function AccountSlugLayout({
   const basePath = `/${account_slug}`;
 
   return (
-    <CustomerLayoutShell timeoutMinutes={timeoutMinutes} basePath={basePath}>
+    <CustomerLayoutShell
+      timeoutMinutes={timeoutMinutes}
+      basePath={basePath}
+      userName={access.userName}
+      accountName={customer.customer_name as string | null}
+    >
       {children}
     </CustomerLayoutShell>
   );

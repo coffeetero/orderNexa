@@ -1,41 +1,31 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
-import { CustomerSidebar } from '@/components/layout/CustomerSidebar';
-import { DashboardHeader } from '@/components/layout/DashboardHeader';
+import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { TopNav } from '@/components/layout/TopNav';
 import { SessionTimeout } from '@/components/auth/SessionTimeout';
 import { createClient } from '@/lib/supabase/client';
-
-function customerBreadcrumb(pathname: string, basePath: string): string {
-  if (pathname === basePath) return 'Dashboard';
-  const suffix = pathname.startsWith(`${basePath}/`) ? pathname.slice(basePath.length) : '';
-  const map: Record<string, string> = {
-    '/orders': 'Manage Orders',
-    '/orders/history': 'Order History',
-    '/invoicing': 'Statements',
-    '/invoicing/history': 'Invoice History',
-    '/payments': 'Payment Management',
-    '/payments/history': 'Payment History',
-  };
-  return map[suffix] ?? '';
-}
+import { customerNav } from '@/lib/nav-config';
 
 type CustomerLayoutShellProps = {
   children: React.ReactNode;
   timeoutMinutes: number;
   basePath: string;
+  userName?: string | null;
+  /** Shown under the user name — the customer account this user belongs to. */
+  accountName?: string | null;
 };
 
-export function CustomerLayoutShell({ children, timeoutMinutes, basePath }: CustomerLayoutShellProps) {
+export function CustomerLayoutShell({
+  children,
+  timeoutMinutes,
+  basePath,
+  userName,
+  accountName,
+}: CustomerLayoutShellProps) {
   const router = useRouter();
-  const pathname = usePathname();
-
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
-
-  const breadcrumb = customerBreadcrumb(pathname, basePath);
+  const menus = useMemo(() => customerNav(basePath), [basePath]);
 
   useEffect(() => {
     let isMounted = true;
@@ -74,28 +64,17 @@ export function CustomerLayoutShell({ children, timeoutMinutes, basePath }: Cust
     <div className="flex h-screen flex-col overflow-hidden">
       <SessionTimeout timeoutMinutes={timeoutMinutes} />
 
-      <DashboardHeader
-        title="Customer Portal"
-        breadcrumb={breadcrumb}
-        onMobileMenuOpen={() => setMobileOpen(true)}
-        onSidebarToggle={() => setSidebarCollapsed((prev) => !prev)}
-        isSidebarCollapsed={sidebarCollapsed}
-        userName="Marie Dupont"
-        userRole="Le Jardin Restaurant"
+      <TopNav
+        menus={menus}
+        homeHref={basePath}
+        brand="Customer Portal"
+        userName={userName}
+        userRole={accountName}
       />
 
-      <div className="flex flex-1 overflow-hidden">
-        <CustomerSidebar
-          basePath={basePath}
-          mobileOpen={mobileOpen}
-          onMobileClose={() => setMobileOpen(false)}
-          collapsed={sidebarCollapsed}
-        />
-
-        <main className="flex-1 overflow-y-auto bg-background p-4 sm:p-6 scrollbar-thin">
-          {children}
-        </main>
-      </div>
+      <main className="flex-1 overflow-y-auto bg-background p-4 scrollbar-thin sm:p-6">
+        <div className="mx-auto w-full max-w-[1440px]">{children}</div>
+      </main>
     </div>
   );
 }

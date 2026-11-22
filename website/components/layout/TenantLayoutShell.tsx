@@ -1,38 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
-import { TenantSidebar } from '@/components/layout/TenantSidebar';
-import { DashboardHeader } from '@/components/layout/DashboardHeader';
+import { useRouter } from 'next/navigation';
+import { TopNav } from '@/components/layout/TopNav';
 import { createClient } from '@/lib/supabase/client';
+import { tenantNav } from '@/lib/nav-config';
 import { cn } from '@/lib/utils';
-
-const breadcrumbMap: Record<string, string> = {
-  '/': 'Home',
-  '/dashboard': 'Dashboard',
-  '/orders': 'Enter Orders',
-  '/orders/new': 'Enter Orders',
-  '/manage-orders': 'Manage Orders',
-  '/customers': 'Customers',
-  '/inventory/item-profile': 'Item Profile',
-  // Legacy paths (e.g. main host without subdomain)
-  '/tenant': 'Dashboard',
-  '/tenant/dashboard': 'Dashboard',
-  '/tenant/orders': 'Enter Orders',
-  '/tenant/orders/new': 'Enter Orders',
-  '/tenant/manage-orders': 'Manage Orders',
-  '/tenant/customers': 'Customers',
-  '/tenant/inventory/item-profile': 'Item Profile',
-};
-
-/** Resolves breadcrumb label for dynamic routes not in the static map. */
-function resolveBreadcrumb(pathname: string): string {
-  const staticLabel = breadcrumbMap[pathname];
-  if (staticLabel) return staticLabel;
-  if (/^\/orders\/\d+\/edit$/.test(pathname)) return 'Edit Order';
-  if (/^\/tenant\/orders\/\d+\/edit$/.test(pathname)) return 'Edit Order';
-  return '';
-}
 
 type TenantLayoutShellProps = {
   children: React.ReactNode;
@@ -53,12 +26,7 @@ export function TenantLayoutShell({
   userRole,
 }: TenantLayoutShellProps) {
   const router = useRouter();
-  const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
-
-  const breadcrumb = resolveBreadcrumb(pathname);
 
   useEffect(() => {
     let isMounted = true;
@@ -92,30 +60,20 @@ export function TenantLayoutShell({
   }
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <TenantSidebar
-        collapsed={collapsed}
-        onCollapse={setCollapsed}
-        mobileOpen={mobileOpen}
-        onMobileClose={() => setMobileOpen(false)}
+    <div className="flex h-screen flex-col overflow-hidden">
+      <TopNav
+        menus={tenantNav}
         homeHref={sidebarHomeHref}
+        brand="Alpine Bakery"
+        userName={userName}
+        userRole={userRole}
+        profileHref="/tenant/profile"
+        settingsHref="/tenant/settings"
       />
 
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <DashboardHeader
-          title="Bakery Dashboard"
-          breadcrumb={breadcrumb}
-          onMobileMenuOpen={() => setMobileOpen(true)}
-          userName={userName ?? undefined}
-          userRole={userRole ?? undefined}
-        />
-
-        <main className="flex-1 overflow-y-auto bg-background px-[10px] pb-[1px] scrollbar-thin">
-          <div className={cn('mx-auto h-full w-full max-w-[1280px]', contentClassName)}>
-            {children}
-          </div>
-        </main>
-      </div>
+      <main className="flex-1 overflow-y-auto bg-background px-[10px] pb-[1px] scrollbar-thin">
+        <div className={cn('mx-auto h-full w-full max-w-[1440px]', contentClassName)}>{children}</div>
+      </main>
     </div>
   );
 }
