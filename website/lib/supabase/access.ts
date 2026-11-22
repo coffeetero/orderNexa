@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server';
 
 export type UserAccess = {
+  /** fnd_users.user_id. (The JWT carries it as app_metadata.app_user_id, but auth.getUser() does not.) */
+  userId: number | null;
   userType: string | null;
   userName: string | null;
   /** Customer portal slug; only set for CUSTOMER_USER accounts linked to a customer. */
@@ -27,10 +29,11 @@ export async function getUserAccess(authUserId: string): Promise<UserAccess> {
     console.warn('[access] fnd_users lookup failed:', profileError.message);
   }
   if (!profile) {
-    return { userType: null, userName: null, accountSlug: null };
+    return { userId: null, userType: null, userName: null, accountSlug: null };
   }
 
   const base = {
+    userId: (profile.user_id as number | null) ?? null,
     userType: (profile.user_type as string | null) ?? null,
     userName: (profile.user_name as string | null) ?? null,
   };

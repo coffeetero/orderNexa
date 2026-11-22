@@ -7,17 +7,6 @@ import { parseTenantSubdomain } from '@/lib/tenant-subdomain';
 
 const DEFAULT_TIMEOUT_MINUTES = 5;
 
-function parseAppUserId(appUserId: unknown): number | null {
-  if (typeof appUserId === 'number' && Number.isInteger(appUserId)) {
-    return appUserId;
-  }
-  if (typeof appUserId === 'string' && appUserId.trim().length > 0) {
-    const parsed = Number(appUserId);
-    return Number.isInteger(parsed) ? parsed : null;
-  }
-  return null;
-}
-
 export default async function AccountSlugLayout({
   children,
   params,
@@ -63,12 +52,12 @@ export default async function AccountSlugLayout({
     notFound();
   }
 
-  const appUserId = parseAppUserId(user.app_metadata?.app_user_id);
+  // Note: user.app_metadata (from auth.getUser) does not contain the hook's app_user_id claim — use fnd_users.user_id.
   let timeoutMinutes = DEFAULT_TIMEOUT_MINUTES;
 
-  if (appUserId !== null) {
+  if (access.userId !== null) {
     const { data } = await supabase.rpc('fnd_session_get_timeout', {
-      p_user_id: appUserId,
+      p_user_id: access.userId,
     });
     if (typeof data === 'number' && Number.isFinite(data)) {
       timeoutMinutes = data;
