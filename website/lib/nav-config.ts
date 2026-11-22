@@ -167,6 +167,15 @@ export const tenantNav: NavMenu[] = [
     groups: [
       { heading: 'Preferences', items: [{ label: 'Appearance', href: '/admin/appearance' }] },
       { heading: 'Production', items: [{ label: 'Production Settings', href: '/admin/production' }] },
+      {
+        heading: 'Access',
+        items: [
+          { label: 'Roles & Access', href: '/admin/roles' },
+          { label: 'Users', href: '/admin/users' },
+          { label: 'Customer Groups', href: '/admin/groups' },
+          { label: 'Phone & Messaging', href: '/admin/channels' },
+        ],
+      },
     ],
   },
 ];
