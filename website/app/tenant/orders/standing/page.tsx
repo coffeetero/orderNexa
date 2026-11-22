@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { localDateIso } from '@/lib/date';
 import { PostStandingOrdersPage } from '@/components/features/orders/PostStandingOrdersPage';
 
 function toNumber(v: unknown): number | null {
@@ -11,9 +12,7 @@ function toNumber(v: unknown): number | null {
 }
 
 function tomorrowIso(): string {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  return d.toISOString().slice(0, 10);
+  return localDateIso(1);
 }
 
 export default async function PostStandingOrdersRoute() {

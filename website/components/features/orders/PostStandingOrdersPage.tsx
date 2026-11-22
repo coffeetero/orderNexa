@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { localDateIso } from '@/lib/date';
 import { CheckSquare, ChevronDown, RotateCcw, Square, Wheat } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -181,7 +182,7 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
     try {
       const res  = await fetch('/api/post-standing-orders', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenant_id: tenantId, orders }),
+        body: JSON.stringify({ tenant_id: tenantId, orders, order_date: localDateIso() }),
       });
       const json = await res.json() as {
         results?: { customer_id: number; production_code: string; status: string; order_number?: string; message?: string }[];

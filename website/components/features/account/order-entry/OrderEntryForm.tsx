@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { localDateIso } from '@/lib/date';
 import { useRouter } from 'next/navigation';
 import { Save, Trash2, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
@@ -268,8 +269,8 @@ export function OrderEntryForm({
       customer_name: (data.customer_name as string) ?? '',
       department_event: (data.department_event as string) ?? '',
       customer_credit: 0,
-      order_date: (data.order_date as string) ?? new Date().toISOString().slice(0, 10),
-      production_date: (data.production_date as string) ?? new Date().toISOString().slice(0, 10),
+      order_date: (data.order_date as string) ?? localDateIso(),
+      production_date: (data.production_date as string) ?? localDateIso(),
       production_code: (data.production_code as string) ?? '',
       delivery_amount: Number(data.delivery_amount ?? 0),
       total_amount: totalAmount,

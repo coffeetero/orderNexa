@@ -1,5 +1,13 @@
 import { NextResponse } from 'next/server';
 import { createClient, getSessionUser } from '@/lib/supabase/server';
+import { isIsoDate, localDateIso } from '@/lib/date';
+import {
+  buildPostedOrderPayload,
+  dowFromDate,
+  priceMap,
+  type ItemPrice,
+  type StandingOrderLine,
+} from '@/lib/standing-orders';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,10 +18,6 @@ function parseInteger(v: unknown): number | null {
     return Number.isFinite(n) && Number.isInteger(n) ? n : null;
   }
   return null;
-}
-
-function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
 }
 
 /** GET — retrieve posting candidates + available production codes */
@@ -69,6 +73,8 @@ export async function POST(request: Request) {
   const payload     = body as Record<string, unknown>;
   const tenantId    = parseInteger(payload.tenant_id);
   const orders      = payload.orders as { customer_id: number; production_date: string; production_code: string }[] | undefined;
+  // Order date is the caller's local "today" (the server may run in another time zone).
+  const orderDate   = isIsoDate(payload.order_date) ? payload.order_date : localDateIso();
 
   if (tenantId === null || !Array.isArray(orders) || orders.length === 0) {
     return NextResponse.json({ error: 'Missing tenant_id or orders' }, { status: 400 });
@@ -78,47 +84,44 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const supabase   = createClient();
-  const orderDate  = todayIso();
   const results: { customer_id: number; production_code: string; status: string; order_id?: number; order_number?: string; message?: string }[] = [];
 
   for (const order of orders) {
     const { customer_id, production_date, production_code } = order;
     try {
+      const dow = dowFromDate(production_date);
+      if (!dow) throw new Error(`Invalid production_date: ${production_date}`);
+
       // 1. Get standing order lines
       const { data: lines, error: linesErr } = await supabase.rpc('om_standing_orders_get', {
         p_tenant_id:       tenantId,
         p_customer_id:     customer_id,
-        p_production_dow:  dowFromDate(production_date),
+        p_production_dow:  dow,
         p_production_code: production_code,
       });
 
       if (linesErr) throw new Error(linesErr.message);
 
-      const soLines = (lines ?? []) as { item_id: number; item_name: string; quantity: number; prep_options: string[] }[];
+      const soLines = (lines ?? []) as StandingOrderLine[];
 
-      // 2. Build order payload — same structure as Enter Orders
-      const savePayload = {
-        customer_id,
-        order_number:    null,   // new order — RPC assigns
-        order_date:      orderDate,
-        production_date,
-        production_code,
-        department_event: null,
-        delivery_amount:  0,
-        lines: soLines.map((l, i) => ({
-          client_temp_id:  `so-${customer_id}-${i}`,
-          order_line_id:   null,
-          item_id:         l.item_id,
-          item_description: l.item_name,
-          quantity:         l.quantity,
-          unit_price:       0,
-          unit_discount:    0,
-          prep_options:     l.prep_options ?? [],
-          is_scored:        false,
-        })),
-      };
+      // 2. Effective prices from the customer's pricebook (same source as Enter Orders)
+      const { data: items, error: itemsErr } = await supabase.rpc('om_items_get_v2', {
+        p_tenant_id:   tenantId,
+        p_customer_id: customer_id,
+      });
+      if (itemsErr) throw new Error(itemsErr.message);
 
-      // 3. Save the order
+      // 3. Build order payload — same structure as Enter Orders
+      const savePayload = buildPostedOrderPayload({
+        customerId:     customer_id,
+        orderDate,
+        productionDate: production_date,
+        productionCode: production_code,
+        lines:          soLines,
+        prices:         priceMap(items as ItemPrice[] | null),
+      });
+
+      // 4. Save the order
       const { data: saved, error: saveErr } = await supabase.rpc('om_orders_save', {
         p_tenant_id: tenantId,
         p_action:    null,
@@ -146,10 +149,4 @@ export async function POST(request: Request) {
   const failed  = results.filter(r => r.status === 'FAILED').length;
 
   return NextResponse.json({ results, summary: { posted, failed } });
-}
-
-/** Derive MON/TUE/etc from an ISO date string */
-function dowFromDate(dateStr: string): string {
-  const d = new Date(dateStr + 'T00:00:00');
-  return ['SUN','MON','TUE','WED','THU','FRI','SAT'][d.getDay()];
 }
