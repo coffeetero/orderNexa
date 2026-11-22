@@ -26,7 +26,6 @@ function LoginForm() {
     setLoading(true);
 
     // --- STAGE 0: ENTRY ---
-    console.log("🚀 [Stage 0] Form Submitted for:", email);
 
     // 1. Authenticate with Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
@@ -42,10 +41,8 @@ function LoginForm() {
 
     if (authData?.user) {
       try {
-        console.log("✅ [Stage 1] Auth Success. Auth UUID:", authData.user.id);
 
         // STEP 1: Get the core user profile
-        console.log("🔍 [Stage 2] Fetching fnd_users...");
         const { data: profile, error: profileError } = await supabase
           .from('fnd_users')
           .select('user_type, user_id')
@@ -61,23 +58,20 @@ function LoginForm() {
         }
 
         if (!profile) {
-          console.warn("⚠️ [Stage 2] No profile found for this UUID.");
+          console.warn("⚠️ [Stage 2] No BPS profile found for this account.");
           await supabase.auth.signOut();
           setError('Access Denied: User record not found.');
           setLoading(false);
           return;
         }
 
-        console.log("💎 [Stage 2] Profile Found:", profile);
         router.refresh();
 
         // STEP 2: Handle Redirection
         if (profile.user_type === 'TENANCY_USER') {
-          console.log("🏃 [Stage 3] Staff User -> Redirecting to /dashboard");
           router.replace('/dashboard');
-        } 
+        }
         else if (profile.user_type === 'CUSTOMER_USER') {
-          console.log("🔍 [Stage 3] Customer User -> Looking for link table entry...");
           
           // STEP 3: Separate query for Customer Link
           const { data: linkData, error: linkError } = await supabase
@@ -97,10 +91,8 @@ function LoginForm() {
             return;
           }
 
-          console.log("🔗 [Stage 3] Link Found. customer_id:", linkData.customer_id);
 
           // STEP 4: Direct lookup for the slug
-          console.log("🔍 [Stage 4] Fetching slug from fnd_customers...");
           const { data: customer, error: customerError } = await supabase
             .from('fnd_customers')
             .select('account_slug')
@@ -112,16 +104,18 @@ function LoginForm() {
           }
 
           const finalSlug = customer?.account_slug;
-          console.log("📍 [Stage 4] Final Slug found:", finalSlug);
 
           if (finalSlug) {
-            console.log("🚀 [Stage 5] Redirecting to:", `/${finalSlug}`);
             router.replace(`/${finalSlug}`);
           } else {
             console.error("⚠️ [Stage 4] Final slug was null or undefined.");
             setError('Configuration error: Account slug not found.');
             setLoading(false);
           }
+        } else {
+          await supabase.auth.signOut();
+          setError('Access Denied: Unrecognized account type.');
+          setLoading(false);
         }
       } catch (err) {
         console.error('🔥 [Critical] Login Logic failed:', err);

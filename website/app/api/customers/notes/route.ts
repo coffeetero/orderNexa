@@ -41,6 +41,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+    return NextResponse.json({ error: 'Request body must be a JSON object' }, { status: 400 });
+  }
   const payload  = body as Record<string, unknown>;
   const tenantId = parseInteger(payload.tenant_id);
   if (tenantId === null) {

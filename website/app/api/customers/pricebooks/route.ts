@@ -26,7 +26,6 @@ export async function GET(request: Request) {
   const rpcArgs: Record<string, unknown> = { p_tenant_id: tenantId };
   if (customerId !== null) rpcArgs.p_customer_id = customerId;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase.rpc as any)('fnd_customer_pricebooks_get', rpcArgs);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });

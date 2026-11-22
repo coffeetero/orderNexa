@@ -41,11 +41,17 @@ export async function POST(request: Request) {
   try { body = await request.json(); }
   catch { return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 }); }
 
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+    return NextResponse.json({ error: 'Request body must be a JSON object' }, { status: 400 });
+  }
   const payload = body as Record<string, unknown>;
   const tenantId     = parseInteger(payload.tenant_id);
   const customerId   = parseInteger(payload.customer_id);
-  const productionDows = payload.production_dows as string[] | undefined;
-  const productionCode = payload.production_code as string | undefined;
+  const productionDows = Array.isArray(payload.production_dows) &&
+    payload.production_dows.every((d): d is string => typeof d === 'string')
+    ? payload.production_dows
+    : undefined;
+  const productionCode = typeof payload.production_code === 'string' ? payload.production_code : undefined;
 
   if (tenantId === null || customerId === null || !productionDows?.length || !productionCode) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
