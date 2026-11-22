@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { createClient } from '@/lib/supabase/client';
+import { parseTenantSubdomain } from '@/lib/tenant-subdomain';
 
 const supabase = createClient();
 
@@ -72,6 +73,13 @@ function LoginForm() {
           router.replace('/dashboard');
         }
         else if (profile.user_type === 'CUSTOMER_USER') {
+          // The customer portal is only served on a tenant host (e.g. alpine.ordernexa.com).
+          if (!parseTenantSubdomain(window.location.host)) {
+            await supabase.auth.signOut();
+            setError("Customer accounts sign in from your bakery's own web address, not this one.");
+            setLoading(false);
+            return;
+          }
           
           // STEP 3: Separate query for Customer Link
           const { data: linkData, error: linkError } = await supabase

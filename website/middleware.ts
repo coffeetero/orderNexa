@@ -3,6 +3,7 @@ import type { CookieOptions } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { parseTenantSubdomain } from '@/lib/tenant-subdomain';
+import { resolveTenantRoute } from '@/lib/tenant-routing';
 
 function copyAuthCookies(from: NextResponse, to: NextResponse) {
   for (const cookie of from.cookies.getAll()) {
@@ -63,54 +64,23 @@ export async function middleware(request: NextRequest) {
     // Stale or revoked refresh token — avoid failing the whole request; RSC uses getSessionUser() too.
   }
 
-  // Tenant host routing (e.g. alpine.localhost or alpine.ordernexa.com)
+  // Tenant host routing (e.g. alpine.localhost or alpine.ordernexa.com). Staff routes are also served on
+  // bare hosts (localhost, 127.0.0.1) — see lib/tenant-routing.ts.
   const subdomain = parseTenantSubdomain(host);
+  const route = resolveTenantRoute(pathname, subdomain);
 
-  if (!subdomain) {
-    console.log(`>>> MAIN DOMAIN: ${pathname}`);
-    return response;
-  }
-
-  // Canonical URLs on tenant hosts are /orders, /customers, … — not /tenant/…
-  // (Rewrites only affect the internal route; the bar shows whatever clients navigate to.)
-  if (pathname.startsWith('/tenant')) {
+  if (route.type === 'redirect') {
     const redirectUrl = request.nextUrl.clone();
-    const afterTenant = pathname.slice('/tenant'.length);
-    if (afterTenant === '' || afterTenant === '/') {
-      redirectUrl.pathname = '/dashboard';
-    } else {
-      redirectUrl.pathname = afterTenant.startsWith('/') ? afterTenant : `/${afterTenant}`;
-    }
+    redirectUrl.pathname = route.to;
     const redirectResponse = NextResponse.redirect(redirectUrl);
     copyAuthCookies(response, redirectResponse);
     return redirectResponse;
   }
 
-  if (pathname === '/') {
-    return response;
-  }
-
-  const tenantKeywords = [
-    'dashboard',
-    'orders',
-    'manage-orders',
-    'settings',
-    'profile',
-    'inventory',
-    'reports',
-    'billing',
-    'invoicing',
-    'payments',
-    'customers',
-    'production',
-    'financials',
-  ];
-  const firstSegment = pathname.split('/').filter(Boolean)[0] ?? '';
-
-  if (tenantKeywords.includes(firstSegment)) {
-    url.pathname = `/tenant${pathname}`;
-    url.searchParams.set('tenant_slug', subdomain);
-    console.log(`>>> TENANT REWRITE: ${subdomain}${pathname} -> ${url.pathname}`);
+  if (route.type === 'rewrite') {
+    url.pathname = route.to;
+    if (route.tenantSlug) url.searchParams.set('tenant_slug', route.tenantSlug);
+    console.log(`>>> TENANT REWRITE: ${subdomain ?? 'bare host'}${pathname} -> ${url.pathname}`);
 
     const rewriteResponse = NextResponse.rewrite(url, {
       request: { headers: requestHeaders },
@@ -119,7 +89,7 @@ export async function middleware(request: NextRequest) {
     return rewriteResponse;
   }
 
-  console.log(`>>> ACCOUNT NEXT: ${subdomain}${pathname}`);
+  console.log(`>>> ${subdomain ? `ACCOUNT NEXT: ${subdomain}` : 'MAIN DOMAIN:'}${pathname}`);
   return response;
 }
 
