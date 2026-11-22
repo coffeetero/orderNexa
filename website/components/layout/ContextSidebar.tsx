@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { ArrowDown, ArrowUp, Pencil, Pin, PinOff, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -33,7 +33,9 @@ function SectionTitle({ children, action }: { children: React.ReactNode; action?
  */
 export function ContextSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
-  const { tenantId, version } = useNav();
+  const { tenantId, version, areas } = useNav();
+  const searchParams = useSearchParams();
+  const adminMenu = tenantNav.find((m) => m.label === 'Admin');
   const [data, setData] = useState<SidebarData | null>(null);
   const [failed, setFailed] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
@@ -87,8 +89,60 @@ export function ContextSidebar({ onNavigate }: { onNavigate?: () => void }) {
 
   const recentLists = moduleLabel ? MODULE_RECENTS[moduleLabel] ?? [] : [];
 
+  const currentSection = searchParams.get('section');
+  const adminGroups = moduleLabel === 'Admin' && adminMenu
+    ? (adminMenu.groups ?? [])
+        .map((g) => ({ ...g, items: g.items.filter((i) => !i.area || areas === null || areas.includes(i.area)) }))
+        .filter((g) => g.items.length > 0)
+    : [];
+
   return (
     <div className="flex h-full flex-col gap-5 px-2 py-3" data-testid="context-sidebar">
+      {adminGroups.length > 0 && (
+        <nav aria-label="Admin sections" data-testid="admin-sections" className="space-y-3">
+          {adminGroups.map((g) => (
+            <section key={g.heading}>
+              <SectionTitle>{g.heading}</SectionTitle>
+              <ul className="space-y-0.5">
+                {g.items.map((item) => {
+                  const isActive = item.href === activeHref;
+                  return (
+                    <li key={item.href}>
+                      <GuardedLink
+                        href={item.href}
+                        onClick={onNavigate}
+                        aria-current={isActive && !item.sections ? 'page' : undefined}
+                        className={cn(rowClass, isActive && !item.sections && 'bg-accent font-medium text-accent-foreground', isActive && item.sections && 'font-medium text-foreground')}
+                      >
+                        <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                      </GuardedLink>
+                      {isActive && item.sections && (
+                        <ul className="ml-3 mt-0.5 space-y-0.5 border-l border-border pl-2">
+                          {item.sections.map((s, idx) => {
+                            const on = (currentSection ?? item.sections![0].key) === s.key;
+                            return (
+                              <li key={s.key}>
+                                <GuardedLink
+                                  href={idx === 0 ? item.href : `${item.href}?section=${s.key}`}
+                                  onClick={onNavigate}
+                                  aria-current={on ? 'page' : undefined}
+                                  className={cn(rowClass, on && 'bg-accent font-medium text-accent-foreground')}
+                                >
+                                  <span className="min-w-0 flex-1 truncate">{s.label}</span>
+                                </GuardedLink>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ))}
+        </nav>
+      )}
       <section aria-labelledby="qa-title">
         <SectionTitle
           action={

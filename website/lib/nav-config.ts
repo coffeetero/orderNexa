@@ -12,6 +12,10 @@ export type NavItem = {
   soon?: boolean;
   /** Restrict to these user types. Omit = every staff user. Hook for real permissions later. */
   requires?: UserType[];
+  /** fnd_areas key the user must be able to read to see this entry in the sidebar section list. */
+  area?: string;
+  /** Sections of a long page, listed under it in the sidebar; the page shows the one in ?section=. */
+  sections?: { key: string; label: string }[];
 };
 export type NavGroup = { heading?: string; items: NavItem[] };
 export type NavMenu = {
@@ -163,20 +167,34 @@ export const tenantNav: NavMenu[] = [
       },
     ],
   },
-  // Visible to all staff for now. Add `requires` to an entry to restrict it once roles exist.
+  // The whole menu (and every page under /admin) needs an admin area; see requiresAnyArea. Appearance lives in the avatar menu.
   {
     label: 'Admin',
     requiresAnyArea: ['admin.roles', 'admin.users', 'admin.groups', 'admin.channels', 'admin.production'],
     groups: [
-      { heading: 'Preferences', items: [{ label: 'Appearance', href: '/admin/appearance' }] },
-      { heading: 'Production', items: [{ label: 'Production Settings', href: '/admin/production' }] },
+      {
+        heading: 'Production',
+        items: [
+          {
+            label: 'Production Settings',
+            href: '/admin/production',
+            area: 'admin.production',
+            sections: [
+              { key: 'codes', label: 'Production codes' },
+              { key: 'methods', label: 'Delivery methods' },
+              { key: 'numbering', label: 'Numbering' },
+              { key: 'runs', label: 'Upcoming runs' },
+            ],
+          },
+        ],
+      },
       {
         heading: 'Access',
         items: [
-          { label: 'Roles & Access', href: '/admin/roles' },
-          { label: 'Users', href: '/admin/users' },
-          { label: 'Customer Groups', href: '/admin/groups' },
-          { label: 'Phone & Messaging', href: '/admin/channels' },
+          { label: 'Roles & Access', href: '/admin/roles', area: 'admin.roles' },
+          { label: 'Users', href: '/admin/users', area: 'admin.users' },
+          { label: 'Customer Groups', href: '/admin/groups', area: 'admin.groups' },
+          { label: 'Phone & Messaging', href: '/admin/channels', area: 'admin.channels' },
         ],
       },
     ],

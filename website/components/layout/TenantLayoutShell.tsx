@@ -109,7 +109,7 @@ export function TenantLayoutShell({
   };
 
   return (
-    <NavProvider tenantId={tenantId}>
+    <NavProvider tenantId={tenantId} areas={areas}>
       <AccountAppearanceLoader />
       <div className="flex h-screen flex-col overflow-hidden">
         <TopNav
@@ -119,7 +119,7 @@ export function TenantLayoutShell({
           userName={userName}
           userRole={userRole}
           profileHref="/tenant/profile"
-          settingsHref="/tenant/settings"
+          appearanceHref="/profile/appearance"
         />
 
         <Breadcrumbs

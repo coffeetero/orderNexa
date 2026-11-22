@@ -28,7 +28,7 @@ add_access_model_tables, add_access_model_functions, add_active_tenancy, add_rls
 
 ## Open / not done
 - Screens for customer admins (the portal side: their own users and roles) and creating/inviting users.
-- Only the Admin top menu is hidden by area access (pages under Admin return not-found too); other menus still show every entry (RLS enforces the data).
+- Only the Admin top menu is hidden by area access (pages under Admin return not-found too); other menus still show every entry (RLS enforces the data). Appearance moved to the avatar menu (/profile/appearance); the old Account Settings page (order-number mask only) was removed because Admin > Production Settings > Numbering covers it.
 - Older functions still contain their own allowed_tenant_ids checks; they work because the token narrows that list. Replace with `fnd_assert_active_tenant` over time.
 - New tables get anon grants from Supabase default privileges: always `REVOKE ALL ... FROM anon` and enable RLS (rls_test fails otherwise).
 - Cloud: apply the four migrations plus the earlier ones; the unprefixed legacy tables now have RLS on and no app access.

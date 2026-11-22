@@ -1,7 +1,7 @@
 import { AppearanceSettings } from '@/components/theme/AppearanceSettings';
 
 export const metadata = {
-  title: 'Appearance — Admin',
+  title: 'Appearance — Profile',
 };
 
 export default function AdminAppearancePage() {

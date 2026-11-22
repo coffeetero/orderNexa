@@ -10,8 +10,8 @@ import {
   Lock,
   LogOut,
   Menu,
+  Palette,
   Search,
-  Settings,
   User,
   Wheat,
 } from 'lucide-react';
@@ -56,7 +56,7 @@ export type TopNavProps = {
   userRole?: string | null;
   /** Staff-only user-menu entries. Omit for customer users. */
   profileHref?: string;
-  settingsHref?: string;
+  appearanceHref?: string;
 };
 
 const topLevelClass =
@@ -83,7 +83,7 @@ export function TopNav({
   userName,
   userRole,
   profileHref,
-  settingsHref,
+  appearanceHref,
 }: TopNavProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -238,10 +238,10 @@ export function TopNav({
                 User Profile
               </DropdownMenuItem>
             )}
-            {settingsHref && (
-              <DropdownMenuItem onClick={() => router.push(settingsHref)}>
-                <Settings className="mr-2 h-4 w-4" />
-                Account Settings
+            {appearanceHref && (
+              <DropdownMenuItem onClick={() => router.push(appearanceHref)}>
+                <Palette className="mr-2 h-4 w-4" />
+                Appearance
               </DropdownMenuItem>
             )}
             <DropdownMenuItem disabled>

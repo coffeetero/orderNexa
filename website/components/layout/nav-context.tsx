@@ -10,6 +10,8 @@ type TouchPayload = { action_key?: string; record?: CurrentRecord };
 type NavContextValue = {
   /** Set by the staff shell; null/undefined disables the sidebar features. */
   tenantId: number | null;
+  /** Areas the user may read (null = unknown, show everything). */
+  areas: string[] | null;
   /** The record the current page is showing (feeds the breadcrumb). */
   record: CurrentRecord | null;
   setRecord: (record: CurrentRecord | null) => void;
@@ -26,6 +28,7 @@ type NavContextValue = {
 const noop = () => {};
 const defaultValue: NavContextValue = {
   tenantId: null,
+  areas: null,
   record: null,
   setRecord: noop,
   version: 0,
@@ -38,7 +41,7 @@ const NavContext = createContext<NavContextValue>(defaultValue);
 
 export const LEAVE_MESSAGE = 'You have unsaved changes. Leave this page without saving?';
 
-export function NavProvider({ tenantId, children }: { tenantId: number | null; children: React.ReactNode }) {
+export function NavProvider({ tenantId, areas = null, children }: { tenantId: number | null; areas?: string[] | null; children: React.ReactNode }) {
   const [record, setRecord] = useState<CurrentRecord | null>(null);
   const [version, setVersion] = useState(0);
   const guards = useRef(new Set<() => boolean>());
@@ -101,8 +104,8 @@ export function NavProvider({ tenantId, children }: { tenantId: number | null; c
   }, [anyDirty]);
 
   const value = useMemo<NavContextValue>(
-    () => ({ tenantId, record, setRecord, version, touch, registerGuard, confirmLeave }),
-    [tenantId, record, version, touch, registerGuard, confirmLeave],
+    () => ({ tenantId, areas, record, setRecord, version, touch, registerGuard, confirmLeave }),
+    [tenantId, areas, record, version, touch, registerGuard, confirmLeave],
   );
 
   return (

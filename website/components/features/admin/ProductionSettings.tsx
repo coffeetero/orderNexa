@@ -237,7 +237,9 @@ function RunRowEditor({ row, tenantId, notify }: { row: RunRow; tenantId: number
   );
 }
 
-export function ProductionSettings({ tenantId }: { tenantId: number }) {
+export type ProductionSection = 'codes' | 'methods' | 'numbering' | 'runs';
+
+export function ProductionSettings({ tenantId, section = 'codes' }: { tenantId: number; section?: ProductionSection }) {
   const [codes, setCodes] = useState<CodeRow[]>([]);
   const [methods, setMethods] = useState<MethodRow[]>([]);
   const [runs, setRuns] = useState<RunRow[]>([]);
@@ -284,12 +286,15 @@ export function ProductionSettings({ tenantId }: { tenantId: number }) {
         </div>
       )}
 
+      {section === 'codes' && (
       <Card><CardContent className="pt-6">
         <h2 className="mb-1 text-lg font-medium">Production codes</h2>
         <p className="mb-2 text-xs text-muted-foreground">The code list itself is the PRODUCTIONCODE value list. Cutoff of 16:00 and 1 day before means 4:00 PM the day before.</p>
         {codes.map((c) => <CodeRowEditor key={c.production_code} row={c} tenantId={tenantId} notify={notify} />)}
       </CardContent></Card>
+      )}
 
+      {section === 'methods' && (
       <Card><CardContent className="pt-6">
         <h2 className="mb-1 text-lg font-medium">Delivery methods</h2>
         <p className="mb-2 text-xs text-muted-foreground">Own fleet methods appear on the driver&apos;s delivery sheet. Methods are never deleted; uncheck Active instead.</p>
@@ -302,19 +307,24 @@ export function ProductionSettings({ tenantId }: { tenantId: number }) {
           onSaved={() => { setNewKey((k) => k + 1); void load(tenantId); }}
         />
       </CardContent></Card>
+      )}
 
+      {section === 'numbering' && (
       <Card><CardContent className="pt-6">
         <h2 className="mb-1 text-lg font-medium">Numbering</h2>
         <p className="mb-2 text-xs text-muted-foreground">Masks may use [YYYY], [YYYYMM], [YYYYMMDD] and # for digits, for example INV-######. Numbers are never reused; the next number can only be raised. Invoice numbers are assigned when the Packaging List is printed.</p>
         {sequences.map((q) => <SequenceRowEditor key={q.sequence_name} row={q} tenantId={tenantId} notify={notify} />)}
       </CardContent></Card>
+      )}
 
+      {section === 'runs' && (
       <Card><CardContent className="pt-6">
         <h2 className="mb-1 text-lg font-medium">Upcoming runs</h2>
         <p className="mb-2 text-xs text-muted-foreground">A run is created when its first order is entered. Change a cutoff here for holidays or special runs (open runs only).</p>
         {runs.length === 0 && <p className="py-3 text-sm text-muted-foreground">No runs yet.</p>}
         {runs.map((r) => <RunRowEditor key={`${r.production_run_id}-${r.cutoff_local}`} row={r} tenantId={tenantId} notify={notify} />)}
       </CardContent></Card>
+      )}
     </div>
   );
 }
