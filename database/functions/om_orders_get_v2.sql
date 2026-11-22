@@ -146,10 +146,9 @@ BEGIN
 
     IF p_customer_id IS NOT NULL THEN
         SELECT
-            CASE WHEN UPPER(TRIM(customer_type)) = 'DEPARTMENT' AND customer_parent_id IS NOT NULL
+            CASE WHEN UPPER(TRIM(customer_type)) = 'SITE' AND customer_parent_id IS NOT NULL
                  THEN customer_parent_id ELSE customer_id END,
-            CASE WHEN UPPER(TRIM(customer_type)) = 'DEPARTMENT'
-                 THEN UPPER(TRIM(customer_name)) ELSE 'ORDER' END
+            COALESCE(NULLIF(UPPER(TRIM(customer_name)), ''), 'ORDER')
           INTO v_lookup_customer_id, v_default_department_event
           FROM fnd_customers
          WHERE tenant_id = p_tenant_id AND customer_id = p_customer_id;

@@ -22,6 +22,17 @@ interface MethodRow {
   requires_tracking: boolean;
   is_active: boolean;
 }
+interface SequenceRow {
+  sequence_name: string;
+  label: string;
+  is_configured: boolean;
+  mask: string;
+  start_value: number;
+  next_value: number;
+  increment_by: number;
+  reset_period: string;
+  requires_gapless: boolean;
+}
 interface RunRow {
   production_run_id: number;
   production_date: string;
@@ -143,6 +154,56 @@ function MethodRowEditor({
   );
 }
 
+function SequenceRowEditor({ row, tenantId, notify }: { row: SequenceRow; tenantId: number; notify: Notify }) {
+  const [mask, setMask] = useState(row.mask);
+  const [next, setNext] = useState(String(row.next_value));
+  const [reset, setReset] = useState(row.reset_period);
+  const [gapless, setGapless] = useState(row.requires_gapless);
+  const [busy, setBusy] = useState(false);
+
+  const save = async () => {
+    setBusy(true);
+    try {
+      await post('/api/admin/sequences', {
+        tenant_id: tenantId, sequence_name: row.sequence_name, mask, start_value: row.start_value,
+        next_value: Number(next), increment_by: row.increment_by, reset_period: reset, requires_gapless: gapless,
+      });
+      notify(`${row.label} saved.`, 'success');
+    } catch (e) {
+      notify((e as Error).message, 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="grid grid-cols-2 items-end gap-3 border-b py-3 sm:grid-cols-[10rem_1fr_8rem_9rem_auto_auto]">
+      <div>
+        <div className="font-medium">{row.label}</div>
+        <div className="text-xs text-muted-foreground">{row.is_configured ? row.sequence_name : `${row.sequence_name} (not set up yet)`}</div>
+      </div>
+      <div>
+        <Label className="text-xs">Mask (# = digit)</Label>
+        <Input value={mask} onChange={(e) => setMask(e.target.value)} />
+      </div>
+      <div>
+        <Label className="text-xs">Next number</Label>
+        <Input type="number" min={0} value={next} onChange={(e) => setNext(e.target.value)} />
+      </div>
+      <div>
+        <Label className="text-xs">Restart</Label>
+        <select className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm" value={reset} onChange={(e) => setReset(e.target.value)}>
+          {['NEVER', 'DAILY', 'MONTHLY', 'YEARLY'].map((p) => <option key={p} value={p}>{p.charAt(0) + p.slice(1).toLowerCase()}</option>)}
+        </select>
+      </div>
+      <label className="flex items-center gap-2 text-sm">
+        <Checkbox checked={gapless} onCheckedChange={(v) => setGapless(v === true)} /> Gapless
+      </label>
+      <Button size="sm" onClick={save} disabled={busy || !mask.includes('#')}>Save</Button>
+    </div>
+  );
+}
+
 function RunRowEditor({ row, tenantId, notify }: { row: RunRow; tenantId: number; notify: Notify }) {
   const [cutoff, setCutoff] = useState(row.cutoff_local);
   const [busy, setBusy] = useState(false);
@@ -180,6 +241,7 @@ export function ProductionSettings({ tenantId }: { tenantId: number }) {
   const [codes, setCodes] = useState<CodeRow[]>([]);
   const [methods, setMethods] = useState<MethodRow[]>([]);
   const [runs, setRuns] = useState<RunRow[]>([]);
+  const [sequences, setSequences] = useState<SequenceRow[]>([]);
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [newKey, setNewKey] = useState(0);
 
@@ -187,14 +249,16 @@ export function ProductionSettings({ tenantId }: { tenantId: number }) {
 
   const load = useCallback(async (tid: number) => {
     try {
-      const [c, m, r] = await Promise.all([
+      const [c, m, r, q] = await Promise.all([
         call<CodeRow[]>(`/api/admin/production-codes?tenant_id=${tid}`),
         call<MethodRow[]>(`/api/admin/delivery-methods?tenant_id=${tid}`),
         call<RunRow[]>(`/api/admin/production-runs?tenant_id=${tid}&upcoming=true`),
+        call<SequenceRow[]>(`/api/admin/sequences?tenant_id=${tid}`),
       ]);
       setCodes(c);
       setMethods(m);
       setRuns([...r].reverse());
+      setSequences(q);
     } catch (e) {
       notify((e as Error).message, 'error');
     }
@@ -237,6 +301,12 @@ export function ProductionSettings({ tenantId }: { tenantId: number }) {
           row={{ delivery_method_code: '', delivery_method_name: '', is_own_fleet: false, requires_tracking: false, is_active: true }}
           onSaved={() => { setNewKey((k) => k + 1); void load(tenantId); }}
         />
+      </CardContent></Card>
+
+      <Card><CardContent className="pt-6">
+        <h2 className="mb-1 text-lg font-medium">Numbering</h2>
+        <p className="mb-2 text-xs text-muted-foreground">Masks may use [YYYY], [YYYYMM], [YYYYMMDD] and # for digits, for example INV-######. Numbers are never reused; the next number can only be raised. Invoice numbers are assigned when the Packaging List is printed.</p>
+        {sequences.map((q) => <SequenceRowEditor key={q.sequence_name} row={q} tenantId={tenantId} notify={notify} />)}
       </CardContent></Card>
 
       <Card><CardContent className="pt-6">

@@ -62,6 +62,7 @@ export const tenantNav: NavMenu[] = [
       {
         heading: 'Floor',
         items: [
+          { label: 'Process Run', href: '/production/process' },
           { label: "Baker's Report", href: '/production/report', soon: true },
           { label: 'Mixing Sheets', href: '/production/mixing', soon: true },
           { label: 'Packing Labels', href: '/production/labels', soon: true },

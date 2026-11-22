@@ -33,11 +33,11 @@ describe('tenantNav matches the real routes', () => {
     for (const href of [
       '/dashboard', '/orders', '/orders/standing', '/orders/standing-mgmt', '/manage-orders',
       '/customers', '/inventory/item-profile', '/production/analysis', '/financials/ar',
-      '/inventory/nutrition', '/orders/callup', '/orders/import', '/orders/returns', '/admin/appearance', '/admin/production',
+      '/inventory/nutrition', '/orders/callup', '/orders/import', '/orders/returns', '/admin/appearance', '/admin/production', '/production/process',
     ]) {
       expect(hrefs.has(href), href).toBe(true);
     }
-    expect(items.length).toBe(1 + 7 + 6 + 4 + 10 + 9 + 2); // Dashboard + old sidebar sections + Admin > Appearance, Production Settings
+    expect(items.length).toBe(1 + 7 + 6 + 4 + 10 + 9 + 3); // Dashboard + old sidebar sections + Admin > Appearance, Production Settings, Production > Process Run, Process Run
   });
 });
 

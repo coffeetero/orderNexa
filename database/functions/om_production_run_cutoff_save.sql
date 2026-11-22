@@ -15,7 +15,7 @@ BEGIN
         RAISE EXCEPTION 'p_tenant_id, p_production_run_id and p_cutoff_local are required';
     END IF;
     UPDATE om_production_runs r
-       SET cutoff_at = p_cutoff_local AT TIME ZONE (SELECT t.time_zone FROM fnd_tenants t WHERE t.tenant_id = p_tenant_id)
+       SET cutoff_at = p_cutoff_local AT TIME ZONE bps.fnd_tenant_time_zone(p_tenant_id)
      WHERE r.tenant_id = p_tenant_id AND r.production_run_id = p_production_run_id AND r.run_status = 'OPEN';
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Run % not found, not open, or you are not allowed to change it', p_production_run_id;

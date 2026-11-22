@@ -30,7 +30,7 @@ BEGIN
     IF p_tenant_id IS NULL THEN
         RAISE EXCEPTION 'p_tenant_id is required';
     END IF;
-    SELECT time_zone INTO v_tz FROM fnd_tenants WHERE tenant_id = p_tenant_id;
+    v_tz := bps.fnd_tenant_time_zone(p_tenant_id);
 
     IF p_production_date IS NULL OR v_code IS NULL THEN
         RETURN jsonb_build_object('production_run_id', NULL, 'run_status', NULL, 'cutoff_at', NULL,

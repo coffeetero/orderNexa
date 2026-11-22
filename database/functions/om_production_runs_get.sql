@@ -18,14 +18,13 @@ AS $function$
                'production_code',   r.production_code,
                'delivery_date',     r.delivery_date,
                'cutoff_at',         r.cutoff_at,
-               'cutoff_local',      to_char(r.cutoff_at AT TIME ZONE t.time_zone, 'YYYY-MM-DD"T"HH24:MI'),
-               'time_zone',         t.time_zone,
+               'cutoff_local',      to_char(r.cutoff_at AT TIME ZONE bps.fnd_tenant_time_zone(r.tenant_id), 'YYYY-MM-DD"T"HH24:MI'),
+               'time_zone',         bps.fnd_tenant_time_zone(r.tenant_id),
                'run_status',        r.run_status,
                'order_count',       (SELECT COUNT(*) FROM om_orders o WHERE o.production_run_id = r.production_run_id)
            ) ORDER BY r.production_date DESC, r.production_code), '[]'::jsonb)
       FROM om_production_runs r
-      JOIN fnd_tenants t ON t.tenant_id = r.tenant_id
      WHERE r.tenant_id = p_tenant_id
        AND r.production_date BETWEEN COALESCE(p_from, DATE '0001-01-01') AND COALESCE(p_to, DATE '9999-12-31')
-       AND (NOT p_upcoming_only OR r.production_date >= ((now() AT TIME ZONE t.time_zone)::date - 1));
+       AND (NOT p_upcoming_only OR r.production_date >= ((now() AT TIME ZONE bps.fnd_tenant_time_zone(r.tenant_id))::date - 1));
 $function$;

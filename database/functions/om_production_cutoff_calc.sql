@@ -15,9 +15,8 @@ STABLE
 SECURITY INVOKER
 SET search_path TO 'bps', 'public'
 AS $function$
-    SELECT ((p_production_date - pc.cutoff_days_before) + pc.cutoff_time) AT TIME ZONE t.time_zone
+    SELECT ((p_production_date - pc.cutoff_days_before) + pc.cutoff_time) AT TIME ZONE bps.fnd_tenant_time_zone(p_tenant_id)
       FROM om_production_codes pc
-      JOIN fnd_tenants t ON t.tenant_id = pc.tenant_id
      WHERE pc.tenant_id       = p_tenant_id
        AND pc.production_code = UPPER(TRIM(p_production_code))
        AND pc.is_active;

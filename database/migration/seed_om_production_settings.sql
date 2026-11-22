@@ -1,5 +1,5 @@
 -- ============================================================
--- Seed production-code cutoffs and delivery methods for tenant "Alpine Bakery" (local data).
+-- Seed production-code cutoffs, delivery methods and invoice/shipment/credit-memo numbering for tenant "Alpine Bakery" (local data).
 -- Cutoffs are defaults only (4:00 PM the day before, delivery the day after): adjust in Admin > Production Codes.
 -- Idempotent. Prerequisites: om_production_codes.sql, om_delivery_methods.sql, PRODUCTIONCODE valueset seeded.
 -- ============================================================
@@ -24,4 +24,12 @@ BEGIN
         (v_tenant_id, 'COURIER',   'Courier (Uber)',       FALSE, FALSE),
         (v_tenant_id, 'PICKUP',    'Customer pickup',      FALSE, FALSE)
     ON CONFLICT (tenant_id, delivery_method_code) DO NOTHING;
+
+    -- Numbering (settings are editable in Admin > Production Settings)
+    INSERT INTO bps.fnd_tenant_sequences (tenant_id, sequence_name, start_value, next_value, increment_by, mask, reset_period, requires_gapless)
+    VALUES
+        (v_tenant_id, 'invoice_number',     1000, 1000, 1, 'INV-######', 'NEVER', FALSE),
+        (v_tenant_id, 'shipment_number',    1000, 1000, 1, 'SHP-######', 'NEVER', FALSE),
+        (v_tenant_id, 'credit_memo_number', 1000, 1000, 1, 'CM-######',  'NEVER', FALSE)
+    ON CONFLICT (tenant_id, sequence_name) DO NOTHING;
 END $$;

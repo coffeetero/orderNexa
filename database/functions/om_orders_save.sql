@@ -4,8 +4,8 @@
 --
 -- department_event defaulting (new orders only):
 --   1. If department_event is passed in the payload → use it
---   2. Else if customer is DEPARTMENT → use the department's customer_name
---   3. Else → default to 'ORDER'
+--   2. Else → the name of the customer the clerk selected (account, department or site)
+--   (fallback 'ORDER' when no customer)
 --
 -- When department_event collides with an existing order for the same
 -- slot (customer + production_date + production_code + department_event),
@@ -13,8 +13,9 @@
 --
 -- delivery_amount (payload) is stored in om_orders.delivery_charge; entered with the order, defaults to 0.
 --
--- DEPARTMENT customers: order is stored under the parent customer_id.
--- (LOCATION type is no longer used — replaced by DEPARTMENT.)
+-- Customer types: an ACCOUNT or DEPARTMENT order is stored under that customer's own customer_id (own order number).
+-- A SITE is a pseudo type: its order is stored under the parent customer_id and the site name is the default
+-- department_event (which can always be overridden).
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION bps.om_orders_save(
@@ -47,7 +48,7 @@ DECLARE
     v_payload_customer_id   BIGINT;
     v_order_customer_id     BIGINT;
     v_order_customer_name   TEXT;
-    v_is_department         BOOLEAN := FALSE;
+    v_is_site               BOOLEAN := FALSE;
     v_payload_customer_name TEXT;
     v_production_date DATE;
     v_production_code TEXT;
@@ -115,21 +116,21 @@ BEGIN
     IF v_payload_customer_id IS NOT NULL THEN
         SELECT
             CASE
-                WHEN UPPER(TRIM(selected.customer_type)) = 'DEPARTMENT'
+                WHEN UPPER(TRIM(selected.customer_type)) = 'SITE'
                  AND selected.customer_parent_id IS NOT NULL
                 THEN parent.customer_id
                 ELSE selected.customer_id
             END,
             CASE
-                WHEN UPPER(TRIM(selected.customer_type)) = 'DEPARTMENT'
+                WHEN UPPER(TRIM(selected.customer_type)) = 'SITE'
                  AND selected.customer_parent_id IS NOT NULL
                 THEN parent.customer_name
                 ELSE selected.customer_name
             END,
-            UPPER(TRIM(selected.customer_type)) = 'DEPARTMENT',
+            UPPER(TRIM(selected.customer_type)) = 'SITE',
             selected.customer_name
           INTO v_order_customer_id, v_order_customer_name,
-               v_is_department, v_payload_customer_name
+               v_is_site, v_payload_customer_name
           FROM fnd_customers selected
           LEFT JOIN fnd_customers parent
                  ON parent.tenant_id   = selected.tenant_id
@@ -154,14 +155,9 @@ BEGIN
     END IF;
 
     -- ── Default department_event when not supplied in payload ─────────────
-    -- 1. Passed in payload → already in v_department_event
-    -- 2. Customer is DEPARTMENT → use department's own customer_name
-    -- 3. Otherwise → 'ORDER'
+    -- The selected customer's own name (site name for a site, department name, account name); 'ORDER' without a customer.
     IF v_department_event IS NULL THEN
-        v_department_event := CASE
-            WHEN v_is_department THEN UPPER(TRIM(v_payload_customer_name))
-            ELSE 'ORDER'
-        END;
+        v_department_event := COALESCE(NULLIF(UPPER(TRIM(v_payload_customer_name)), ''), 'ORDER');
     END IF;
 
     -- ── HEADER INSERT (new order) ─────────────────────────────────────────

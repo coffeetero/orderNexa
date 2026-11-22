@@ -153,6 +153,24 @@ BEGIN
   INSERT INTO _t VALUES ('staff update keeps delivery_charge when payload has delivery_amount', (SELECT delivery_charge FROM om_orders WHERE order_id = v_order) = 9);
 END $$;
 
+-- ── Regression: claims carry allowed_tenant_ids only (no tenant_id); tenant time zone must still resolve ──
+SELECT set_config('request.jwt.claims', json_build_object('role','authenticated','app_metadata',
+  json_build_object('allowed_tenant_ids', json_build_array(200000000002), 'restricted_tenant_ids', json_build_array(200000000002),
+                    'allowed_customer_ids', json_build_array(200000000040)))::text, true);
+DO $$
+DECLARE v_info jsonb; v_raised boolean;
+BEGIN
+  v_info := om_production_cutoff_get(200000000002, DATE '2020-01-15', 'MORNING', 200000000040);
+  INSERT INTO _t VALUES ('cutoff_get resolves a run that does not exist yet (tenant time zone readable)', v_info->>'cutoff_at' IS NOT NULL AND v_info->>'time_zone' = 'America/New_York');
+  INSERT INTO _t VALUES ('a past date with no run yet is closed to customers', NOT (v_info->>'is_open')::boolean);
+  BEGIN PERFORM om_orders_save(200000000002, NULL, NULL, jsonb_build_object('customer_id', 200000000040, 'production_date','2020-01-15','production_code','MORNING','lines','[]'::jsonb)); v_raised := false;
+  EXCEPTION WHEN OTHERS THEN v_raised := true; END;
+  INSERT INTO _t VALUES ('customer cannot place the first order of a run that is already past its cutoff', v_raised);
+  INSERT INTO _t VALUES ('time zone helper hides other tenants', bps.fnd_tenant_time_zone(999) IS NULL);
+  INSERT INTO _t VALUES ('report defaults load for staff and customers', om_report_defaults_get(200000000002) -> 'from_date' IS NOT NULL
+      AND jsonb_array_length(om_report_defaults_get(200000000002) -> 'production_codes') = 5);
+END $$;
+
 RESET ROLE;
 SELECT CASE WHEN ok THEN 'PASS ' ELSE 'FAIL ' END || name AS result FROM _t;
 DO $$

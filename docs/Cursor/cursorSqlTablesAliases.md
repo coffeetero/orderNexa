@@ -35,5 +35,9 @@ Use this file as the default alias reference when writing SQL in this repo.
 | `fnd_user_tenants` | `usrTnt` |
 | `fnd_users` | `usr` |
 | `om_order_lines` | `ordrLn` |
-| `om_order_shipments` | `ordrShpmnt` |
+| `om_delivery_methods` | `dlvMth` |
+| `om_production_codes` | `prdCd` |
+| `om_production_runs` | `prdRun` |
+| `om_shipment_lines` | `shpmntLn` |
+| `om_shipments` | `shpmnt` |
 | `om_orders` | `ordr` |

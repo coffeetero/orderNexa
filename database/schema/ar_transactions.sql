@@ -69,3 +69,27 @@ COMMENT ON COLUMN ar_transactions.legacy_ar_id IS
 
 COMMENT ON COLUMN ar_transactions.status IS
     'Document lifecycle: OPEN, PARTIAL, CLOSED, CANCELLED.';
+
+-- ============================================================
+-- Order-to-invoice: invoices are built per production run and numbered when printed.
+--   DRAFT  = built by "Process run", no document_number yet (assigned at the Packaging print from the tenant
+--            sequence 'invoice_number'); OPEN/PARTIAL/CLOSED/CANCELLED as before (CANCELLED = void, never deleted).
+--   production_run_id = the run an INV belongs to (one invoice per customer per run).
+--   applies_to_ar_transaction_id = the invoice a credit memo (transaction_type 'CM') corrects.
+-- ============================================================
+ALTER TABLE ar_transactions ALTER COLUMN document_number DROP NOT NULL;
+ALTER TABLE ar_transactions ADD COLUMN IF NOT EXISTS production_run_id BIGINT REFERENCES om_production_runs(production_run_id);
+ALTER TABLE ar_transactions ADD COLUMN IF NOT EXISTS applies_to_ar_transaction_id BIGINT REFERENCES ar_transactions(ar_transaction_id);
+ALTER TABLE ar_transactions DROP CONSTRAINT IF EXISTS ar_transactions_status_check;
+ALTER TABLE ar_transactions DROP CONSTRAINT IF EXISTS chk_ar_transactions_status;
+ALTER TABLE ar_transactions ADD CONSTRAINT chk_ar_transactions_status
+    CHECK (status IN ('DRAFT', 'OPEN', 'PARTIAL', 'CLOSED', 'CANCELLED'));
+ALTER TABLE ar_transactions DROP CONSTRAINT IF EXISTS chk_ar_transactions_number_when_issued;
+ALTER TABLE ar_transactions ADD CONSTRAINT chk_ar_transactions_number_when_issued
+    CHECK (status = 'DRAFT' OR document_number IS NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_ar_transactions_invoice_run
+    ON ar_transactions (tenant_id, customer_id, production_run_id)
+    WHERE transaction_type = 'INV' AND production_run_id IS NOT NULL AND status <> 'CANCELLED';
+CREATE INDEX IF NOT EXISTS idx_ar_transactions_run ON ar_transactions (tenant_id, production_run_id) WHERE production_run_id IS NOT NULL;
+COMMENT ON COLUMN ar_transactions.status IS
+    'Document lifecycle: DRAFT (no number yet), OPEN, PARTIAL, CLOSED, CANCELLED (void).';

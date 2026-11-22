@@ -2,7 +2,7 @@
 -- AR_TRANSACTION_LINES  –  Line detail for an AR document
 -- Target: Supabase (PostgreSQL 15+)
 --
--- Run after: ar_transactions.sql, om_order_shipments.sql, fnd_items.sql
+-- Run after: ar_transactions.sql, om_shipment_lines.sql, fnd_items.sql
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS ar_transaction_lines (
@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS ar_transaction_lines (
     unit_price              NUMERIC(14,4),
     amount                  NUMERIC(14,4) NOT NULL,
 
-    order_shipment_id       BIGINT      REFERENCES om_order_shipments(order_shipment_id) ON DELETE SET NULL,
+    shipment_line_id        BIGINT      REFERENCES om_shipment_lines(shipment_line_id) ON DELETE SET NULL,
 
     snapshot_data           JSONB       NOT NULL DEFAULT '{}'::jsonb,
 
@@ -42,9 +42,9 @@ ALTER TABLE ar_transaction_lines OWNER TO bps_owner;
 CREATE INDEX IF NOT EXISTS idx_ar_transaction_lines_txn
     ON ar_transaction_lines (tenant_id, ar_transaction_id);
 
-CREATE INDEX IF NOT EXISTS idx_ar_transaction_lines_order_shipment
-    ON ar_transaction_lines (tenant_id, order_shipment_id)
-    WHERE order_shipment_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_ar_transaction_lines_shipment_line
+    ON ar_transaction_lines (tenant_id, shipment_line_id)
+    WHERE shipment_line_id IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_ar_transaction_lines_item
     ON ar_transaction_lines (tenant_id, item_id)
@@ -67,7 +67,7 @@ COMMENT ON TABLE ar_transaction_lines IS
     'Commercial / tax lines; optional at go-live if header-only AR is enough.';
 
 COMMENT ON COLUMN ar_transaction_lines.source_type IS
-    'Line classification: ITEM, DELIVERY, FEE, ADJUSTMENT.';
+    'Line classification: ITEM, DELIVERY (delivery charge from the order), FEE, ADJUSTMENT (credit memo lines).';
 
 COMMENT ON COLUMN ar_transaction_lines.item_description IS
     'Display text for the line (e.g. product or charge label).';

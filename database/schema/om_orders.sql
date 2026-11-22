@@ -66,20 +66,8 @@ UPDATE om_orders
  WHERE customer_name IS NULL
    AND snapshot_data ? 'cus_name';
 
-UPDATE om_orders o
-   SET customer_id = parent.customer_id,
-       customer_name = parent.customer_name,
-       department_event =
-           COALESCE(NULLIF(UPPER(TRIM(o.department_event)), ''), UPPER(TRIM(location.customer_name)), '')
-           || '-' || o.order_number
-  FROM fnd_customers location
-  JOIN fnd_customers parent
-    ON parent.tenant_id = location.tenant_id
-   AND parent.customer_id = location.customer_parent_id
- WHERE location.tenant_id = o.tenant_id
-   AND location.customer_id = o.customer_id
-   AND UPPER(TRIM(location.customer_type)) IN ('DEPARTMENT', 'LOCATION')
-   AND location.customer_parent_id IS NOT NULL;
+-- (Removed: a one-off that rolled DEPARTMENT/LOCATION orders up to the parent customer. Departments now keep their own
+--  customer_id; only SITE orders are stored under the parent, with the site name as department_event. See om_orders_save.)
 
 UPDATE om_orders
    SET production_code = NULLIF(UPPER(TRIM(production_code)), ''),
