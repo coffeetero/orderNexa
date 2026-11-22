@@ -9,7 +9,7 @@ import { NavProvider } from '@/components/layout/nav-context';
 import { AccountAppearanceLoader } from '@/components/theme/AppearanceProvider';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import { createClient } from '@/lib/supabase/client';
-import { tenantNav } from '@/lib/nav-config';
+import { tenantNav, visibleMenus } from '@/lib/nav-config';
 import { SIDEBAR_COLLAPSED, SIDEBAR_COOKIE, SIDEBAR_OPEN } from '@/lib/sidebar-pref';
 import { cn } from '@/lib/utils';
 
@@ -26,6 +26,8 @@ type TenantLayoutShellProps = {
   tenantId?: number | null;
   /** Initial docked-sidebar state from the cookie. */
   sidebarCollapsed?: boolean;
+  /** Areas the user may read; menus that require other areas are hidden. Omit to show every menu. */
+  areas?: string[] | null;
 };
 
 const DOCKED_QUERY = '(min-width: 1280px)';
@@ -38,6 +40,7 @@ export function TenantLayoutShell({
   userRole,
   tenantId = null,
   sidebarCollapsed = false,
+  areas = null,
 }: TenantLayoutShellProps) {
   const router = useRouter();
   const [authChecked, setAuthChecked] = useState(false);
@@ -110,7 +113,7 @@ export function TenantLayoutShell({
       <AccountAppearanceLoader />
       <div className="flex h-screen flex-col overflow-hidden">
         <TopNav
-          menus={tenantNav}
+          menus={visibleMenus(tenantNav, areas)}
           homeHref={sidebarHomeHref}
           brand="Alpine Bakery"
           userName={userName}

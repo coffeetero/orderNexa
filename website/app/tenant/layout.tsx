@@ -25,6 +25,11 @@ export default async function TenantLayout({ children }: { children: React.React
     const first = Array.isArray(tenantData) ? tenantData[0] : null;
     tenantId = typeof first?.tenant_id === 'number' ? first.tenant_id : null;
   }
+  let areas: string[] | null = null;
+  if (access.userType === 'TENANCY_USER') {
+    const { data: areaData } = await createClient().rpc('fnd_my_areas');
+    areas = Array.isArray(areaData) ? (areaData as string[]) : [];
+  }
   const sidebarCollapsed = cookies().get(SIDEBAR_COOKIE)?.value === SIDEBAR_COLLAPSED;
 
   return (
@@ -34,6 +39,7 @@ export default async function TenantLayout({ children }: { children: React.React
       userRole={access.userType === 'TENANCY_USER' ? 'Staff' : null}
       tenantId={tenantId}
       sidebarCollapsed={sidebarCollapsed}
+      areas={areas}
     >
       {children}
     </TenantLayoutShell>

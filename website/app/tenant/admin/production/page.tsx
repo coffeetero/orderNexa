@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { requireArea } from '@/lib/supabase/guard';
 import { ProductionSettings } from '@/components/features/admin/ProductionSettings';
 
 export const metadata = {
@@ -6,6 +7,7 @@ export const metadata = {
 };
 
 export default async function AdminProductionPage() {
+  await requireArea('admin.production');
   // Resolve the tenant on the server (same pattern as Enter Orders); the browser session has no tenant_id claim.
   const { data } = await createClient().rpc('fnd_tenants_get');
   const tenants = Array.isArray(data) ? data : [];

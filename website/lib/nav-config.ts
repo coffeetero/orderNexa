@@ -18,6 +18,8 @@ export type NavMenu = {
   label: string;
   /** Top-level link (no dropdown). */
   href?: string;
+  /** Hide the whole menu unless the user may read at least one of these areas (fnd_areas keys). Omit = always shown. */
+  requiresAnyArea?: string[];
   groups?: NavGroup[];
 };
 
@@ -164,6 +166,7 @@ export const tenantNav: NavMenu[] = [
   // Visible to all staff for now. Add `requires` to an entry to restrict it once roles exist.
   {
     label: 'Admin',
+    requiresAnyArea: ['admin.roles', 'admin.users', 'admin.groups', 'admin.channels', 'admin.production'],
     groups: [
       { heading: 'Preferences', items: [{ label: 'Appearance', href: '/admin/appearance' }] },
       { heading: 'Production', items: [{ label: 'Production Settings', href: '/admin/production' }] },
@@ -179,6 +182,12 @@ export const tenantNav: NavMenu[] = [
     ],
   },
 ];
+
+/** Menus the user may see, given the areas they can read (null = unknown, show everything). */
+export function visibleMenus(menus: NavMenu[], areas: string[] | null): NavMenu[] {
+  if (areas === null) return menus;
+  return menus.filter((m) => !m.requiresAnyArea || m.requiresAnyArea.some((a) => areas.includes(a)));
+}
 
 /** Customer-portal navigation under `/<account_slug>`. */
 export function customerNav(basePath: string): NavMenu[] {

@@ -1,6 +1,6 @@
 # Access model (roles, areas, data scope, one tenancy per session)
 
-Status: built locally (steps a-d). Not applied to the cloud. Admin screens: Admin > Roles & Access, Users, Customer Groups, Phone & Messaging (API in add_access_admin_functions.sql). Creating new users is not built.
+Status: built locally (steps a-d). Not applied to the cloud. Admin screens: Admin > Roles & Access, Users, Customer Groups, Phone & Messaging (API in add_access_admin_functions, add_access_my_areas.sql). Creating new users is not built.
 
 ## Rules
 - One active tenancy per auth session: `app_metadata.tenant_id` (+ `tenant_slug`), issued by `bps_access_token_hook` from `fnd_user_active_tenant`
@@ -21,14 +21,14 @@ Status: built locally (steps a-d). Not applied to the cloud. Admin screens: Admi
 In policies wrap them as `(SELECT ...)` so Postgres evaluates them once per query.
 
 ## Apply order
-add_access_model_tables, add_access_model_functions, add_active_tenancy, add_rls_access_model, add_access_admin_functions.
+add_access_model_tables, add_access_model_functions, add_active_tenancy, add_rls_access_model, add_access_admin_functions, add_access_my_areas.
 
 ## Tests
 `database/tests/`: access_model_test, active_tenancy_test, access_admin_test, rls_test (also scans every table and function for missing RLS or anon access).
 
 ## Open / not done
 - Screens for customer admins (the portal side: their own users and roles) and creating/inviting users.
-- Menu items are not yet hidden by area access (RLS already enforces it).
+- Only the Admin top menu is hidden by area access (pages under Admin return not-found too); other menus still show every entry (RLS enforces the data).
 - Older functions still contain their own allowed_tenant_ids checks; they work because the token narrows that list. Replace with `fnd_assert_active_tenant` over time.
 - New tables get anon grants from Supabase default privileges: always `REVOKE ALL ... FROM anon` and enable RLS (rls_test fails otherwise).
 - Cloud: apply the four migrations plus the earlier ones; the unprefixed legacy tables now have RLS on and no app access.

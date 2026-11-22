@@ -27,6 +27,7 @@ BEGIN
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","app_metadata":{"tenant_id":200000000002,"allowed_tenant_ids":[200000000002],"app_user_id":200000174045}}', true);
   SET LOCAL ROLE authenticated;
 
+  INSERT INTO _t VALUES ('tenant administrator areas include every admin area', (SELECT count(*) FROM unnest(fnd_my_areas()) a WHERE a LIKE 'admin.%') = 6);
   -- roles
   j := fnd_roles_get(200000000002);
   INSERT INTO _t VALUES ('roles list shows both system roles', (SELECT count(*) FROM jsonb_array_elements(j) e WHERE (e->>'is_system')::boolean) = 2);
@@ -104,6 +105,7 @@ DECLARE uClerk bigint := (SELECT v FROM _ids WHERE k='uClerk'); uTarget bigint :
 BEGIN
   PERFORM set_config('request.jwt.claims', format('{"role":"authenticated","app_metadata":{"tenant_id":200000000002,"allowed_tenant_ids":[200000000002],"app_user_id":%s}}', uClerk), true);
   SET LOCAL ROLE authenticated;
+  INSERT INTO _t VALUES ('clerk areas list holds orders.enter and no admin area', 'orders.enter' = ANY (fnd_my_areas()) AND NOT EXISTS (SELECT 1 FROM unnest(fnd_my_areas()) a WHERE a LIKE 'admin.%'));
   INSERT INTO _t VALUES ('clerk sees no roles', fnd_roles_get(200000000002) = '[]'::jsonb);
   INSERT INTO _t VALUES ('clerk sees no users except themselves', jsonb_array_length(fnd_users_get(200000000002)) <= 1);
   INSERT INTO _t VALUES ('clerk sees no groups or numbers', fnd_customer_groups_get(200000000002) = '[]'::jsonb AND fnd_phone_numbers_get(200000000002) = '[]'::jsonb);

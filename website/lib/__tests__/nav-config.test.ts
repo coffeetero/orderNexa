@@ -90,3 +90,14 @@ describe('findActiveMenu', () => {
     expect(findActiveMenu('/dashboard', tenantNav)?.label).toBe('Dashboard');
   });
 });
+
+import { visibleMenus } from '../nav-config';
+describe('visibleMenus', () => {
+  it('hides the Admin menu unless the user can read an admin area', () => {
+    const labels = (areas: string[] | null) => visibleMenus(tenantNav, areas).map((m) => m.label);
+    expect(labels(['orders.enter'])).not.toContain('Admin');
+    expect(labels(['orders.enter', 'admin.users'])).toContain('Admin');
+    expect(labels(null)).toContain('Admin');
+    expect(labels([])).toContain('Orders');
+  });
+});
