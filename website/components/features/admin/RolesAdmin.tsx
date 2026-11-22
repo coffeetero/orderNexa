@@ -15,7 +15,7 @@ const FLAGS: { key: Flag; label: string }[] = [
   { key: 'can_void', label: 'Void' }, { key: 'can_delete', label: 'Delete' },
 ];
 
-export function RolesAdmin({ tenantId }: { tenantId: number }) {
+export function RolesAdmin({ tenantId, audience }: { tenantId: number; audience: 'TENANT' | 'CUSTOMER' }) {
   const { notify, banner } = useBanner();
   const [roles, setRoles] = useState<Role[]>([]);
   const [selected, setSelected] = useState<Role | null>(null);
@@ -79,24 +79,25 @@ export function RolesAdmin({ tenantId }: { tenantId: number }) {
 
   return (
     <div className="space-y-4 p-4 sm:p-6">
-      <PageHead title="Roles & Access">
+      <PageHead title={audience === 'TENANT' ? 'Tenant Roles' : 'Customer Roles'}>
         A role is a named set of rights. For each area choose what the role may do; write, approve, void and delete all include read.
-        Users get one or more roles. Tenant roles are for your staff; customer roles are for people at your customers.
+        Users get one or more roles.{' '}
+        {audience === 'TENANT'
+          ? 'These roles are for your own staff and are never visible to customers.'
+          : 'These roles are for people at your customers (the portal). Customers can create roles of their own for their staff; they appear here so you can help them.'}
       </PageHead>
       {banner}
       <div className="grid gap-6 lg:grid-cols-[18rem_1fr]">
         <div className="space-y-2">
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" onClick={() => open(null, 'TENANT')}>New tenant role</Button>
-            <Button size="sm" variant="outline" onClick={() => open(null, 'CUSTOMER')}>New customer role</Button>
+            <Button size="sm" onClick={() => open(null, audience)}>{audience === 'TENANT' ? 'New tenant role' : 'New customer role'}</Button>
           </div>
-          {(['TENANT', 'CUSTOMER'] as const).map((aud) => (
+          {[audience].map((aud) => (
             <div key={aud}>
-              <div className="mt-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">{aud === 'TENANT' ? 'Tenant roles' : 'Customer roles'}</div>
               {roles.filter((r) => r.role_audience === aud).map((r) => (
                 <button key={r.role_id} onClick={() => open(r)}
                   className={`mt-1 flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-sm hover:bg-muted ${selected?.role_id === r.role_id ? 'border-primary bg-muted' : ''}`}>
-                  <span>{r.role_name}{r.is_system ? ' · system' : ''}{!r.is_active ? ' · inactive' : ''}</span>
+                  <span>{r.role_name}{r.is_system ? ' · system' : ''}{r.owner_customer_id ? ' · made by a customer' : ''}{!r.is_active ? ' · inactive' : ''}</span>
                   <span className="text-xs text-muted-foreground">{r.user_count} users</span>
                 </button>
               ))}

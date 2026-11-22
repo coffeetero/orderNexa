@@ -1,6 +1,6 @@
 # Access model (roles, areas, data scope, one tenancy per session)
 
-Status: built locally (steps a-d). Not applied to the cloud. Admin screens: Admin > Roles & Access, Users, Customer Groups, Phone & Messaging (API in add_access_admin_functions, add_access_my_areas.sql). Creating new users is not built.
+Status: built locally (steps a-d). Not applied to the cloud. Admin screens: Admin > Tenant Roles, Customer Roles, Users, Customer Groups, Phone & Messaging (API in add_access_admin_functions, add_access_my_areas, add_customer_roles_area.sql). Creating new users is not built.
 
 ## Rules
 - One active tenancy per auth session: `app_metadata.tenant_id` (+ `tenant_slug`), issued by `bps_access_token_hook` from `fnd_user_active_tenant`
@@ -21,7 +21,7 @@ Status: built locally (steps a-d). Not applied to the cloud. Admin screens: Admi
 In policies wrap them as `(SELECT ...)` so Postgres evaluates them once per query.
 
 ## Apply order
-add_access_model_tables, add_access_model_functions, add_active_tenancy, add_rls_access_model, add_access_admin_functions, add_access_my_areas.
+add_access_model_tables, add_access_model_functions, add_active_tenancy, add_rls_access_model, add_access_admin_functions, add_access_my_areas, add_customer_roles_area.
 
 ## Tests
 `database/tests/`: access_model_test, active_tenancy_test, access_admin_test, rls_test (also scans every table and function for missing RLS or anon access).

@@ -27,7 +27,7 @@ BEGIN
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","app_metadata":{"tenant_id":200000000002,"allowed_tenant_ids":[200000000002],"app_user_id":200000174045}}', true);
   SET LOCAL ROLE authenticated;
 
-  INSERT INTO _t VALUES ('tenant administrator areas include every admin area', (SELECT count(*) FROM unnest(fnd_my_areas()) a WHERE a LIKE 'admin.%') = 6);
+  INSERT INTO _t VALUES ('tenant administrator areas include every admin area', (SELECT count(*) FROM unnest(fnd_my_areas()) a WHERE a LIKE 'admin.%') = 7);
   -- roles
   j := fnd_roles_get(200000000002);
   INSERT INTO _t VALUES ('roles list shows both system roles', (SELECT count(*) FROM jsonb_array_elements(j) e WHERE (e->>'is_system')::boolean) = 2);
@@ -96,6 +96,38 @@ BEGIN
   INSERT INTO _t VALUES ('number deleted', jsonb_array_length(fnd_phone_numbers_get(200000000002)) = 0);
   BEGIN PERFORM fnd_role_save(999, '{"role_name":"x"}'::jsonb); r := false; EXCEPTION WHEN OTHERS THEN r := true; END;
   INSERT INTO _t VALUES ('another tenant id is refused', r);
+  RESET ROLE;
+END $$;
+
+-- ── tenant roles and customer roles are separate areas (support can see one without the other) ──
+DO $$
+DECLARE uT bigint; uC bigint; rT bigint; rC bigint; n int; r boolean;
+BEGIN
+  INSERT INTO fnd_roles (tenant_id, role_name, role_audience) VALUES (200000000002, 'zz tenant-roles only', 'TENANT') RETURNING role_id INTO rT;
+  INSERT INTO fnd_role_area_access (tenant_id, role_id, area_key, can_read, can_write, can_delete) VALUES (200000000002, rT, 'admin.roles', true, true, true);
+  INSERT INTO fnd_roles (tenant_id, role_name, role_audience) VALUES (200000000002, 'zz customer-roles only', 'TENANT') RETURNING role_id INTO rC;
+  INSERT INTO fnd_role_area_access (tenant_id, role_id, area_key, can_read, can_write, can_delete) VALUES (200000000002, rC, 'admin.customer-roles', true, true, true);
+  INSERT INTO fnd_users (tenant_id, auth_user_id, user_name, user_type) VALUES (200000000002, gen_random_uuid(), 'zz tr', 'TENANCY_USER') RETURNING user_id INTO uT;
+  INSERT INTO fnd_users (tenant_id, auth_user_id, user_name, user_type) VALUES (200000000002, gen_random_uuid(), 'zz cr', 'TENANCY_USER') RETURNING user_id INTO uC;
+  INSERT INTO fnd_user_tenants (tenant_id, user_id) VALUES (200000000002, uT), (200000000002, uC);
+  INSERT INTO fnd_user_roles (tenant_id, user_id, role_id) VALUES (200000000002, uT, rT), (200000000002, uC, rC);
+
+  PERFORM set_config('request.jwt.claims', format('{"role":"authenticated","app_metadata":{"tenant_id":200000000002,"allowed_tenant_ids":[200000000002],"app_user_id":%s}}', uT), true);
+  SET LOCAL ROLE authenticated;
+  SELECT count(*) INTO n FROM fnd_roles WHERE role_audience = 'CUSTOMER'; INSERT INTO _t VALUES ('tenant-roles user sees no customer roles', n = 0);
+  SELECT count(*) INTO n FROM fnd_roles WHERE role_audience = 'TENANT'; INSERT INTO _t VALUES ('...but sees tenant roles', n > 0);
+  BEGIN PERFORM fnd_role_save(200000000002, '{"role_name":"zz sneaky","role_audience":"CUSTOMER"}'::jsonb); r := false; EXCEPTION WHEN OTHERS THEN r := true; END;
+  INSERT INTO _t VALUES ('...and cannot create a customer role', r);
+  PERFORM fnd_role_save(200000000002, '{"role_name":"zz made by tr","role_audience":"TENANT"}'::jsonb);
+  INSERT INTO _t VALUES ('...can create a tenant role', true);
+
+  PERFORM set_config('request.jwt.claims', format('{"role":"authenticated","app_metadata":{"tenant_id":200000000002,"allowed_tenant_ids":[200000000002],"app_user_id":%s}}', uC), true);
+  SELECT count(*) INTO n FROM fnd_roles WHERE role_audience = 'TENANT'; INSERT INTO _t VALUES ('customer-roles user (support) sees no tenant roles', n = 0);
+  SELECT count(*) INTO n FROM fnd_roles WHERE role_audience = 'CUSTOMER'; INSERT INTO _t VALUES ('...but sees the customer roles', n > 0);
+  BEGIN PERFORM fnd_role_save(200000000002, '{"role_name":"zz sneaky2","role_audience":"TENANT"}'::jsonb); r := false; EXCEPTION WHEN OTHERS THEN r := true; END;
+  INSERT INTO _t VALUES ('...and cannot create a tenant role', r);
+  PERFORM fnd_role_save(200000000002, '{"role_name":"zz made by cr","role_audience":"CUSTOMER"}'::jsonb);
+  INSERT INTO _t VALUES ('...can create a customer role', true);
   RESET ROLE;
 END $$;
 
