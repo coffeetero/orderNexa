@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
+import { GuardedLink as Link } from '@/components/layout/GuardedLink';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Bell,

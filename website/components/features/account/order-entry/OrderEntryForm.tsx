@@ -1,7 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { localDateIso } from '@/lib/date';
+import { useBreadcrumbRecord, useNav, useNavGuard, useTrackRecent } from '@/components/layout/nav-context';
+import { useDeepLinkId } from '@/lib/use-deep-link';
+import type { CurrentRecord } from '@/lib/nav-records';
 import { useRouter } from 'next/navigation';
 import { Save, Trash2, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
@@ -128,6 +131,22 @@ function normalizePrepOptions(raw: unknown): PrepOption[] {
     .filter((option) => option.value.length > 0);
 }
 
+/**
+ * Stable fingerprint of what the user has actually entered. Compared with the fingerprint taken when an
+ * order was loaded, it tells the navigation guard whether leaving would discard work.
+ */
+function draftSignature(d: OrderEntryDraft): string {
+  return JSON.stringify([
+    d.customer_id,
+    d.department_event,
+    d.po_number,
+    d.production_date,
+    d.production_code,
+    d.delivery_amount,
+    d.lines.map((l) => [l.item_id, l.quantity, l.unit_price, l.unit_discount, l.is_scored, (l.prep_options ?? []).map((o) => o.value)]),
+  ]);
+}
+
 interface OrderEntryFormProps {
   mode: 'new' | 'edit';
   /** Provided in edit mode — the form fetches the order on mount. */
@@ -148,6 +167,7 @@ export function OrderEntryForm({
   serverCustomers,
 }: OrderEntryFormProps) {
   const router = useRouter();
+  const { touch: touchNav } = useNav();
 
   // ── Session / tenant ───────────────────────────────────────────────────
   // Initialise directly from the server-passed value when available.
@@ -217,6 +237,16 @@ export function OrderEntryForm({
     zeroLinePrices,
     getLineQty,
   } = useOrderEntryState(initialData);
+
+  // Unsaved-changes tracking for the navigation guard: fingerprint of the draft as last loaded/saved.
+  const cleanSigRef = useRef<string | null>(initialData ? draftSignature(initialData) : null);
+  const loadOrderClean = useCallback(
+    (loaded: OrderEntryDraft) => {
+      cleanSigRef.current = draftSignature(loaded);
+      loadOrder(loaded);
+    },
+    [loadOrder],
+  );
 
   const {
     customerInputRef,
@@ -407,11 +437,11 @@ export function OrderEntryForm({
         loadedDraft.customer_id = selectedCustomerId;
         loadedDraft.customer_name = selectedCustomerName;
       }
-      loadOrder(loadedDraft);
+      loadOrderClean(loadedDraft);
       setActiveLineIndex(null);
       setShouldFocusItemWhenReady(true);
     },
-    [tenantId, draft.customer_id, draft.customer_name, loadOrder, mapOrderToDraft, showStatusMessage],
+    [tenantId, draft.customer_id, draft.customer_name, loadOrderClean, mapOrderToDraft, showStatusMessage],
   );
 
   // ── Load PRODUCTIONCODE valueset, default draft.production_code ───────────
@@ -609,12 +639,12 @@ export function OrderEntryForm({
           showStatusMessage({ text: 'Order detail was empty; no lines were loaded.', type: 'error' });
           return;
         }
-        loadOrder(mapOrderToDraft(data as Record<string, unknown>));
+        loadOrderClean(mapOrderToDraft(data as Record<string, unknown>));
       })
       .catch(() => {
         showStatusMessage({ text: 'Could not load order lines. Network request failed.', type: 'error' });
       });
-  }, [mode, orderId, tenantId, initialData, loadOrder, mapOrderToDraft, showStatusMessage]);
+  }, [mode, orderId, tenantId, initialData, loadOrderClean, mapOrderToDraft, showStatusMessage]);
 
   // ── Focus on initial load ──────────────────────────────────────────────
   useEffect(() => {
@@ -693,6 +723,42 @@ export function OrderEntryForm({
     },
     [getDefaultDepartmentEvent, setCustomer, setField],
   );
+
+  // ── Sidebar / breadcrumb integration ───────────────────────────────────
+  const customerRecord = useMemo<CurrentRecord | null>(() => {
+    if (!draft.customer_id || !draft.customer_name) return null;
+    const number = customers.find((c) => c.customer_id === draft.customer_id)?.customer_number;
+    return {
+      type: 'customer',
+      key: String(draft.customer_id),
+      label: number ? `${number} · ${draft.customer_name}` : draft.customer_name,
+    };
+  }, [customers, draft.customer_id, draft.customer_name]);
+
+  const orderRecord = useMemo<CurrentRecord | null>(
+    () =>
+      draft.order_id && draft.order_number
+        ? {
+            type: 'order',
+            key: String(draft.order_id),
+            label: [draft.order_number, draft.customer_name].filter(Boolean).join(' · '),
+          }
+        : null,
+    [draft.order_id, draft.order_number, draft.customer_name],
+  );
+
+  useBreadcrumbRecord(orderRecord ?? customerRecord);
+  useTrackRecent(customerRecord);
+  useTrackRecent(orderRecord);
+  useNavGuard(draft.lines.length > 0 && draftSignature(draft) !== cleanSigRef.current);
+
+  // /orders?customer=ID (from the sidebar): select that customer exactly as if it was picked in the combobox.
+  useDeepLinkId('customer', mode === 'new' && tenantId !== null && customers.length > 0, (id) => {
+    const customer = customers.find((c) => c.customer_id === id);
+    if (!customer) return;
+    handleCustomerChange(customer);
+    focusDepartmentEvent();
+  });
 
   const warnIfExistingOrderLoaded = useCallback(() => {
     if (!draft.order_id) return false;
@@ -949,6 +1015,14 @@ export function OrderEntryForm({
         text: json.data?.message ?? 'Order saved.',
         type: 'success',
       });
+      const savedNumber = json.data?.order_number ?? draft.order_number ?? String(resolvedOrderId);
+      touchNav({
+        record: {
+          type: 'order',
+          key: String(resolvedOrderId),
+          label: [savedNumber, draft.customer_name].filter(Boolean).join(' · '),
+        },
+      });
       reset({ preserveProductionSlot: true });
       setDepartmentEventOptions([]);
       setSelectedDepartmentEventId(null);
@@ -956,7 +1030,7 @@ export function OrderEntryForm({
     } finally {
       setIsSaving(false);
     }
-  }, [canSave, tenantId, isSaving, draft, reset, setField, focusCustomer, showStatusMessage]);
+  }, [canSave, tenantId, isSaving, draft, reset, setField, focusCustomer, showStatusMessage, touchNav]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {

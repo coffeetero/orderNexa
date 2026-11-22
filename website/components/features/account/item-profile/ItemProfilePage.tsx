@@ -16,6 +16,8 @@ import { EntityComboBox } from '@/components/bps/EntityComboBox';
 import { ItemPricebooksTab, type ItemPricebooksTabHandle } from './ItemPricebooksTab';
 import { ItemNotesTab } from './ItemNotesTab';
 import type { PrepOption } from '@/lib/types';
+import { useCurrentRecord, useNavGuard } from '@/components/layout/nav-context';
+import { useDeepLinkId } from '@/lib/use-deep-link';
 
 interface ItemProfile {
   tenant_id: number;
@@ -301,6 +303,19 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
     [draft, originalDraft, isCreatingNew],
   );
   const isAnythingDirty = isProfileDirty || isPricebooksDirty;
+
+  // Sidebar / breadcrumb integration: the open item, unsaved-changes guard, and ?item=ID deep links.
+  const navLabel = [originalDraft.item_number, originalDraft.item_name].filter(Boolean).join(' · ');
+  useCurrentRecord(
+    selectedItemId !== null && originalDraft.item_id === selectedItemId && navLabel
+      ? { type: 'item', key: String(selectedItemId), label: navLabel }
+      : null,
+  );
+  useNavGuard(isAnythingDirty);
+  useDeepLinkId('item', items.length > 0, (id) => {
+    setIsCreatingNew(false);
+    void loadItemDetail(id);
+  });
 
   const set = <K extends keyof ItemProfile>(field: K, value: ItemProfile[K]) =>
     setDraft((prev) => ({ ...prev, [field]: value }));

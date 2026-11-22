@@ -21,6 +21,8 @@ import { CustomerContactsTab, CustomerContactsTabHandle } from '@/components/fea
 import { CustomerNotesTab, CustomerNotesTabHandle } from '@/components/features/account/CustomerNotesTab';
 import { CustomerPricebooksTab, CustomerPricebooksTabHandle } from '@/components/features/account/CustomerPricebooksTab';
 import { SaveChangesDialog } from '@/components/features/account/SaveChangesDialog';
+import { useCurrentRecord, useNavGuard } from '@/components/layout/nav-context';
+import { useDeepLinkId } from '@/lib/use-deep-link';
 
 type TenantOption = {
   tenant_id: number;
@@ -512,6 +514,22 @@ export function CustomerManagementPage({
     activeTab === 'contacts' ? contactsIsDirty :
     activeTab === 'pricing'  ? pricingIsDirty  :
     activeTab === 'notes'    ? notesIsDirty    : false;
+
+  // Sidebar / breadcrumb integration: the open customer, unsaved-changes guard, and ?customer=ID deep links.
+  const navLabel = selectedOriginal
+    ? [selectedOriginal.customer_number, selectedOriginal.customer_name].filter(Boolean).join(' · ')
+    : '';
+  useCurrentRecord(
+    selectedCustomerId !== null && navLabel
+      ? { type: 'customer', key: String(selectedCustomerId), label: navLabel }
+      : null,
+  );
+  useNavGuard(profileIsDirty || contactsIsDirty || pricingIsDirty || notesIsDirty);
+  useDeepLinkId('customer', customers.length > 0, (id) => {
+    const row = customers.find((c) => c.customer_id === id);
+    if (row) void loadCustomerIntoForm(row);
+    else setStatusMessage('That customer is not available.');
+  });
 
   const handleTabChange = (newTab: string) => {
     if (currentTabIsDirty) {
