@@ -22,12 +22,12 @@ export default function AccountCustomerDashboardPage({ params }: Props) {
         <CustomerMetricCard
           metric={mockCustomerMetrics.totalOrders}
           icon={ShoppingCart}
-          accentColor="bg-sky-500/10 text-sky-600 dark:text-sky-400"
+          accentColor="bg-info/10 text-info"
         />
         <CustomerMetricCard
           metric={mockCustomerMetrics.openInvoices}
           icon={FileText}
-          accentColor="bg-amber-500/10 text-amber-600 dark:text-amber-400"
+          accentColor="bg-warning/10 text-warning"
         />
         <CustomerMetricCard
           metric={mockCustomerMetrics.lastOrderDate}
@@ -92,8 +92,8 @@ export default function AccountCustomerDashboardPage({ params }: Props) {
                       variant="outline"
                       className={
                         invoice.status === 'overdue'
-                          ? 'text-[10px] bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/25 mt-0.5'
-                          : 'text-[10px] bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/25 mt-0.5'
+                          ? 'text-[10px] bg-destructive/10 text-destructive border-destructive/25 mt-0.5'
+                          : 'text-[10px] bg-warning/10 text-warning border-warning/25 mt-0.5'
                       }
                     >
                       {invoice.status === 'overdue' ? 'Overdue' : 'Open'}

@@ -28,8 +28,8 @@ export function MetricCard({ metric, icon: Icon, accentColor = 'bg-primary/10 te
               className={cn(
                 'flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
                 isPositive
-                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
-                  : 'bg-red-500/10 text-red-600 dark:text-red-400'
+                  ? 'bg-success/10 text-success'
+                  : 'bg-destructive/10 text-destructive'
               )}
             >
               {isPositive ? (

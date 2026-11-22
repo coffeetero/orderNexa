@@ -245,8 +245,8 @@ export function OrderHeaderRow({
             className={cn(
               'h-9 w-full rounded-md border border-input px-2 text-sm text-foreground',
               isTomorrow
-                ? 'bg-emerald-100 dark:bg-emerald-950/50'
-                : 'bg-red-100 dark:bg-red-950/50',
+                ? 'bg-success-soft'
+                : 'bg-destructive/10',
               'focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary',
             )}
             value={draft.production_date}

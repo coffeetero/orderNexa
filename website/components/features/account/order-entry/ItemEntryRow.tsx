@@ -194,9 +194,9 @@ export function ItemEntryRow({
           className={cn(
             'block h-9 w-full rounded border px-2 text-right text-sm font-bold tabular-nums',
             'leading-9',
-            'bg-amber-50 dark:bg-amber-950/40',
-            'border-amber-200 dark:border-amber-800',
-            'text-amber-800 dark:text-amber-300',
+            'bg-warning-soft',
+            'border-warning/40',
+            'text-warning',
           )}
           tabIndex={-1}
           aria-label="Total Order"

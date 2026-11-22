@@ -49,7 +49,7 @@ const STATUS_LABEL: Record<string, string> = {
   FAILED: '✗ Failed',
 };
 const STATUS_CLASS: Record<string, string> = {
-  POSTED: 'text-emerald-600 dark:text-emerald-400',
+  POSTED: 'text-success',
   FAILED: 'text-destructive',
 };
 
@@ -353,7 +353,7 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
         {!isLoading && grouped.map(({ code, rows }) => (
           <div key={code}>
             {/* Group header */}
-            <div className="bg-emerald-100 dark:bg-emerald-950/50 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-emerald-800 dark:text-emerald-300 border-b border-emerald-200 dark:border-emerald-800">
+            <div className="bg-success-soft px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-success border-b border-success/40">
               {availableCodes.find(c => c.value === code)?.label ?? code}
             </div>
 

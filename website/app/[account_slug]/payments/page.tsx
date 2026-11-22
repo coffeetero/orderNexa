@@ -65,7 +65,7 @@ export default async function AccountPaymentsPage() {
         <Card className="border-border/60">
           <CardContent className="p-4">
             <div
-              className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mb-0.5 tabular-nums"
+              className="text-2xl font-bold text-success mb-0.5 tabular-nums"
               style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
             >
               $0.00
@@ -134,7 +134,7 @@ export default async function AccountPaymentsPage() {
                       </span>
                     </TableCell>
                     <TableCell className="text-right">
-                      <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                      <span className="text-sm font-semibold text-success tabular-nums">
                         ${payment.amount.toFixed(2)}
                       </span>
                     </TableCell>

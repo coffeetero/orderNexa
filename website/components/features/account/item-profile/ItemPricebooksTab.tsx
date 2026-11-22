@@ -189,7 +189,7 @@ export const ItemPricebooksTab = forwardRef<ItemPricebooksTabHandle, ItemPricebo
                     className={cn(
                       'grid grid-cols-[1fr_72px_148px] items-center border-b border-border/40 px-3 py-1.5 last:border-0 transition-colors',
                       inactive && 'opacity-50',
-                      dirty && 'bg-amber-50 dark:bg-amber-950/20',
+                      dirty && 'bg-warning-soft',
                     )}
                   >
                     <span className="truncate pr-2 text-sm">{row.pricebook_name}</span>

@@ -37,7 +37,7 @@ const SYSTEM_CONFIG: Record<'ADDRESSES' | 'OTHER_CONTACTS', {
 }> = {
   ADDRESSES: {
     icon: Home,
-    color: 'bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300',
+    color: 'bg-info-soft text-info',
     description: 'Billing, shipping, and delivery addresses',
   },
   OTHER_CONTACTS: {
@@ -143,11 +143,11 @@ function deriveCardName(department: string, jobTitle: string) {
 }
 
 const AVATAR_COLORS = [
-  'bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300',
+  'bg-info-soft text-info',
   'bg-violet-100 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300',
-  'bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300',
-  'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300',
-  'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300',
+  'bg-destructive/10 text-destructive',
+  'bg-warning-soft text-warning',
+  'bg-success-soft text-success',
   'bg-cyan-100 text-cyan-700 dark:bg-cyan-950/50 dark:text-cyan-300',
   'bg-orange-100 text-orange-700 dark:bg-orange-950/50 dark:text-orange-300',
   'bg-pink-100 text-pink-700 dark:bg-pink-950/50 dark:text-pink-300',
@@ -168,9 +168,9 @@ function initials(name: string) {
 
 function GeocodeStatus({ status, formattedAddress }: { status?: string; formattedAddress?: string | null }) {
   if (!status || status === 'SKIPPED') return null;
-  if (status === 'PENDING')      return <p className="mt-0.5 text-[11px] text-amber-600 dark:text-amber-400">Pending geocoding…</p>;
-  if (status === 'PROCESSING')   return <p className="mt-0.5 text-[11px] text-sky-600 dark:text-sky-400">Processing…</p>;
-  if (status === 'OK')           return <p className="mt-0.5 text-[11px] text-emerald-600 dark:text-emerald-400 truncate">{formattedAddress ?? 'Geocoded'}</p>;
+  if (status === 'PENDING')      return <p className="mt-0.5 text-[11px] text-warning">Pending geocoding…</p>;
+  if (status === 'PROCESSING')   return <p className="mt-0.5 text-[11px] text-info">Processing…</p>;
+  if (status === 'OK')           return <p className="mt-0.5 text-[11px] text-success truncate">{formattedAddress ?? 'Geocoded'}</p>;
   if (status === 'ZERO_RESULTS') return <p className="mt-0.5 text-[11px] text-orange-600 dark:text-orange-400">Address not found</p>;
   if (status === 'FAILED')       return <p className="mt-0.5 text-[11px] text-destructive">Geocoding failed</p>;
   return null;
@@ -475,7 +475,7 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
                             {initials(contact.card_name || '?')}
                             {contact.is_primary && (
                               <div className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-background shadow-sm">
-                                <Star className="h-2.5 w-2.5 text-amber-500" fill="currentColor" />
+                                <Star className="h-2.5 w-2.5 text-warning" fill="currentColor" />
                               </div>
                             )}
                           </div>
@@ -646,7 +646,7 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
                 </div>
                 <div className="flex items-center gap-4">
                   <button type="button" onClick={() => setField('is_primary', !form.is_primary)}
-                    className={cn('flex items-center gap-1.5 text-xs transition-colors', form.is_primary ? 'text-amber-500' : 'text-muted-foreground hover:text-foreground')}>
+                    className={cn('flex items-center gap-1.5 text-xs transition-colors', form.is_primary ? 'text-warning' : 'text-muted-foreground hover:text-foreground')}>
                     <Star className="h-3.5 w-3.5" fill={form.is_primary ? 'currentColor' : 'none'} />
                     Primary contact
                   </button>
@@ -684,11 +684,11 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
                     </div>
                     <div className="flex items-center gap-0.5 pt-0.5">
                       <button type="button" title={p.is_primary ? 'Primary' : 'Set as primary'} onClick={() => togglePointPrimary(i)}
-                        className={cn('rounded p-0.5 transition-colors', p.is_primary ? 'text-amber-500' : 'text-muted-foreground/40 hover:text-amber-400')}>
+                        className={cn('rounded p-0.5 transition-colors', p.is_primary ? 'text-warning' : 'text-muted-foreground/40 hover:text-amber-400')}>
                         <Star className="h-3.5 w-3.5" fill={p.is_primary ? 'currentColor' : 'none'} />
                       </button>
                       <button type="button" title={p.do_not_contact ? 'Do not contact' : 'Mark as do not contact'} onClick={() => updatePoint(i, { do_not_contact: !p.do_not_contact })}
-                        className={cn('rounded p-0.5 transition-colors', p.do_not_contact ? 'text-rose-500' : 'text-muted-foreground/40 hover:text-rose-400')}>
+                        className={cn('rounded p-0.5 transition-colors', p.do_not_contact ? 'text-destructive' : 'text-muted-foreground/40 hover:text-rose-400')}>
                         <Ban className="h-3.5 w-3.5" />
                       </button>
                       <button type="button" onClick={() => removePoint(i)} className="rounded p-0.5 text-muted-foreground/40 hover:text-destructive transition-colors">
