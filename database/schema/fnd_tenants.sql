@@ -139,3 +139,10 @@ CREATE TRIGGER trg_fnd_tenants_audit
     FOR EACH ROW EXECUTE FUNCTION fn_audit_log('tenant_id');
 
 -- RLS policies: fnd_tenants_policies.sql
+
+-- ============================================================
+-- time_zone: IANA zone used to interpret per-tenant clock times (e.g. order cutoff). See om_production_codes.sql.
+-- ============================================================
+ALTER TABLE fnd_tenants ADD COLUMN IF NOT EXISTS time_zone TEXT NOT NULL DEFAULT 'America/New_York';
+COMMENT ON COLUMN fnd_tenants.time_zone IS
+    'IANA time zone of the tenant (cutoff times and delivery dates are read in this zone).';

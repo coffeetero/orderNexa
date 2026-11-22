@@ -11,6 +11,8 @@
 -- slot (customer + production_date + production_code + department_event),
 -- a suffix is appended: 'ORDER-01', 'KITCHEN-02', etc.
 --
+-- delivery_amount (payload) is stored in om_orders.delivery_charge; entered with the order, defaults to 0.
+--
 -- DEPARTMENT customers: order is stored under the parent customer_id.
 -- (LOCATION type is no longer used — replaced by DEPARTMENT.)
 -- ============================================================
@@ -55,6 +57,9 @@ DECLARE
     v_requires_gapless BOOLEAN;
     v_constraint_name TEXT;
     v_has_po_number BOOLEAN := FALSE;
+    v_delivery_charge NUMERIC(12,2);
+    v_run_id        BIGINT;
+    v_old_order     om_orders%ROWTYPE;
 BEGIN
     IF p_tenant_id IS NULL THEN
         RAISE EXCEPTION 'p_tenant_id is required';
@@ -64,6 +69,11 @@ BEGIN
     IF LOWER(COALESCE(p_action, '')) = 'delete' THEN
         IF p_order_id IS NULL THEN
             RAISE EXCEPTION 'p_order_id is required for delete';
+        END IF;
+        SELECT * INTO v_old_order FROM om_orders WHERE order_id = p_order_id AND tenant_id = p_tenant_id;
+        IF FOUND THEN
+            PERFORM bps.om_production_cutoff_assert(p_tenant_id, v_old_order.production_date,
+                                                    v_old_order.production_code, v_old_order.customer_id);
         END IF;
         v_requires_gapless := FALSE;
         SELECT COALESCE(seq.requires_gapless, FALSE)
@@ -128,6 +138,21 @@ BEGIN
            AND selected.customer_id = v_payload_customer_id;
     END IF;
 
+    -- ── Cutoff: customers cannot enter or change orders for a run past its cutoff ──
+    IF p_order_id IS NOT NULL THEN
+        SELECT * INTO v_old_order FROM om_orders WHERE order_id = p_order_id AND tenant_id = p_tenant_id;
+        IF FOUND THEN
+            PERFORM bps.om_production_cutoff_assert(p_tenant_id, v_old_order.production_date,
+                                                    v_old_order.production_code, v_old_order.customer_id);
+        END IF;
+    END IF;
+    PERFORM bps.om_production_cutoff_assert(p_tenant_id, v_production_date, v_production_code, v_order_customer_id);
+    v_run_id := bps.om_production_run_get_or_create(p_tenant_id, v_production_date, v_production_code);
+    v_delivery_charge := COALESCE(NULLIF(TRIM(p_payload->>'delivery_amount'), '')::NUMERIC, 0);
+    IF v_delivery_charge < 0 THEN
+        RAISE EXCEPTION 'delivery_amount cannot be negative';
+    END IF;
+
     -- ── Default department_event when not supplied in payload ─────────────
     -- 1. Passed in payload → already in v_department_event
     -- 2. Customer is DEPARTMENT → use department's own customer_name
@@ -184,7 +209,8 @@ BEGIN
                         order_number, po_number, order_date, production_date, production_code,
                         quantity, amount, discount_amount,
                         customer_id, customer_name, department_event,
-                        order_source, tenant_id, snapshot_data
+                        order_source, tenant_id, snapshot_data,
+                        delivery_charge, production_run_id
                     ) VALUES (
                         v_order_number,
                         v_po_number,
@@ -194,7 +220,8 @@ BEGIN
                         v_order_customer_id, v_order_customer_name,
                         v_department_event,
                         'Clerk', p_tenant_id,
-                        COALESCE(p_payload->'snapshot_data', '{}'::JSONB)
+                        COALESCE(p_payload->'snapshot_data', '{}'::JSONB),
+                        v_delivery_charge, v_run_id
                     )
                     RETURNING order_id INTO v_order_id;
                 ELSE
@@ -202,7 +229,8 @@ BEGIN
                         order_number, order_date, production_date, production_code,
                         quantity, amount, discount_amount,
                         customer_id, customer_name, department_event,
-                        order_source, tenant_id, snapshot_data
+                        order_source, tenant_id, snapshot_data,
+                        delivery_charge, production_run_id
                     ) VALUES (
                         v_order_number,
                         NULLIF(TRIM(p_payload->>'order_date'), '')::DATE,
@@ -211,7 +239,8 @@ BEGIN
                         v_order_customer_id, v_order_customer_name,
                         v_department_event,
                         'Clerk', p_tenant_id,
-                        COALESCE(p_payload->'snapshot_data', '{}'::JSONB)
+                        COALESCE(p_payload->'snapshot_data', '{}'::JSONB),
+                        v_delivery_charge, v_run_id
                     )
                     RETURNING order_id INTO v_order_id;
                 END IF;
@@ -249,6 +278,8 @@ BEGIN
                 order_date       = NULLIF(TRIM(p_payload->>'order_date'), '')::DATE,
                 production_date  = v_production_date,
                 production_code  = v_production_code,
+                production_run_id = v_run_id,
+                delivery_charge  = CASE WHEN p_payload ? 'delivery_amount' THEN v_delivery_charge ELSE delivery_charge END,
                 customer_id      = v_order_customer_id,
                 customer_name    = v_order_customer_name,
                 department_event = CASE
@@ -262,6 +293,8 @@ BEGIN
                 order_date       = NULLIF(TRIM(p_payload->>'order_date'), '')::DATE,
                 production_date  = v_production_date,
                 production_code  = v_production_code,
+                production_run_id = v_run_id,
+                delivery_charge  = CASE WHEN p_payload ? 'delivery_amount' THEN v_delivery_charge ELSE delivery_charge END,
                 customer_id      = v_order_customer_id,
                 customer_name    = v_order_customer_name,
                 department_event = CASE

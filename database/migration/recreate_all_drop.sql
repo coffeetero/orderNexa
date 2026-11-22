@@ -20,6 +20,9 @@ DROP TABLE IF EXISTS ar_transaction_lines CASCADE;
 DROP TABLE IF EXISTS ar_transactions CASCADE;
 
 -- --- OM ---
+DROP TABLE IF EXISTS om_production_runs CASCADE;
+DROP TABLE IF EXISTS om_production_codes CASCADE;
+DROP TABLE IF EXISTS om_delivery_methods CASCADE;
 DROP TABLE IF EXISTS om_order_shipments CASCADE;
 DROP TABLE IF EXISTS om_order_fullfillments CASCADE;
 DROP TABLE IF EXISTS om_order_lines CASCADE;

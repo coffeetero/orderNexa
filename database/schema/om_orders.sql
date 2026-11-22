@@ -112,3 +112,16 @@ CREATE TRIGGER trg_om_orders_audit
     FOR EACH ROW EXECUTE FUNCTION fn_audit_log('order_id');
 
 -- RLS policies: om_orders_policies.sql
+
+-- Delivery charge entered with the order (billed to the customer; becomes an invoice line in a later phase).
+ALTER TABLE om_orders
+    ADD COLUMN IF NOT EXISTS delivery_charge NUMERIC(12,2) NOT NULL DEFAULT 0;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_om_orders_delivery_charge') THEN
+        ALTER TABLE om_orders ADD CONSTRAINT chk_om_orders_delivery_charge CHECK (delivery_charge >= 0);
+    END IF;
+END $$;
+
+-- production_run_id (FK to om_production_runs) is added in om_production_runs.sql.

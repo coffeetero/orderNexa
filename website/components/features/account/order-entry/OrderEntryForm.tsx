@@ -8,6 +8,7 @@ import type { CurrentRecord } from '@/lib/nav-records';
 import { useRouter } from 'next/navigation';
 import { Save, Trash2, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -443,6 +444,38 @@ export function OrderEntryForm({
     },
     [tenantId, draft.customer_id, draft.customer_name, loadOrderClean, mapOrderToDraft, showStatusMessage],
   );
+
+  // ── Cutoff for the selected production date + code (display only; the save function enforces it for customers) ──
+  const [cutoff, setCutoff] = useState<{
+    cutoff_at: string | null;
+    effective_cutoff_at: string | null;
+    time_zone: string | null;
+    is_open: boolean;
+  } | null>(null);
+  useEffect(() => {
+    if (!tenantId || !draft.production_date || !draft.production_code) {
+      setCutoff(null);
+      return;
+    }
+    let cancelled = false;
+    const qs = new URLSearchParams({
+      tenant_id: String(tenantId),
+      production_date: draft.production_date,
+      production_code: draft.production_code,
+    });
+    if (draft.customer_id) qs.set('customer_id', String(draft.customer_id));
+    fetch(`/api/orders/cutoff?${qs.toString()}`)
+      .then((r) => r.json())
+      .then((json: { data?: typeof cutoff }) => {
+        if (!cancelled) setCutoff(json.data ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setCutoff(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tenantId, draft.production_date, draft.production_code, draft.customer_id]);
 
   // ── Load PRODUCTIONCODE valueset, default draft.production_code ───────────
   useEffect(() => {
@@ -1153,6 +1186,23 @@ export function OrderEntryForm({
           />
         </div>
 
+        {cutoff?.effective_cutoff_at && (
+          <p
+            className={cn(
+              'mt-1 px-1 text-xs',
+              cutoff.is_open ? 'text-muted-foreground' : 'font-medium text-warning',
+            )}
+            role="status"
+          >
+            Cutoff{' '}
+            {new Intl.DateTimeFormat('en-US', {
+              weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+              timeZone: cutoff.time_zone ?? undefined,
+            }).format(new Date(cutoff.effective_cutoff_at))}
+            {cutoff.is_open ? '' : ' — closed to customers (staff can still save)'}
+          </p>
+        )}
+
         {/* ── ROW 2: Item Entry Loop ────────────────────────────────────── */}
         <div className="shrink-0 mt-2">
           <ItemEntryRow
@@ -1165,6 +1215,8 @@ export function OrderEntryForm({
             orderNumber={draft.order_number}
             poNumber={draft.po_number}
             onPoNumberChange={(value) => setField('po_number', value)}
+            deliveryAmount={draft.delivery_amount}
+            onDeliveryAmountChange={(value) => setField('delivery_amount', value)}
             orderTotal={draft.total_amount + draft.delivery_amount}
             entryToolbar={
               <>

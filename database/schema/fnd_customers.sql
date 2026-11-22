@@ -197,3 +197,16 @@ CREATE TRIGGER trg_fnd_customers_audit
     FOR EACH ROW EXECUTE FUNCTION fn_audit_log('customer_id');
 
 -- RLS policies: fnd_customers_policies.sql
+
+-- Extra minutes this customer may keep ordering after a run's cutoff. NULL = inherit from the nearest ancestor that has a value.
+ALTER TABLE fnd_customers ADD COLUMN IF NOT EXISTS cutoff_extra_minutes INTEGER;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_fnd_customers_cutoff_extra_minutes') THEN
+        ALTER TABLE fnd_customers ADD CONSTRAINT chk_fnd_customers_cutoff_extra_minutes
+            CHECK (cutoff_extra_minutes IS NULL OR cutoff_extra_minutes >= 0);
+    END IF;
+END $$;
+COMMENT ON COLUMN fnd_customers.cutoff_extra_minutes IS
+    'Extra minutes after a run''s cutoff_at during which this customer may still order. NULL = inherit from parent.';
+-- delivery_method_code is added in om_delivery_methods.sql (needs that table for its foreign key).

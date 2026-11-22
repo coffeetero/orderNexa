@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { EntityComboBox } from '@/components/bps/EntityComboBox';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import type { OrderEntryItem } from '@/lib/types';
@@ -25,6 +26,9 @@ interface ItemEntryRowProps {
   /** Customer purchase order number for this order. */
   poNumber: string;
   onPoNumberChange: (value: string) => void;
+  /** Delivery charge billed with this order (entered by the clerk; defaults to 0). */
+  deliveryAmount: number;
+  onDeliveryAmountChange: (value: number) => void;
   /** Header total (lines + delivery). */
   orderTotal: number;
   /** Placed to the right of Total Order (e.g. Sample, Clear). */
@@ -41,9 +45,16 @@ export function ItemEntryRow({
   orderNumber,
   poNumber,
   onPoNumberChange,
+  deliveryAmount,
+  onDeliveryAmountChange,
   orderTotal,
   entryToolbar,
 }: ItemEntryRowProps) {
+  // Local text so partial input like "12." survives; re-synced when the order changes underneath it.
+  const [deliveryText, setDeliveryText] = useState(deliveryAmount ? String(deliveryAmount) : '');
+  useEffect(() => {
+    setDeliveryText((text) => (Number(text || 0) === deliveryAmount ? text : deliveryAmount ? String(deliveryAmount) : ''));
+  }, [deliveryAmount]);
   const [selectedItem, setSelectedItem] = useState<OrderEntryItem | null>(null);
   const [qtyValue, setQtyValue] = useState<string>('');
   const lastItemRef = useRef<OrderEntryItem | null>(null);
@@ -177,6 +188,32 @@ export function ItemEntryRow({
           disabled={disabled}
           onChange={(e) => onPoNumberChange(e.target.value)}
           aria-label="PO Number"
+        />
+      </div>
+
+      {/* Delivery charge */}
+      <div className="flex w-24 shrink-0 flex-col gap-1">
+        <Label
+          htmlFor="delivery-amount"
+          className={cn(CONTROL_LABEL, 'w-full justify-center text-center !items-center')}
+        >
+          Delivery
+        </Label>
+        <Input
+          id="delivery-amount"
+          type="number"
+          inputMode="decimal"
+          min={0}
+          step="0.01"
+          placeholder="0.00"
+          disabled={disabled}
+          value={deliveryText}
+          onChange={(e) => {
+            setDeliveryText(e.target.value);
+            const n = Number(e.target.value);
+            onDeliveryAmountChange(Number.isFinite(n) && n >= 0 ? n : 0);
+          }}
+          className="h-9 text-right tabular-nums"
         />
       </div>
 
