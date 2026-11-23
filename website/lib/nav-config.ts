@@ -173,7 +173,7 @@ export const tenantNav: NavMenu[] = [
     requiresAnyArea: ['admin.roles', 'admin.customer-roles', 'admin.users', 'admin.groups', 'admin.channels', 'admin.production'],
     groups: [
       {
-        heading: 'Production',
+        heading: 'Application Settings',
         items: [
           {
             label: 'Application Settings',
@@ -182,7 +182,7 @@ export const tenantNav: NavMenu[] = [
             sections: [
               { key: 'codes', label: 'Production codes' },
               { key: 'methods', label: 'Delivery methods' },
-              { key: 'numbering', label: 'Numbering' },
+              { key: 'numbering', label: 'Formats' },
               { key: 'runs', label: 'Upcoming runs' },
             ],
           },

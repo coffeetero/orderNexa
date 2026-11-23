@@ -146,39 +146,39 @@ export function ContextSidebar({ onNavigate }: { onNavigate?: () => void }) {
             <section key={g.heading}>
               <SectionTitle>{g.heading}</SectionTitle>
               <ul className="space-y-0">
-                {g.items.map((item) => {
+                {g.items.flatMap((item) => {
+                  if (item.sections) {
+                    // The group is the page: each section is its own entry.
+                    const onPage = item.href === activeHref;
+                    return item.sections.map((sec, idx) => {
+                      const on = onPage && (currentSection ?? item.sections![0].key) === sec.key;
+                      return (
+                        <li key={`${item.href}-${sec.key}`}>
+                          <GuardedLink
+                            href={idx === 0 ? item.href : `${item.href}?section=${sec.key}`}
+                            onClick={onNavigate}
+                            aria-current={on ? 'page' : undefined}
+                            className={cn(rowClass, on && 'bg-accent font-medium text-accent-foreground')}
+                          >
+                            <span className="min-w-0 flex-1 truncate">{sec.label}</span>
+                          </GuardedLink>
+                        </li>
+                      );
+                    });
+                  }
                   const isActive = item.href === activeHref;
-                  return (
+                  return [(
                     <li key={item.href}>
                       <GuardedLink
                         href={item.href}
                         onClick={onNavigate}
-                        aria-current={isActive && !item.sections ? 'page' : undefined}
-                        className={cn(rowClass, isActive && !item.sections && 'bg-accent font-medium text-accent-foreground', isActive && item.sections && 'font-medium text-foreground')}
+                        aria-current={isActive ? 'page' : undefined}
+                        className={cn(rowClass, isActive && 'bg-accent font-medium text-accent-foreground')}
                       >
                         <span className="min-w-0 flex-1 truncate">{item.label}</span>
                       </GuardedLink>
-                      {isActive && item.sections && (
-                        <ul className="ml-3 mt-0.5 space-y-0 border-l border-border pl-2">
-                          {item.sections.map((s, idx) => {
-                            const on = (currentSection ?? item.sections![0].key) === s.key;
-                            return (
-                              <li key={s.key}>
-                                <GuardedLink
-                                  href={idx === 0 ? item.href : `${item.href}?section=${s.key}`}
-                                  onClick={onNavigate}
-                                  aria-current={on ? 'page' : undefined}
-                                  className={cn(rowClass, on && 'bg-accent font-medium text-accent-foreground')}
-                                >
-                                  <span className="min-w-0 flex-1 truncate">{s.label}</span>
-                                </GuardedLink>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      )}
                     </li>
-                  );
+                  )];
                 })}
               </ul>
             </section>

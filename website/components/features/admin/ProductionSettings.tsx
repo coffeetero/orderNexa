@@ -132,24 +132,34 @@ function CodesEditor({ rows, tenantId, notify }: { rows: CodeRow[]; tenantId: nu
   );
 }
 
-function MethodRowEditor({
-  row, tenantId, notify, onSaved, isNew,
-}: { row: MethodRow; tenantId: number; notify: Notify; onSaved: () => void; isNew?: boolean }) {
-  const [code, setCode] = useState(row.delivery_method_code);
-  const [name, setName] = useState(row.delivery_method_name);
-  const [fleet, setFleet] = useState(row.is_own_fleet);
-  const [tracking, setTracking] = useState(row.requires_tracking);
-  const [active, setActive] = useState(row.is_active);
+type MethodDraft = { code: string; name: string; fleet: boolean; tracking: boolean; active: boolean };
+const toMethodDraft = (m: MethodRow): MethodDraft => ({
+  code: m.delivery_method_code, name: m.delivery_method_name, fleet: m.is_own_fleet, tracking: m.requires_tracking, active: m.is_active,
+});
+const blankMethod: MethodDraft = { code: '', name: '', fleet: false, tracking: false, active: true };
+
+function MethodsEditor({ rows, tenantId, notify, onSaved }: { rows: MethodRow[]; tenantId: number; notify: Notify; onSaved: () => void }) {
+  const [drafts, setDrafts] = useState<MethodDraft[]>([]);
+  const [fresh, setFresh] = useState<MethodDraft>(blankMethod);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => { setDrafts(rows.map(toMethodDraft)); }, [rows]);
+
+  const patch = (i: number, p: Partial<MethodDraft>) => setDrafts((d) => d.map((x, k) => (k === i ? { ...x, ...p } : x)));
+  const addNew = fresh.code.trim() !== '' || fresh.name.trim() !== '';
+  const invalid = drafts.some((d) => !d.name.trim()) || (addNew && (!fresh.code.trim() || !fresh.name.trim()));
 
   const save = async () => {
     setBusy(true);
     try {
-      await post('/api/admin/delivery-methods', {
-        tenant_id: tenantId, delivery_method_code: code, delivery_method_name: name,
-        is_own_fleet: fleet, requires_tracking: tracking, is_active: active,
-      });
-      notify(`${name} saved.`, 'success');
+      for (const d of [...drafts, ...(addNew ? [fresh] : [])]) {
+        await post('/api/admin/delivery-methods', {
+          tenant_id: tenantId, delivery_method_code: d.code, delivery_method_name: d.name,
+          is_own_fleet: d.fleet, requires_tracking: d.tracking, is_active: d.active,
+        });
+      }
+      notify('Delivery methods saved.', 'success');
+      setFresh(blankMethod);
       onSaved();
     } catch (e) {
       notify((e as Error).message, 'error');
@@ -158,45 +168,65 @@ function MethodRowEditor({
     }
   };
 
-  return (
-    <div className="grid grid-cols-2 items-end gap-3 border-b py-3 sm:grid-cols-[9rem_1fr_auto_auto_auto_auto]">
+  const line = (d: MethodDraft, isNew: boolean, set: (p: Partial<MethodDraft>) => void, key: string) => (
+    <div key={key} className="grid grid-cols-2 items-end gap-3 border-b py-3 sm:grid-cols-[9rem_1fr_auto_auto_auto]">
       <div>
         <Label className="text-xs">Code</Label>
-        <Input value={code} disabled={!isNew} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="OWN_TRUCK" />
+        <Input value={d.code} disabled={!isNew} onChange={(e) => set({ code: e.target.value.toUpperCase() })} placeholder="OWN_TRUCK" />
       </div>
       <div>
         <Label className="text-xs">Name</Label>
-        <Input value={name} onChange={(e) => setName(e.target.value)} />
+        <Input value={d.name} onChange={(e) => set({ name: e.target.value })} />
       </div>
       <label className="flex items-center gap-2 text-sm">
-        <Checkbox checked={fleet} onCheckedChange={(v) => setFleet(v === true)} /> Own fleet
+        <Checkbox checked={d.fleet} onCheckedChange={(v) => set({ fleet: v === true })} /> Own fleet
       </label>
       <label className="flex items-center gap-2 text-sm">
-        <Checkbox checked={tracking} onCheckedChange={(v) => setTracking(v === true)} /> Tracking
+        <Checkbox checked={d.tracking} onCheckedChange={(v) => set({ tracking: v === true })} /> Tracking
       </label>
       <label className="flex items-center gap-2 text-sm">
-        <Checkbox checked={active} onCheckedChange={(v) => setActive(v === true)} /> Active
+        <Checkbox checked={d.active} onCheckedChange={(v) => set({ active: v === true })} /> Active
       </label>
-      <Button size="sm" onClick={save} disabled={busy || !code.trim() || !name.trim()}>{isNew ? 'Add' : 'Save'}</Button>
     </div>
+  );
+
+  return (
+    <>
+      <div className="mb-1 flex items-start justify-between gap-3">
+        <h2 className="text-lg font-medium">Delivery methods</h2>
+        <Button size="sm" onClick={save} disabled={busy || invalid}>Save</Button>
+      </div>
+      <p className="mb-2 text-xs text-muted-foreground">Own fleet methods appear on the driver&apos;s delivery sheet. Methods are never deleted; uncheck Active instead. Fill in the empty row at the bottom to add a method, then Save.</p>
+      {drafts.map((d, i) => line(d, false, (p) => patch(i, p), d.code))}
+      {line(fresh, true, (p) => setFresh((f) => ({ ...f, ...p })), 'new')}
+    </>
   );
 }
 
-function SequenceRowEditor({ row, tenantId, notify }: { row: SequenceRow; tenantId: number; notify: Notify }) {
-  const [mask, setMask] = useState(row.mask);
-  const [next, setNext] = useState(String(row.next_value));
-  const [reset, setReset] = useState(row.reset_period);
-  const [gapless, setGapless] = useState(row.requires_gapless);
+type SeqDraft = { mask: string; next: string; reset: string; gapless: boolean };
+const toSeqDraft = (q: SequenceRow): SeqDraft => ({ mask: q.mask, next: String(q.next_value), reset: q.reset_period, gapless: q.requires_gapless });
+
+function FormatsEditor({ rows, tenantId, notify }: { rows: SequenceRow[]; tenantId: number; notify: Notify }) {
+  const [drafts, setDrafts] = useState<Record<string, SeqDraft>>({});
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => { setDrafts(Object.fromEntries(rows.map((q) => [q.sequence_name, toSeqDraft(q)]))); }, [rows]);
+
+  const set = (name: string, p: Partial<SeqDraft>) => setDrafts((d) => ({ ...d, [name]: { ...d[name], ...p } }));
+  const invalid = rows.some((q) => !drafts[q.sequence_name]?.mask.includes('#'));
 
   const save = async () => {
     setBusy(true);
     try {
-      await post('/api/admin/sequences', {
-        tenant_id: tenantId, sequence_name: row.sequence_name, mask, start_value: row.start_value,
-        next_value: Number(next), increment_by: row.increment_by, reset_period: reset, requires_gapless: gapless,
-      });
-      notify(`${row.label} saved.`, 'success');
+      for (const q of rows) {
+        const d = drafts[q.sequence_name];
+        if (!d) continue;
+        await post('/api/admin/sequences', {
+          tenant_id: tenantId, sequence_name: q.sequence_name, mask: d.mask, start_value: q.start_value,
+          next_value: Number(d.next), increment_by: q.increment_by, reset_period: d.reset, requires_gapless: d.gapless,
+        });
+      }
+      notify('Formats saved.', 'success');
     } catch (e) {
       notify((e as Error).message, 'error');
     } finally {
@@ -205,30 +235,42 @@ function SequenceRowEditor({ row, tenantId, notify }: { row: SequenceRow; tenant
   };
 
   return (
-    <div className="grid grid-cols-2 items-end gap-3 border-b py-3 sm:grid-cols-[10rem_1fr_8rem_9rem_auto_auto]">
-      <div>
-        <div className="font-medium">{row.label}</div>
-        <div className="text-xs text-muted-foreground">{row.is_configured ? row.sequence_name : `${row.sequence_name} (not set up yet)`}</div>
+    <>
+      <div className="mb-1 flex items-start justify-between gap-3">
+        <h2 className="text-lg font-medium">Formats</h2>
+        <Button size="sm" onClick={save} disabled={busy || invalid}>Save</Button>
       </div>
-      <div>
-        <Label className="text-xs">Mask (# = digit)</Label>
-        <Input value={mask} onChange={(e) => setMask(e.target.value)} />
-      </div>
-      <div>
-        <Label className="text-xs">Next number</Label>
-        <Input type="number" min={0} value={next} onChange={(e) => setNext(e.target.value)} />
-      </div>
-      <div>
-        <Label className="text-xs">Restart</Label>
-        <select className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm" value={reset} onChange={(e) => setReset(e.target.value)}>
-          {['NEVER', 'DAILY', 'MONTHLY', 'YEARLY'].map((p) => <option key={p} value={p}>{p.charAt(0) + p.slice(1).toLowerCase()}</option>)}
-        </select>
-      </div>
-      <label className="flex items-center gap-2 text-sm">
-        <Checkbox checked={gapless} onCheckedChange={(v) => setGapless(v === true)} /> Gapless
-      </label>
-      <Button size="sm" onClick={save} disabled={busy || !mask.includes('#')}>Save</Button>
-    </div>
+      <p className="mb-2 text-xs text-muted-foreground">Masks may use [YYYY], [YYYYMM], [YYYYMMDD] and # for digits, for example INV-######. Numbers are never reused; the next number can only be raised. Invoice numbers are assigned when the Packaging List is printed.</p>
+      {rows.map((q) => {
+        const d = drafts[q.sequence_name];
+        if (!d) return null;
+        return (
+          <div key={q.sequence_name} className="grid grid-cols-2 items-end gap-3 border-b py-3 sm:grid-cols-[10rem_1fr_8rem_9rem_auto]">
+            <div>
+              <div className="font-medium">{q.label}</div>
+              <div className="text-xs text-muted-foreground">{q.is_configured ? q.sequence_name : `${q.sequence_name} (not set up yet)`}</div>
+            </div>
+            <div>
+              <Label className="text-xs">Mask (# = digit)</Label>
+              <Input value={d.mask} onChange={(e) => set(q.sequence_name, { mask: e.target.value })} />
+            </div>
+            <div>
+              <Label className="text-xs">Next number</Label>
+              <Input type="number" min={0} value={d.next} onChange={(e) => set(q.sequence_name, { next: e.target.value })} />
+            </div>
+            <div>
+              <Label className="text-xs">Restart</Label>
+              <select className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm" value={d.reset} onChange={(e) => set(q.sequence_name, { reset: e.target.value })}>
+                {['NEVER', 'DAILY', 'MONTHLY', 'YEARLY'].map((x) => <option key={x} value={x}>{x.charAt(0) + x.slice(1).toLowerCase()}</option>)}
+              </select>
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox checked={d.gapless} onCheckedChange={(v) => set(q.sequence_name, { gapless: v === true })} /> Gapless
+            </label>
+          </div>
+        );
+      })}
+    </>
   );
 }
 
@@ -273,7 +315,6 @@ export function ProductionSettings({ tenantId, section = 'codes' }: { tenantId: 
   const [runs, setRuns] = useState<RunRow[]>([]);
   const [sequences, setSequences] = useState<SequenceRow[]>([]);
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
-  const [newKey, setNewKey] = useState(0);
 
   const notify: Notify = useCallback((text, type) => setMessage({ text, type }), []);
 
@@ -322,24 +363,13 @@ export function ProductionSettings({ tenantId, section = 'codes' }: { tenantId: 
 
       {section === 'methods' && (
       <Card><CardContent className="pt-6">
-        <h2 className="mb-1 text-lg font-medium">Delivery methods</h2>
-        <p className="mb-2 text-xs text-muted-foreground">Own fleet methods appear on the driver&apos;s delivery sheet. Methods are never deleted; uncheck Active instead.</p>
-        {methods.map((m) => (
-          <MethodRowEditor key={m.delivery_method_code} row={m} tenantId={tenantId} notify={notify} onSaved={() => load(tenantId)} />
-        ))}
-        <MethodRowEditor
-          key={`new-${newKey}`} isNew tenantId={tenantId} notify={notify}
-          row={{ delivery_method_code: '', delivery_method_name: '', is_own_fleet: false, requires_tracking: false, is_active: true }}
-          onSaved={() => { setNewKey((k) => k + 1); void load(tenantId); }}
-        />
+        <MethodsEditor rows={methods} tenantId={tenantId} notify={notify} onSaved={() => load(tenantId)} />
       </CardContent></Card>
       )}
 
       {section === 'numbering' && (
       <Card><CardContent className="pt-6">
-        <h2 className="mb-1 text-lg font-medium">Numbering</h2>
-        <p className="mb-2 text-xs text-muted-foreground">Masks may use [YYYY], [YYYYMM], [YYYYMMDD] and # for digits, for example INV-######. Numbers are never reused; the next number can only be raised. Invoice numbers are assigned when the Packaging List is printed.</p>
-        {sequences.map((q) => <SequenceRowEditor key={q.sequence_name} row={q} tenantId={tenantId} notify={notify} />)}
+        <FormatsEditor rows={sequences} tenantId={tenantId} notify={notify} />
       </CardContent></Card>
       )}
 
