@@ -106,8 +106,10 @@ export async function POST(request: Request) {
 
       // 2. Effective prices from the customer's pricebook (same source as Enter Orders)
       const { data: items, error: itemsErr } = await supabase.rpc('om_items_get_v2', {
-        p_tenant_id:   tenantId,
-        p_customer_id: customer_id,
+        p_tenant_id:       tenantId,
+        p_customer_id:     customer_id,
+        p_production_date: production_date,
+        p_production_code: production_code,
       });
       if (itemsErr) throw new Error(itemsErr.message);
 

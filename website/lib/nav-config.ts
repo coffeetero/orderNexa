@@ -106,7 +106,7 @@ export const tenantNav: NavMenu[] = [
         items: [
           { label: 'Manage Items', href: '/inventory', soon: true },
           { label: 'Item Profiles', href: '/inventory/item-profile' },
-          { label: 'Pricing Lists', href: '/inventory/pricing', soon: true },
+          { label: 'Pricing Books', href: '/inventory/pricing' },
         ],
       },
       {

@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
   AlertDialogAction,
+  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
@@ -514,10 +515,12 @@ export function OrderEntryForm({
     const customerIdForRequest = draft.customer_id;
     setIsLoadingItems(true);
     setItemsError(null);
-    const qs = customerIdForRequest
-      ? `tenant_id=${tenantId}&customer_id=${customerIdForRequest}`
-      : `tenant_id=${tenantId}`;
-    fetch(`/api/items?${qs}`)
+    const params = new URLSearchParams({ tenant_id: String(tenantId) });
+    if (customerIdForRequest) params.set('customer_id', String(customerIdForRequest));
+    // Prices follow the delivery date, which comes from the production date and code.
+    if (draft.production_date) params.set('production_date', draft.production_date);
+    if (draft.production_code) params.set('production_code', draft.production_code);
+    fetch(`/api/items?${params}`)
       .then((r) => r.json())
       .then(({ data, error }) => {
         if (error) {
@@ -529,7 +532,7 @@ export function OrderEntryForm({
       .finally(() => {
         setIsLoadingItems(false);
       });
-  }, [tenantId, draft.customer_id]);
+  }, [tenantId, draft.customer_id, draft.production_date, draft.production_code]);
 
   useEffect(() => {
     if (!shouldFocusItemWhenReady || isLoadingItems || orderPickOpen) return;
@@ -887,7 +890,10 @@ export function OrderEntryForm({
     [loadOrderById, setField],
   );
 
-  const handleItemCommit = useCallback(
+  // An item no pricing book prices on the delivery date: ask before adding it (the price can then be typed, or left at 0).
+  const [unpricedPrompt, setUnpricedPrompt] = useState<{ item: OrderEntryItem; quantity: number } | null>(null);
+
+  const addItemLine = useCallback(
     (item: OrderEntryItem, quantity: number) => {
       const tempId = addOrUpdateLine(item, quantity);
       const lineIndex = draft.lines.findIndex((l) => l.item_id === item.item_id);
@@ -903,6 +909,18 @@ export function OrderEntryForm({
       });
     },
     [addOrUpdateLine, draft.lines, focusItem],
+  );
+
+  const handleItemCommit = useCallback(
+    (item: OrderEntryItem, quantity: number) => {
+      const alreadyOnOrder = draft.lines.some((l) => l.item_id === item.item_id);
+      if (draft.customer_id !== null && item.in_pricebook === false && !alreadyOnOrder) {
+        setUnpricedPrompt({ item, quantity });
+        return;
+      }
+      addItemLine(item, quantity);
+    },
+    [addItemLine, draft.customer_id, draft.lines],
   );
 
   const handleDiscountEnter = useCallback(() => {
@@ -1299,6 +1317,29 @@ export function OrderEntryForm({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogAction ref={productionDateBlockedOkRef}>OK</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={unpricedPrompt !== null} onOpenChange={(open) => { if (!open) { setUnpricedPrompt(null); focusItem(); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Item does not exist</AlertDialogTitle>
+            <AlertDialogDescription>
+              {unpricedPrompt ? `${unpricedPrompt.item.item_number} ${unpricedPrompt.item.item_name} is not in this customer's pricing books for the delivery date. ` : ''}
+              Add it to the order anyway? You can then type a price, or leave it at 0 for a sample.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>No</AlertDialogCancel>
+            <AlertDialogAction
+              autoFocus
+              onClick={() => {
+                if (unpricedPrompt) addItemLine(unpricedPrompt.item, unpricedPrompt.quantity);
+                setUnpricedPrompt(null);
+              }}
+            >
+              Yes
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

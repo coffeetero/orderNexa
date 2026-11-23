@@ -17,6 +17,7 @@ import { getCurrentTenantId } from '@/lib/supabase/tenant';
 
 interface TodayOrder { order_id: number; order_number: string; customer_name: string | null; production_code: string | null; quantity: number | null; amount: number | null }
 interface TodayOrders { today: string; order_count: number; total_amount: number; orders: TodayOrder[] }
+interface Todo { kind: string; customer_name: string; pricebook_name: string; assignment_type: string; status: string; is_active: boolean; effective_start_date: string; days_until_start: number }
 interface Buckets { current_amt: number; d1_30: number; d31_60: number; d61_90: number; d90_plus: number; total: number }
 interface ArDashboard { as_of: string; totals: Buckets; accounts: { customer_id: string; customer_name: string; total: number; d90_plus: number }[] }
 
@@ -27,16 +28,18 @@ export const dynamic = 'force-dynamic';
 export default async function TenantDashboardPage() {
   const supabase = createClient();
   const tenantId = await getCurrentTenantId();
-  const [areasRes, ordersRes, arRes] = tenantId === null
-    ? [null, null, null]
+  const [areasRes, ordersRes, arRes, todoRes] = tenantId === null
+    ? [null, null, null, null]
     : await Promise.all([
         supabase.rpc('fnd_my_areas'),
         supabase.rpc('om_orders_today_get', { p_tenant_id: tenantId, p_limit: 8 }),
         supabase.rpc('ar_dashboard_get', { p_tenant_id: tenantId, p_limit: 8 }),
+        supabase.rpc('fnd_todos_get', { p_tenant_id: tenantId }),
       ]);
   const areas = Array.isArray(areasRes?.data) ? (areasRes!.data as string[]) : [];
   const todays = (ordersRes?.data ?? null) as TodayOrders | null;
   const ar = (arRes?.data ?? null) as ArDashboard | null;
+  const todos = (Array.isArray(todoRes?.data) ? todoRes!.data : []) as Todo[];
   const showAr = areas.includes('financials.aging');
   const showOrders = areas.includes('orders.manage') || areas.includes('orders.enter');
   const dateLabel = todays
@@ -83,6 +86,35 @@ export default async function TenantDashboardPage() {
           accentColor="bg-violet-500/10 text-violet-600 dark:text-violet-400"
         />
       </div>
+
+      {todos.length > 0 && (
+        <Card className="border-warning/40">
+          <CardHeader className="pb-3">
+            <CardTitle
+              className="text-base font-semibold"
+              style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+            >
+              To-Do&apos;s
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0 pb-1">
+            <ul className="divide-y divide-border/40">
+              {todos.map((t, i) => (
+                <li key={i} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-6 py-2 text-sm">
+                  <span className="font-medium">{t.pricebook_name}</span>
+                  <span className="text-muted-foreground">{t.assignment_type} for {t.customer_name}</span>
+                  <span className="text-muted-foreground">
+                    {t.days_until_start > 0 ? `starts in ${t.days_until_start} day${t.days_until_start === 1 ? '' : 's'}` : t.days_until_start === 0 ? 'starts today' : `started ${-t.days_until_start} day${t.days_until_start === -1 ? '' : 's'} ago`}
+                    {' '}({t.effective_start_date})
+                  </span>
+                  <span className="ml-auto rounded bg-warning/15 px-2 py-0.5 text-xs text-warning">{t.is_active ? t.status : `${t.status}, inactive`}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="px-6 pb-2 pt-1 text-xs text-muted-foreground">These pricing books are not in effect yet. Approve and activate them on the customer&apos;s Pricing tab.</p>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="border-border/60 col-span-1 lg:col-span-2">

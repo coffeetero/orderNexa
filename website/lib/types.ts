@@ -177,8 +177,10 @@ export interface OrderEntryItem {
   allowed_prep_options: PrepOption[];
   default_prep_options: PrepOption[];
   default_scored: boolean;
-  /** Effective unit price from customer pricebook; null when no pricebook found */
+  /** Effective unit price from the customer's pricing books for the delivery date; null when no book prices the item */
   unit_price: number | null;
+  /** False when no eligible pricing book holds the item (staff are asked before adding it; customers cannot). Absent without a customer. */
+  in_pricebook?: boolean;
 }
 
 /** A single line in the in-memory order entry draft. */

@@ -1,14 +1,16 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef, forwardRef, useImperativeHandle } from 'react';
-import { Trash2, Plus, ChevronDown, GripVertical } from 'lucide-react';
+import { Trash2, Plus, ChevronDown, GripVertical, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
+import { shadowedRows } from '@/lib/pricing-warnings';
 
 const ASSIGNMENT_TYPES = ['Default', 'Seasonal', 'Promotional', 'Introductory'] as const;
-const STATUSES = ['Draft', 'Pending Approval', 'Scheduled', 'Expired', 'Archived'] as const;
+// A book prices orders only when the assignment is active, Approved and the delivery date is inside its dates; books are tried in table order.
+const STATUSES = ['Draft', 'Pending Approval', 'Approved', 'Archived'] as const;
 
 interface Pricebook { pricebook_id: number; pricebook_name: string; }
 
@@ -210,6 +212,7 @@ export const CustomerPricebooksTab = forwardRef<CustomerPricebooksTabHandle, Cus
     const setField = (key: string, field: keyof AssignmentRow, value: unknown) =>
       setRows((prev) => prev.map((r) => r._key === key ? { ...r, [field]: value } : r));
 
+    const shadowed = shadowedRows(rows);
     const handleDragStart = (key: string) => setDraggingKey(key);
     const handleDragOver  = (e: React.DragEvent, key: string) => {
       e.preventDefault();
@@ -280,6 +283,16 @@ export const CustomerPricebooksTab = forwardRef<CustomerPricebooksTabHandle, Cus
           </Button>
         </div>
 
+        <p className="text-xs text-muted-foreground">
+          Books are tried from the top down, item by item, and only while active, Approved and within their dates for the delivery date. Drag a row to change its order.
+        </p>
+        {shadowed.size > 0 && (
+          <p className="flex items-start gap-1.5 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-foreground" role="status">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
+            A Default book sits above {shadowed.size === 1 ? 'a book' : `${shadowed.size} books`} with overlapping dates, so the Default wins for every item it holds. Drag the marked rows above it if that is not intended.
+          </p>
+        )}
+
         {/* Grid */}
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
@@ -324,6 +337,11 @@ export const CustomerPricebooksTab = forwardRef<CustomerPricebooksTabHandle, Cus
                       <GripVertical className="h-3.5 w-3.5" />
                     </td>
                     <td className="px-3 py-1.5 min-w-[180px]">
+                      {shadowed.has(row._key) && (
+                        <span className="mb-1 flex items-center gap-1 text-[11px] text-warning" title="A Default book above this row wins first for the items it holds.">
+                          <AlertTriangle className="h-3 w-3" />Default above wins
+                        </span>
+                      )}
                       <PricebookCell
                         pricebooks={pricebooks}
                         value={row.pricebook_id}
