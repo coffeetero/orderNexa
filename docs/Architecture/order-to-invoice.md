@@ -130,6 +130,6 @@ Rule: every computation (dates, cutoffs, totals, validation) lives in `bps.*` da
   changed after printing.
 - **Credits** (Financials > Enter Credits): lookup by invoice or order number; a numbered CM document (`credit_memo_number`)
   with negative ADJUSTMENT lines, capped at the delivered quantity less earlier credits.
-- **Numbering settings:** order, invoice, shipment and credit memo sequences are editable in Admin > Production Settings.
+- **Numbering settings:** order, invoice, shipment and credit memo sequences are editable in Admin > Application Settings.
 - **Not done:** customer-portal ordering UI, standing-order rework, COD recognition at order entry, emailing or texting
   invoices, dot-matrix output formats, inventory/spoilage, statements, and the cloud migrations.

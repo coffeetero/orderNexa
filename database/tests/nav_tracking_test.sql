@@ -56,8 +56,8 @@ BEGIN
   INSERT INTO _t VALUES ('pins can be reordered', n = 1);
   SELECT use_count INTO n FROM fnd_user_menu_actions WHERE action_key = '/orders';
   INSERT INTO _t VALUES ('re-pinning preserves use_count', n = 2);
-  BEGIN PERFORM fnd_nav_pins_set(ARRAY['/a','/b','/c','/d']); denied := false; EXCEPTION WHEN OTHERS THEN denied := true; END;
-  INSERT INTO _t VALUES ('more than 3 pins rejected', denied);
+  BEGIN PERFORM fnd_nav_pins_set(ARRAY['/a','/b','/c','/d','/e']); denied := false; EXCEPTION WHEN OTHERS THEN denied := true; END;
+  INSERT INTO _t VALUES ('more than 4 pins rejected', denied);
   BEGIN PERFORM fnd_nav_pins_set(ARRAY['/a','/a']); denied := false; EXCEPTION WHEN OTHERS THEN denied := true; END;
   INSERT INTO _t VALUES ('duplicate pins rejected', denied);
   BEGIN PERFORM fnd_nav_touch(ta, 'not a path'); denied := false; EXCEPTION WHEN OTHERS THEN denied := true; END;

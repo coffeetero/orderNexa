@@ -176,7 +176,7 @@ export const tenantNav: NavMenu[] = [
         heading: 'Production',
         items: [
           {
-            label: 'Production Settings',
+            label: 'Application Settings',
             href: '/admin/production',
             area: 'admin.production',
             sections: [

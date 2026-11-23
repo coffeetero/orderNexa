@@ -1,6 +1,6 @@
 import type { BuiltAction } from '@/lib/nav-config';
 
-export const QUICK_ACCESS_SLOTS = 3;
+export const QUICK_ACCESS_SLOTS = 4;
 const WINDOW_DAYS = 90;
 
 /** Shown until the user has history. "Manage Items" has no page yet, so Item Profiles stands in (see FALLBACK). */
@@ -16,7 +16,7 @@ export type ActionRow = {
 };
 
 /**
- * The (up to 3) menu actions for Quick Access:
+ * The (up to 4) menu actions for Quick Access:
  *   1. pinned actions, in pin order
  *   2. most-used actions in the last 90 days (use_count, then recency)
  *   3. defaults, then fallbacks, for any slot still empty
@@ -50,7 +50,7 @@ export function selectQuickAccess(
   return picked;
 }
 
-/** Validates a requested pin list (ordered, unique, max 3, built + authorized only). */
+/** Validates a requested pin list (ordered, unique, max 4, built + authorized only). */
 export function normalizePins(keys: unknown, allowed: BuiltAction[]): string[] | null {
   if (!Array.isArray(keys) || keys.length > QUICK_ACCESS_SLOTS) return null;
   const ok = new Set(allowed.map((a) => a.href));

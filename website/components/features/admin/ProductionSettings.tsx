@@ -273,7 +273,7 @@ export function ProductionSettings({ tenantId, section = 'codes' }: { tenantId: 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">
       <div>
-        <h1 className="text-2xl font-semibold">Production settings</h1>
+        <h1 className="text-2xl font-semibold">Application settings</h1>
         <p className="text-sm text-muted-foreground">
           Cutoffs stop customers from entering or changing orders. A run&apos;s cutoff is the production date minus
           the days before, at the cutoff time (tenant time zone). Staff are never blocked.

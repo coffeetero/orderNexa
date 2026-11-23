@@ -3,7 +3,7 @@ import { requireArea } from '@/lib/supabase/guard';
 import { ProductionSettings, type ProductionSection } from '@/components/features/admin/ProductionSettings';
 
 export const metadata = {
-  title: 'Production Settings — Admin',
+  title: 'Application Settings — Admin',
 };
 
 const SECTIONS: ProductionSection[] = ['codes', 'methods', 'numbering', 'runs'];

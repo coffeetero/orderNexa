@@ -5,7 +5,7 @@ import { normalizePins } from '@/lib/quick-access';
 
 export const dynamic = 'force-dynamic';
 
-/** POST /api/nav/pins  { action_keys: string[] } — replaces the user's pinned Quick Access (ordered, max 3). */
+/** POST /api/nav/pins  { action_keys: string[] } — replaces the user's pinned Quick Access (ordered, max 4). */
 export async function POST(request: Request) {
   let body: unknown;
   try {
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
 
   const pins = normalizePins((body as Record<string, unknown>).action_keys, auth.allowed);
   if (pins === null) {
-    return NextResponse.json({ error: 'action_keys must be up to 3 unique, available actions' }, { status: 400 });
+    return NextResponse.json({ error: 'action_keys must be up to 4 unique, available actions' }, { status: 400 });
   }
 
   const supabase = createClient();

@@ -28,7 +28,7 @@ function SectionTitle({ children, action }: { children: React.ReactNode; action?
 }
 
 /**
- * Quick Access (the user's 3 most useful actions) + recent records for the current module.
+ * Quick Access (the user's 4 most useful actions) + recent records for the current module.
  * Content comes from /api/nav/sidebar; it never blocks the page it sits beside.
  */
 export function ContextSidebar({ onNavigate }: { onNavigate?: () => void }) {
@@ -98,8 +98,50 @@ export function ContextSidebar({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <div className="flex h-full flex-col gap-5 px-2 py-3" data-testid="context-sidebar">
+      <section aria-labelledby="qa-title">
+        <SectionTitle
+          action={
+            data ? (
+              <QuickAccessEditor
+                pinned={data.pinned}
+                actions={actions}
+                onChange={savePins}
+              />
+            ) : null
+          }
+        >
+          <span id="qa-title">Quick access</span>
+        </SectionTitle>
+        <ul className="space-y-0.5">
+          {data
+            ? data.quickAccess.map((href) => {
+                const action = byHref.get(href);
+                if (!action) return null;
+                const isPinned = data.pinned.includes(href);
+                return (
+                  <li key={href}>
+                    <GuardedLink
+                      href={href}
+                      onClick={onNavigate}
+                      title={action.module}
+                      aria-current={href === activeHref ? 'page' : undefined}
+                      className={cn(rowClass, href === activeHref && 'bg-accent font-medium text-accent-foreground')}
+                    >
+                      <span className="min-w-0 flex-1 truncate">{action.label}</span>
+                      {isPinned && <Pin className="h-3 w-3 shrink-0 text-muted-foreground" aria-label="Pinned" />}
+                    </GuardedLink>
+                  </li>
+                );
+              })
+            : [0, 1, 2, 3].map((i) => (
+                <li key={i} aria-hidden="true" className="h-8 animate-pulse rounded-md bg-muted/60" />
+              ))}
+        </ul>
+        {failed && <p className="px-2 pt-1 text-xs text-muted-foreground">Couldn&apos;t refresh. Showing the last list.</p>}
+      </section>
+
       {adminGroups.length > 0 && (
-        <nav aria-label="Admin sections" data-testid="admin-sections" className="space-y-3">
+        <nav aria-label="Admin sections" data-testid="admin-sections" className="space-y-3 border-t border-border pt-4">
           {adminGroups.map((g) => (
             <section key={g.heading}>
               <SectionTitle>{g.heading}</SectionTitle>
@@ -143,48 +185,6 @@ export function ContextSidebar({ onNavigate }: { onNavigate?: () => void }) {
           ))}
         </nav>
       )}
-      <section aria-labelledby="qa-title">
-        <SectionTitle
-          action={
-            data ? (
-              <QuickAccessEditor
-                pinned={data.pinned}
-                actions={actions}
-                onChange={savePins}
-              />
-            ) : null
-          }
-        >
-          <span id="qa-title">Quick access</span>
-        </SectionTitle>
-        <ul className="space-y-0.5">
-          {data
-            ? data.quickAccess.map((href) => {
-                const action = byHref.get(href);
-                if (!action) return null;
-                const isPinned = data.pinned.includes(href);
-                return (
-                  <li key={href}>
-                    <GuardedLink
-                      href={href}
-                      onClick={onNavigate}
-                      title={action.module}
-                      aria-current={href === activeHref ? 'page' : undefined}
-                      className={cn(rowClass, href === activeHref && 'bg-accent font-medium text-accent-foreground')}
-                    >
-                      <span className="min-w-0 flex-1 truncate">{action.label}</span>
-                      {isPinned && <Pin className="h-3 w-3 shrink-0 text-muted-foreground" aria-label="Pinned" />}
-                    </GuardedLink>
-                  </li>
-                );
-              })
-            : [0, 1, 2].map((i) => (
-                <li key={i} aria-hidden="true" className="h-8 animate-pulse rounded-md bg-muted/60" />
-              ))}
-        </ul>
-        {failed && <p className="px-2 pt-1 text-xs text-muted-foreground">Couldn&apos;t refresh. Showing the last list.</p>}
-      </section>
-
       {recentLists.map(({ type, title }) => {
         const rows = (data?.recents ?? []).filter((r) => r.record_type === type);
         return (
@@ -225,7 +225,7 @@ export function ContextSidebar({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-/** Pin, unpin and reorder Quick Access (up to 3). Keyboard accessible: plain buttons, no drag-only controls. */
+/** Pin, unpin and reorder Quick Access (up to 4). Keyboard accessible: plain buttons, no drag-only controls. */
 function QuickAccessEditor({
   pinned,
   actions,
