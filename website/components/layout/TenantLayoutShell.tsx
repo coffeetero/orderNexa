@@ -21,7 +21,6 @@ type TenantLayoutShellProps = {
   contentClassName?: string;
   /** Signed-in user shown in the header (from fnd_users.user_name). */
   userName?: string | null;
-  userRole?: string | null;
   /** Tenant the sidebar tracks activity for. Omit to hide the sidebar and its toggle. */
   tenantId?: number | null;
   /** Initial docked-sidebar state from the cookie. */
@@ -37,7 +36,6 @@ export function TenantLayoutShell({
   sidebarHomeHref = '/dashboard',
   contentClassName,
   userName,
-  userRole,
   tenantId = null,
   sidebarCollapsed = false,
   areas = null,
@@ -117,7 +115,6 @@ export function TenantLayoutShell({
           homeHref={sidebarHomeHref}
           brand="Alpine Bakery"
           userName={userName}
-          userRole={userRole}
           profileHref="/tenant/profile"
           appearanceHref="/profile/appearance"
         />

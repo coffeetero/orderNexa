@@ -71,7 +71,6 @@ export default async function AccountSlugLayout({
       timeoutMinutes={timeoutMinutes}
       basePath={basePath}
       userName={access.userName}
-      accountName={customer.customer_name as string | null}
     >
       {children}
     </CustomerLayoutShell>

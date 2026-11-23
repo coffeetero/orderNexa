@@ -47,13 +47,20 @@ import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle } from '@
 
 const supabase = createClient();
 
-export type TopNavProps = {
+function initials(name?: string | null): string | null {
+  const parts = (name ?? '').trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return null;
+  const first = parts[0][0];
+  const last = parts.length > 1 ? parts[parts.length - 1][0] : (parts[0][1] ?? '');
+  return (first + last).toUpperCase();
+}
+
+type TopNavProps = {
   menus: NavMenu[];
   /** Logo target (staff dashboard, or the customer's own dashboard). */
   homeHref: string;
   brand: string;
   userName?: string | null;
-  userRole?: string | null;
   /** Staff-only user-menu entries. Omit for customer users. */
   profileHref?: string;
   appearanceHref?: string;
@@ -81,7 +88,6 @@ export function TopNav({
   homeHref,
   brand,
   userName,
-  userRole,
   profileHref,
   appearanceHref,
 }: TopNavProps) {
@@ -212,24 +218,15 @@ export function TopNav({
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="ml-1 h-9 gap-2 border-l border-border px-2 hover:bg-muted" aria-label="User menu">
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/15 text-primary">
-                <User className="h-3.5 w-3.5" />
-              </span>
-              <span className="hidden text-left xl:block">
-                <span className="block max-w-[12rem] truncate text-xs font-medium leading-none text-foreground">
-                  {userName || 'Signed-in user'}
-                </span>
-                {userRole ? (
-                  <span className="mt-0.5 block text-[10px] leading-none text-muted-foreground">{userRole}</span>
-                ) : null}
+            <Button variant="ghost" className="ml-1 h-9 border-l border-border px-2 hover:bg-muted" aria-label={`User menu${userName ? `, ${userName}` : ''}`}>
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary">
+                {initials(userName) ?? <User className="h-3.5 w-3.5" />}
               </span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel className="truncate font-normal">
               <span className="block truncate text-sm font-medium">{userName || 'Signed-in user'}</span>
-              {userRole ? <span className="block text-xs text-muted-foreground">{userRole}</span> : null}
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             {profileHref && (

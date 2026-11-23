@@ -45,7 +45,6 @@ export default async function HomePage() {
       <TenantLayoutShell
         sidebarHomeHref={sidebarHomeHref}
         userName={access.userName}
-        userRole={access.userType === 'TENANCY_USER' ? 'Staff' : null}
       >
         <HomeContent withFooter={false} />
       </TenantLayoutShell>

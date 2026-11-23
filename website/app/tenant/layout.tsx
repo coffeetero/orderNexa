@@ -36,7 +36,6 @@ export default async function TenantLayout({ children }: { children: React.React
     <TenantLayoutShell
       sidebarHomeHref="/dashboard"
       userName={access.userName}
-      userRole={access.userType === 'TENANCY_USER' ? 'Staff' : null}
       tenantId={tenantId}
       sidebarCollapsed={sidebarCollapsed}
       areas={areas}

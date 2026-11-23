@@ -14,7 +14,6 @@ type CustomerLayoutShellProps = {
   basePath: string;
   userName?: string | null;
   /** Shown under the user name — the customer account this user belongs to. */
-  accountName?: string | null;
 };
 
 export function CustomerLayoutShell({
@@ -22,7 +21,6 @@ export function CustomerLayoutShell({
   timeoutMinutes,
   basePath,
   userName,
-  accountName,
 }: CustomerLayoutShellProps) {
   const router = useRouter();
   const [authChecked, setAuthChecked] = useState(false);
@@ -71,7 +69,6 @@ export function CustomerLayoutShell({
         homeHref={basePath}
         brand="Customer Portal"
         userName={userName}
-        userRole={accountName}
       />
 
       <main className="flex-1 overflow-y-auto bg-background p-4 scrollbar-thin sm:p-6">
