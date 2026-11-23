@@ -85,15 +85,14 @@ export const tenantNav: NavMenu[] = [
       {
         heading: 'Profiles',
         items: [
-          { label: 'Customer Profiles', href: '/customers' },
-          { label: 'Pricing Lists', href: '/customers/pricing', soon: true },
+          { label: 'Customer Management', href: '/customers' },
         ],
       },
       {
         heading: 'Reporting',
         items: [
           { label: 'Reports', href: '/customers/reports', soon: true },
-          { label: 'Exports', href: '/customers/exports', soon: true },
+          { label: 'Import/Export', href: '/customers/exports', soon: true },
         ],
       },
     ],
@@ -104,8 +103,7 @@ export const tenantNav: NavMenu[] = [
       {
         heading: 'Items',
         items: [
-          { label: 'Manage Items', href: '/inventory', soon: true },
-          { label: 'Item Profiles', href: '/inventory/item-profile' },
+          { label: 'Item Management', href: '/inventory/item-profile' },
           { label: 'Pricing Books', href: '/inventory/pricing' },
         ],
       },

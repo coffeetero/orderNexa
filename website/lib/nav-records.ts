@@ -61,7 +61,7 @@ export function isValidActionKey(key: unknown): key is string {
 /**
  * One-click navigation target for a recent record, or null when its page does not exist yet.
  * `module` is the top-level menu the sidebar is showing (a recent customer opens Enter Orders under
- * Orders, and Customer Profiles under Customers).
+ * Orders, and Customer Management under Customers).
  */
 export function recordHref(type: RecordType, key: string, module: string | null | undefined): string | null {
   const k = encodeURIComponent(key);

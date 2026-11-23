@@ -3,7 +3,7 @@ import type { BuiltAction } from '@/lib/nav-config';
 export const QUICK_ACCESS_SLOTS = 4;
 const WINDOW_DAYS = 90;
 
-/** Shown until the user has history. "Manage Items" has no page yet, so Item Profiles stands in (see FALLBACK). */
+/** Shown until the user has history. There is no Inventory landing page, so Item Management stands in (see FALLBACK). */
 export const DEFAULT_QUICK_ACCESS = ['/orders', '/customers', '/inventory'];
 export const FALLBACK_QUICK_ACCESS = ['/inventory/item-profile', '/orders/standing-mgmt', '/manage-orders'];
 

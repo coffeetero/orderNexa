@@ -107,7 +107,7 @@ export function TopNav({
       key={item.href}
       asChild
       disabled={item.soon}
-      className="gap-2 py-2 data-[disabled]:opacity-60"
+      className="gap-2 py-1 pl-5 data-[disabled]:opacity-60"
     >
       {item.soon ? (
         <span title="Coming soon" aria-disabled="true">
@@ -183,13 +183,13 @@ export function TopNav({
               <MenubarContent
                 className={cn(
                   'max-h-[calc(100vh-5rem)] overflow-y-auto p-2',
-                  twoColumns ? 'grid w-[32rem] grid-cols-2 gap-x-3 gap-y-1' : 'min-w-[16rem]',
+                  twoColumns ? 'grid w-[32rem] grid-cols-2 gap-x-4 gap-y-3' : 'min-w-[16rem] space-y-2',
                 )}
               >
                 {groups.map((group, gi) => (
-                  <MenubarGroup key={group.heading ?? gi} className="space-y-0.5">
+                  <MenubarGroup key={group.heading ?? gi} className="space-y-px">
                     {group.heading && (
-                      <MenubarLabel className="px-2 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      <MenubarLabel className="mb-0.5 border-b border-border px-2 pb-1 pt-1 text-[11px] font-bold uppercase tracking-wider text-primary">
                         {group.heading}
                       </MenubarLabel>
                     )}

@@ -17,8 +17,8 @@ describe('builtActions / authorization', () => {
   it('lists only built entries with their module', () => {
     const hrefs = allowed.map((a) => a.href);
     expect(hrefs).toContain('/orders');
-    expect(hrefs).not.toContain('/inventory'); // Manage Items is "Soon"
-    expect(allowed.find((a) => a.href === '/customers')).toMatchObject({ label: 'Customer Profiles', module: 'Customers' });
+    expect(hrefs).not.toContain('/inventory'); // no Inventory landing page
+    expect(allowed.find((a) => a.href === '/customers')).toMatchObject({ label: 'Customer Management', module: 'Customers' });
   });
   it('honours the requires hook', () => {
     const item: NavItem = { label: 'X', href: '/x', requires: ['TENANCY_USER'] };
@@ -33,7 +33,7 @@ describe('builtActions / authorization', () => {
 });
 
 describe('selectQuickAccess', () => {
-  it('starts with the defaults (Item Profiles stands in for the unbuilt Manage Items)', () => {
+  it('starts with the defaults (Item Management stands in for the missing Inventory landing page)', () => {
     expect(selectQuickAccess([], allowed, NOW)).toEqual(['/orders', '/customers', '/inventory/item-profile', '/orders/standing-mgmt']);
   });
   it('puts pins first, in pin order', () => {
@@ -119,14 +119,14 @@ describe('buildBreadcrumbs', () => {
   it('shows Module > Page', () => {
     expect(buildBreadcrumbs('/customers', tenantNav)).toEqual([
       { label: 'Customers', href: '/customers' },
-      { label: 'Customer Profiles' },
+      { label: 'Customer Management' },
     ]);
   });
   it('adds the selected record and makes the page crumb a link', () => {
     const record = { type: 'customer' as const, key: '10700', label: 'Hoboken Bread Dist' };
     expect(buildBreadcrumbs('/customers', tenantNav, record)).toEqual([
       { label: 'Customers', href: '/customers' },
-      { label: 'Customer Profiles', href: '/customers' },
+      { label: 'Customer Management', href: '/customers' },
       { label: 'Hoboken Bread Dist' },
     ]);
   });

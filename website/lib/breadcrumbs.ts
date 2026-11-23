@@ -11,7 +11,7 @@ const EXTRA_PAGES: Record<string, string> = {
 
 /**
  * `Module › Page › Record`. The last crumb is the current location and has no href. Clicking the module goes to
- * its first built page; clicking the page leaves the record (e.g. back to an empty Customer Profiles).
+ * its first built page; clicking the page leaves the record (e.g. back to an empty Customer Management).
  */
 export function buildBreadcrumbs(pathname: string, menus: NavMenu[], record?: CurrentRecord | null): Crumb[] {
   const path = normalizePath(pathname);

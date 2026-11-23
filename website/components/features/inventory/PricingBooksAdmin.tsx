@@ -197,15 +197,17 @@ export function PricingBooksAdmin({ tenantId }: { tenantId: number }) {
               {detailsOpen && <div className="grid gap-3 sm:grid-cols-2">
                 <div><Label htmlFor="pb-name" className="text-xs">Name</Label><Input id="pb-name" value={form.pricebook_name} onChange={(e) => setForm({ ...form, pricebook_name: e.target.value })} /></div>
                 <div><Label htmlFor="pb-status" className="text-xs">Status</Label>
-                  <select id="pb-status" className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-                    {STATUSES.map((st) => <option key={st} value={st}>{st}</option>)}
-                  </select></div>
+                  <div className="flex items-center gap-4">
+                    <select id="pb-status" className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-sm" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+                      {STATUSES.map((st) => <option key={st} value={st}>{st}</option>)}
+                    </select>
+                    <label className="flex items-center gap-2 text-sm"><Checkbox checked={form.is_active} onCheckedChange={(v) => setForm({ ...form, is_active: v === true })} /> Active</label>
+                  </div></div>
                 <div><Label htmlFor="pb-from" className="text-xs">From</Label><Input id="pb-from" type="date" value={form.effective_start_date} onChange={(e) => setForm({ ...form, effective_start_date: e.target.value })} /></div>
                 <div><Label htmlFor="pb-to" className="text-xs">To</Label><Input id="pb-to" type="date" value={form.effective_end_date} onChange={(e) => setForm({ ...form, effective_end_date: e.target.value })} className={cn(datesBad && 'border-destructive')} /></div>
                 <div className="sm:col-span-2"><Label htmlFor="pb-desc" className="text-xs">Notes</Label><Input id="pb-desc" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
-                <div><Label className="text-xs">User</Label><div className="flex h-9 items-center text-sm">{selectedBook?.created_by_name ?? '—'}</div></div>
-                <div><Label className="text-xs">Approver</Label><div className="flex h-9 items-center text-sm">{selectedBook?.approved_by_name ?? '—'}</div></div>
-                <label className="flex items-center gap-2 text-sm"><Checkbox checked={form.is_active} onCheckedChange={(v) => setForm({ ...form, is_active: v === true })} /> Active</label>
+                <div><Label className="text-xs">Created By</Label><div className="flex h-9 items-center text-sm">{selectedBook?.created_by_name ?? '—'}</div></div>
+                <div><Label className="text-xs">Approved by</Label><div className="flex h-9 items-center text-sm">{selectedBook?.approved_by_name ?? '—'}</div></div>
                 {selectedBook && !selectedBook.is_active && selectedBook.disabled_at && (
                   <div className="text-sm text-muted-foreground">Disabled {fmtDate(selectedBook.disabled_at)}{selectedBook.disabled_by_name ? ` by ${selectedBook.disabled_by_name}` : ''}</div>
                 )}

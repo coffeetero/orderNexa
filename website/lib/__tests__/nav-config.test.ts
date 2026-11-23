@@ -37,7 +37,7 @@ describe('tenantNav matches the real routes', () => {
     ]) {
       expect(hrefs.has(href), href).toBe(true);
     }
-    expect(items.length).toBe(1 + 7 + 6 + 4 + 10 + 9 + 11); // Dashboard + old sidebar sections + Admin > Appearance, Application Settings, Production > Process Run, Process Run
+    expect(items.length).toBe(1 + 7 + 6 + 3 + 9 + 9 + 11); // Dashboard + old sidebar sections + Admin > Appearance, Application Settings, Production > Process Run, Process Run
   });
 });
 
