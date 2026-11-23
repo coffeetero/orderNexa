@@ -27,7 +27,7 @@ BEGIN
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","app_metadata":{"tenant_id":200000000002,"allowed_tenant_ids":[200000000002],"app_user_id":200000174045}}', true);
   SET LOCAL ROLE authenticated;
 
-  INSERT INTO _t VALUES ('tenant administrator areas include every admin area', (SELECT count(*) FROM unnest(fnd_my_areas()) a WHERE a LIKE 'admin.%') = 7);
+  INSERT INTO _t VALUES ('tenant administrator areas include every admin area', (SELECT count(*) FROM unnest(fnd_my_areas()) a WHERE a LIKE 'admin.%') = 8);
   -- roles
   j := fnd_roles_get(200000000002);
   INSERT INTO _t VALUES ('roles list shows both system roles', (SELECT count(*) FROM jsonb_array_elements(j) e WHERE (e->>'is_system')::boolean) = 2);
@@ -147,6 +147,31 @@ BEGIN
   INSERT INTO _t VALUES ('clerk cannot assign roles', r);
   BEGIN PERFORM fnd_customer_group_save(200000000002, '{"group_name":"zz hack"}'::jsonb); r := false; EXCEPTION WHEN OTHERS THEN r := true; END;
   INSERT INTO _t VALUES ('clerk cannot create a group', r);
+  RESET ROLE;
+END $$;
+
+-- ── company security settings ────────────────────────────────────────────────
+DO $$
+DECLARE uClerk bigint := (SELECT v FROM _ids WHERE k='uClerk'); r boolean; j jsonb;
+BEGIN
+  PERFORM set_config('request.jwt.claims', '{"role":"authenticated","app_metadata":{"tenant_id":200000000002,"allowed_tenant_ids":[200000000002],"app_user_id":200000174045}}', true);
+  SET LOCAL ROLE authenticated;
+  j := fnd_security_settings_get(200000000002);
+  INSERT INTO _t VALUES ('security settings default to 30 / 12 / 90 / 5', j = '{"idle_timeout_minutes":30,"min_password_length":12,"password_max_age_days":90,"password_history_count":5}'::jsonb);
+  PERFORM fnd_security_settings_save(200000000002, '{"idle_timeout_minutes":15,"min_password_length":14}'::jsonb);
+  j := fnd_security_settings_get(200000000002);
+  INSERT INTO _t VALUES ('security settings save changes only the given values', (j ->> 'idle_timeout_minutes')::int = 15 AND (j ->> 'min_password_length')::int = 14 AND (j ->> 'password_max_age_days')::int = 90);
+  BEGIN PERFORM fnd_security_settings_save(200000000002, '{"min_password_length":3}'::jsonb); r := false; EXCEPTION WHEN OTHERS THEN r := true; END;
+  INSERT INTO _t VALUES ('password length under 8 is rejected', r);
+  BEGIN PERFORM fnd_security_settings_get(200000000009); r := false; EXCEPTION WHEN OTHERS THEN r := true; END;
+  INSERT INTO _t VALUES ('another company settings are refused', r);
+  RESET ROLE;
+
+  PERFORM set_config('request.jwt.claims', format('{"role":"authenticated","app_metadata":{"tenant_id":200000000002,"allowed_tenant_ids":[200000000002],"app_user_id":%s}}', uClerk), true);
+  SET LOCAL ROLE authenticated;
+  INSERT INTO _t VALUES ('clerk cannot read security settings rows', NOT EXISTS (SELECT 1 FROM fnd_tenant_security_settings));
+  BEGIN PERFORM fnd_security_settings_save(200000000002, '{"idle_timeout_minutes":0}'::jsonb); r := false; EXCEPTION WHEN OTHERS THEN r := true; END;
+  INSERT INTO _t VALUES ('clerk cannot change security settings', r);
   RESET ROLE;
 END $$;
 

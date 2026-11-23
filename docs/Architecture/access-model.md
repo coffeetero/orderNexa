@@ -32,3 +32,6 @@ add_access_model_tables, add_access_model_functions, add_active_tenancy, add_rls
 - Older functions still contain their own allowed_tenant_ids checks; they work because the token narrows that list. Replace with `fnd_assert_active_tenant` over time.
 - New tables get anon grants from Supabase default privileges: always `REVOKE ALL ... FROM anon` and enable RLS (rls_test fails otherwise).
 - Cloud: apply the four migrations plus the earlier ones; the unprefixed legacy tables now have RLS on and no app access.
+
+## Company security settings
+Admin > Application Settings > Security (area `admin.security`) stores per-company idle timeout, minimum password length, password expiry and password history count in `fnd_tenant_security_settings` (migration `add_security_settings.sql`; no row means defaults 30 / 12 / 90 / 5, 0 = off). The settings are saved only; enforcement at sign-in (timeout, length, expiry, history) is not built yet.

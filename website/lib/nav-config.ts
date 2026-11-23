@@ -170,7 +170,7 @@ export const tenantNav: NavMenu[] = [
   // The whole menu (and every page under /admin) needs an admin area; see requiresAnyArea. Appearance lives in the avatar menu.
   {
     label: 'Admin',
-    requiresAnyArea: ['admin.roles', 'admin.customer-roles', 'admin.users', 'admin.groups', 'admin.channels', 'admin.production'],
+    requiresAnyArea: ['admin.roles', 'admin.customer-roles', 'admin.users', 'admin.groups', 'admin.channels', 'admin.production', 'admin.security'],
     groups: [
       {
         heading: 'Application Settings',
@@ -186,7 +186,7 @@ export const tenantNav: NavMenu[] = [
               { key: 'runs', label: 'Upcoming runs' },
             ],
           },
-          { label: 'Security', href: '/admin/security', soon: true },
+          { label: 'Security', href: '/admin/security', area: 'admin.security' },
         ],
       },
       {
