@@ -19,6 +19,7 @@ Supabase credentials (CLI flags or environment variables / .env file):
     --pg-db         SUPABASE_DB        default postgres
     --pg-user       SUPABASE_USER      default postgres
     --pg-password   SUPABASE_PASSWORD
+    (env only)      SUPABASE_SSLMODE   default require; use disable for the local Postgres
 
 Additional options:
     --schema               Destination PostgreSQL schema (default: public)
@@ -196,7 +197,7 @@ def connect_supabase(args: argparse.Namespace) -> psycopg2.extensions.connection
         user=args.pg_user,
         password=args.pg_password,
         connect_timeout=30,
-        sslmode="require",
+        sslmode=os.getenv("SUPABASE_SSLMODE", "require"),
     )
     conn.autocommit = False
     log.info("Supabase connected.")
