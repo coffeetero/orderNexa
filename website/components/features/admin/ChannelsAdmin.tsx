@@ -44,8 +44,8 @@ export function ChannelsAdmin({ tenantId }: { tenantId: number }) {
   return (
     <div className="space-y-4 p-4 sm:p-6">
       <PageHead title="Phone & Messaging Numbers">
-        The numbers your customers call or message (Twilio, WhatsApp). Each number belongs to one tenant, so an incoming call or message opens the right
-        tenant. Numbers are stored with the country code.
+        The numbers your customers call or message (Twilio, WhatsApp). Each number belongs to one company, so an incoming call or message opens the right
+        company. Numbers are stored with the country code.
       </PageHead>
       {banner}
       <div>

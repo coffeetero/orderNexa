@@ -322,7 +322,7 @@ BEGIN
   SELECT p_tenant_id, 'All Customers', true
    WHERE NOT EXISTS (SELECT 1 FROM bps.fnd_customer_groups WHERE tenant_id = p_tenant_id AND is_all_customers);
   INSERT INTO bps.fnd_roles (tenant_id, role_name, role_audience, is_system)
-  SELECT p_tenant_id, v.n, v.a, true FROM (VALUES ('Tenant Administrator','TENANT'),('Customer Administrator','CUSTOMER')) v(n,a)
+  SELECT p_tenant_id, v.n, v.a, true FROM (VALUES ('Company Administrator','TENANT'),('Customer Administrator','CUSTOMER')) v(n,a)
    WHERE NOT EXISTS (SELECT 1 FROM bps.fnd_roles r WHERE r.tenant_id = p_tenant_id AND r.owner_customer_id IS NULL AND r.role_name = v.n);
   INSERT INTO bps.fnd_role_area_access (tenant_id, role_id, area_key, can_read, can_write, can_approve, can_void, can_delete)
   SELECT p_tenant_id, r.role_id, a.area_key, true, true, true, true, true
@@ -342,12 +342,12 @@ DECLARE t record;
 BEGIN
   FOR t IN SELECT tenant_id FROM bps.fnd_tenants LOOP PERFORM bps.fnd_tenant_access_seed(t.tenant_id); END LOOP;
   PERFORM bps.fnd_customer_group_effective_rebuild(tenant_id) FROM bps.fnd_tenants;
-  -- existing users keep working: tenant users become Tenant Administrator + All Customers, customer users Customer Administrator
+  -- existing users keep working: tenant users become Company Administrator + All Customers, customer users Customer Administrator
   INSERT INTO bps.fnd_user_roles (tenant_id, user_id, role_id)
   SELECT ut.tenant_id, u.user_id, r.role_id
     FROM bps.fnd_user_tenants ut JOIN bps.fnd_users u ON u.user_id = ut.user_id
     JOIN bps.fnd_roles r ON r.tenant_id = ut.tenant_id AND r.is_system AND r.owner_customer_id IS NULL
-     AND r.role_name = CASE u.user_type WHEN 'TENANCY_USER' THEN 'Tenant Administrator' WHEN 'CUSTOMER_USER' THEN 'Customer Administrator' END
+     AND r.role_name = CASE u.user_type WHEN 'TENANCY_USER' THEN 'Company Administrator' WHEN 'CUSTOMER_USER' THEN 'Customer Administrator' END
    WHERE ut.is_active ON CONFLICT DO NOTHING;
   INSERT INTO bps.fnd_user_customer_groups (tenant_id, user_id, group_id)
   SELECT ut.tenant_id, u.user_id, g.group_id

@@ -18,9 +18,9 @@ BEGIN
   INSERT INTO fnd_tenants (tenant_name) VALUES ('zz Test Tenant 2') RETURNING tenant_id INTO t2;
   INSERT INTO fnd_customers (tenant_id, customer_name, customer_type) VALUES (t2, 'T2 Customer', 'ACCOUNT') RETURNING customer_id INTO c2;
   INSERT INTO _ids VALUES ('t2', t2), ('c2', c2);
-  SELECT role_id INTO r_tadm FROM fnd_roles WHERE tenant_id = 200000000002 AND role_name = 'Tenant Administrator' AND owner_customer_id IS NULL;
+  SELECT role_id INTO r_tadm FROM fnd_roles WHERE tenant_id = 200000000002 AND role_name = 'Company Administrator' AND owner_customer_id IS NULL;
   SELECT role_id INTO r_cadm FROM fnd_roles WHERE tenant_id = 200000000002 AND role_name = 'Customer Administrator' AND owner_customer_id IS NULL;
-  SELECT role_id INTO r_t2adm FROM fnd_roles WHERE tenant_id = t2 AND role_name = 'Tenant Administrator';
+  SELECT role_id INTO r_t2adm FROM fnd_roles WHERE tenant_id = t2 AND role_name = 'Company Administrator';
   INSERT INTO _ids VALUES ('r_tadm', r_tadm), ('r_cadm', r_cadm), ('r_t2adm', r_t2adm);
 
   INSERT INTO fnd_users (tenant_id, auth_user_id, user_name, user_type) VALUES (200000000002, gen_random_uuid(), 'zz clerk', 'TENANCY_USER') RETURNING user_id INTO uA;
@@ -158,7 +158,7 @@ BEGIN
   BEGIN INSERT INTO fnd_customer_groups (tenant_id, group_name) VALUES (200000000002, 'zz hack'); r := false; EXCEPTION WHEN OTHERS THEN r := true; END;
   INSERT INTO _t VALUES ('clerk cannot create a group', r);
   BEGIN INSERT INTO fnd_user_roles (tenant_id, user_id, role_id) VALUES (200000000002, uA, r_tadm); r := false; EXCEPTION WHEN OTHERS THEN r := true; END;
-  INSERT INTO _t VALUES ('clerk cannot grant themselves Tenant Administrator', r);
+  INSERT INTO _t VALUES ('clerk cannot grant themselves Company Administrator', r);
 
   -- tenant admin: system role guards
   PERFORM set_config('request.jwt.claims', format('{"role":"authenticated","app_metadata":{"tenant_id":200000000002,"app_user_id":%s}}', uC), true);
@@ -234,8 +234,8 @@ BEGIN
   BEGIN INSERT INTO fnd_tenant_phone_numbers (tenant_id, phone_number, channel, is_shared) VALUES (200000000002, '+15555550102', 'VOICE', true); r := false; EXCEPTION WHEN OTHERS THEN r := true; END;
   INSERT INTO _t VALUES ('shared number cannot carry a tenant', r);
   RESET ROLE;
-  INSERT INTO _t VALUES ('seeded users kept access: tenant user is Tenant Administrator + All Customers',
-     EXISTS (SELECT 1 FROM fnd_user_roles ur JOIN fnd_roles r2 USING (role_id) WHERE ur.user_id = 200000174045 AND r2.role_name = 'Tenant Administrator')
+  INSERT INTO _t VALUES ('seeded users kept access: tenant user is Company Administrator + All Customers',
+     EXISTS (SELECT 1 FROM fnd_user_roles ur JOIN fnd_roles r2 USING (role_id) WHERE ur.user_id = 200000174045 AND r2.role_name = 'Company Administrator')
      AND EXISTS (SELECT 1 FROM fnd_user_customer_groups ug JOIN fnd_customer_groups g USING (group_id) WHERE ug.user_id = 200000174045 AND g.is_all_customers));
   INSERT INTO _t VALUES ('a new tenant is seeded with the group and both system roles',
      EXISTS (SELECT 1 FROM fnd_customer_groups WHERE tenant_id = (SELECT v FROM _ids WHERE k='t2') AND is_all_customers)

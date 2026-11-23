@@ -389,7 +389,7 @@ export function CustomerManagementPage({
 
   const handleSave = async () => {
     if (!tenantId) {
-      setStatusMessage('Select a tenant first.');
+      setStatusMessage('Select a company first.');
       return;
     }
 
@@ -594,10 +594,10 @@ export function CustomerManagementPage({
           <Card className="border-border/60 lg:h-[calc(100vh-12rem)]">
             <CardContent className="flex h-full flex-col gap-[6px] p-4">
               <div className="space-y-1.5">
-                <Label htmlFor="tenant">Tenant</Label>
+                <Label htmlFor="tenant">Company</Label>
                 <Select value={tenantId === null ? '' : String(tenantId)} onValueChange={handleTenantChange}>
                   <SelectTrigger id="tenant">
-                    <SelectValue placeholder="Select tenant" />
+                    <SelectValue placeholder="Select company" />
                   </SelectTrigger>
                   <SelectContent>
                     {tenants.map((tenant) => (
@@ -655,7 +655,7 @@ export function CustomerManagementPage({
                 placeholder="Search number or name"
                 disabled={!tenantId}
                 loading={isLoadingCustomers}
-                emptyText={tenantId ? 'No customers found.' : 'Select a tenant first.'}
+                emptyText={tenantId ? 'No customers found.' : 'Select a company first.'}
                 className="w-full"
               />
             </div>

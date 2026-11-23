@@ -74,12 +74,12 @@ function Picker() {
       <div className="w-full max-w-md space-y-4">
         <div className="text-center">
           <div className="flex justify-center mb-3 text-primary"><Building2 className="h-8 w-8" /></div>
-          <h1 className="text-2xl font-bold">Choose a tenancy</h1>
-          <p className="text-sm text-muted-foreground">You can work in one tenancy at a time.</p>
+          <h1 className="text-2xl font-bold">Choose a company</h1>
+          <p className="text-sm text-muted-foreground">You can work in one company at a time.</p>
         </div>
-        {wrongAddress && <p className="text-sm text-destructive">Your account has no access to the tenancy at this web address.</p>}
+        {wrongAddress && <p className="text-sm text-destructive">Your account has no access to the company at this web address.</p>}
         {error && <p className="text-sm text-destructive">{error}</p>}
-        {tenancies.length === 0 && <p className="text-sm text-muted-foreground text-center">No tenancy is assigned to your account.</p>}
+        {tenancies.length === 0 && <p className="text-sm text-muted-foreground text-center">No company is assigned to your account.</p>}
         <div className="space-y-2">
           {tenancies.map((t) => (
             <Button key={t.tenant_id} variant="outline" className="w-full justify-start h-12" disabled={busy || (!!hostSlug && t.tenant_slug !== hostSlug)} onClick={() => choose(t)}>

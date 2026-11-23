@@ -389,7 +389,7 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
   };
 
   if (!tenantId) {
-    return <div className="p-4 text-sm text-muted-foreground">Tenant context is unavailable.</div>;
+    return <div className="p-4 text-sm text-muted-foreground">Company context is unavailable.</div>;
   }
 
   const formTitle = draft.item_number || draft.item_name

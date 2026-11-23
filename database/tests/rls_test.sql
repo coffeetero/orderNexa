@@ -43,8 +43,8 @@ BEGIN
   INSERT INTO fnd_tenants (tenant_name) VALUES ('zz RLS Tenant 2') RETURNING tenant_id INTO t2;
   INSERT INTO fnd_customers (tenant_id, customer_name, customer_type) VALUES (t2, 'T2 Customer', 'ACCOUNT') RETURNING customer_id INTO c2;
   INSERT INTO _ids VALUES ('t2', t2), ('c2', c2);
-  SELECT role_id INTO r_tadm  FROM fnd_roles WHERE tenant_id = 200000000002 AND role_name = 'Tenant Administrator';
-  SELECT role_id INTO r_t2adm FROM fnd_roles WHERE tenant_id = t2 AND role_name = 'Tenant Administrator';
+  SELECT role_id INTO r_tadm  FROM fnd_roles WHERE tenant_id = 200000000002 AND role_name = 'Company Administrator';
+  SELECT role_id INTO r_t2adm FROM fnd_roles WHERE tenant_id = t2 AND role_name = 'Company Administrator';
   INSERT INTO fnd_roles (tenant_id, role_name, role_audience) VALUES (200000000002, 'zz Clerk', 'TENANT') RETURNING role_id INTO r_clerk;
   INSERT INTO fnd_role_area_access (tenant_id, role_id, area_key, can_read, can_write) VALUES (200000000002, r_clerk, 'orders.enter', true, true);
   INSERT INTO fnd_roles (tenant_id, role_name, role_audience) VALUES (200000000002, 'zz Accountant', 'TENANT') RETURNING role_id INTO r_ar;

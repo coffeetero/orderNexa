@@ -50,7 +50,7 @@ CREATE TABLE bps.fnd_roles (
   owner_customer_id BIGINT REFERENCES bps.fnd_customers(customer_id) ON DELETE CASCADE, -- NULL = tenant-level role; set = created by that customer, visible only beneath it
   role_name         TEXT NOT NULL,
   role_audience     TEXT NOT NULL CHECK (role_audience IN ('TENANT','CUSTOMER')),
-  is_system         BOOLEAN NOT NULL DEFAULT false,   -- seeded (Tenant Administrator, Customer Administrator); cannot be deleted
+  is_system         BOOLEAN NOT NULL DEFAULT false,   -- seeded (Company Administrator, Customer Administrator); cannot be deleted
   is_active         BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(), created_by BIGINT,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_by BIGINT,

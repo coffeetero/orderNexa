@@ -90,7 +90,7 @@ export function RolesAdmin({ tenantId, audience }: { tenantId: number; audience:
       <div className="grid gap-6 lg:grid-cols-[18rem_1fr]">
         <div className="space-y-2">
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" onClick={() => open(null, audience)}>{audience === 'TENANT' ? 'New tenant role' : 'New customer role'}</Button>
+            <Button size="sm" onClick={() => open(null, audience)}>{audience === 'TENANT' ? 'New company role' : 'New customer role'}</Button>
           </div>
           {[audience].map((aud) => (
             <div key={aud}>
@@ -109,7 +109,7 @@ export function RolesAdmin({ tenantId, audience }: { tenantId: number; audience:
           <div className="min-w-0 space-y-3">
             <div className="flex flex-wrap items-end gap-3">
               <div className="w-72 max-w-full">
-                <Label className="text-xs">Role name ({draft.role_audience === 'TENANT' ? 'tenant' : 'customer'} role)</Label>
+                <Label className="text-xs">Role name ({draft.role_audience === 'TENANT' ? 'company' : 'customer'} role)</Label>
                 <Input aria-label="Role name" value={draft.role_name} disabled={readOnly} onChange={(e) => setDraft({ ...draft, role_name: e.target.value })} />
               </div>
               <label className="flex items-center gap-2 text-sm">

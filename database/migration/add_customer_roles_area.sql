@@ -1,7 +1,7 @@
 -- =====================================================================================
 -- Tenant roles and customer roles become two separate areas, so support staff can be given one without the other.
 --   admin.roles           : tenant roles (for the tenant's own staff)
---   admin.customer-roles  : customer roles (new area; the Tenant Administrator role receives it automatically)
+--   admin.customer-roles  : customer roles (new area; the Company Administrator role receives it automatically)
 -- Customers still see only CUSTOMER roles (portal.roles) and never a tenant role. No new table or column: one new row in fnd_areas.
 -- Apply after add_access_my_areas.sql.
 -- =====================================================================================
@@ -10,7 +10,7 @@ SET search_path = bps, public;
 INSERT INTO bps.fnd_areas (area_key, module, area_name, audience, display_order)
 VALUES ('admin.customer-roles', 'Admin', 'Customer Roles', 'TENANT', 606)
 ON CONFLICT (area_key) DO NOTHING;
-UPDATE bps.fnd_areas SET area_name = 'Tenant Roles' WHERE area_key = 'admin.roles';
+UPDATE bps.fnd_areas SET area_name = 'Company Roles' WHERE area_key = 'admin.roles';
 
 DO $$ DECLARE t record; BEGIN
   FOR t IN SELECT tenant_id FROM bps.fnd_tenants LOOP PERFORM bps.fnd_tenant_access_seed(t.tenant_id); END LOOP;
