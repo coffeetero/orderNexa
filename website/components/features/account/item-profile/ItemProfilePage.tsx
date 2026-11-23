@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 import { ItemPricebooksTab, type ItemPricebooksTabHandle } from './ItemPricebooksTab';
 import { ItemNotesTab } from './ItemNotesTab';
@@ -227,6 +228,7 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
   const [isPricebooksDirty, setIsPricebooksDirty] = useState(false);
   const [isComponentsDirty, setIsComponentsDirty] = useState(false);
   const [tab, setTab] = useState('profile');
+  const [confirmUncompound, setConfirmUncompound] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -397,6 +399,12 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
     if (!tenantId) return;
     setIsSaving(true);
     try {
+      // ── 0. Turning Compound off: the components must go first ─────────
+      if (!draft.is_compound && isComponentsDirty) {
+        const ok = await componentsRef.current?.save();
+        if (!ok) return;
+      }
+
       // ── 1. Save profile (if dirty or creating) ────────────────────────
       let savedId: number | null | undefined = draft.item_id;
       if (isProfileDirty) {
@@ -427,7 +435,7 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
       }
 
       // ── 3. Save components (if dirty) ─────────────────────────────────
-      if (isComponentsDirty) {
+      if (isComponentsDirty && draft.is_compound) {
         const ok = await componentsRef.current?.save();
         if (!ok) {
           if (isProfileDirty) toast.error('Profile saved, but components could not be saved.', { duration: Infinity });
@@ -573,7 +581,10 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
                         <Checkbox
                           disabled={isFormDisabled}
                           checked={draft.is_compound}
-                          onCheckedChange={(v) => set('is_compound', v === true)}
+                          onCheckedChange={(v) => {
+                            if (v !== true && (componentsRef.current?.count() ?? 0) > 0) { setConfirmUncompound(true); return; }
+                            set('is_compound', v === true);
+                          }}
                         />
                         Compound item
                       </label>
@@ -721,16 +732,14 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
 
               {/* ── Components Tab ──────────────────────────────────── */}
               <TabsContent value="components" forceMount className="data-[state=inactive]:hidden">
-                {draft.is_compound && (
-                  <ItemComponentsTab
-                    ref={componentsRef}
-                    tenantId={tenantId}
-                    itemId={selectedItemId}
-                    candidates={items}
-                    disabled={isFormDisabled}
-                    onDirtyChange={setIsComponentsDirty}
-                  />
-                )}
+                <ItemComponentsTab
+                  ref={componentsRef}
+                  tenantId={tenantId}
+                  itemId={selectedItemId}
+                  candidates={items}
+                  disabled={isFormDisabled}
+                  onDirtyChange={setIsComponentsDirty}
+                />
               </TabsContent>
 
               {/* ── Pricebooks Tab ──────────────────────────────────── */}
@@ -753,6 +762,22 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
         </Tabs>
         )}
         </div>
+
+        <AlertDialog open={confirmUncompound} onOpenChange={setConfirmUncompound}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Remove the components first</AlertDialogTitle>
+              <AlertDialogDescription>
+                This item has {componentsRef.current?.count() ?? 0} component(s). A compound item can&apos;t be turned off while it has components.
+                Remove them and turn Compound item off? Nothing is deleted until you Save.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Keep compound</AlertDialogCancel>
+              <AlertDialogAction onClick={() => { componentsRef.current?.clear(); set('is_compound', false); }}>Remove components</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         </div>
       </div>
     </div>

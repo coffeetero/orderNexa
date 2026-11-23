@@ -14,6 +14,10 @@ export interface ItemComponentsTabHandle {
   save: () => Promise<boolean>;
   /** Puts the list back to the last loaded state. */
   reset: () => void;
+  /** How many components are on the list right now (unsaved changes included). */
+  count: () => number;
+  /** Empties the list (applied when saved). */
+  clear: () => void;
 }
 
 interface Props {
@@ -74,6 +78,8 @@ export const ItemComponentsTab = forwardRef<ItemComponentsTabHandle, Props>(func
       return true;
     },
     reset: () => setRows(originalRef.current),
+    count: () => rowsRef.current.length,
+    clear: () => setRows([]),
   }), [tenantId, itemId, load]);
 
   const inList = useMemo(() => new Set(rows.map((r) => r.item_id)), [rows]);
