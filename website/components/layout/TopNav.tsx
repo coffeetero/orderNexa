@@ -7,7 +7,6 @@ import {
   Bell,
   ChevronDown,
   CircleHelp as HelpCircle,
-  Lock,
   LogOut,
   Menu,
   Palette,
@@ -244,11 +243,6 @@ export function TopNav({
             <DropdownMenuItem disabled>
               <Bell className="mr-2 h-4 w-4" />
               Notification Preferences
-              <SoonBadge />
-            </DropdownMenuItem>
-            <DropdownMenuItem disabled>
-              <Lock className="mr-2 h-4 w-4" />
-              Security
               <SoonBadge />
             </DropdownMenuItem>
             <DropdownMenuSeparator />

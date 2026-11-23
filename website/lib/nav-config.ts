@@ -204,6 +204,10 @@ export const tenantNav: NavMenu[] = [
           { label: 'Customer Groups', href: '/admin/groups', area: 'admin.groups' },
         ],
       },
+      {
+        heading: 'Security',
+        items: [{ label: 'Security', href: '/admin/security', soon: true }],
+      },
     ],
   },
 ];
