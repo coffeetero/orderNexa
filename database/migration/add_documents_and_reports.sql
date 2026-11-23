@@ -54,14 +54,26 @@ DO $$ DECLARE t record; BEGIN
 END $$;
 
 -- ---------- picker: active Accounts the caller may see ----------
-CREATE OR REPLACE FUNCTION bps.fnd_report_accounts_get(p_tenant_id bigint) RETURNS jsonb
+-- p_with_invoices: only accounts (with their sites and departments) that have an issued invoice dated between p_from and p_to
+-- (either bound may be NULL = open-ended). Used by AR Open Balances, AR Aging and Sales.
+CREATE OR REPLACE FUNCTION bps.fnd_report_accounts_get(p_tenant_id bigint, p_with_invoices boolean DEFAULT false, p_from date DEFAULT NULL, p_to date DEFAULT NULL) RETURNS jsonb
 LANGUAGE plpgsql STABLE SET search_path = bps, public AS $$
 BEGIN
   PERFORM bps.fnd_assert_active_tenant(p_tenant_id);
-  RETURN (SELECT COALESCE(jsonb_agg(jsonb_build_object('customer_id', c.customer_id, 'customer_name', c.customer_name, 'customer_number', c.customer_number)
-                                    ORDER BY c.customer_name), '[]'::jsonb)
-            FROM bps.fnd_customers c
-           WHERE c.tenant_id = p_tenant_id AND upper(btrim(c.customer_type)) = 'ACCOUNT' AND c.is_active);
+  RETURN (WITH RECURSIVE tree(account_id, customer_id) AS (
+      SELECT c.customer_id, c.customer_id FROM bps.fnd_customers c
+       WHERE c.tenant_id = p_tenant_id AND upper(btrim(c.customer_type)) = 'ACCOUNT' AND c.is_active
+      UNION ALL
+      SELECT tree.account_id, c.customer_id FROM bps.fnd_customers c JOIN tree ON c.customer_parent_id = tree.customer_id
+       WHERE c.tenant_id = p_tenant_id AND upper(btrim(c.customer_type)) <> 'ACCOUNT')
+    SELECT COALESCE(jsonb_agg(jsonb_build_object('customer_id', c.customer_id, 'customer_name', c.customer_name, 'customer_number', c.customer_number)
+                              ORDER BY c.customer_name), '[]'::jsonb)
+      FROM bps.fnd_customers c
+     WHERE c.tenant_id = p_tenant_id AND upper(btrim(c.customer_type)) = 'ACCOUNT' AND c.is_active
+       AND (NOT COALESCE(p_with_invoices, false) OR EXISTS (
+             SELECT 1 FROM tree JOIN bps.ar_transactions t ON t.customer_id = tree.customer_id AND t.tenant_id = p_tenant_id
+              WHERE tree.account_id = c.customer_id AND t.transaction_type = 'INV' AND t.status NOT IN ('DRAFT','CANCELLED')
+                AND (p_from IS NULL OR t.transaction_date >= p_from) AND (p_to IS NULL OR t.transaction_date <= p_to))));
 END $$;
 
 -- ---------- open items: invoices and credit memos with what is still owed as of a date ----------
@@ -319,12 +331,12 @@ BEGIN
 END $$;
 
 REVOKE EXECUTE ON FUNCTION
-  bps.fnd_report_accounts_get(bigint), bps.ar_report_open_items(bigint, bigint[], date), bps.ar_open_balances_get(bigint, bigint[], date),
+  bps.fnd_report_accounts_get(bigint, boolean, date, date), bps.ar_report_open_items(bigint, bigint[], date), bps.ar_open_balances_get(bigint, bigint[], date),
   bps.ar_aging_get(bigint, bigint[], date), bps.ar_statement_get(bigint, bigint, date, date), bps.ar_sales_report_get(bigint, bigint[], date, date),
   bps.ar_revenue_forecast_get(bigint, bigint[], date, integer, integer), bps.ar_invoice_document_get(bigint, bigint), bps.ar_invoices_unsaved_get(bigint, bigint),
   bps.fnd_document_save(bigint, jsonb), bps.fnd_documents_get(bigint, bigint, text[]), bps.fnd_document_get(bigint, bigint) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION
-  bps.fnd_report_accounts_get(bigint), bps.ar_report_open_items(bigint, bigint[], date), bps.ar_open_balances_get(bigint, bigint[], date),
+  bps.fnd_report_accounts_get(bigint, boolean, date, date), bps.ar_report_open_items(bigint, bigint[], date), bps.ar_open_balances_get(bigint, bigint[], date),
   bps.ar_aging_get(bigint, bigint[], date), bps.ar_statement_get(bigint, bigint, date, date), bps.ar_sales_report_get(bigint, bigint[], date, date),
   bps.ar_revenue_forecast_get(bigint, bigint[], date, integer, integer), bps.ar_invoice_document_get(bigint, bigint), bps.ar_invoices_unsaved_get(bigint, bigint),
   bps.fnd_document_save(bigint, jsonb), bps.fnd_documents_get(bigint, bigint, text[]), bps.fnd_document_get(bigint, bigint) TO authenticated, service_role, bps_dev;

@@ -11,13 +11,22 @@ export const dynamic = 'force-dynamic';
 const isDate = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
 const toB64 = (b: Uint8Array) => Buffer.from(b).toString('base64');
 
-/** GET /api/reports/financial?tenant_id=n → active Accounts the caller may report on (the customer picker). */
+/**
+ * GET /api/reports/financial?tenant_id=n[&with_invoices=1&from=YYYY-MM-DD&to=YYYY-MM-DD] → active Accounts the caller may report on (the customer picker).
+ * With with_invoices only accounts that have an issued invoice in the period (from and to are each optional).
+ */
 export async function GET(request: Request) {
-  const tenantId = toInt(new URL(request.url).searchParams.get('tenant_id'));
+  const q = new URL(request.url).searchParams;
+  const tenantId = toInt(q.get('tenant_id'));
   if (tenantId === null) return NextResponse.json({ error: 'Invalid or missing tenant_id' }, { status: 400 });
   const auth = await requireStaff();
   if (!auth.ok) return auth.response;
-  const { data, error } = await createClient().rpc('fnd_report_accounts_get', { p_tenant_id: tenantId });
+  const from = q.get('from');
+  const to = q.get('to');
+  if ((from && !isDate(from)) || (to && !isDate(to))) return NextResponse.json({ error: 'from and to must be YYYY-MM-DD' }, { status: 400 });
+  const { data, error } = await createClient().rpc('fnd_report_accounts_get', {
+    p_tenant_id: tenantId, p_with_invoices: q.get('with_invoices') === '1', p_from: from || null, p_to: to || null,
+  });
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ data });
 }

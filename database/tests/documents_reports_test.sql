@@ -50,6 +50,9 @@ BEGIN
   INSERT INTO _t VALUES ('picker lists active accounts only', jsonb_array_length(j) > 0 AND NOT EXISTS (
      SELECT 1 FROM jsonb_array_elements(j) e JOIN fnd_customers c ON c.customer_id = (e ->> 'customer_id')::bigint WHERE upper(c.customer_type) <> 'ACCOUNT' OR NOT c.is_active));
 
+  INSERT INTO _t VALUES ('with-invoices picker lists the account for a range holding its invoice', fnd_report_accounts_get(200000000002, true, current_date - 60, current_date) @> '[{"customer_id":200000000091}]'::jsonb);
+  INSERT INTO _t VALUES ('with-invoices picker omits it for a range before the invoice', NOT (fnd_report_accounts_get(200000000002, true, current_date - 90, current_date - 45) @> '[{"customer_id":200000000091}]'::jsonb));
+  INSERT INTO _t VALUES ('with-invoices picker lists fewer accounts than the full list', jsonb_array_length(fnd_report_accounts_get(200000000002, true, NULL, current_date)) < jsonb_array_length(fnd_report_accounts_get(200000000002)));
   j := ar_open_balances_get(200000000002, acc, current_date);
   a := j -> 'accounts' -> 0;
   INSERT INTO _t VALUES ('open balance is 10.00 (25 invoice - 10 paid - 5 credit)', (a ->> 'balance')::numeric = 10);

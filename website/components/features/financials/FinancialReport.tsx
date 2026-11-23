@@ -36,12 +36,31 @@ export function FinancialReport({ tenantId, kind }: { tenantId: number; kind: Re
   const [result, setResult] = useState<Result | null>(null);
   const frame = useRef<HTMLIFrameElement>(null);
 
+  // AR Open Balances, AR Aging and Sales list only active accounts that have an invoice in the period (up to the as-of date, or from-to).
+  const needsInvoices = kind === 'ar' || kind === 'aging' || kind === 'sales';
+  const periodFrom = kind === 'sales' ? from : '';
+  const periodTo = kind === 'sales' ? to : asOf;
+
   useEffect(() => {
-    fetch(`/api/reports/financial?tenant_id=${tenantId}`)
+    const qs = new URLSearchParams({ tenant_id: String(tenantId) });
+    if (needsInvoices) {
+      qs.set('with_invoices', '1');
+      if (periodFrom) qs.set('from', periodFrom);
+      if (periodTo) qs.set('to', periodTo);
+    }
+    let live = true;
+    fetch(`/api/reports/financial?${qs}`)
       .then((r) => r.json())
-      .then((j: { data?: PickAccount[]; error?: string }) => (j.error ? setMessage({ text: j.error, error: true }) : setAccounts(j.data ?? [])))
-      .catch((e: Error) => setMessage({ text: e.message, error: true }));
-  }, [tenantId]);
+      .then((j: { data?: PickAccount[]; error?: string }) => {
+        if (!live) return;
+        if (j.error) { setMessage({ text: j.error, error: true }); return; }
+        const list = j.data ?? [];
+        setAccounts(list);
+        setSelected((prev) => new Set(Array.from(prev).filter((id) => list.some((a) => a.customer_id === id))));
+      })
+      .catch((e: Error) => live && setMessage({ text: e.message, error: true }));
+    return () => { live = false; };
+  }, [tenantId, needsInvoices, periodFrom, periodTo]);
 
   useEffect(() => () => { if (result) URL.revokeObjectURL(result.url); }, [result]);
 
@@ -97,6 +116,7 @@ export function FinancialReport({ tenantId, kind }: { tenantId: number; kind: Re
           )}
           <Button onClick={() => run(false)} disabled={busy || none} className="ml-auto gap-1.5"><Play className="h-4 w-4" />{busy ? 'Running…' : 'Run'}</Button>
         </div>
+        {needsInvoices && <p className="text-xs text-muted-foreground">Only active customers with an invoice {kind === 'sales' ? 'in this period' : 'on or before the as-of date'} are listed.</p>}
         {accounts === null ? <p className="text-sm text-muted-foreground">Loading customers…</p> : <CustomerPicker accounts={accounts} selected={selected} onChange={setSelected} />}
         {message && <p role="status" className={`text-sm ${message.error ? 'text-destructive' : 'text-foreground'}`}>{message.text}</p>}
       </CardContent></Card>
