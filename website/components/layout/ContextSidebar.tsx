@@ -15,13 +15,13 @@ import { cn } from '@/lib/utils';
 type SidebarData = { quickAccess: string[]; pinned: string[]; recents: RecentRow[] };
 
 const rowClass =
-  'flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-sm text-foreground/80 outline-none ' +
+  'flex h-6 w-full items-center gap-2 rounded-md px-2 text-left text-sm text-foreground/80 outline-none ' +
   'transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring';
 
 function SectionTitle({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between px-2 pb-1">
-      <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{children}</h2>
+      <h2 className="text-[13.5px] font-bold uppercase tracking-wider text-muted-foreground">{children}</h2>
       {action}
     </div>
   );
@@ -112,7 +112,7 @@ export function ContextSidebar({ onNavigate }: { onNavigate?: () => void }) {
         >
           <span id="qa-title">Quick access</span>
         </SectionTitle>
-        <ul className="space-y-0.5">
+        <ul className="space-y-0">
           {data
             ? data.quickAccess.map((href) => {
                 const action = byHref.get(href);
@@ -134,7 +134,7 @@ export function ContextSidebar({ onNavigate }: { onNavigate?: () => void }) {
                 );
               })
             : [0, 1, 2, 3].map((i) => (
-                <li key={i} aria-hidden="true" className="h-8 animate-pulse rounded-md bg-muted/60" />
+                <li key={i} aria-hidden="true" className="h-6 animate-pulse rounded-md bg-muted/60" />
               ))}
         </ul>
         {failed && <p className="px-2 pt-1 text-xs text-muted-foreground">Couldn&apos;t refresh. Showing the last list.</p>}
@@ -145,7 +145,7 @@ export function ContextSidebar({ onNavigate }: { onNavigate?: () => void }) {
           {adminGroups.map((g) => (
             <section key={g.heading}>
               <SectionTitle>{g.heading}</SectionTitle>
-              <ul className="space-y-0.5">
+              <ul className="space-y-0">
                 {g.items.map((item) => {
                   const isActive = item.href === activeHref;
                   return (
@@ -159,7 +159,7 @@ export function ContextSidebar({ onNavigate }: { onNavigate?: () => void }) {
                         <span className="min-w-0 flex-1 truncate">{item.label}</span>
                       </GuardedLink>
                       {isActive && item.sections && (
-                        <ul className="ml-3 mt-0.5 space-y-0.5 border-l border-border pl-2">
+                        <ul className="ml-3 mt-0.5 space-y-0 border-l border-border pl-2">
                           {item.sections.map((s, idx) => {
                             const on = (currentSection ?? item.sections![0].key) === s.key;
                             return (
@@ -191,7 +191,7 @@ export function ContextSidebar({ onNavigate }: { onNavigate?: () => void }) {
           <section key={type} aria-label={title}>
             <SectionTitle>{title}</SectionTitle>
             {!data ? (
-              <div aria-hidden="true" className="h-8 animate-pulse rounded-md bg-muted/60" />
+              <div aria-hidden="true" className="h-6 animate-pulse rounded-md bg-muted/60" />
             ) : rows.length === 0 ? (
               <p className="px-2 text-xs text-muted-foreground">
                 {type === 'production_run'
@@ -199,7 +199,7 @@ export function ContextSidebar({ onNavigate }: { onNavigate?: () => void }) {
                   : 'Nothing yet. Records you open show up here.'}
               </p>
             ) : (
-              <ul className="space-y-0.5">
+              <ul className="space-y-0">
                 {rows.map((row) => {
                   const href = recordHref(row.record_type, row.record_key, moduleLabel);
                   return (
@@ -282,7 +282,7 @@ function QuickAccessEditor({
         )}
 
         <p className="mb-1 text-xs font-medium text-muted-foreground">{full ? 'Unpin one to add another' : 'Add to quick access'}</p>
-        <ul className="max-h-48 space-y-0.5 overflow-y-auto">
+        <ul className="max-h-48 space-y-0 overflow-y-auto">
           {available.map((a) => (
             <li key={a.href}>
               <button
