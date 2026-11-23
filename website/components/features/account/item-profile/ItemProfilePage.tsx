@@ -379,18 +379,23 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
     setIsCreatingNew(true);
   };
 
-  const visibleItems = useMemo(() => {
+  // Every filter except Category, so the Category list only offers categories that still have items.
+  const matchesFilters = useCallback((it: SlimItem) => {
     const t = searchQuery.trim().toLowerCase();
-    return items.filter((it) =>
-      it.item_id === selectedItemId ||
-      ((statusFilters.includes(it.is_active ? 'Active' : 'Inactive')) &&
-        (!onlyCompound || it.is_compound) && (!onlyUnpriced || it.is_priced === false) && (!onlyStale || it.is_stale) &&
-        (!categoryFilter || it.category === categoryFilter) &&
-        (!t || `${it.item_number} ${it.item_name}`.toLowerCase().includes(t))))
+    return statusFilters.includes(it.is_active ? 'Active' : 'Inactive') &&
+      (!onlyCompound || it.is_compound) && (!onlyUnpriced || it.is_priced === false) && (!onlyStale || it.is_stale) &&
+      (!t || `${it.item_number} ${it.item_name}`.toLowerCase().includes(t));
+  }, [statusFilters, onlyCompound, onlyUnpriced, onlyStale, searchQuery]);
+
+  const visibleItems = useMemo(() => {
+    return items.filter((it) => it.item_id === selectedItemId || (matchesFilters(it) && (!categoryFilter || it.category === categoryFilter)))
       .map((it) => ({ it, group: categories.find((c) => c.value === it.category)?.label ?? it.category ?? 'No category' }))
       .sort((a, b) => (a.group === b.group ? a.it.item_number.localeCompare(b.it.item_number, undefined, { numeric: true })
         : a.group === 'No category' ? 1 : b.group === 'No category' ? -1 : a.group.localeCompare(b.group)));
-  }, [categories, items, selectedItemId, statusFilters, onlyCompound, onlyUnpriced, onlyStale, categoryFilter, searchQuery]);
+  }, [categories, items, selectedItemId, matchesFilters, categoryFilter]);
+
+  const usedCategories = useMemo(() => new Set(items.filter(matchesFilters).map((it) => it.category)), [items, matchesFilters]);
+  useEffect(() => { if (categoryFilter && !usedCategories.has(categoryFilter)) setCategoryFilter(''); }, [categoryFilter, usedCategories]);
 
   // Changing a filter closes the open item, unless it has unsaved changes.
   const filterChanged = () => { if (!isAnythingDirty) selectItem(null); };
@@ -399,6 +404,13 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
     if (!tenantId) return;
     setIsSaving(true);
     try {
+      // A saved compound item must keep at least one component (a brand-new one gets its components after its first save).
+      if (draft.is_compound && selectedItemId !== null && (componentsRef.current?.count() ?? 0) === 0) {
+        toast.error('A compound item needs at least one component. Add components on the Components tab, or turn Compound item off.');
+        setTab('components');
+        return;
+      }
+
       // ── 0. Turning Compound off: the components must go first ─────────
       if (!draft.is_compound && isComponentsDirty) {
         const ok = await componentsRef.current?.save();
@@ -443,7 +455,12 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
         }
       }
 
-      toast.success('Saved.');
+      if (draft.is_compound && selectedItemId === null) {
+        setTab('components');
+        toast.success('Saved. Add its components on this tab.');
+      } else {
+        toast.success('Saved.');
+      }
     } finally {
       setIsSaving(false);
     }
@@ -487,14 +504,14 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
               </div>
               <select aria-label="Category" className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm" value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); filterChanged(); }}>
                 <option value="">Include All</option>
-                {categories.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                {categories.filter((c) => usedCategories.has(c.value)).map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
               </select>
             </div>
             <ul className="max-h-[70vh] divide-y overflow-y-auto">
               {visibleItems.map(({ it, group }, idx) => (
                 <Fragment key={it.item_id}>
                   {(idx === 0 || visibleItems[idx - 1].group !== group) && (
-                    <li className="sticky top-0 z-[1] bg-muted px-3 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group}</li>
+                    <li className="sticky top-0 z-[1] border-l-4 border-primary bg-muted px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-primary">{group}</li>
                   )}
                   <li>
                     <button type="button" onClick={() => selectItem(it)}
