@@ -20,6 +20,18 @@ BEGIN
   INSERT INTO _ids VALUES ('uCl', uCl);
 END $$;
 
+-- ── last used refresh (trusted) ──────────────────────────────────────────────
+DO $$
+DECLARE pb bigint; want date; got date; n int;
+BEGIN
+  SELECT pricebook_id, last_used_date INTO pb, want FROM fnd_pricebooks WHERE tenant_id = 200000000002 AND last_used_date IS NOT NULL ORDER BY pricebook_id LIMIT 1;
+  UPDATE fnd_pricebooks SET last_used_date = NULL WHERE pricebook_id = pb;
+  n := fnd_pricebooks_last_used_refresh(200000000002);
+  SELECT last_used_date INTO got FROM fnd_pricebooks WHERE pricebook_id = pb;
+  INSERT INTO _t VALUES ('the refresh restores a book''s last used date from its customers'' orders', got = want AND n >= 1);
+  INSERT INTO _t VALUES ('a second refresh changes nothing', fnd_pricebooks_last_used_refresh(200000000002) = 0);
+END $$;
+
 -- ── as the staff administrator ───────────────────────────────────────────────
 DO $$
 DECLARE id bigint; b jsonb; r boolean; s jsonb;
@@ -53,11 +65,12 @@ BEGIN
   INSERT INTO _t VALUES ('enabling clears the disabled stamp and a Draft clears the approver', b ->> 'disabled_at' IS NULL AND b ->> 'approved_by_name' IS NULL);
 
   INSERT INTO _ids VALUES ('pb', id);
+  INSERT INTO _t VALUES ('a book with no customers and no orders is stale', (SELECT (x ->> 'is_stale')::boolean FROM jsonb_array_elements(fnd_pricebooks_list_get(200000000002)) x WHERE (x ->> 'pricebook_id')::bigint = id));
   SELECT x INTO b FROM jsonb_array_elements(fnd_customer_pricebooks_get(200000000002, NULL) -> 'pricebooks') x WHERE (x ->> 'pricebook_id')::bigint = id;
   INSERT INTO _t VALUES ('the customer Pricing tab list carries the book dates', b ->> 'effective_start_date' = '2027-03-01');
 
   s := fnd_pricing_settings_get(200000000002);
-  INSERT INTO _t VALUES ('unused years defaults to 1', (s ->> 'pricebook_unused_years')::int = 1);
+  INSERT INTO _t VALUES ('unused years defaults to 2', (s ->> 'pricebook_unused_years')::int = 2);
   s := fnd_pricing_settings_save(200000000002, '{"pricebook_unused_years": 3}'::jsonb);
   INSERT INTO _t VALUES ('unused years can be changed', (s ->> 'pricebook_unused_years')::int = 3);
   BEGIN PERFORM fnd_pricing_settings_save(200000000002, '{"pricebook_unused_years": 0}'::jsonb); r := false;

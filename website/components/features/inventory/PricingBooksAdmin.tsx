@@ -13,13 +13,16 @@ import { cn } from '@/lib/utils';
 interface BookRow {
   pricebook_id: number; pricebook_name: string; description: string | null; is_active: boolean; status: string;
   effective_start_date: string | null; effective_end_date: string | null; created_by_name: string | null; approved_by_name: string | null;
-  disabled_at: string | null; disabled_by_name: string | null; item_count: number; assigned_count: number;
+  disabled_at: string | null; disabled_by_name: string | null; is_stale: boolean; last_used_months: number | null; item_count: number; assigned_count: number;
 }
 interface ItemLine { item_id: number; item_number: string; item_name: string; category: string; price: string; is_active: boolean; removed: boolean }
 interface Assignment { customer_id: number; customer_name: string; assignment_type: string; status: string; is_active: boolean; effective_start_date: string; effective_end_date: string | null }
 interface CatalogItem { item_id: number; item_number: string; item_name: string; category: string | null }
 type ApiItem = { item_id: number; item_number: string; item_name: string; category: string | null; item_price: number | null; is_active: boolean };
 
+const FILTERS = ['Active', 'Unassigned', 'Disabled', 'Stale'] as const;
+type BookFilter = (typeof FILTERS)[number];
+const matchesFilter = (b: BookRow, f: BookFilter) => (f === 'Active' ? b.is_active : f === 'Disabled' ? !b.is_active : f === 'Unassigned' ? b.assigned_count === 0 : b.is_stale);
 const STATUSES = ['Draft', 'Scheduled', 'Approved'];
 const NO_CATEGORY = 'No category';
 const toLine = (i: ApiItem): ItemLine => ({ item_id: i.item_id, item_number: i.item_number ?? '', item_name: i.item_name, category: i.category ?? NO_CATEGORY, price: i.item_price === null ? '' : String(i.item_price), is_active: i.is_active, removed: false });
@@ -39,8 +42,10 @@ export function PricingBooksAdmin({ tenantId }: { tenantId: number }) {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState('');
+  const [category, setCategory] = useState('');
   const [busy, setBusy] = useState(false);
-  const [includeDisabled, setIncludeDisabled] = useState(false);
+  const [filters, setFilters] = useState<BookFilter[]>(['Active']);
+  const [staleYears, setStaleYears] = useState(1);
   const [baseline, setBaseline] = useState('');
   const [detailsOpen, setDetailsOpen] = useState(true);
   const [assignedOpen, setAssignedOpen] = useState(true);
@@ -51,11 +56,12 @@ export function PricingBooksAdmin({ tenantId }: { tenantId: number }) {
 
   useEffect(() => {
     void loadBooks();
+    adminCall<{ pricebook_unused_years: number }>(`/api/admin/pricing-settings?tenant_id=${tenantId}`).then((d) => setStaleYears(d.pricebook_unused_years)).catch(() => {});
     adminCall<CatalogItem[]>(`/api/items?tenant_id=${tenantId}`).then(setCatalog).catch(() => {});
   }, [tenantId, loadBooks]);
 
   const open = useCallback(async (id: number | 'new') => {
-    setSelectedId(id); setQ(''); setFilter('');
+    setSelectedId(id); setQ(''); setFilter(''); setCategory('');
     if (id === 'new') { setForm(blank); setLines([]); setAssignments([]); setBaseline(snapOf(blank, [])); return; }
     const b = books.find((x) => x.pricebook_id === id);
     if (b) setForm(formFrom(b));
@@ -75,7 +81,7 @@ export function PricingBooksAdmin({ tenantId }: { tenantId: number }) {
     setLines((ls) => ls.filter((l) => !l.removed));
     setAssignments([]);
     setBaseline('');
-    setQ(''); setFilter('');
+    setQ(''); setFilter(''); setCategory('');
   };
 
   const inBook = useMemo(() => new Set(lines.filter((l) => !l.removed).map((l) => l.item_id)), [lines]);
@@ -85,10 +91,12 @@ export function PricingBooksAdmin({ tenantId }: { tenantId: number }) {
     return catalog.filter((c) => !inBook.has(c.item_id) && `${c.item_number} ${c.item_name}`.toLowerCase().includes(t)).slice(0, 8);
   }, [q, catalog, inBook]);
   const shown = useMemo(() => lines
+    .filter((l) => !category || l.category === category)
     .filter((l) => !filter.trim() || `${l.item_number} ${l.item_name}`.toLowerCase().includes(filter.trim().toLowerCase()))
     .sort((a, b) => (a.category === b.category ? a.item_number.localeCompare(b.item_number, undefined, { numeric: true }) : a.category === NO_CATEGORY ? 1 : b.category === NO_CATEGORY ? -1 : a.category.localeCompare(b.category))),
-  [lines, filter]);
-  const visibleBooks = books.filter((b) => includeDisabled || b.is_active || b.pricebook_id === selectedId);
+  [lines, filter, category]);
+  const categories = useMemo(() => Array.from(new Set(lines.map((l) => l.category))).sort((a, b) => (a === NO_CATEGORY ? 1 : b === NO_CATEGORY ? -1 : a.localeCompare(b))), [lines]);
+  const visibleBooks = books.filter((b) => b.pricebook_id === selectedId || filters.some((f) => matchesFilter(b, f)));
   const selectedBook = books.find((b) => b.pricebook_id === selectedId);
 
   const setLine = (id: number, p: Partial<ItemLine>) => setLines((ls) => ls.map((l) => (l.item_id === id ? { ...l, ...p } : l)));
@@ -122,10 +130,16 @@ export function PricingBooksAdmin({ tenantId }: { tenantId: number }) {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-4 p-4 sm:p-6">
-      <p className="max-w-3xl text-sm text-muted-foreground">
-        A pricing book is a list of items and prices. Assign books to a customer account on its Pricing tab; they are used in the order shown there, item by item, while active, Approved and within their dates for the delivery date.
-      </p>
+    <div className="mx-auto max-w-7xl space-y-4 p-2 sm:p-3">
+      <div className="flex items-start justify-between gap-3">
+        <p className="max-w-3xl text-sm text-muted-foreground">
+          A pricing book is a list of items and prices. Assign books to a customer account on its Pricing tab; they are used in the order shown there, item by item, while active, Approved and within their dates for the delivery date.
+        </p>
+        <Button size="sm" variant="outline" className="shrink-0" disabled={selectedId === null}
+          onClick={() => { const open = !(detailsOpen || assignedOpen); setDetailsOpen(open); setAssignedOpen(open); }}>
+          {detailsOpen || assignedOpen ? 'Collapse All' : 'Expand All'}
+        </Button>
+      </div>
       {banner}
 
       <div className="grid gap-4 lg:grid-cols-[18rem_1fr]">
@@ -136,31 +150,47 @@ export function PricingBooksAdmin({ tenantId }: { tenantId: number }) {
               <Button size="sm" className="gap-1" onClick={() => void open('new')}><Plus className="h-4 w-4" />New</Button>
               <Button size="sm" variant="outline" disabled={typeof selectedId !== 'number'} onClick={copyAsNew}>Copy As New</Button>
             </div>
-            <label className="flex items-center gap-2 text-sm"><Checkbox checked={includeDisabled} onCheckedChange={(v) => setIncludeDisabled(v === true)} /> Include Disabled</label>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+              {FILTERS.map((f) => (
+                <label key={f} className="flex items-center gap-1.5 text-sm">
+                  <Checkbox checked={filters.includes(f)} onCheckedChange={(v) => { setFilters((cur) => (v === true ? [...cur, f] : cur.filter((x) => x !== f))); setSelectedId(null); }} />
+                  {f === 'Stale' ? `Stale (${staleYears} ${staleYears === 1 ? 'Year' : 'Years'})` : f}
+                </label>
+              ))}
+            </div>
           </div>
-          <ul className="max-h-[70vh] divide-y overflow-y-auto">
+          <div className="max-h-[70vh] overflow-y-auto">
+          <div className="sticky top-0 z-10 grid grid-cols-[1fr_2.25rem_2.5rem_2.75rem] items-end gap-1 border-b bg-muted px-3 py-1 text-[11px] font-semibold text-muted-foreground">
+            <span>Name</span><span className="text-center">Items</span><span className="text-center">Agmts</span><span className="text-center leading-tight">Last<br />Used</span>
+          </div>
+          <ul className="divide-y">
             {visibleBooks.map((b) => (
               <li key={b.pricebook_id}>
                 <button type="button" onClick={() => void open(b.pricebook_id)}
                   className={cn('w-full px-3 py-2 text-left text-sm hover:bg-muted', !b.is_active && 'bg-muted/60 text-muted-foreground', selectedId === b.pricebook_id && 'bg-accent')}>
-                  <div className="flex items-center gap-2"><span className="flex-1 truncate font-medium">{b.pricebook_name}</span>{!b.is_active && <span className="text-[10px] uppercase">Disabled</span>}</div>
-                  <div className="text-xs text-muted-foreground">{b.status} · {b.item_count} items · {b.assigned_count} customer{b.assigned_count === 1 ? '' : 's'}</div>
+                  <div className="grid grid-cols-[1fr_2.25rem_2.5rem_2.75rem] items-center gap-1">
+                    <span className="truncate font-medium">{b.pricebook_name}</span>
+                    <span className="text-center text-xs">{b.item_count}</span>
+                    <span className="text-center text-xs">{b.assigned_count}</span>
+                    <span className="text-center text-xs">{b.last_used_months === null ? '—' : `${b.last_used_months} mo`}</span>
+                  </div>
                 </button>
               </li>
             ))}
             {visibleBooks.length === 0 && <li className="px-3 py-4 text-sm text-muted-foreground">No pricing books.</li>}
           </ul>
+          </div>
         </CardContent></Card>
 
         {selectedId === null ? (
-          <Card><CardContent className="p-6 text-sm text-muted-foreground">Select a pricing book, or create a new one.</CardContent></Card>
+          <Card><CardContent className="flex min-h-[40vh] items-center justify-center p-6 text-center text-sm text-muted-foreground">Select a pricing book, or create a new one.</CardContent></Card>
         ) : (
           <div className="space-y-4">
             <Card><CardContent className="space-y-3 pt-6">
               <div className="flex items-start justify-between gap-3">
                 <button type="button" className="flex items-center gap-1 text-left" aria-expanded={detailsOpen} onClick={() => setDetailsOpen((o) => !o)}>
                   {detailsOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                  <h2 className="text-lg font-medium">{selectedId === 'new' ? 'New pricing book' : form.pricebook_name} <span className="text-sm font-normal text-muted-foreground">Details</span></h2>
+                  <h2 className="text-lg font-medium">Price Book Details</h2>
                 </button>
                 <Button size="sm" onClick={save} disabled={busy || invalid}>Save</Button>
               </div>
@@ -186,7 +216,7 @@ export function PricingBooksAdmin({ tenantId }: { tenantId: number }) {
               <Card><CardContent className="space-y-3 pt-6">
                 <button type="button" className="flex items-center gap-1" aria-expanded={assignedOpen} onClick={() => setAssignedOpen((o) => !o)}>
                   {assignedOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                  <h3 className="text-base font-medium">Assigned to ({assignments.length})</h3>
+                  <h3 className="text-base font-medium">Assignments ({assignments.length})</h3>
                 </button>
                 {assignedOpen && <div className="overflow-x-auto rounded-md border">
                   <table className="w-full text-sm">
@@ -206,6 +236,10 @@ export function PricingBooksAdmin({ tenantId }: { tenantId: number }) {
             <Card><CardContent className="space-y-3 pt-6">
               <div className="flex flex-wrap items-center gap-3">
                 <h3 className="mr-auto text-base font-medium">Items ({lines.filter((l) => !l.removed).length})</h3>
+                <select aria-label="Category" className="h-9 rounded-md border border-input bg-background px-2 text-sm" value={category} onChange={(e) => setCategory(e.target.value)}>
+                  <option value="">Include All</option>
+                  {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
                 {lines.length > 10 && <Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter items" aria-label="Filter items" className="w-48" />}
               </div>
               <div className="relative">

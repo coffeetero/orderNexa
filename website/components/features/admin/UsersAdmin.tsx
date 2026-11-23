@@ -43,7 +43,7 @@ export function UsersAdmin({ tenantId, audience: pageAudience }: { tenantId: num
   }
 
   return (
-    <div className="space-y-4 p-4 sm:p-6">
+    <div className="space-y-4 p-2 sm:p-3">
       <PageHead title={pageAudience === 'CUSTOMER' ? 'Customer Users' : 'Company Users'}>
         Give each person their roles and, for your own staff, the customer groups they can see. A user with no role can sign in but sees nothing;
         a staff user with no group sees no customers. New users are not created here yet.

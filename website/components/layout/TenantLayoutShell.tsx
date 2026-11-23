@@ -127,7 +127,7 @@ export function TenantLayoutShell({
 
         <div className="flex min-h-0 flex-1">
           {/* main comes first in the DOM (Tab reaches the page before the sidebar) but is shown to the right. */}
-          <main className="order-2 min-w-0 flex-1 overflow-y-auto bg-background px-[10px] pb-[1px] scrollbar-thin">
+          <main className="order-2 min-w-0 flex-1 overflow-y-auto bg-background px-[5px] pb-[1px] scrollbar-thin">
             <div className={cn('mx-auto h-full w-full max-w-[1440px]', contentClassName)}>{children}</div>
           </main>
 

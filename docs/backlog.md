@@ -12,7 +12,7 @@ Status: designed, not built. Names below need approval before any migration is a
 ### Tables (2)
 1. `fnd_health_checks`: one row per company per check, seeded from the check list.
    - `tenant_id`, `check_code`, `name`, `category` (Setup / Data), `description`, `runs_before_production`, `is_enabled`, `last_run_at`, `last_warnings`, `last_errors`.
-2. `fnd_health_log`: one row per finding, `type` column = Warning / Error.
+2. `fnd_health_log`: one row per finding, `type` column = Information / Warning / Error.
    - `log_id`, `tenant_id`, `check_code`, `type`, `trigger` (Scheduled / Manual / Production Run), `found_at`, `findings` (what is wrong), `remediation` (how to fix), `record_type`, `record_id`, `customer_id` (nullable, for scope), `fixed_at`, `fixed_by`.
    - A re-run that no longer finds an item closes it (`fixed_at` set, `fixed_by` null = fixed automatically). A person can also mark it fixed.
 
@@ -32,6 +32,7 @@ Status: designed, not built. Names below need approval before any migration is a
 - Computations in database functions, one per check; a new check is one function plus one catalog entry.
 
 ### Severity examples
+- Information: shown on the dashboard, never changes the heart colour. A finding can be one summary row with a count and a link, e.g. "Found 3 Price Books not used in over 2 years" linking to the Pricing Books page (Stale filter).
 - Error: order entered for a customer with no pricing book.
 - Warning: customer with no contact information.
 
@@ -57,4 +58,4 @@ Status: designed, not built. Names below need approval before any migration is a
 - Items grouped by category.
 
 ### Health check (links to item 1)
-- Pricing: book not used in over a year is disabled (shown as a notification with a link to the Pricing Books page).
+- Pricing: nightly, `fnd_pricebooks_last_used_refresh(tenant)` refreshes `fnd_pricebooks.last_used_date` (already built; call it from the health check), then an Information finding reports books not used in over N years (company setting) with a link to the Pricing Books page.

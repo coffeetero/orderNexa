@@ -1,7 +1,7 @@
 SET search_path = bps, public;
 -- Pricing book status (Draft / Scheduled / Approved), default dates, approver, and who/when disabled.
 -- Status is informational for now: pricing still uses the book's Active flag and the assignment's status and dates.
--- New columns: fnd_pricebooks.status, effective_start_date, effective_end_date, approved_by, approved_at, disabled_at, disabled_by;
+-- New columns: fnd_pricebooks.last_used_date (refreshed nightly by fnd_pricebooks_last_used_refresh), fnd_pricebooks.status, effective_start_date, effective_end_date, approved_by, approved_at, disabled_at, disabled_by;
 --              fnd_tenants.pricebook_unused_years (used later by the health check "book not used").
 -- Run after add_pricing_books.sql.
 
@@ -13,6 +13,7 @@ ALTER TABLE bps.fnd_pricebooks
   ADD COLUMN approved_at timestamptz,
   ADD COLUMN disabled_at timestamptz,
   ADD COLUMN disabled_by bigint,
+  ADD COLUMN last_used_date date,
   ADD CONSTRAINT chk_fnd_pricebooks_status CHECK (status IN ('Draft', 'Scheduled', 'Approved')),
   ADD CONSTRAINT chk_fnd_pricebooks_dates CHECK (effective_end_date IS NULL OR effective_start_date IS NULL OR effective_end_date >= effective_start_date);
 
@@ -20,7 +21,7 @@ ALTER TABLE bps.fnd_pricebooks
 UPDATE bps.fnd_pricebooks SET status = 'Approved', approved_at = COALESCE(updated_at, created_at), approved_by = COALESCE(updated_by, created_by);
 UPDATE bps.fnd_pricebooks SET disabled_at = COALESCE(updated_at, created_at), disabled_by = updated_by WHERE NOT is_active;
 
-ALTER TABLE bps.fnd_tenants ADD COLUMN pricebook_unused_years integer NOT NULL DEFAULT 1 CHECK (pricebook_unused_years >= 1);
+ALTER TABLE bps.fnd_tenants ADD COLUMN pricebook_unused_years integer NOT NULL DEFAULT 2 CHECK (pricebook_unused_years >= 1);
 
 -- Records who approved and who/when disabled; only a pricing approver may set Approved.
 CREATE OR REPLACE FUNCTION bps.fnd_pricebooks_track() RETURNS trigger
@@ -54,12 +55,19 @@ CREATE TRIGGER trg_fnd_pricebooks_track BEFORE INSERT OR UPDATE ON bps.fnd_price
 -- ---------- Pricing Books screen ----------
 CREATE OR REPLACE FUNCTION bps.fnd_pricebooks_list_get(p_tenant_id bigint) RETURNS jsonb
 LANGUAGE plpgsql STABLE SET search_path = bps, public AS $$
+-- last_used_date is stored (see fnd_pricebooks_last_used_refresh); months and is_stale (never used, or last used before the company's "unused years" ago) come from it.
+DECLARE v_today date; v_cutoff date;
 BEGIN
   PERFORM bps.fnd_assert_active_tenant(p_tenant_id);
+  v_today := (now() AT TIME ZONE bps.fnd_tenant_time_zone(p_tenant_id))::date;
+  SELECT v_today - (t.pricebook_unused_years * 365) INTO v_cutoff FROM bps.fnd_tenants t WHERE t.tenant_id = p_tenant_id;
   RETURN (SELECT COALESCE(jsonb_agg(jsonb_build_object('pricebook_id', b.pricebook_id, 'pricebook_name', b.pricebook_name, 'description', b.description,
       'is_active', b.is_active, 'status', b.status, 'effective_start_date', b.effective_start_date, 'effective_end_date', b.effective_end_date,
       'created_by_name', cu.user_name, 'approved_by_name', au.user_name, 'approved_at', b.approved_at,
       'disabled_at', b.disabled_at, 'disabled_by_name', du.user_name,
+      'last_used_date', b.last_used_date,
+      'last_used_months', CASE WHEN b.last_used_date IS NULL THEN NULL ELSE (extract(year FROM age(v_today, b.last_used_date)) * 12 + extract(month FROM age(v_today, b.last_used_date)))::int END,
+      'is_stale', (b.last_used_date IS NULL OR b.last_used_date < v_cutoff),
       'item_count', (SELECT count(*) FROM bps.fnd_pricebook_items i WHERE i.pricebook_id = b.pricebook_id AND i.is_active),
       'assigned_count', (SELECT count(DISTINCT cp.customer_id) FROM bps.fnd_customer_pricebooks cp WHERE cp.pricebook_id = b.pricebook_id))
       ORDER BY b.pricebook_name), '[]'::jsonb)
@@ -196,7 +204,31 @@ BEGIN
   RETURN bps.fnd_pricing_settings_get(p_tenant_id);
 END $$;
 
-REVOKE EXECUTE ON FUNCTION bps.fnd_pricebooks_list_get(bigint), bps.fnd_pricebook_save(bigint, jsonb), bps.fnd_pricebook_detail_get(bigint, bigint),
+-- Sets each book's last_used_date: the latest production date of an order by a customer the book is assigned to (or that customer's sites
+-- and departments). One pass over the orders; meant to run nightly as a health check. Returns how many books changed.
+CREATE OR REPLACE FUNCTION bps.fnd_pricebooks_last_used_refresh(p_tenant_id bigint) RETURNS integer
+LANGUAGE plpgsql SET search_path = bps, public AS $$
+DECLARE n integer;
+BEGIN
+  PERFORM bps.fnd_assert_active_tenant(p_tenant_id);
+  WITH used AS (
+    SELECT cp.pricebook_id, max(o.production_date) AS d
+      FROM bps.om_orders o
+      JOIN bps.fnd_customers oc ON oc.customer_id = o.customer_id
+      JOIN bps.fnd_customer_pricebooks cp ON cp.customer_id = COALESCE(oc.top_customer_id, oc.customer_id) AND cp.tenant_id = p_tenant_id
+     WHERE o.tenant_id = p_tenant_id
+     GROUP BY cp.pricebook_id)
+  UPDATE bps.fnd_pricebooks b SET last_used_date = u.d
+    FROM (SELECT pb.pricebook_id, used.d FROM bps.fnd_pricebooks pb LEFT JOIN used ON used.pricebook_id = pb.pricebook_id WHERE pb.tenant_id = p_tenant_id) u
+   WHERE b.pricebook_id = u.pricebook_id AND b.last_used_date IS DISTINCT FROM u.d;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  RETURN n;
+END $$;
+
+REVOKE EXECUTE ON FUNCTION bps.fnd_pricebooks_last_used_refresh(bigint), bps.fnd_pricebooks_list_get(bigint), bps.fnd_pricebook_save(bigint, jsonb), bps.fnd_pricebook_detail_get(bigint, bigint),
   bps.fnd_customer_pricebooks_get(bigint, bigint), bps.fnd_pricing_settings_get(bigint), bps.fnd_pricing_settings_save(bigint, jsonb) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION bps.fnd_pricebooks_list_get(bigint), bps.fnd_pricebook_save(bigint, jsonb), bps.fnd_pricebook_detail_get(bigint, bigint),
+GRANT EXECUTE ON FUNCTION bps.fnd_pricebooks_last_used_refresh(bigint), bps.fnd_pricebooks_list_get(bigint), bps.fnd_pricebook_save(bigint, jsonb), bps.fnd_pricebook_detail_get(bigint, bigint),
   bps.fnd_customer_pricebooks_get(bigint, bigint), bps.fnd_pricing_settings_get(bigint), bps.fnd_pricing_settings_save(bigint, jsonb) TO authenticated, service_role, bps_dev;
+
+-- First fill for every company.
+SELECT bps.fnd_pricebooks_last_used_refresh(tenant_id) FROM bps.fnd_tenants;

@@ -62,7 +62,7 @@ export function ProcessRun({ tenantId }: { tenantId: number }) {
   };
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
+    <div className="mx-auto max-w-4xl space-y-6 p-2 sm:p-3">
       <div>
         <h1 className="text-2xl font-semibold">Process run</h1>
         <p className="text-sm text-muted-foreground">

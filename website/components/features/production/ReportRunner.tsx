@@ -124,7 +124,7 @@ export function ReportRunner({ tenantId, report, title, description, customerBas
   const canRun = !busy && Boolean(from && to) && (!needsList || selected.size > 0);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">
+    <div className="mx-auto max-w-5xl space-y-6 p-2 sm:p-3">
       <div>
         <h1 className="text-2xl font-semibold">{title}</h1>
         <p className="text-sm text-muted-foreground">{description}</p>

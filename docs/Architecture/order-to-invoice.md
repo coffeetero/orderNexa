@@ -145,4 +145,5 @@ A customer account is assigned one or more pricing books (`fnd_customer_priceboo
 - A book has its own status (Draft, Scheduled, Approved), From/To dates, notes, creator and approver. Status is informational for now; pricing still uses the book's Active flag and the assignment's own status and dates. New assignments on the customer Pricing tab default to the book's dates and may be overridden.
 - Only a pricing approver can set a book to Approved (the approver and time are recorded). Disabling a book records who and when; enabling clears it.
 - Copy As New is a screen action: it opens a new unsaved book with the items and prices, status Draft, not active.
+- `fnd_pricebooks.last_used_date` is the latest production date of an order by a customer the book is assigned to (sites and departments count toward their account). It is stored and refreshed by `fnd_pricebooks_last_used_refresh(tenant)`, meant for the nightly health check, so the list never scans orders.
 - Company setting `fnd_tenants.pricebook_unused_years` (Application Settings > Pricing) is read by the future "book not used" health check (docs/backlog.md).

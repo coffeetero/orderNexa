@@ -89,7 +89,7 @@ export function FinancialReport({ tenantId, kind }: { tenantId: number; kind: Re
 
   const none = selected.size === 0;
   return (
-    <div className="mx-auto max-w-5xl space-y-4 p-4 sm:p-6">
+    <div className="mx-auto max-w-5xl space-y-4 p-2 sm:p-3">
       <div>
         <h1 className="text-2xl font-semibold">{cfg.title}</h1>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{cfg.help}</p>

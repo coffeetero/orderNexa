@@ -56,7 +56,7 @@ export function GroupsAdmin({ tenantId }: { tenantId: number }) {
 
   const locked = !!draft?.is_all_customers;
   return (
-    <div className="space-y-4 p-4 sm:p-6">
+    <div className="space-y-4 p-2 sm:p-3">
       <PageHead title="Customer Groups">
         Groups decide which customers a staff user can see, for example White Glove Service or High Risk. A customer in a group brings its departments and
         sites with it. Everyone who should see every customer gets the built-in All Customers group; staff with no group see no customers.
