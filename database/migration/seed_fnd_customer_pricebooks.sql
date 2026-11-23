@@ -31,16 +31,18 @@ BEGIN
         effective_start_date,
         effective_end_date,
         is_active,
-        tenant_id
+        tenant_id,
+        status
     )
     SELECT
         cus.customer_id,
         prcBk.pricebook_id,
-        'PRIMARY',
+        'Default',
         DATE '2000-01-01',
         NULL,
         TRUE,
-        cus.tenant_id
+        cus.tenant_id,
+        'Approved'
     FROM fnd_customers cus
     INNER JOIN customer c
         ON (NULLIF(TRIM(BOTH FROM COALESCE(c.cus_id::text, '')), ''))::integer = cus.legacy_id

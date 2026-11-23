@@ -59,7 +59,7 @@ BEGIN
   j := fnd_users_get(200000000002);
   INSERT INTO _t VALUES ('users list includes the test users with their role ids', jsonb_array_length(j) >= 4
      AND EXISTS (SELECT 1 FROM jsonb_array_elements(j) e WHERE e->>'user_name' = 'zz clerk' AND jsonb_array_length(e->'role_ids') = 1));
-  v_group := fnd_customer_group_save(200000000002, jsonb_build_object('group_name','zz Group','customer_ids', jsonb_build_array(200000000158)));
+  v_group := fnd_customer_group_save(200000000002, jsonb_build_object('group_name','zz Group','customer_ids', jsonb_build_array((SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 221))));
   PERFORM fnd_user_access_save(200000000002, uTarget, ARRAY[v_role], ARRAY[v_group], true);
   INSERT INTO _t VALUES ('user access save sets role and group',
      EXISTS (SELECT 1 FROM fnd_user_roles WHERE user_id = uTarget AND role_id = v_role) AND EXISTS (SELECT 1 FROM fnd_user_customer_groups WHERE user_id = uTarget AND group_id = v_group));
@@ -76,8 +76,8 @@ BEGIN
   j := fnd_customer_groups_get(200000000002);
   INSERT INTO _t VALUES ('groups list has All Customers first and the new group with its effective customers',
      (j->0->>'is_all_customers')::boolean AND EXISTS (SELECT 1 FROM jsonb_array_elements(j) e WHERE e->>'group_name' = 'zz Group' AND (e->>'effective_count')::int >= 1));
-  PERFORM fnd_customer_group_save(200000000002, jsonb_build_object('group_id', v_group, 'group_name','zz Group','customer_ids', jsonb_build_array(200000000685, 200000000106)));
-  INSERT INTO _t VALUES ('group members are replaced', (SELECT array_agg(customer_id ORDER BY customer_id) FROM fnd_customer_group_members WHERE group_id = v_group) = ARRAY[200000000106::bigint, 200000000685]);
+  PERFORM fnd_customer_group_save(200000000002, jsonb_build_object('group_id', v_group, 'group_name','zz Group','customer_ids', jsonb_build_array((SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 893), (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 172))));
+  INSERT INTO _t VALUES ('group members are replaced', (SELECT array_agg(customer_id ORDER BY customer_id) FROM fnd_customer_group_members WHERE group_id = v_group) = ARRAY[(SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 172)::bigint, (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 893)]);
   BEGIN PERFORM fnd_customer_group_save(200000000002, jsonb_build_object('group_id', (SELECT group_id FROM fnd_customer_groups WHERE tenant_id = 200000000002 AND is_all_customers), 'group_name','x')); r := false;
   EXCEPTION WHEN OTHERS THEN r := true; END;
   INSERT INTO _t VALUES ('the All Customers group cannot be edited', r);

@@ -8,13 +8,13 @@ SET search_path = bps, public;
 CREATE TEMP TABLE _t (name text, ok boolean);
 CREATE TEMP TABLE _id (k text PRIMARY KEY, v bigint);
 GRANT ALL ON _t TO PUBLIC;
--- A customer-side user attached to account 200000000040 (Customer Administrator role), used for the customer-restricted claims below.
+-- A customer-side user attached to account (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 102) (Customer Administrator role), used for the customer-restricted claims below.
 DO $$
 DECLARE u bigint;
 BEGIN
   INSERT INTO fnd_users (tenant_id, auth_user_id, user_name, user_type) VALUES (200000000002, gen_random_uuid(), 'zz test customer user', 'CUSTOMER_USER') RETURNING user_id INTO u;
   INSERT INTO fnd_user_tenants (tenant_id, user_id) VALUES (200000000002, u);
-  INSERT INTO fnd_user_customers (tenant_id, user_id, customer_id) VALUES (200000000002, u, 200000000040);
+  INSERT INTO fnd_user_customers (tenant_id, user_id, customer_id) VALUES (200000000002, u, (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 102));
   INSERT INTO fnd_user_roles (tenant_id, user_id, role_id)
     SELECT 200000000002, u, role_id FROM fnd_roles WHERE tenant_id = 200000000002 AND role_name = 'Customer Administrator' AND owner_customer_id IS NULL;
   PERFORM set_config('t.cust_user', u::text, false);
@@ -39,11 +39,11 @@ DECLARE a bigint; b bigint; r jsonb; o1 text; sa jsonb; sb jsonb; la bigint; lb 
 BEGIN
   SELECT v INTO a FROM _id WHERE k='a'; SELECT v INTO b FROM _id WHERE k='b';
   r := om_orders_save(200000000002, NULL, NULL, jsonb_build_object('customer_id', a, 'production_date', '2033-02-10', 'production_code', 'MORNING', 'delivery_amount', 6,
-       'lines', jsonb_build_array(jsonb_build_object('item_id', 200000001619, 'item_description','Roll','quantity',10,'unit_price',2),
-                                  jsonb_build_object('item_id', 200000001619, 'item_description','Loaf','quantity',5,'unit_price',4))));
+       'lines', jsonb_build_array(jsonb_build_object('item_id', (SELECT item_id FROM bps.fnd_items WHERE tenant_id = 200000000002 AND legacy_id = 11608), 'item_description','Roll','quantity',10,'unit_price',2),
+                                  jsonb_build_object('item_id', (SELECT item_id FROM bps.fnd_items WHERE tenant_id = 200000000002 AND legacy_id = 11608), 'item_description','Loaf','quantity',5,'unit_price',4))));
   INSERT INTO _id VALUES ('o1', (r->>'order_id')::bigint);
   PERFORM om_orders_save(200000000002, NULL, NULL, jsonb_build_object('customer_id', b, 'production_date', '2033-02-10', 'production_code', 'MORNING',
-       'lines', jsonb_build_array(jsonb_build_object('item_id', 200000001619, 'item_description','Frozen bun','quantity',3,'unit_price',10))));
+       'lines', jsonb_build_array(jsonb_build_object('item_id', (SELECT item_id FROM bps.fnd_items WHERE tenant_id = 200000000002 AND legacy_id = 11608), 'item_description','Frozen bun','quantity',3,'unit_price',10))));
   PERFORM om_production_runs_process(200000000002, DATE '2033-02-10', DATE '2033-02-10', NULL);
   PERFORM om_report_packaging_issue(200000000002, DATE '2033-02-10', DATE '2033-02-10', NULL, ARRAY[a, b]);
 

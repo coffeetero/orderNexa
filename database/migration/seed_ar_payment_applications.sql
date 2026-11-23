@@ -33,11 +33,11 @@ BEGIN
         RAISE EXCEPTION 'Tenant "Alpine Bakery" not found in fnd_tenants';
     END IF;
 
-    IF to_regclass('public.pmt_detail') IS NULL THEN
+    IF to_regclass('bps.pmt_detail') IS NULL THEN
         RAISE EXCEPTION 'public.pmt_detail not found — run dataPump.py';
     END IF;
 
-    IF to_regclass('public.ar') IS NULL THEN
+    IF to_regclass('bps.ar') IS NULL THEN
         RAISE EXCEPTION 'public.ar not found — run dataPump.py';
     END IF;
 

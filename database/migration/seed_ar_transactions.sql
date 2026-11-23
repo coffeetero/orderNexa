@@ -33,7 +33,7 @@ BEGIN
         RAISE EXCEPTION 'Tenant "Alpine Bakery" not found in fnd_tenants';
     END IF;
 
-    IF to_regclass('public.ordr') IS NULL THEN
+    IF to_regclass('bps.ordr') IS NULL THEN
         RAISE EXCEPTION 'public.ordr not found — run dataPump.py to load legacy ordr';
     END IF;
 
@@ -44,45 +44,38 @@ BEGIN
     DELETE FROM ar_transaction_lines WHERE tenant_id = v_tenant_id;
     DELETE FROM ar_transactions WHERE tenant_id = v_tenant_id;
 
+    -- One invoice per legacy ar INV row (ar_trn_ref = invoice number). Orders reach it through ordr.invc_no (lines seed).
     INSERT INTO ar_transactions (
-        tenant_id,
-        customer_id,
-        transaction_type,
-        document_number,
-        transaction_date,
-        due_date,
-        currency_code,
-        amount,
-        legacy_ar_id,
-        status
+        tenant_id, customer_id, transaction_type, document_number, transaction_date, due_date,
+        currency_code, amount, legacy_ar_id, status
     )
     SELECT
-        ordr.tenant_id,
-        ordr.customer_id,
-        'INV' as transaction_type,
-        COALESCE(
-            NULLIF(trim(both from lo.invc_no::text), ''),
-            trim(both from ordr.order_number)
-        ) as document_number,
-        COALESCE(ordr.order_date, DATE '2000-01-01') as transaction_date,
-        COALESCE(ordr.order_date, DATE '2000-01-01') as due_date,
-        'USD' as currency_code,
-        ordr.amount::NUMERIC(14,4) as amount,
-        ar_trn_id::BIGINT as legacy_ar_trn_id,
-        'OPEN' as status
-    FROM om_orders ordr
-    INNER JOIN ordr lo
-        ON lo.ordr_no = ordr.order_number::BIGINT
-    INNER JOIN ar
-      on ar.ar_trn_ref = lo.invc_no
-    WHERE 
-      ordr.customer_id IS NOT NULL;
+        c.tenant_id,
+        c.customer_id,
+        'INV',
+        a.ar_trn_ref::BIGINT::TEXT,
+        COALESCE(a.ar_trn_date, DATE '2000-01-01'),
+        COALESCE(a.ar_trn_date, DATE '2000-01-01'),
+        'USD',
+        COALESCE(a.ar_trn_amt, 0)::NUMERIC(14,4),
+        a.ar_trn_id::BIGINT,
+        CASE WHEN COALESCE(a.ar_trn_bal, 0) = 0 THEN 'CLOSED'
+             WHEN COALESCE(a.ar_trn_bal, 0) < COALESCE(a.ar_trn_amt, 0) THEN 'PARTIAL'
+             ELSE 'OPEN' END
+    FROM ar a
+    INNER JOIN fnd_customers c
+        ON c.tenant_id = v_tenant_id
+       AND c.legacy_id = a.cus_id::INT
+    WHERE a.ar_trn_type = 'INV'
+      AND a.ar_trn_ref IS NOT NULL
+      -- Not migrated: entries dated after tomorrow (the old system accepted entries with a wrong year).
+      AND COALESCE(a.ar_trn_date, DATE '2000-01-01') <= CURRENT_DATE + 1;
 
     GET DIAGNOSTICS v_inserted = ROW_COUNT;
     RAISE NOTICE 'ar_transactions: inserted % rows (from om_orders + ordr; check transaction_type literal in seed file)', v_inserted;
 
     -- DONT KNOW WHY WE NEED THIS
-    -- IF to_regclass('public.ar') IS NOT NULL THEN
+    -- IF to_regclass('bps.ar') IS NOT NULL THEN
     --     UPDATE ar_transactions t
     --     SET legacy_ar_id = m.ar_trn_id
     --     FROM (

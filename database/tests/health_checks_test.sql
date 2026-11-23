@@ -50,7 +50,7 @@ BEGIN
   -- an upcoming order for an account whose book does not cover the delivery date is an Error
   UPDATE fnd_customer_pricebooks SET effective_end_date = '2020-12-31' WHERE customer_id = acc;
   PERFORM om_orders_save(200000000002, NULL, NULL, jsonb_build_object('customer_id', acc, 'production_date', (current_date + 10)::text, 'production_code', 'MORNING',
-     'lines', jsonb_build_array(jsonb_build_object('item_id', 200000001619, 'item_description', 'Roll', 'quantity', 1, 'unit_price', 1))));
+     'lines', jsonb_build_array(jsonb_build_object('item_id', (SELECT item_id FROM bps.fnd_items WHERE tenant_id = 200000000002 AND legacy_id = 11608), 'item_description', 'Roll', 'quantity', 1, 'unit_price', 1))));
   s := fnd_health_run(200000000002, 'Manual', 'orders_without_pricebook');
   INSERT INTO _t VALUES ('an upcoming order with no pricing book in effect is an Error', EXISTS (SELECT 1 FROM jsonb_array_elements(fnd_health_findings_get(200000000002)) x WHERE x ->> 'check_code' = 'orders_without_pricebook' AND x ->> 'type' = 'Error' AND (x ->> 'customer_id')::bigint = acc));
   INSERT INTO _t VALUES ('an open Error turns the heart red', fnd_health_status(200000000002) ->> 'state' = 'error');

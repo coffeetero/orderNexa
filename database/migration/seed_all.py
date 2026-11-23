@@ -49,13 +49,13 @@ load_dotenv(ROOT / ".env", override=True)
 BOOTSTRAP_SQL = ROOT / "newTables" / "seed_fnd_tenants.sql"
 
 SEEDS: list[str] = [
-    "seed_fnd_pricebooks.sql",
     "seed_fnd_customers.sql",
     "seed_fnd_contacts.sql",
+    "seed_fnd_pricebooks.sql",
     "seed_fnd_customer_pricebooks.sql",
     "seed_fnd_items.sql",
     "seed_om_standing_orders.sql",
-    "seed_fnd_valuesets_from_legacy_item.sql",
+    "seed_fnd_valuesets_item_lookups.sql",
     "seed_item_prep_options.sql",
     "seed_fnd_valueset_production_codes.sql",
     "seed_fnd_item_bom.sql",
@@ -63,7 +63,6 @@ SEEDS: list[str] = [
     "seed_om_orders.sql",
     "seed_fnd_tenant_sequences.sql",
     "seed_om_order_lines.sql",
-    "seed_om_order_shipments.sql",
     "seed_ar_transactions.sql",
     "seed_ar_transaction_lines.sql",
     "seed_ar_payments.sql",
@@ -84,8 +83,9 @@ def main() -> int:
         dbname=os.getenv("SUPABASE_DB"),
         user=os.getenv("SUPABASE_USER"),
         password=password,
-        sslmode="require",
+        sslmode=os.getenv("SUPABASE_SSLMODE", "require"),
         connect_timeout=30,
+        options="-c search_path=bps",
     )
     conn.autocommit = False
 

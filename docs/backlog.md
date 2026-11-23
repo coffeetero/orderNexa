@@ -69,3 +69,11 @@ Status: first release built (see docs/Architecture/health-checks.md): two tables
   3. Repeatable deltas like Alpine, or a one-time cutover.
   4. Entities in scope at launch: orders and invoices, or only setup data (customers, items, prices).
 - Alpine incremental pump, open questions: modified-date columns in ordr, ordr_detail, ar, pmt_detail; re-check window (days) and how the old system cancels or deletes orders; conflict rule when a synced order is edited in the new app during UAT; whether conversion runs automatically after each pump or by a person.
+
+## 4. Order-level shipping and migration follow-ups
+- Decision: an order is one delivery (one method, shipped or not). `om_orders` carries `delivery_method_code`, `shipped_at/by`, `carrier`, `tracking_reference`, `delivery_cost`; `ar_transaction_lines.order_id` links an invoice line to its order. Items needing another method (frozen, UPS) go on their own order, so AR is not held back by a late shipment. Item default delivery method (`fnd_items`) and the order-entry split are still to build.
+- Rework still pending because it reads the shipment tables: `om_production_run_process`, `om_shipment_confirm`, `om_shipments_get`, `om_report_delivery_get`, `om_invoices_get` (already references a dropped table), `ar_credit_memo_create` cap, the Deliveries page, their SQL tests. Then drop `om_shipments`, `om_shipment_lines` and `ar_transaction_lines.shipment_line_id`.
+- Partial fulfilment (later): split the order line. Add a fulfilled column, mark the first row fulfilled and insert a new line for the unfulfilled quantity. No backorder table.
+- Roles refactor: `fnd_roles.owner_customer_id` causes `TRUNCATE fnd_customers CASCADE` to wipe roles, role access and user roles. Move customer ownership into a table `fnd_customer_roles` and update the 7 functions, 5 policies, tests and the Roles page that use the column.
+- Migration: seeds still truncate or delete. Split a one-time reset step from the migration, make every seed an upsert by legacy id, then run the incremental pump without truncates.
+- Migration data to check: 106 invoices whose line total differs from the header (largest 567.08); 7 of 1,296 legacy payments not migrated; 16,193 invoices have no loaded orders (single total line).

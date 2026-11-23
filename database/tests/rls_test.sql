@@ -51,7 +51,7 @@ BEGIN
   INSERT INTO fnd_role_area_access (tenant_id, role_id, area_key, can_read, can_write)
     VALUES (200000000002, r_ar, 'financials.ar', true, false), (200000000002, r_ar, 'financials.credits', true, true);
   INSERT INTO fnd_customer_groups (tenant_id, group_name) VALUES (200000000002, 'zz G1') RETURNING group_id INTO g1;
-  INSERT INTO fnd_customer_group_members (tenant_id, group_id, customer_id) VALUES (200000000002, g1, 200000000158);
+  INSERT INTO fnd_customer_group_members (tenant_id, group_id, customer_id) VALUES (200000000002, g1, (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 221));
 
   INSERT INTO fnd_users (tenant_id, auth_user_id, user_name, user_type) VALUES (200000000002, gen_random_uuid(), 'zz clerk all', 'TENANCY_USER') RETURNING user_id INTO uClerk;
   INSERT INTO fnd_users (tenant_id, auth_user_id, user_name, user_type) VALUES (200000000002, gen_random_uuid(), 'zz clerk g1', 'TENANCY_USER') RETURNING user_id INTO uWG;
@@ -101,7 +101,7 @@ BEGIN
   SELECT count(*) INTO n FROM fnd_customers WHERE tenant_id = 200000000002; INSERT INTO _t VALUES ('clerk can read customers (needed for order entry)', n > 100);
   BEGIN INSERT INTO fnd_customers (tenant_id, customer_name, customer_type) VALUES (200000000002, 'zz clerk made', 'ACCOUNT'); r := false; EXCEPTION WHEN OTHERS THEN r := true; END;
   INSERT INTO _t VALUES ('clerk cannot create customers', r);
-  UPDATE fnd_customers SET customer_name = 'zz hacked' WHERE customer_id = 200000000040; GET DIAGNOSTICS rows = ROW_COUNT;
+  UPDATE fnd_customers SET customer_name = 'zz hacked' WHERE customer_id = (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 102); GET DIAGNOSTICS rows = ROW_COUNT;
   INSERT INTO _t VALUES ('clerk cannot rename customers', rows = 0);
   DELETE FROM om_orders WHERE order_id IN (SELECT order_id FROM om_orders LIMIT 1); GET DIAGNOSTICS rows = ROW_COUNT;
   INSERT INTO _t VALUES ('clerk cannot delete orders (no delete right)', rows = 0);
@@ -122,7 +122,7 @@ BEGIN
   PERFORM set_config('request.jwt.claims', format('{"role":"authenticated","app_metadata":{"tenant_id":200000000002,"allowed_tenant_ids":[200000000002],"app_user_id":%s}}', uAcct), true);
   SELECT count(*) INTO n FROM ar_transactions; INSERT INTO _t VALUES ('accountant sees invoices', n = 2);
   SELECT count(*) INTO n FROM om_orders; INSERT INTO _t VALUES ('accountant: financials areas also let them read orders', n = 5);
-  BEGIN INSERT INTO om_orders (tenant_id, customer_id, order_number, order_date) VALUES (200000000002, 200000000158, 'ZZ-1', CURRENT_DATE); r := false; EXCEPTION WHEN OTHERS THEN r := true; END;
+  BEGIN INSERT INTO om_orders (tenant_id, customer_id, order_number, order_date) VALUES (200000000002, (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 221), 'ZZ-1', CURRENT_DATE); r := false; EXCEPTION WHEN OTHERS THEN r := true; END;
   INSERT INTO _t VALUES ('accountant cannot enter orders', r);
   RESET ROLE;
 END $$;
@@ -137,7 +137,7 @@ BEGIN
   SELECT count(*) INTO n FROM om_order_lines l WHERE NOT EXISTS (SELECT 1 FROM om_orders o WHERE o.order_id = l.order_id);
   INSERT INTO _t VALUES ('...and the lines follow their order', n = 0);
   SELECT count(*) INTO n FROM fnd_customers; INSERT INTO _t VALUES ('group user sees the group''s customer and its departments/sites (7), nothing else', n = 7);
-  SELECT count(*) INTO n FROM fnd_notes WHERE source_table = 'fnd_customers' AND entity_id <> 200000000158; INSERT INTO _t VALUES ('notes of other customers are hidden', n = 0);
+  SELECT count(*) INTO n FROM fnd_notes WHERE source_table = 'fnd_customers' AND entity_id <> (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 221); INSERT INTO _t VALUES ('notes of other customers are hidden', n = 0);
   PERFORM set_config('request.jwt.claims', format('{"role":"authenticated","app_metadata":{"tenant_id":200000000002,"allowed_tenant_ids":[200000000002],"app_user_id":%s}}', uNone), true);
   SELECT count(*) INTO n FROM om_orders; SELECT count(*) INTO n2 FROM fnd_customers;
   INSERT INTO _t VALUES ('a user with no group sees no orders and no customers', n = 0 AND n2 = 0);
@@ -184,7 +184,7 @@ BEGIN
   SET LOCAL ROLE authenticated;
   SELECT count(*) INTO n FROM om_orders; INSERT INTO _t VALUES ('customer user sees only their own account''s orders', n = 1);
   SELECT count(*) INTO n FROM fnd_customers; INSERT INTO _t VALUES ('...and the customers in their own account tree (12)', n = 12);
-  SELECT count(*) INTO n FROM fnd_customers WHERE customer_id NOT IN (SELECT customer_id FROM fnd_customers WHERE customer_id = 200000000091 OR customer_parent_id = 200000000091);
+  SELECT count(*) INTO n FROM fnd_customers WHERE customer_id NOT IN (SELECT customer_id FROM fnd_customers WHERE customer_id = (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 156) OR customer_parent_id = (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 156));
   INSERT INTO _t VALUES ('...nothing outside their account tree', n = 0);
   SELECT count(*) INTO n FROM om_production_runs; INSERT INTO _t VALUES ('customer user can read runs/settings (needed for cutoff display)', n >= 0);
   BEGIN INSERT INTO fnd_customers (tenant_id, customer_name, customer_type) VALUES (200000000002, 'zz portal made', 'ACCOUNT'); r := false; EXCEPTION WHEN OTHERS THEN r := true; END;
@@ -193,7 +193,7 @@ BEGIN
   INSERT INTO _t VALUES ('customer user cannot change production settings', rows = 0);
   SELECT count(*) INTO n FROM fnd_users WHERE user_id <> 200000174046; INSERT INTO _t VALUES ('customer admin sees only users attached to their account', n = 0);
   SELECT count(*) INTO n FROM fnd_tenant_sequences; INSERT INTO _t VALUES ('customer user sees no numbering settings', n = 0);
-  SELECT count(*) INTO n FROM ar_transactions WHERE customer_id <> 200000000091; INSERT INTO _t VALUES ('customer user sees no other customer''s invoices', n = 0);
+  SELECT count(*) INTO n FROM ar_transactions WHERE customer_id <> (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 156); INSERT INTO _t VALUES ('customer user sees no other customer''s invoices', n = 0);
   RESET ROLE;
 END $$;
 

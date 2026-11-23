@@ -10,7 +10,7 @@ GRANT ALL ON _t, _ids TO PUBLIC;
 
 -- Account 91 has orders; build one shipped invoice (25.00), a credit memo (-5.00) and a payment (10.00 applied) around today.
 DO $$
-DECLARE o record; v_ship bigint; v_sl bigint; v_inv bigint; v_cm bigint; v_pay bigint; v_acc bigint := 200000000091;
+DECLARE o record; v_ship bigint; v_sl bigint; v_inv bigint; v_cm bigint; v_pay bigint; v_acc bigint := (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 156);
         uClerk bigint; uCust91 bigint; uCust40 bigint; r_clerk bigint; r_cadm bigint;
 BEGIN
   SELECT order_id, order_line_id, production_run_id INTO o FROM om_orders JOIN om_order_lines USING (order_id, tenant_id) WHERE customer_id = v_acc AND tenant_id = 200000000002 LIMIT 1;
@@ -33,7 +33,7 @@ BEGIN
   INSERT INTO fnd_users (tenant_id, auth_user_id, user_name, user_type) VALUES (200000000002, gen_random_uuid(), 'zz doc cust 91', 'CUSTOMER_USER') RETURNING user_id INTO uCust91;
   INSERT INTO fnd_users (tenant_id, auth_user_id, user_name, user_type) VALUES (200000000002, gen_random_uuid(), 'zz doc cust 40', 'CUSTOMER_USER') RETURNING user_id INTO uCust40;
   INSERT INTO fnd_user_tenants (tenant_id, user_id) SELECT 200000000002, u FROM unnest(ARRAY[uClerk, uCust91, uCust40]) u;
-  INSERT INTO fnd_user_customers (tenant_id, user_id, customer_id) VALUES (200000000002, uCust91, v_acc), (200000000002, uCust40, 200000000040);
+  INSERT INTO fnd_user_customers (tenant_id, user_id, customer_id) VALUES (200000000002, uCust91, v_acc), (200000000002, uCust40, (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 102));
   SELECT role_id INTO r_cadm FROM fnd_roles WHERE tenant_id = 200000000002 AND role_name = 'Customer Administrator' AND owner_customer_id IS NULL;
   INSERT INTO fnd_user_roles (tenant_id, user_id, role_id) VALUES (200000000002, uClerk, r_clerk), (200000000002, uCust91, r_cadm), (200000000002, uCust40, r_cadm);
   INSERT INTO _ids VALUES ('uClerk', uClerk), ('uCust91', uCust91), ('uCust40', uCust40), ('inv', v_inv);
@@ -41,7 +41,7 @@ END $$;
 
 -- ── staff administrator: reports ─────────────────────────────────────────────
 DO $$
-DECLARE j jsonb; a jsonb; acc bigint[] := ARRAY[200000000091]::bigint[]; n int;
+DECLARE j jsonb; a jsonb; acc bigint[] := ARRAY[(SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 156)]::bigint[]; n int;
 BEGIN
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","app_metadata":{"tenant_id":200000000002,"allowed_tenant_ids":[200000000002],"app_user_id":200000174045}}', true);
   SET LOCAL ROLE authenticated;
@@ -50,8 +50,8 @@ BEGIN
   INSERT INTO _t VALUES ('picker lists active accounts only', jsonb_array_length(j) > 0 AND NOT EXISTS (
      SELECT 1 FROM jsonb_array_elements(j) e JOIN fnd_customers c ON c.customer_id = (e ->> 'customer_id')::bigint WHERE upper(c.customer_type) <> 'ACCOUNT' OR NOT c.is_active));
 
-  INSERT INTO _t VALUES ('with-invoices picker lists the account for a range holding its invoice', fnd_report_accounts_get(200000000002, true, current_date - 60, current_date) @> '[{"customer_id":200000000091}]'::jsonb);
-  INSERT INTO _t VALUES ('with-invoices picker omits it for a range before the invoice', NOT (fnd_report_accounts_get(200000000002, true, current_date - 90, current_date - 45) @> '[{"customer_id":200000000091}]'::jsonb));
+  INSERT INTO _t VALUES ('with-invoices picker lists the account for a range holding its invoice', fnd_report_accounts_get(200000000002, true, current_date - 60, current_date) @> '[{"customer_id":(SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 156)}]'::jsonb);
+  INSERT INTO _t VALUES ('with-invoices picker omits it for a range before the invoice', NOT (fnd_report_accounts_get(200000000002, true, current_date - 90, current_date - 45) @> '[{"customer_id":(SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 156)}]'::jsonb));
   INSERT INTO _t VALUES ('with-invoices picker lists fewer accounts than the full list', jsonb_array_length(fnd_report_accounts_get(200000000002, true, NULL, current_date)) < jsonb_array_length(fnd_report_accounts_get(200000000002)));
   j := ar_open_balances_get(200000000002, acc, current_date);
   a := j -> 'accounts' -> 0;
@@ -68,9 +68,9 @@ BEGIN
   INSERT INTO _t VALUES ('aging puts the invoice in 31-60 and the credit in 1-30', (a ->> 'd31_60')::numeric = 15 AND (a ->> 'd1_30')::numeric = -5 AND (a ->> 'total')::numeric = 10);
   INSERT INTO _t VALUES ('aging totals add up', ((j -> 'totals') ->> 'total')::numeric = 10);
 
-  j := ar_statement_get(200000000002, 200000000091, current_date, current_date - 60);
+  j := ar_statement_get(200000000002, (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 156), current_date, current_date - 60);
   INSERT INTO _t VALUES ('statement from before the invoice: opening 0, closing 10, 3 entries', (j ->> 'opening_balance')::numeric = 0 AND (j ->> 'closing_balance')::numeric = 10 AND jsonb_array_length(j -> 'entries') = 3);
-  j := ar_statement_get(200000000002, 200000000091, current_date, current_date - 30);
+  j := ar_statement_get(200000000002, (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 156), current_date, current_date - 30);
   INSERT INTO _t VALUES ('statement carries the earlier invoice as opening 25 and a running balance', (j ->> 'opening_balance')::numeric = 25 AND ((j -> 'entries' -> 0) ->> 'balance')::numeric = 15 AND (j ->> 'closing_balance')::numeric = 10);
 
   j := ar_sales_report_get(200000000002, acc, current_date - 60, current_date);
@@ -86,14 +86,14 @@ BEGIN
 
   j := ar_invoice_document_get(200000000002, (SELECT v FROM _ids WHERE k = 'inv'));
   INSERT INTO _t VALUES ('invoice document has header, 1 line and the recognized total', j ->> 'document_number' = 'ZZ-INV-1' AND jsonb_array_length(j -> 'lines') = 1 AND (j ->> 'amount')::numeric = 25);
-  INSERT INTO _t VALUES ('unsaved invoices include this one', ar_invoices_unsaved_get(200000000002, 200000000091) @> to_jsonb((SELECT v FROM _ids WHERE k = 'inv')));
+  INSERT INTO _t VALUES ('unsaved invoices include this one', ar_invoices_unsaved_get(200000000002, (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 156)) @> to_jsonb((SELECT v FROM _ids WHERE k = 'inv')));
 
   j := ar_dashboard_get(200000000002, 8);
   INSERT INTO _t VALUES ('dashboard lists the account owing 10.00 with nothing over 90 days', EXISTS (SELECT 1 FROM jsonb_array_elements(j -> 'accounts') e
-     WHERE (e ->> 'customer_id')::bigint = 200000000091 AND (e ->> 'total')::numeric = 10 AND (e ->> 'd90_plus')::numeric = 0));
+     WHERE (e ->> 'customer_id')::bigint = (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 156) AND (e ->> 'total')::numeric = 10 AND (e ->> 'd90_plus')::numeric = 0));
   INSERT INTO _t VALUES ('dashboard totals include the 15.00 in 31-60 days', (j -> 'totals' ->> 'd31_60')::numeric >= 15);
   INSERT INTO _t VALUES ('dashboard limit is respected and accounts are sorted by balance', jsonb_array_length(ar_dashboard_get(200000000002, 1) -> 'accounts') <= 1);
-  UPDATE om_orders SET production_date = (now() AT TIME ZONE fnd_tenant_time_zone(200000000002))::date WHERE order_id = (SELECT order_id FROM om_orders WHERE customer_id = 200000000091 AND tenant_id = 200000000002 LIMIT 1);
+  UPDATE om_orders SET production_date = (now() AT TIME ZONE fnd_tenant_time_zone(200000000002))::date WHERE order_id = (SELECT order_id FROM om_orders WHERE customer_id = (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 156) AND tenant_id = 200000000002 LIMIT 1);
   j := om_orders_today_get(200000000002, 8);
   INSERT INTO _t VALUES ('today orders list the order whose production date is today', (j ->> 'order_count')::int >= 1 AND jsonb_array_length(j -> 'orders') >= 1);
   RESET ROLE;
@@ -106,12 +106,12 @@ DECLARE d1 bigint; d2 bigint; j jsonb; r boolean; b64 text := encode('%PDF-1.4 t
 BEGIN
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","app_metadata":{"tenant_id":200000000002,"allowed_tenant_ids":[200000000002],"app_user_id":200000174045}}', true);
   SET LOCAL ROLE authenticated;
-  d1 := fnd_document_save(200000000002, jsonb_build_object('document_type','STATEMENT','title','Statement','as_of_date',current_date,'customer_id',200000000091,
+  d1 := fnd_document_save(200000000002, jsonb_build_object('document_type','STATEMENT','title','Statement','as_of_date',current_date,'customer_id',(SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 156),
         'parameters','{"from":"2026-01-01"}'::jsonb,'file_name','s.pdf','content_base64',b64));
   d2 := fnd_document_save(200000000002, jsonb_build_object('document_type','AR_AGING','title','Aging','as_of_date',current_date,'file_name','a.pdf','content_base64',b64));
   INSERT INTO _ids VALUES ('d1', d1), ('d2', d2);
-  INSERT INTO _t VALUES ('admin lists the customer documents with as-of date and parameters', (fnd_documents_get(200000000002, 200000000091, NULL) -> 0 ->> 'as_of_date')::date = current_date
-     AND (fnd_documents_get(200000000002, 200000000091, NULL) -> 0 -> 'parameters' ->> 'from') = '2026-01-01');
+  INSERT INTO _t VALUES ('admin lists the customer documents with as-of date and parameters', (fnd_documents_get(200000000002, (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 156), NULL) -> 0 ->> 'as_of_date')::date = current_date
+     AND (fnd_documents_get(200000000002, (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 156), NULL) -> 0 -> 'parameters' ->> 'from') = '2026-01-01');
   INSERT INTO _t VALUES ('admin can fetch the PDF bytes back', convert_from(decode(fnd_document_get(200000000002, d1) ->> 'content_base64', 'base64'), 'UTF8') = '%PDF-1.4 test');
   BEGIN PERFORM fnd_document_save(200000000002, jsonb_build_object('document_type','BOGUS','title','x','as_of_date',current_date,'file_name','x.pdf','content_base64',b64)); r := false; EXCEPTION WHEN OTHERS THEN r := true; END;
   INSERT INTO _t VALUES ('unknown document type is rejected', r);
@@ -135,7 +135,7 @@ BEGIN
   INSERT INTO _t VALUES ('customer user can open their document', fnd_document_get(200000000002, d1) ->> 'file_name' = 's.pdf');
   BEGIN PERFORM fnd_document_get(200000000002, d2); r := false; EXCEPTION WHEN OTHERS THEN r := true; END;
   INSERT INTO _t VALUES ('customer user cannot open a multi-customer report', r);
-  BEGIN PERFORM fnd_document_save(200000000002, jsonb_build_object('document_type','STATEMENT','title','x','as_of_date',current_date,'customer_id',200000000091,'file_name','x.pdf','content_base64',b64)); r := false; EXCEPTION WHEN OTHERS THEN r := true; END;
+  BEGIN PERFORM fnd_document_save(200000000002, jsonb_build_object('document_type','STATEMENT','title','x','as_of_date',current_date,'customer_id',(SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 156),'file_name','x.pdf','content_base64',b64)); r := false; EXCEPTION WHEN OTHERS THEN r := true; END;
   INSERT INTO _t VALUES ('customer user cannot save a document', r);
   RESET ROLE;
 

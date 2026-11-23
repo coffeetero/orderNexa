@@ -129,6 +129,8 @@ BEGIN
            AND parent.customer_id = cus.customer_parent_id
         LEFT JOIN customer cu
             ON cu.cus_id::NUMERIC = o.cus_id
+        -- Not migrated: orders dated after tomorrow (the old system accepted entries with a wrong year).
+        WHERE COALESCE(o.ordr_prdctn_dt::DATE, o.ordr_dt::DATE, DATE '2000-01-01') <= CURRENT_DATE + 1
     ),
     duplicate_slots AS (
         SELECT
@@ -158,7 +160,9 @@ BEGIN
         discount_amount,
         quantity,
         snapshot_data,
-        tenant_id
+        tenant_id,
+        delivery_method_code,
+        shipped_at
     )
     SELECT
         src.order_number,
@@ -176,7 +180,9 @@ BEGIN
         src.discount_amount,
         src.quantity,
         src.snapshot_data,
-        src.tenant_id
+        src.tenant_id,
+        'OWN_TRUCK',
+        CASE WHEN src.production_date <= CURRENT_DATE THEN src.production_date::timestamptz END
     FROM order_source src
     LEFT JOIN duplicate_slots dup
         ON dup.tenant_id = src.tenant_id

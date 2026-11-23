@@ -24,11 +24,7 @@ BEGIN
         RAISE EXCEPTION 'Tenant "Alpine Bakery" not found in fnd_tenants';
     END IF;
 
-    v_legacy_ordr_table := COALESCE(
-        to_regclass('ordr'),
-        to_regclass('bps.ordr'),
-        to_regclass('public.ordr')
-    );
+    v_legacy_ordr_table := to_regclass('bps.ordr');
 
     IF v_legacy_ordr_table IS NULL THEN
         RAISE EXCEPTION 'legacy ordr table not found';

@@ -35,9 +35,9 @@ BEGIN
         RAISE EXCEPTION 'fnd_currencies must contain USD — run newTables/fnd_currencies.sql';
     END IF;
 
-    IF to_regclass('public.item_price') IS NOT NULL THEN
+    IF to_regclass('bps.item_price') IS NOT NULL THEN
         v_src := 'item_price';
-    ELSIF to_regclass('public.item_prices') IS NOT NULL THEN
+    ELSIF to_regclass('bps.item_prices') IS NOT NULL THEN
         v_src := 'item_prices';
     ELSE
         RAISE EXCEPTION 'Need legacy table public.item_price or public.item_prices';
@@ -47,10 +47,11 @@ BEGIN
 
     v_sql := format(
         $q$
-        INSERT INTO fnd_pricebooks (pricebook_name, tenant_id, currency_id)
+        INSERT INTO fnd_pricebooks (pricebook_name, tenant_id, currency_id, status)
         SELECT DISTINCT TRIM(BOTH FROM COALESCE(t.cus_price_cd::text, '')),
                %L::bigint,
-               %L::bigint
+               %L::bigint,
+               'Approved'
         FROM %I t
         WHERE NULLIF(TRIM(BOTH FROM COALESCE(t.cus_price_cd::text, '')), '') IS NOT NULL
         $q$,
@@ -61,8 +62,8 @@ BEGIN
     EXECUTE v_sql;
 
     IF NOT EXISTS (SELECT 1 FROM fnd_pricebooks WHERE tenant_id = v_tenant_id) THEN
-        INSERT INTO fnd_pricebooks (pricebook_name, tenant_id, currency_id)
-        VALUES ('Default', v_tenant_id, v_currency_id);
+        INSERT INTO fnd_pricebooks (pricebook_name, tenant_id, currency_id, status)
+        VALUES ('Default', v_tenant_id, v_currency_id, 'Approved');
     END IF;
 
     RAISE NOTICE 'fnd_pricebooks: % rows (source table %)', (SELECT COUNT(*)::INT FROM fnd_pricebooks WHERE tenant_id = v_tenant_id), v_src;

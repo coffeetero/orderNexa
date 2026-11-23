@@ -2,20 +2,20 @@
 -- SQL tests for Phase 2: order save customer rules, invoice owner, delivery method, Process run (shipments + invoice
 -- drafts), reprocessing, staff-only access and numbering settings. One transaction, ROLLED BACK; local DB only:
 --   docker exec -i supabase_db_bps-local psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 < database/tests/order_processing_test.sql
--- Assumes the Alpine Bakery seed (tenant 200000000002, item 200000001619, seeded settings and sequences).
+-- Assumes the Alpine Bakery seed (tenant 200000000002, item (SELECT item_id FROM bps.fnd_items WHERE tenant_id = 200000000002 AND legacy_id = 11608), seeded settings and sequences).
 -- ============================================================
 BEGIN;
 SET search_path = bps, public;
 CREATE TEMP TABLE _t (name text, ok boolean);
 CREATE TEMP TABLE _id (k text PRIMARY KEY, v bigint);
 GRANT ALL ON _t TO PUBLIC;
--- A customer-side user attached to account 200000000040 (Customer Administrator role), used for the customer-restricted claims below.
+-- A customer-side user attached to account (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 102) (Customer Administrator role), used for the customer-restricted claims below.
 DO $$
 DECLARE u bigint;
 BEGIN
   INSERT INTO fnd_users (tenant_id, auth_user_id, user_name, user_type) VALUES (200000000002, gen_random_uuid(), 'zz test customer user', 'CUSTOMER_USER') RETURNING user_id INTO u;
   INSERT INTO fnd_user_tenants (tenant_id, user_id) VALUES (200000000002, u);
-  INSERT INTO fnd_user_customers (tenant_id, user_id, customer_id) VALUES (200000000002, u, 200000000040);
+  INSERT INTO fnd_user_customers (tenant_id, user_id, customer_id) VALUES (200000000002, u, (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 102));
   INSERT INTO fnd_user_roles (tenant_id, user_id, role_id)
     SELECT 200000000002, u, role_id FROM fnd_roles WHERE tenant_id = 200000000002 AND role_name = 'Customer Administrator' AND owner_customer_id IS NULL;
   PERFORM set_config('t.cust_user', u::text, false);
@@ -58,12 +58,12 @@ BEGIN
   -- O1: account, two lines (one discounted) and a delivery charge
   r := om_orders_save(200000000002, NULL, NULL, jsonb_build_object('customer_id', a, 'production_date', '2031-05-10', 'production_code', 'MORNING',
         'delivery_amount', 4, 'lines', jsonb_build_array(
-          jsonb_build_object('item_id', 200000001619, 'item_description','Roll','quantity',2,'unit_price',5),
-          jsonb_build_object('item_id', 200000001619, 'item_description','Loaf','quantity',1,'unit_price',3,'unit_discount',1))));
+          jsonb_build_object('item_id', (SELECT item_id FROM bps.fnd_items WHERE tenant_id = 200000000002 AND legacy_id = 11608), 'item_description','Roll','quantity',2,'unit_price',5),
+          jsonb_build_object('item_id', (SELECT item_id FROM bps.fnd_items WHERE tenant_id = 200000000002 AND legacy_id = 11608), 'item_description','Loaf','quantity',1,'unit_price',3,'unit_discount',1))));
   INSERT INTO _id VALUES ('o1', (r->>'order_id')::bigint);
   FOR o IN SELECT * FROM (VALUES ('o2', d1), ('o3', d2), ('o4', s1), ('o5', s2)) AS x(k, cid) LOOP
     r := om_orders_save(200000000002, NULL, NULL, jsonb_build_object('customer_id', o.cid, 'production_date', '2031-05-10', 'production_code', 'MORNING',
-          'lines', jsonb_build_array(jsonb_build_object('item_id', 200000001619, 'item_description','Bun','quantity',1,'unit_price',10))));
+          'lines', jsonb_build_array(jsonb_build_object('item_id', (SELECT item_id FROM bps.fnd_items WHERE tenant_id = 200000000002 AND legacy_id = 11608), 'item_description','Bun','quantity',1,'unit_price',10))));
     INSERT INTO _id VALUES (o.k, (r->>'order_id')::bigint);
   END LOOP;
 
@@ -115,8 +115,8 @@ BEGIN
 
   -- a zero-quantity order line is neither shipped nor billed
   PERFORM om_orders_save(200000000002, NULL, (SELECT v FROM _id WHERE k='o2'), jsonb_build_object('customer_id', d1, 'production_date', '2031-05-10', 'production_code', 'MORNING',
-        'lines', jsonb_build_array(jsonb_build_object('item_id', 200000001619, 'item_description','Bun','quantity',1,'unit_price',10),
-                                   jsonb_build_object('item_id', 200000001619, 'item_description','Zero','quantity',0,'unit_price',7))));
+        'lines', jsonb_build_array(jsonb_build_object('item_id', (SELECT item_id FROM bps.fnd_items WHERE tenant_id = 200000000002 AND legacy_id = 11608), 'item_description','Bun','quantity',1,'unit_price',10),
+                                   jsonb_build_object('item_id', (SELECT item_id FROM bps.fnd_items WHERE tenant_id = 200000000002 AND legacy_id = 11608), 'item_description','Zero','quantity',0,'unit_price',7))));
   PERFORM om_production_runs_process(200000000002, DATE '2031-05-10', DATE '2031-05-10', NULL);
   INSERT INTO _t VALUES ('zero-quantity lines are not billed or shipped',
       NOT EXISTS (SELECT 1 FROM ar_transaction_lines WHERE item_description = 'Zero') AND NOT EXISTS (SELECT 1 FROM om_shipment_lines sl JOIN om_order_lines ol USING (order_line_id) WHERE ol.item_description = 'Zero'));
@@ -132,7 +132,7 @@ BEGIN
 
   -- an order edit flows into the invoice
   PERFORM om_orders_save(200000000002, NULL, (SELECT v FROM _id WHERE k='o3'), jsonb_build_object('customer_id', d2, 'production_date', '2031-05-10', 'production_code', 'MORNING',
-        'lines', jsonb_build_array(jsonb_build_object('item_id', 200000001619, 'item_description','Bun','quantity',2,'unit_price',10))));
+        'lines', jsonb_build_array(jsonb_build_object('item_id', (SELECT item_id FROM bps.fnd_items WHERE tenant_id = 200000000002 AND legacy_id = 11608), 'item_description','Bun','quantity',2,'unit_price',10))));
   PERFORM om_production_runs_process(200000000002, DATE '2031-05-10', DATE '2031-05-10', NULL);
   INSERT INTO _t VALUES ('order edit then reprocess updates the invoice total to 46', (SELECT amount FROM ar_transactions WHERE ar_transaction_id = ia) = 46);
 
@@ -184,7 +184,7 @@ BEGIN
   INSERT INTO _t VALUES ('a customer user cannot process runs by range', d);
   BEGIN PERFORM fnd_tenant_sequences_save(200000000002, '{"sequence_name":"invoice_number","mask":"X-####"}'::jsonb); d := false; EXCEPTION WHEN OTHERS THEN d := true; END;
   INSERT INTO _t VALUES ('a customer user cannot change numbering', d);
-  INSERT INTO _t VALUES ('a customer user sees no invoices of other customers', (SELECT COUNT(*) FROM ar_transactions) = 0);
+  INSERT INTO _t VALUES ('a customer user sees no invoices of other customers', NOT EXISTS (SELECT 1 FROM ar_transactions WHERE customer_id <> ALL (fnd_scope_customer_ids())));
   INSERT INTO _t VALUES ('a customer user sees no shipments of other customers', (SELECT COUNT(*) FROM om_shipments) = 0);
 END $$;
 

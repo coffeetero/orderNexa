@@ -33,7 +33,7 @@ BEGIN
         RAISE EXCEPTION 'Tenant "Alpine Bakery" not found in fnd_tenants';
     END IF;
 
-    IF to_regclass('public.ar') IS NULL THEN
+    IF to_regclass('bps.ar') IS NULL THEN
         RAISE EXCEPTION 'public.ar not found — run dataPump.py';
     END IF;
 
@@ -82,7 +82,9 @@ BEGIN
             ON cus.tenant_id = v_tenant_id
            AND cus.legacy_id = a.cus_id::INT
         WHERE upper(trim(both from coalesce(a.ar_trn_type::text, ''))) = 'PMT'
-          AND ABS(COALESCE(a.ar_trn_amt, 0)) > 0;
+          AND ABS(COALESCE(a.ar_trn_amt, 0)) > 0
+          -- Not migrated: entries dated after tomorrow (the old system accepted entries with a wrong year).
+          AND COALESCE(a.ar_trn_date, DATE '2000-01-01') <= CURRENT_DATE + 1;
 
         GET DIAGNOSTICS v_inserted = ROW_COUNT;
         RAISE NOTICE 'ar_payments: inserted % rows', v_inserted;

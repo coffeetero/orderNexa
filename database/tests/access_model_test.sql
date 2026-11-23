@@ -2,7 +2,7 @@
 -- SQL tests for the access model: roles/areas, customer-group scope, single active tenancy, leakage, escalation guards.
 -- One transaction, ROLLED BACK; local DB only:
 --   docker exec -i supabase_db_bps-local psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 -q < database/tests/access_model_test.sql
--- Assumes the Alpine Bakery seed: tenant 200000000002, account 200000000040 with department 200000000042, account 200000000091.
+-- Assumes the Alpine Bakery data: tenant 200000000002, customers found by legacy id (102 Hilton account, 104 its department Grill 53, 156 Hoboken Bread Dist, 118 AG Food Corp).
 -- ============================================================
 BEGIN;
 SET search_path = bps, public;
@@ -32,13 +32,13 @@ BEGIN
   INSERT INTO _ids VALUES ('uA', uA), ('uB', uB), ('uC', uC), ('uD', uD), ('uE', uE), ('uF', uF);
   INSERT INTO fnd_user_tenants (tenant_id, user_id) SELECT 200000000002, u FROM unnest(ARRAY[uA,uB,uC,uD,uE,uF]) u;
   INSERT INTO fnd_user_tenants (tenant_id, user_id) VALUES (t2, uC);
-  INSERT INTO fnd_user_customers (tenant_id, user_id, customer_id) VALUES (200000000002, uD, 200000000040), (200000000002, uE, 200000000040), (200000000002, uF, 200000000091);
+  INSERT INTO fnd_user_customers (tenant_id, user_id, customer_id) VALUES (200000000002, uD, (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 102)), (200000000002, uE, (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 102)), (200000000002, uF, (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 156));
 
   -- a tenant-level clerk role (order entry only) and a White Glove group holding account 40
   INSERT INTO fnd_roles (tenant_id, role_name, role_audience) VALUES (200000000002, 'Order Clerk', 'TENANT') RETURNING role_id INTO r_clerk;
   INSERT INTO fnd_role_area_access (tenant_id, role_id, area_key, can_read, can_write) VALUES (200000000002, r_clerk, 'orders.enter', true, true);
   INSERT INTO fnd_customer_groups (tenant_id, group_name) VALUES (200000000002, 'White Glove') RETURNING group_id INTO g_wg;
-  INSERT INTO fnd_customer_group_members (tenant_id, group_id, customer_id) VALUES (200000000002, g_wg, 200000000040);
+  INSERT INTO fnd_customer_group_members (tenant_id, group_id, customer_id) VALUES (200000000002, g_wg, (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 102));
   INSERT INTO fnd_user_roles (tenant_id, user_id, role_id) VALUES (200000000002, uA, r_clerk), (200000000002, uC, r_tadm), (t2, uC, r_t2adm), (200000000002, uD, r_cadm);
   INSERT INTO fnd_user_customer_groups (tenant_id, user_id, group_id)
     VALUES (200000000002, uA, g_wg),
@@ -78,22 +78,22 @@ DO $$
 DECLARE uA bigint := (SELECT v FROM _ids WHERE k='uA'); uB bigint := (SELECT v FROM _ids WHERE k='uB'); uC bigint := (SELECT v FROM _ids WHERE k='uC');
   uD bigint := (SELECT v FROM _ids WHERE k='uD'); g_wg bigint := (SELECT v FROM _ids WHERE k='g_wg'); ids bigint[]; new_c bigint; hg bigint; r boolean;
 BEGIN
-  INSERT INTO _t VALUES ('department inherits the group of its account', EXISTS (SELECT 1 FROM fnd_customer_group_effective WHERE customer_id = 200000000042 AND group_id = g_wg));
-  INSERT INTO _t VALUES ('account in the group has an effective row', EXISTS (SELECT 1 FROM fnd_customer_group_effective WHERE customer_id = 200000000040 AND group_id = g_wg));
-  INSERT INTO _t VALUES ('unrelated customer has no effective group', NOT EXISTS (SELECT 1 FROM fnd_customer_group_effective WHERE customer_id = 200000000091));
-  INSERT INTO fnd_customers (tenant_id, customer_name, customer_type, customer_parent_id) VALUES (200000000002, 'zz new site', 'SITE', 200000000040) RETURNING customer_id INTO new_c;
+  INSERT INTO _t VALUES ('department inherits the group of its account', EXISTS (SELECT 1 FROM fnd_customer_group_effective WHERE customer_id = (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 104) AND group_id = g_wg));
+  INSERT INTO _t VALUES ('account in the group has an effective row', EXISTS (SELECT 1 FROM fnd_customer_group_effective WHERE customer_id = (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 102) AND group_id = g_wg));
+  INSERT INTO _t VALUES ('unrelated customer has no effective group', NOT EXISTS (SELECT 1 FROM fnd_customer_group_effective WHERE customer_id = (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 156)));
+  INSERT INTO fnd_customers (tenant_id, customer_name, customer_type, customer_parent_id) VALUES (200000000002, 'zz new site', 'SITE', (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 102)) RETURNING customer_id INTO new_c;
   INSERT INTO _t VALUES ('new child customer starts with the parent group', EXISTS (SELECT 1 FROM fnd_customer_group_effective WHERE customer_id = new_c AND group_id = g_wg));
-  UPDATE fnd_customers SET customer_parent_id = 200000000091 WHERE customer_id = new_c;
+  UPDATE fnd_customers SET customer_parent_id = (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 156) WHERE customer_id = new_c;
   INSERT INTO _t VALUES ('moving a customer drops the old inherited group', NOT EXISTS (SELECT 1 FROM fnd_customer_group_effective WHERE customer_id = new_c));
   INSERT INTO fnd_customer_groups (tenant_id, group_name) VALUES (200000000002, 'High Risk') RETURNING group_id INTO hg;
-  INSERT INTO fnd_customer_group_members (tenant_id, group_id, customer_id) VALUES (200000000002, hg, 200000000042);
-  INSERT INTO _t VALUES ('a child with its own group overrides the inherited one', EXISTS (SELECT 1 FROM fnd_customer_group_effective WHERE customer_id = 200000000042 AND group_id = hg)
-       AND NOT EXISTS (SELECT 1 FROM fnd_customer_group_effective WHERE customer_id = 200000000042 AND group_id = g_wg));
+  INSERT INTO fnd_customer_group_members (tenant_id, group_id, customer_id) VALUES (200000000002, hg, (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 104));
+  INSERT INTO _t VALUES ('a child with its own group overrides the inherited one', EXISTS (SELECT 1 FROM fnd_customer_group_effective WHERE customer_id = (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 104) AND group_id = hg)
+       AND NOT EXISTS (SELECT 1 FROM fnd_customer_group_effective WHERE customer_id = (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 104) AND group_id = g_wg));
   DELETE FROM fnd_customer_group_members WHERE group_id = hg;
-  INSERT INTO _t VALUES ('removing the override restores inheritance', EXISTS (SELECT 1 FROM fnd_customer_group_effective WHERE customer_id = 200000000042 AND group_id = g_wg));
+  INSERT INTO _t VALUES ('removing the override restores inheritance', EXISTS (SELECT 1 FROM fnd_customer_group_effective WHERE customer_id = (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 104) AND group_id = g_wg));
 
   BEGIN INSERT INTO fnd_customer_group_members (tenant_id, group_id, customer_id)
-          SELECT 200000000002, group_id, 200000000091 FROM fnd_customer_groups WHERE tenant_id = 200000000002 AND is_all_customers; r := false;
+          SELECT 200000000002, group_id, (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 156) FROM fnd_customer_groups WHERE tenant_id = 200000000002 AND is_all_customers; r := false;
   EXCEPTION WHEN OTHERS THEN r := true; END;
   INSERT INTO _t VALUES ('All Customers group refuses explicit members', r);
   BEGIN DELETE FROM fnd_customer_groups WHERE tenant_id = 200000000002 AND is_all_customers; r := false; EXCEPTION WHEN OTHERS THEN r := true; END;
@@ -103,15 +103,15 @@ BEGIN
   SET LOCAL ROLE authenticated;
   ids := fnd_scope_customer_ids();
   INSERT INTO _t VALUES ('White Glove user: not all, sees account 40 and department 42 only',
-      NOT fnd_scope_is_all() AND 200000000040 = ANY(ids) AND 200000000042 = ANY(ids) AND NOT (200000000091 = ANY(ids)));
-  INSERT INTO _t VALUES ('fnd_customer_in_scope agrees', fnd_customer_in_scope(200000000042) AND NOT fnd_customer_in_scope(200000000091));
+      NOT fnd_scope_is_all() AND (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 102) = ANY(ids) AND (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 104) = ANY(ids) AND NOT ((SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 156) = ANY(ids)));
+  INSERT INTO _t VALUES ('fnd_customer_in_scope agrees', fnd_customer_in_scope((SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 104)) AND NOT fnd_customer_in_scope((SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 156)));
   PERFORM set_config('request.jwt.claims', format('{"role":"authenticated","app_metadata":{"tenant_id":200000000002,"app_user_id":%s}}', uB), true);
   INSERT INTO _t VALUES ('user with no group sees no customers (not "all")', NOT fnd_scope_is_all() AND cardinality(fnd_scope_customer_ids()) = 0);
   PERFORM set_config('request.jwt.claims', format('{"role":"authenticated","app_metadata":{"tenant_id":200000000002,"app_user_id":%s}}', uC), true);
-  INSERT INTO _t VALUES ('user holding All Customers skips the customer check', fnd_scope_is_all() AND fnd_customer_in_scope(200000000091));
+  INSERT INTO _t VALUES ('user holding All Customers skips the customer check', fnd_scope_is_all() AND fnd_customer_in_scope((SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 156)));
   PERFORM set_config('request.jwt.claims', format('{"role":"authenticated","app_metadata":{"tenant_id":200000000002,"app_user_id":%s}}', uD), true);
   ids := fnd_scope_customer_ids();
-  INSERT INTO _t VALUES ('customer user scope = own customer + descendants only', NOT fnd_scope_is_all() AND 200000000040 = ANY(ids) AND 200000000042 = ANY(ids) AND NOT (200000000091 = ANY(ids)));
+  INSERT INTO _t VALUES ('customer user scope = own customer + descendants only', NOT fnd_scope_is_all() AND (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 102) = ANY(ids) AND (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 104) = ANY(ids) AND NOT ((SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 156) = ANY(ids)));
   RESET ROLE;
 END $$;
 
@@ -185,9 +185,9 @@ BEGIN
   SET LOCAL ROLE authenticated;
   SELECT count(*) INTO n FROM fnd_roles WHERE role_audience = 'TENANT'; INSERT INTO _t VALUES ('customer admin cannot see tenant-side roles', n = 0);
   SELECT count(*) INTO n FROM fnd_roles WHERE role_audience = 'CUSTOMER'; INSERT INTO _t VALUES ('customer admin sees customer roles', n > 0);
-  INSERT INTO fnd_roles (tenant_id, owner_customer_id, role_name, role_audience) VALUES (200000000002, 200000000040, 'Buyers', 'CUSTOMER') RETURNING role_id INTO new_role;
+  INSERT INTO fnd_roles (tenant_id, owner_customer_id, role_name, role_audience) VALUES (200000000002, (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 102), 'Buyers', 'CUSTOMER') RETURNING role_id INTO new_role;
   INSERT INTO _t VALUES ('customer admin can create a role owned by their customer', new_role IS NOT NULL);
-  BEGIN INSERT INTO fnd_roles (tenant_id, owner_customer_id, role_name, role_audience) VALUES (200000000002, 200000000091, 'Intruder', 'CUSTOMER'); r := false; EXCEPTION WHEN OTHERS THEN r := true; END;
+  BEGIN INSERT INTO fnd_roles (tenant_id, owner_customer_id, role_name, role_audience) VALUES (200000000002, (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 156), 'Intruder', 'CUSTOMER'); r := false; EXCEPTION WHEN OTHERS THEN r := true; END;
   INSERT INTO _t VALUES ('...but not for another customer', r);
   BEGIN INSERT INTO fnd_roles (tenant_id, role_name, role_audience) VALUES (200000000002, 'Tenant-level', 'CUSTOMER'); r := false; EXCEPTION WHEN OTHERS THEN r := true; END;
   INSERT INTO _t VALUES ('...and cannot create a tenant-level role', r);
@@ -206,7 +206,7 @@ BEGIN
   -- escalation: lead (portal.roles write, portal.orders read only) tries to grant rights they do not hold
   PERFORM set_config('request.jwt.claims', format('{"role":"authenticated","app_metadata":{"tenant_id":200000000002,"app_user_id":%s}}', uE), true);
   SET LOCAL ROLE authenticated;
-  INSERT INTO fnd_roles (tenant_id, owner_customer_id, role_name, role_audience) VALUES (200000000002, 200000000040, 'Lead made', 'CUSTOMER') RETURNING role_id INTO new_role;
+  INSERT INTO fnd_roles (tenant_id, owner_customer_id, role_name, role_audience) VALUES (200000000002, (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 102), 'Lead made', 'CUSTOMER') RETURNING role_id INTO new_role;
   BEGIN INSERT INTO fnd_role_area_access (tenant_id, role_id, area_key, can_read) VALUES (200000000002, new_role, 'portal.payments', true); r := false; EXCEPTION WHEN OTHERS THEN r := true; END;
   INSERT INTO _t VALUES ('escalation blocked: cannot grant an area they do not hold', r);
   BEGIN INSERT INTO fnd_role_area_access (tenant_id, role_id, area_key, can_read, can_write) VALUES (200000000002, new_role, 'portal.orders', true, true); r := false; EXCEPTION WHEN OTHERS THEN r := true; END;

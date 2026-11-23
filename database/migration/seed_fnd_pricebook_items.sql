@@ -27,9 +27,9 @@ BEGIN
         RAISE EXCEPTION 'Tenant "Alpine Bakery" not found in fnd_tenants';
     END IF;
 
-    IF to_regclass('public.item_price') IS NOT NULL THEN
+    IF to_regclass('bps.item_price') IS NOT NULL THEN
         v_src := 'item_price';
-    ELSIF to_regclass('public.item_prices') IS NOT NULL THEN
+    ELSIF to_regclass('bps.item_prices') IS NOT NULL THEN
         v_src := 'item_prices';
     ELSE
         RAISE EXCEPTION 'Need legacy table public.item_price or public.item_prices';
@@ -39,7 +39,7 @@ BEGIN
     FROM pg_catalog.pg_attribute a
     JOIN pg_catalog.pg_class c ON c.oid = a.attrelid
     JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-    WHERE n.nspname = 'public'
+    WHERE n.nspname = 'bps'
       AND c.relname = v_src
       AND a.attnum > 0
       AND NOT a.attisdropped

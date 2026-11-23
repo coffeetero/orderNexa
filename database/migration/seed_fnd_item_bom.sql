@@ -17,6 +17,7 @@ DECLARE
     v_inserted        INT;
     v_orphans         INT;
     v_skip_single     INT;
+    v_nested          INT;
     v_excluded_parents INT[] := ARRAY[
         291
     ];
@@ -64,17 +65,12 @@ BEGIN
         RAISE NOTICE 'Parents with only 1 component line in citem (excluded): %', v_skip_single;
     END IF;
 
-    INSERT INTO fnd_item_bom (
-        tenant_id,
-        parent_item_id,
-        item_id,
-        quantity
-    )
+    -- Candidate component rows (two levels only: a parent that is also a component of another parent loses its component role).
+    CREATE TEMP TABLE _bom ON COMMIT DROP AS
     SELECT
-        v_tenant_id,
-        parent.item_id,
-        component.item_id,
-        COALESCE(c.citem_qty, 1)
+        parent.item_id    AS parent_item_id,
+        component.item_id AS item_id,
+        COALESCE(c.citem_qty, 1) AS quantity
     FROM citem c
     JOIN fnd_items parent
       ON parent.tenant_id = v_tenant_id
@@ -91,6 +87,18 @@ BEGIN
           GROUP BY c2.citem_id
           HAVING COUNT(*) > 1
       );
+
+    SELECT COUNT(*) INTO v_nested FROM _bom WHERE item_id IN (SELECT parent_item_id FROM _bom);
+    IF v_nested > 0 THEN
+        RAISE NOTICE 'WARNING: % component rows skipped because the component is itself a compound parent (two levels only)', v_nested;
+        DELETE FROM _bom WHERE item_id IN (SELECT parent_item_id FROM _bom);
+    END IF;
+
+    -- Parents are compound items.
+    UPDATE fnd_items SET is_compound = TRUE WHERE item_id IN (SELECT parent_item_id FROM _bom);
+
+    INSERT INTO fnd_item_bom (tenant_id, parent_item_id, item_id, quantity)
+    SELECT v_tenant_id, parent_item_id, item_id, quantity FROM _bom;
 
     GET DIAGNOSTICS v_inserted = ROW_COUNT;
     RAISE NOTICE 'fnd_item_bom: % rows inserted (this run)', v_inserted;
