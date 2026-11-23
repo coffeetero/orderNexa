@@ -190,7 +190,7 @@ export const tenantNav: NavMenu[] = [
         ],
       },
       {
-        heading: 'Company',
+        heading: 'Company Settings',
         items: [
           { label: 'Roles', href: '/admin/roles', area: 'admin.roles' },
           { label: 'Users', href: '/admin/users', area: 'admin.users' },
@@ -198,7 +198,7 @@ export const tenantNav: NavMenu[] = [
         ],
       },
       {
-        heading: 'Customer',
+        heading: 'Customer Settings',
         items: [
           { label: 'Customer Roles', href: '/admin/customer-roles', area: 'admin.customer-roles' },
           { label: 'Customer Users', href: '/admin/customer-users', area: 'admin.users' },
