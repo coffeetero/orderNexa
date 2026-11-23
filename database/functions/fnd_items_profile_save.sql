@@ -9,6 +9,7 @@
 -- ============================================================
 
 DROP FUNCTION IF EXISTS bps.fnd_items_profile_save(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, NUMERIC, TEXT, NUMERIC, NUMERIC, NUMERIC, BOOLEAN, BOOLEAN, JSONB, JSONB, TEXT, TEXT, TEXT, TEXT, TEXT, NUMERIC, NUMERIC, NUMERIC);
+DROP FUNCTION IF EXISTS bps.fnd_items_profile_save(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, NUMERIC, TEXT, NUMERIC, NUMERIC, NUMERIC, BOOLEAN, BOOLEAN, JSONB, JSONB, TEXT, TEXT, TEXT, TEXT, TEXT, NUMERIC, NUMERIC, NUMERIC, BOOLEAN);
 
 CREATE OR REPLACE FUNCTION bps.fnd_items_profile_save(
   p_tenant_id             BIGINT,
@@ -34,7 +35,8 @@ CREATE OR REPLACE FUNCTION bps.fnd_items_profile_save(
   p_sheeter_setting       TEXT      DEFAULT NULL,
   p_weight_adjuster       NUMERIC   DEFAULT 0,
   p_scale_weight          NUMERIC   DEFAULT 0,
-  p_scale_qty             NUMERIC   DEFAULT 0
+  p_scale_qty             NUMERIC   DEFAULT 0,
+  p_is_compound           BOOLEAN   DEFAULT FALSE
 )
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -60,7 +62,7 @@ BEGIN
       allowed_prep_options, default_prep_options,
       dough_type, shape, packing,
       machine_setting, sheeter_setting,
-      weight_adjuster, scale_weight, scale_qty
+      weight_adjuster, scale_weight, scale_qty, is_compound
     ) VALUES (
       p_tenant_id, p_item_number, p_item_name, p_item_description,
       p_category, COALESCE(p_unit_of_sale, 'PCS'),
@@ -73,7 +75,8 @@ BEGIN
       p_machine_setting, p_sheeter_setting,
       COALESCE(p_weight_adjuster, 0),
       COALESCE(p_scale_weight, 0),
-      COALESCE(p_scale_qty, 0)
+      COALESCE(p_scale_qty, 0),
+      COALESCE(p_is_compound, FALSE)
     )
     RETURNING item_id INTO v_item_id;
 
@@ -101,7 +104,8 @@ BEGIN
       sheeter_setting      = p_sheeter_setting,
       weight_adjuster      = COALESCE(p_weight_adjuster, 0),
       scale_weight         = COALESCE(p_scale_weight, 0),
-      scale_qty            = COALESCE(p_scale_qty, 0)
+      scale_qty            = COALESCE(p_scale_qty, 0),
+      is_compound          = COALESCE(p_is_compound, FALSE)
     WHERE tenant_id = p_tenant_id
       AND item_id   = p_item_id;
 
@@ -116,3 +120,6 @@ BEGIN
   RETURN jsonb_build_object('item_id', v_item_id);
 END;
 $$;
+
+REVOKE EXECUTE ON FUNCTION bps.fnd_items_profile_save(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, NUMERIC, TEXT, NUMERIC, NUMERIC, NUMERIC, BOOLEAN, BOOLEAN, JSONB, JSONB, TEXT, TEXT, TEXT, TEXT, TEXT, NUMERIC, NUMERIC, NUMERIC, BOOLEAN) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION bps.fnd_items_profile_save(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, NUMERIC, TEXT, NUMERIC, NUMERIC, NUMERIC, BOOLEAN, BOOLEAN, JSONB, JSONB, TEXT, TEXT, TEXT, TEXT, TEXT, NUMERIC, NUMERIC, NUMERIC, BOOLEAN) TO authenticated, service_role, bps_dev;

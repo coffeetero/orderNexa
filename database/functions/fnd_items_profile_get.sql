@@ -3,7 +3,7 @@
 --
 -- Two modes controlled by p_item_id:
 --
---   p_item_id IS NULL  → slim list (id, number, name, is_active)
+--   p_item_id IS NULL  → slim list (id, number, name, is_active, is_compound, category, is_priced)
 --                         used to populate the search combobox on mount
 --
 --   p_item_id IS NOT NULL → full detail for one item (all fnd_items columns)
@@ -27,6 +27,7 @@ SET search_path = bps, public
 AS $$
 DECLARE
     v_result JSONB;
+    v_cutoff DATE;
 BEGIN
     IF p_tenant_id IS NULL THEN
         RAISE EXCEPTION 'p_tenant_id is required';
@@ -36,6 +37,8 @@ BEGIN
     -- Slim list mode: combobox population on page load
     -- --------------------------------------------------------
     IF p_item_id IS NULL THEN
+        SELECT (now() AT TIME ZONE bps.fnd_tenant_time_zone(p_tenant_id))::date - (t.pricebook_unused_years * 365)
+          INTO v_cutoff FROM fnd_tenants t WHERE t.tenant_id = p_tenant_id;
         SELECT COALESCE(jsonb_agg(row_data ORDER BY (row_data->>'item_number')), '[]'::JSONB)
           INTO v_result
           FROM (
@@ -43,7 +46,13 @@ BEGIN
                 'item_id',     i.item_id,
                 'item_number', COALESCE(i.item_number, ''),
                 'item_name',   i.item_name,
-                'is_active',   i.is_active
+                'is_active',   i.is_active,
+                'is_compound', i.is_compound,
+                'category',    i.category,
+                -- priced = on at least one active pricing book line
+                'is_priced',   i.item_id IN (SELECT pi.item_id FROM fnd_pricebook_items pi WHERE pi.tenant_id = p_tenant_id AND pi.is_active),
+                -- stale = never ordered, or not ordered within the company's unused years (fnd_tenants.pricebook_unused_years)
+                'is_stale',    (i.last_ordered_date IS NULL OR i.last_ordered_date < v_cutoff)
             ) AS row_data
               FROM fnd_items i
              WHERE i.tenant_id = p_tenant_id
@@ -78,6 +87,7 @@ BEGIN
         -- Sales
         'sales_terms_apply',    i.sales_terms_apply,
         'is_active',            i.is_active,
+        'is_compound',          i.is_compound,
         -- Prep options (JSONB text arrays)
         'allowed_prep_options', i.allowed_prep_options,
         'default_prep_options', i.default_prep_options,
@@ -101,3 +111,6 @@ BEGIN
     RETURN COALESCE(v_result, 'null'::JSONB);
 END;
 $$;
+
+REVOKE EXECUTE ON FUNCTION bps.fnd_items_profile_get(BIGINT, BOOLEAN, BIGINT) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION bps.fnd_items_profile_get(BIGINT, BOOLEAN, BIGINT) TO authenticated, service_role, bps_dev;

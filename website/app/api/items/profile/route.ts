@@ -191,6 +191,7 @@ export async function POST(request: Request) {
     p_weight_adjuster:      parseNumber(payload.weight_adjuster) ?? 0,
     p_scale_weight:         parseNumber(payload.scale_weight) ?? 0,
     p_scale_qty:            parseNumber(payload.scale_qty) ?? 0,
+    p_is_compound:          payload.is_compound === true,
   });
 
   if (error) {

@@ -338,9 +338,9 @@ function PricingEditor({ tenantId, notify }: { tenantId: number; notify: Notify 
         <h2 className="text-lg font-medium">Pricing</h2>
         <Button size="sm" onClick={save} disabled={busy || bad || years === saved}>Save</Button>
       </div>
-      <p className="mb-3 text-xs text-muted-foreground">A pricing book counts as unused when none of its customers has ordered in this many years. Unused books are reported by the health checks.</p>
+      <p className="mb-3 text-xs text-muted-foreground">Stale: a pricing book is stale when none of its customers has ordered in this many years, and an item is stale when it has not been ordered in this many years. Used by the Stale filters and the health checks.</p>
       <div className="flex items-center gap-2 text-sm">
-        <Label htmlFor="pb-years" className="text-xs">Years without orders</Label>
+        <Label htmlFor="pb-years" className="text-xs">Stale after (years without orders)</Label>
         <Input id="pb-years" type="number" min={1} max={50} step={1} className="w-24" value={years} onChange={(e) => setYears(e.target.value)} />
       </div>
     </>

@@ -56,6 +56,7 @@ export const ItemPricebooksTab = forwardRef<ItemPricebooksTabHandle, ItemPricebo
     const [original, setOriginal]   = useState<PricebookRow[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [search, setSearch]       = useState('');
+    const [pricedOnly, setPricedOnly] = useState(true);
     const loadedItemId = useRef<number | null | undefined>(undefined);
 
     // Stable refs so imperative handle always sees latest state without re-creating
@@ -147,18 +148,31 @@ export const ItemPricebooksTab = forwardRef<ItemPricebooksTabHandle, ItemPricebo
       return <p className="py-4 text-sm text-muted-foreground">Select an item to manage pricebook prices.</p>;
     }
 
+    // A book whose price was just typed stays visible even before it is saved.
     const filtered = rows.filter((r) =>
-      r.pricebook_name.toLowerCase().includes(search.toLowerCase()),
+      r.pricebook_name.toLowerCase().includes(search.toLowerCase()) &&
+      (!pricedOnly || r.pricebook_item_id !== null || r.item_price !== ''),
     );
 
     return (
       <div className="space-y-3">
-        <Input
-          placeholder="Search pricebooks…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="h-8 max-w-xs text-sm"
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            placeholder="Search pricebooks…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-8 max-w-xs text-sm"
+          />
+          <select
+            aria-label="Show"
+            className="h-8 rounded-md border border-input bg-background px-2 text-sm"
+            value={pricedOnly ? 'priced' : 'all'}
+            onChange={(e) => setPricedOnly(e.target.value === 'priced')}
+          >
+            <option value="priced">Priced Books Only</option>
+            <option value="all">All Active Price Books</option>
+          </select>
+        </div>
 
         {/* Grid */}
         {isLoading ? (
@@ -175,7 +189,7 @@ export const ItemPricebooksTab = forwardRef<ItemPricebooksTabHandle, ItemPricebo
             {/* Rows */}
             {filtered.length === 0 ? (
               <div className="px-3 py-6 text-center text-sm text-muted-foreground">
-                No pricebooks found.
+                {pricedOnly && !search ? 'This item is not priced in any pricebook. Choose All Active Price Books to add a price.' : 'No pricebooks found.'}
               </div>
             ) : (
               filtered.map((row) => {

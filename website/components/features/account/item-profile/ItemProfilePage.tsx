@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
-import { Plus, ChevronDown } from 'lucide-react';
+import { Fragment, useCallback, useEffect, useRef, useState, useMemo } from 'react';
+import { Plus, ChevronDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -12,9 +12,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
-import { EntityComboBox } from '@/components/bps/EntityComboBox';
 import { ItemPricebooksTab, type ItemPricebooksTabHandle } from './ItemPricebooksTab';
 import { ItemNotesTab } from './ItemNotesTab';
+import { ItemComponentsTab, type ItemComponentsTabHandle } from './ItemComponentsTab';
 import type { PrepOption } from '@/lib/types';
 import { useCurrentRecord, useNavGuard } from '@/components/layout/nav-context';
 import { useDeepLinkId } from '@/lib/use-deep-link';
@@ -34,6 +34,7 @@ interface ItemProfile {
   box_capacity_optimal: number | null;
   sales_terms_apply: boolean;
   is_active: boolean;
+  is_compound: boolean;
   allowed_prep_options: string[];
   default_prep_options: string[];
   dough_type: string | null;
@@ -51,6 +52,10 @@ interface SlimItem {
   item_number: string;
   item_name: string;
   is_active: boolean;
+  is_compound?: boolean;
+  category?: string | null;
+  is_priced?: boolean;
+  is_stale?: boolean;
 }
 
 interface ItemProfilePageProps {
@@ -71,6 +76,7 @@ const EMPTY_ITEM: Omit<ItemProfile, 'tenant_id'> = {
   box_capacity_optimal: null,
   sales_terms_apply: true,
   is_active: true,
+  is_compound: false,
   allowed_prep_options: [],
   default_prep_options: [],
   dough_type: '',
@@ -111,6 +117,7 @@ function normalizeItem(raw: Record<string, unknown>, tenantId: number): ItemProf
     box_capacity_optimal: raw.box_capacity_optimal == null ? null : Number(raw.box_capacity_optimal),
     sales_terms_apply: raw.sales_terms_apply !== false,
     is_active: raw.is_active !== false,
+    is_compound: raw.is_compound === true,
     allowed_prep_options: normalizePrepCodes(raw.allowed_prep_options),
     default_prep_options: normalizePrepCodes(raw.default_prep_options),
     dough_type: raw.dough_type == null ? '' : String(raw.dough_type),
@@ -218,14 +225,24 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
   const [draft, setDraft] = useState<ItemProfile>(() => emptyDraft(tenantId ?? 0));
   const [originalDraft, setOriginalDraft] = useState<ItemProfile>(() => emptyDraft(tenantId ?? 0));
   const [isPricebooksDirty, setIsPricebooksDirty] = useState(false);
+  const [isComponentsDirty, setIsComponentsDirty] = useState(false);
+  const [tab, setTab] = useState('profile');
   const [isLoading, setIsLoading] = useState(false);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [listOpen, setListOpen] = useState(true);
+  const [statusFilters, setStatusFilters] = useState<string[]>(['Active']);
+  const [onlyCompound, setOnlyCompound] = useState(false);
+  const [onlyUnpriced, setOnlyUnpriced] = useState(false);
+  const [onlyStale, setOnlyStale] = useState(false);
+  const [staleYears, setStaleYears] = useState(2);
+  const [categoryFilter, setCategoryFilter] = useState('');
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const loadedRef = useRef(false);
   const detailAbortRef = useRef<AbortController | null>(null);
   const pricebooksRef = useRef<ItemPricebooksTabHandle>(null);
+  const componentsRef = useRef<ItemComponentsTabHandle>(null);
 
   // Fetches slim list + valueset lookups once on mount (and after save to refresh names).
   const loadItems = useCallback(async () => {
@@ -234,7 +251,7 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
     try {
       const response = await fetch(`/api/items/profile?tenant_id=${tenantId}&inactive_only=false`);
       const json = (await response.json()) as {
-        data?: { item_id: number; item_number: string; item_name: string; is_active: boolean }[];
+        data?: SlimItem[];
         prepValues?: PrepOption[];
         categories?: PrepOption[];
         doughTypes?: PrepOption[];
@@ -254,6 +271,8 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
       setShapes(Array.isArray(json.shapes) ? json.shapes : []);
       setPackings(Array.isArray(json.packings) ? json.packings : []);
       setUnits(Array.isArray(json.units) ? json.units : []);
+    } catch {
+      toast.error('Could not load items. Reload the page to try again.', { duration: Infinity });
     } finally {
       setIsLoading(false);
     }
@@ -293,7 +312,13 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
     if (loadedRef.current) return;
     loadedRef.current = true;
     void loadItems();
-  }, [loadItems]);
+    if (tenantId) {
+      fetch(`/api/admin/pricing-settings?tenant_id=${tenantId}`)
+        .then((r) => r.json() as Promise<{ data?: { pricebook_unused_years: number } }>)
+        .then((j) => { if (j.data?.pricebook_unused_years) setStaleYears(j.data.pricebook_unused_years); })
+        .catch(() => {});
+    }
+  }, [loadItems, tenantId]);
 
   const isFormDisabled = !isCreatingNew && selectedItemId === null && draft.item_id === null;
 
@@ -302,7 +327,10 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
     () => isCreatingNew || JSON.stringify(draft) !== JSON.stringify(originalDraft),
     [draft, originalDraft, isCreatingNew],
   );
-  const isAnythingDirty = isProfileDirty || isPricebooksDirty;
+  const isAnythingDirty = isProfileDirty || isPricebooksDirty || isComponentsDirty;
+
+  // The Components tab only exists for compound items; leave it if the flag is turned off.
+  useEffect(() => { if (tab === 'components' && !draft.is_compound) setTab('profile'); }, [tab, draft.is_compound]);
 
   // Sidebar / breadcrumb integration: the open item, unsaved-changes guard, and ?item=ID deep links.
   const navLabel = [originalDraft.item_number, originalDraft.item_name].filter(Boolean).join(' · ');
@@ -324,6 +352,7 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
     setDraft(originalDraft);
     setIsCreatingNew(false);
     pricebooksRef.current?.reset();
+    componentsRef.current?.reset();
   }, [originalDraft]);
 
   const selectItem = (item: SlimItem | null) => {
@@ -345,9 +374,24 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
     setSelectedItemId(null);
     setDraft(empty);
     setOriginalDraft(empty);
-    setSearchQuery('');
     setIsCreatingNew(true);
   };
+
+  const visibleItems = useMemo(() => {
+    const t = searchQuery.trim().toLowerCase();
+    return items.filter((it) =>
+      it.item_id === selectedItemId ||
+      ((statusFilters.includes(it.is_active ? 'Active' : 'Inactive')) &&
+        (!onlyCompound || it.is_compound) && (!onlyUnpriced || it.is_priced === false) && (!onlyStale || it.is_stale) &&
+        (!categoryFilter || it.category === categoryFilter) &&
+        (!t || `${it.item_number} ${it.item_name}`.toLowerCase().includes(t))))
+      .map((it) => ({ it, group: categories.find((c) => c.value === it.category)?.label ?? it.category ?? 'No category' }))
+      .sort((a, b) => (a.group === b.group ? a.it.item_number.localeCompare(b.it.item_number, undefined, { numeric: true })
+        : a.group === 'No category' ? 1 : b.group === 'No category' ? -1 : a.group.localeCompare(b.group)));
+  }, [categories, items, selectedItemId, statusFilters, onlyCompound, onlyUnpriced, onlyStale, categoryFilter, searchQuery]);
+
+  // Changing a filter closes the open item, unless it has unsaved changes.
+  const filterChanged = () => { if (!isAnythingDirty) selectItem(null); };
 
   const saveAll = async () => {
     if (!tenantId) return;
@@ -382,6 +426,15 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
         }
       }
 
+      // ── 3. Save components (if dirty) ─────────────────────────────────
+      if (isComponentsDirty) {
+        const ok = await componentsRef.current?.save();
+        if (!ok) {
+          if (isProfileDirty) toast.error('Profile saved, but components could not be saved.', { duration: Infinity });
+          return;
+        }
+      }
+
       toast.success('Saved.');
     } finally {
       setIsSaving(false);
@@ -402,36 +455,69 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
     <div className="space-y-6">
       <div className="flex min-h-0 flex-1 flex-col gap-4">
 
-        {/* ── Item Selector + Actions ─────────────────────────────────── */}
-        <div className="sticky top-0 z-10 grid grid-cols-3 items-start gap-3 bg-background pb-2 pt-1">
-          <div className="col-span-2 flex flex-col gap-1.5">
-            <Label htmlFor="item-combobox" className="text-xs font-semibold text-muted-foreground">Search Item</Label>
-            <EntityComboBox
-              triggerId="item-combobox"
-              items={items}
-              value={selectedItemId}
-              onChange={selectItem}
-              getId={(item) => item.item_id}
-              getLabel={(item) => `${item.item_number} — ${item.item_name}`}
-              getParentId={() => null}
-              getSearchText={(item) => `${item.item_number} ${item.item_name}`}
-              inputValue={searchQuery}
-              onInputValueChange={setSearchQuery}
-              placeholder="Search number or name"
-              alwaysOpen
-              collapseOnSelect
-              clearSearchOnFocus
-              disabled={isLoading}
-              loading={isLoading}
-              clearable
-              className="w-full"
-            />
-          </div>
-          <div className="flex items-center justify-end gap-2 pt-6">
-            <Button type="button" variant="outline" size="sm" onClick={startNewItem} disabled={isLoading || isDetailLoading}>
-              <Plus className="mr-1 h-3.5 w-3.5" />
-              Item
-            </Button>
+        <div className={cn('grid items-start gap-4', listOpen && 'lg:grid-cols-[18rem_1fr]')}>
+
+        {/* ── Item list ───────────────────────────────────────────────── */}
+        {listOpen && (
+          <Card><CardContent className="space-y-2 p-0">
+            <div className="space-y-2 border-b p-3">
+              <div className="flex items-center justify-between gap-2">
+                <h1 className="text-xl font-semibold">Items</h1>
+                <Button type="button" size="sm" className="gap-1" onClick={startNewItem} disabled={isLoading || isDetailLoading}><Plus className="h-4 w-4" />New</Button>
+              </div>
+              <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search number or name" aria-label="Search items" />
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                {(['Active', 'Inactive'] as const).map((f) => (
+                  <label key={f} className="flex items-center gap-1.5 text-sm">
+                    <Checkbox checked={statusFilters.includes(f)} onCheckedChange={(v) => { setStatusFilters((cur) => (v === true ? [...cur, f] : cur.filter((x) => x !== f))); filterChanged(); }} />
+                    {f}
+                  </label>
+                ))}
+                <label className="flex items-center gap-1.5 text-sm"><Checkbox checked={onlyCompound} onCheckedChange={(v) => { setOnlyCompound(v === true); filterChanged(); }} />Compound</label>
+                <label className="flex items-center gap-1.5 text-sm"><Checkbox checked={onlyUnpriced} onCheckedChange={(v) => { setOnlyUnpriced(v === true); filterChanged(); }} />Unpriced</label>
+                <label className="col-span-2 flex items-center gap-1.5 text-sm"><Checkbox checked={onlyStale} onCheckedChange={(v) => { setOnlyStale(v === true); filterChanged(); }} />Stale ({staleYears} {staleYears === 1 ? 'Year' : 'Years'})</label>
+              </div>
+              <select aria-label="Category" className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm" value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); filterChanged(); }}>
+                <option value="">Include All</option>
+                {categories.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+              </select>
+            </div>
+            <ul className="max-h-[70vh] divide-y overflow-y-auto">
+              {visibleItems.map(({ it, group }, idx) => (
+                <Fragment key={it.item_id}>
+                  {(idx === 0 || visibleItems[idx - 1].group !== group) && (
+                    <li className="sticky top-0 z-[1] bg-muted px-3 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group}</li>
+                  )}
+                  <li>
+                    <button type="button" onClick={() => selectItem(it)}
+                      className={cn('w-full px-3 py-1.5 text-left text-sm hover:bg-muted', !it.is_active && 'bg-muted/60 text-muted-foreground', selectedItemId === it.item_id && 'bg-accent')}>
+                      <div className="truncate font-medium">{it.item_number} {it.item_name}</div>
+                      {(it.is_compound || !it.is_active) && (
+                        <div className="truncate text-xs text-muted-foreground">{[it.is_compound && 'Compound', !it.is_active && 'Inactive'].filter(Boolean).join(' · ')}</div>
+                      )}
+                    </button>
+                  </li>
+                </Fragment>
+              ))}
+              {visibleItems.length === 0 && <li className="px-3 py-4 text-sm text-muted-foreground">{isLoading ? 'Loading…' : 'No items.'}</li>}
+            </ul>
+            <div className="border-t px-3 py-1 text-xs text-muted-foreground">{visibleItems.length} of {items.length}</div>
+          </CardContent></Card>
+        )}
+
+        <div className="flex min-w-0 flex-col gap-4">
+        {/* ── Actions ─────────────────────────────────────────────────── */}
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-2 bg-background pb-2 pt-1">
+          <Button type="button" variant="outline" size="sm" onClick={() => setListOpen((o) => !o)} aria-label={listOpen ? 'Hide item list' : 'Show item list'}>
+            {listOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
+          </Button>
+          <div className="flex items-center gap-2">
+            {!listOpen && (
+              <Button type="button" variant="outline" size="sm" onClick={startNewItem} disabled={isLoading || isDetailLoading}>
+                <Plus className="mr-1 h-3.5 w-3.5" />
+                Item
+              </Button>
+            )}
             <Button type="button" variant="outline" size="sm" onClick={resetAll} disabled={isSaving || isDetailLoading || !isAnythingDirty}>
               Cancel
             </Button>
@@ -442,9 +528,16 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
         </div>
 
         {/* ── Tabs ────────────────────────────────────────────────────── */}
-        <Tabs defaultValue="profile" className="space-y-0">
+        {isFormDisabled ? (
+          <Card><CardContent className="flex min-h-[40vh] items-center justify-center p-6 text-center text-sm text-muted-foreground">
+            Select an item or create a new one.
+          </CardContent></Card>
+        ) : (
+        <Tabs value={tab} onValueChange={setTab} className="space-y-0">
           <TabsList className="relative z-0 h-auto w-fit justify-start gap-0.5 rounded-none bg-transparent p-0">
             <TabsTrigger value="profile" className={TAB_TRIGGER}>Profile</TabsTrigger>
+            <TabsTrigger value="details" className={TAB_TRIGGER}>Details</TabsTrigger>
+            <TabsTrigger value="components" disabled={!draft.is_compound} className={TAB_TRIGGER}>Components</TabsTrigger>
             <TabsTrigger value="pricebooks" className={TAB_TRIGGER}>Pricebooks</TabsTrigger>
             <TabsTrigger value="notes" className={TAB_TRIGGER}>Notes</TabsTrigger>
           </TabsList>
@@ -467,7 +560,7 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
                       <Label className="text-xs font-semibold text-muted-foreground">Item Name</Label>
                       <Input disabled={isFormDisabled} value={draft.item_name} onChange={(e) => set('item_name', e.target.value)} placeholder="Item name" />
                     </div>
-                    <div className="flex items-end pb-1">
+                    <div className="flex items-end gap-6 pb-1">
                       <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
                         <Checkbox
                           disabled={isFormDisabled}
@@ -475,6 +568,14 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
                           onCheckedChange={(v) => set('is_active', v === true)}
                         />
                         Active
+                      </label>
+                      <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+                        <Checkbox
+                          disabled={isFormDisabled}
+                          checked={draft.is_compound}
+                          onCheckedChange={(v) => set('is_compound', v === true)}
+                        />
+                        Compound item
                       </label>
                     </div>
                   </div>
@@ -514,6 +615,11 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
                     </div>
                   </div>
                 </fieldset>
+
+              </TabsContent>
+
+              {/* ── Details Tab ─────────────────────────────────────── */}
+              <TabsContent value="details" className="space-y-9">
 
                 {/* Preparation */}
                 <fieldset className="rounded-lg border border-border/60 bg-muted/20 p-4">
@@ -613,6 +719,20 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
 
               </TabsContent>
 
+              {/* ── Components Tab ──────────────────────────────────── */}
+              <TabsContent value="components" forceMount className="data-[state=inactive]:hidden">
+                {draft.is_compound && (
+                  <ItemComponentsTab
+                    ref={componentsRef}
+                    tenantId={tenantId}
+                    itemId={selectedItemId}
+                    candidates={items}
+                    disabled={isFormDisabled}
+                    onDirtyChange={setIsComponentsDirty}
+                  />
+                )}
+              </TabsContent>
+
               {/* ── Pricebooks Tab ──────────────────────────────────── */}
               <TabsContent value="pricebooks" forceMount className="data-[state=inactive]:hidden">
                 <ItemPricebooksTab
@@ -631,6 +751,9 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
             </CardContent>
           </Card>
         </Tabs>
+        )}
+        </div>
+        </div>
       </div>
     </div>
   );
