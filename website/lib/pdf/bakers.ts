@@ -9,10 +9,12 @@ export interface BakersData {
     total_quantity: number;
     last_printed_at: string | null;
     changed_since_print: boolean;
+    /** Compound items ordered in the run. Their components are already counted in the categories below; they are not part of the totals. */
+    compounds?: { item_number: string | null; item_name: string | null; quantity: number; order_count: number }[];
     categories: {
       category: string;
       total_quantity: number;
-      items: { item_number: string | null; item_name: string | null; dough_type: string | null; unit_of_sale: string | null; quantity: number; order_count: number }[];
+      items: { item_number: string | null; item_name: string | null; dough_type: string | null; unit_of_sale: string | null; quantity: number; in_compounds?: number; order_count: number }[];
     }[];
   }[];
 }
@@ -56,6 +58,11 @@ export async function bakersPdf(data: BakersData, generatedLabel: string): Promi
         cell(w, item.item_number ?? '', COLS.num, y, { size: 9 });
         const nameLines = wrap(item.item_name ?? '', w.font, 9, COLS.dough - COLS.name - 8);
         cell(w, nameLines[0], COLS.name, y, { size: 9 });
+        if ((item.in_compounds ?? 0) > 0) {
+          const x = COLS.name + w.font.widthOfTextAtSize(nameLines[0], 9) + 6;
+          const note = `(${qty(item.in_compounds ?? 0)} in sets)`;
+          if (x + w.font.widthOfTextAtSize(note, 7) < COLS.dough - 4) cell(w, note, x, y, { size: 7, muted: true });
+        }
         cell(w, item.dough_type ?? '', COLS.dough, y, { size: 9 });
         cell(w, item.unit_of_sale ?? '', COLS.unit, y, { size: 9 });
         cell(w, qty(item.quantity), COLS.qtyRight, y, { size: 9, bold: true, align: 'right', right: COLS.qtyRight });
@@ -70,6 +77,28 @@ export async function bakersPdf(data: BakersData, generatedLabel: string): Promi
     });
     ensure(w, 24);
     text(w, `Run total: ${qty(run.total_quantity)} units`, { size: 11, bold: true });
+    if (run.compounds && run.compounds.length > 0) {
+      w.y -= 10;
+      ensure(w, 50);
+      text(w, 'Compound items to assemble', { size: 11, bold: true }, 14);
+      text(w, 'Their components are already counted in the quantities above; these are not added to the totals.', { size: 8, muted: true }, 12);
+      const y0 = w.y;
+      cell(w, 'Item #', COLS.num, y0, { size: 8, bold: true, muted: true });
+      cell(w, 'Item', COLS.name, y0, { size: 8, bold: true, muted: true });
+      cell(w, 'Quantity', COLS.qtyRight, y0, { size: 8, bold: true, muted: true, align: 'right', right: COLS.qtyRight });
+      cell(w, 'Orders', COLS.ordersRight, y0, { size: 8, bold: true, muted: true, align: 'right', right: COLS.ordersRight });
+      w.y -= 12;
+      rule(w, 3);
+      run.compounds.forEach((c) => {
+        ensure(w, 16);
+        const y = w.y;
+        cell(w, c.item_number ?? '', COLS.num, y, { size: 9 });
+        cell(w, wrap(c.item_name ?? '', w.font, 9, COLS.qtyRight - COLS.name - 60)[0], COLS.name, y, { size: 9 });
+        cell(w, qty(c.quantity), COLS.qtyRight, y, { size: 9, bold: true, align: 'right', right: COLS.qtyRight });
+        cell(w, String(c.order_count), COLS.ordersRight, y, { size: 9, muted: true, align: 'right', right: COLS.ordersRight });
+        w.y -= 13;
+      });
+    }
   });
   footerPageNumbers(w.doc, w.font, `Baker's Report - ${generatedLabel}`);
   return w.doc.save();

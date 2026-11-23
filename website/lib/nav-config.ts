@@ -186,6 +186,7 @@ export const tenantNav: NavMenu[] = [
             ],
           },
           { label: 'Security', href: '/admin/security', area: 'admin.security' },
+          { label: 'Health Checks', href: '/admin/health', area: 'admin.health' },
         ],
       },
       {

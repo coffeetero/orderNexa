@@ -27,7 +27,7 @@ BEGIN
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","app_metadata":{"tenant_id":200000000002,"allowed_tenant_ids":[200000000002],"app_user_id":200000174045}}', true);
   SET LOCAL ROLE authenticated;
 
-  INSERT INTO _t VALUES ('tenant administrator areas include every admin area', (SELECT count(*) FROM unnest(fnd_my_areas()) a WHERE a LIKE 'admin.%') = 8);
+  INSERT INTO _t VALUES ('tenant administrator areas include every admin area', (SELECT count(*) FROM unnest(fnd_my_areas()) a WHERE a LIKE 'admin.%') = 9);
   -- roles
   j := fnd_roles_get(200000000002);
   INSERT INTO _t VALUES ('roles list shows both system roles', (SELECT count(*) FROM jsonb_array_elements(j) e WHERE (e->>'is_system')::boolean) = 2);

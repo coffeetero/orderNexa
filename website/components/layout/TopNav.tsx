@@ -19,6 +19,7 @@ import { createClient } from '@/lib/supabase/client';
 import { findActiveHref, findActiveMenu, type NavItem, type NavMenu } from '@/lib/nav-config';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
+import { HealthHeart } from '@/components/layout/HealthHeart';
 import {
   Accordion,
   AccordionContent,
@@ -63,6 +64,8 @@ type TopNavProps = {
   /** Staff-only user-menu entries. Omit for customer users. */
   profileHref?: string;
   appearanceHref?: string;
+  /** Staff with Health Checks access: shows the heart, linking here. */
+  healthHref?: string;
 };
 
 const topLevelClass =
@@ -88,6 +91,7 @@ export function TopNav({
   brand,
   userName,
   profileHref,
+  healthHref,
   appearanceHref,
 }: TopNavProps) {
   const router = useRouter();
@@ -206,6 +210,7 @@ export function TopNav({
 
       {/* Right-hand controls */}
       <div className="flex items-center gap-1">
+        {healthHref && <HealthHeart href={healthHref} />}
         <Button variant="ghost" size="icon" className="hidden h-9 w-9 text-muted-foreground sm:inline-flex" aria-label="Search">
           <Search className="h-4 w-4" />
         </Button>
