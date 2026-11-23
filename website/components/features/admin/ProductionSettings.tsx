@@ -56,21 +56,35 @@ async function call<T>(url: string, init?: RequestInit): Promise<T> {
 const post = (url: string, body: unknown) =>
   call<unknown>(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
-function CodeRowEditor({ row, tenantId, notify }: { row: CodeRow; tenantId: number; notify: Notify }) {
-  const [time, setTime] = useState(row.cutoff_time ?? '');
-  const [before, setBefore] = useState(String(row.cutoff_days_before ?? 1));
-  const [after, setAfter] = useState(String(row.delivery_days_after ?? 1));
-  const [active, setActive] = useState(row.is_active ?? true);
+type CodeDraft = { time: string; before: string; after: string; active: boolean };
+const toDraft = (r: CodeRow): CodeDraft => ({
+  time: r.cutoff_time ?? '', before: String(r.cutoff_days_before ?? 1),
+  after: String(r.delivery_days_after ?? 1), active: r.is_active ?? true,
+});
+
+function CodesEditor({ rows, tenantId, notify }: { rows: CodeRow[]; tenantId: number; notify: Notify }) {
+  const [drafts, setDrafts] = useState<Record<string, CodeDraft>>({});
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setDrafts(Object.fromEntries(rows.map((r) => [r.production_code, toDraft(r)])));
+  }, [rows]);
+
+  const set = (code: string, patch: Partial<CodeDraft>) =>
+    setDrafts((d) => ({ ...d, [code]: { ...d[code], ...patch } }));
 
   const save = async () => {
     setBusy(true);
     try {
-      await post('/api/admin/production-codes', {
-        tenant_id: tenantId, production_code: row.production_code, cutoff_time: time,
-        cutoff_days_before: Number(before), delivery_days_after: Number(after), is_active: active,
-      });
-      notify(`${row.label} saved.`, 'success');
+      for (const r of rows) {
+        const d = drafts[r.production_code];
+        if (!d) continue;
+        await post('/api/admin/production-codes', {
+          tenant_id: tenantId, production_code: r.production_code, cutoff_time: d.time,
+          cutoff_days_before: Number(d.before), delivery_days_after: Number(d.after), is_active: d.active,
+        });
+      }
+      notify('Production codes saved.', 'success');
     } catch (e) {
       notify((e as Error).message, 'error');
     } finally {
@@ -78,29 +92,43 @@ function CodeRowEditor({ row, tenantId, notify }: { row: CodeRow; tenantId: numb
     }
   };
 
+  const incomplete = rows.some((r) => !drafts[r.production_code]?.time);
+
   return (
-    <div className="grid grid-cols-2 items-end gap-3 border-b py-3 sm:grid-cols-[10rem_8rem_8rem_8rem_auto_auto]">
-      <div className="col-span-2 sm:col-span-1">
-        <div className="font-medium">{row.label}</div>
-        <div className="text-xs text-muted-foreground">{row.production_code}</div>
+    <>
+      <div className="mb-1 flex items-start justify-between gap-3">
+        <h2 className="text-lg font-medium">Production codes</h2>
+        <Button size="sm" onClick={save} disabled={busy || incomplete}>Save</Button>
       </div>
-      <div>
-        <Label className="text-xs">Cutoff time</Label>
-        <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
-      </div>
-      <div>
-        <Label className="text-xs">Days before production</Label>
-        <Input type="number" min={0} value={before} onChange={(e) => setBefore(e.target.value)} />
-      </div>
-      <div>
-        <Label className="text-xs">Delivery days after</Label>
-        <Input type="number" min={0} value={after} onChange={(e) => setAfter(e.target.value)} />
-      </div>
-      <label className="flex items-center gap-2 text-sm">
-        <Checkbox checked={active} onCheckedChange={(v) => setActive(v === true)} /> Active
-      </label>
-      <Button size="sm" onClick={save} disabled={busy || !time}>Save</Button>
-    </div>
+      <p className="mb-2 text-xs text-muted-foreground">The code list itself is the PRODUCTIONCODE value list. Cutoff of 16:00 and 1 day before means 4:00 PM the day before.</p>
+      {rows.map((row) => {
+        const d = drafts[row.production_code];
+        if (!d) return null;
+        return (
+          <div key={row.production_code} className="grid grid-cols-2 items-end gap-3 border-b py-3 sm:grid-cols-[10rem_8rem_8rem_8rem_auto]">
+            <div className="col-span-2 sm:col-span-1">
+              <div className="font-medium">{row.label}</div>
+              <div className="text-xs text-muted-foreground">{row.production_code}</div>
+            </div>
+            <div>
+              <Label className="text-xs">Cutoff time</Label>
+              <Input type="time" value={d.time} onChange={(e) => set(row.production_code, { time: e.target.value })} />
+            </div>
+            <div>
+              <Label className="text-xs">Days before production</Label>
+              <Input type="number" min={0} value={d.before} onChange={(e) => set(row.production_code, { before: e.target.value })} />
+            </div>
+            <div>
+              <Label className="text-xs">Delivery days after</Label>
+              <Input type="number" min={0} value={d.after} onChange={(e) => set(row.production_code, { after: e.target.value })} />
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox checked={d.active} onCheckedChange={(v) => set(row.production_code, { active: v === true })} /> Active
+            </label>
+          </div>
+        );
+      })}
+    </>
   );
 }
 
@@ -288,9 +316,7 @@ export function ProductionSettings({ tenantId, section = 'codes' }: { tenantId: 
 
       {section === 'codes' && (
       <Card><CardContent className="pt-6">
-        <h2 className="mb-1 text-lg font-medium">Production codes</h2>
-        <p className="mb-2 text-xs text-muted-foreground">The code list itself is the PRODUCTIONCODE value list. Cutoff of 16:00 and 1 day before means 4:00 PM the day before.</p>
-        {codes.map((c) => <CodeRowEditor key={c.production_code} row={c} tenantId={tenantId} notify={notify} />)}
+        <CodesEditor rows={codes} tenantId={tenantId} notify={notify} />
       </CardContent></Card>
       )}
 
