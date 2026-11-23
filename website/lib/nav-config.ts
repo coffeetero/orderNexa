@@ -186,6 +186,7 @@ export const tenantNav: NavMenu[] = [
               { key: 'runs', label: 'Upcoming runs' },
             ],
           },
+          { label: 'Security', href: '/admin/security', soon: true },
         ],
       },
       {
@@ -203,10 +204,6 @@ export const tenantNav: NavMenu[] = [
           { label: 'Customer Users', href: '/admin/customer-users', area: 'admin.users' },
           { label: 'Customer Groups', href: '/admin/groups', area: 'admin.groups' },
         ],
-      },
-      {
-        heading: 'Security',
-        items: [{ label: 'Security', href: '/admin/security', soon: true }],
       },
     ],
   },
