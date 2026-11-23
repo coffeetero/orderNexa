@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DocumentsList } from '@/components/features/financials/DocumentsList';
 import { CustomerContactsTab, CustomerContactsTabHandle } from '@/components/features/account/CustomerContactsTab';
 import { CustomerNotesTab, CustomerNotesTabHandle } from '@/components/features/account/CustomerNotesTab';
 import { CustomerPricebooksTab, CustomerPricebooksTabHandle } from '@/components/features/account/CustomerPricebooksTab';
@@ -499,7 +500,7 @@ export function CustomerManagementPage({
 
   useEffect(() => {
     if (!isAccount) {
-      if (activeTab === 'pricing') setActiveTab('contacts');
+      if (activeTab === 'pricing' || activeTab === 'documents') setActiveTab('contacts');
       setPricingIsDirty(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -703,6 +704,14 @@ export function CustomerManagementPage({
               >
                 Notes
               </TabsTrigger>
+              {isAccount && (
+              <TabsTrigger
+                value="documents"
+                className="relative z-0 -mb-px rounded-b-none rounded-t-lg border border-muted bg-muted/70 px-4 py-1.5 data-[state=active]:z-10 data-[state=active]:translate-y-[1px] data-[state=active]:border-border/60 data-[state=active]:border-b-transparent data-[state=active]:bg-card data-[state=active]:font-semibold data-[state=active]:text-[15px]"
+              >
+                Documents
+              </TabsTrigger>
+              )}
               <TabsTrigger
                 value="settings"
                 className="relative z-0 -mb-px rounded-b-none rounded-t-lg border border-muted bg-muted/70 px-4 py-1.5 data-[state=active]:z-10 data-[state=active]:translate-y-[1px] data-[state=active]:border-border/60 data-[state=active]:border-b-transparent data-[state=active]:bg-card data-[state=active]:font-semibold data-[state=active]:text-[15px]"
@@ -913,6 +922,12 @@ export function CustomerManagementPage({
                     onDirtyChange={setNotesIsDirty}
                   />
                 </TabsContent>
+
+                {isAccount && (
+                <TabsContent value="documents">
+                  <DocumentsList tenantId={tenantId ?? 0} customerId={selectedCustomerId} canCreateInvoices />
+                </TabsContent>
+                )}
 
                 <TabsContent value="settings">
                   <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">

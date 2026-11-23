@@ -139,9 +139,9 @@ export const tenantNav: NavMenu[] = [
       {
         heading: 'Receivables',
         items: [
-          { label: 'AR Open Balances', href: '/financials/ar', soon: true },
-          { label: 'AR Aging Report', href: '/financials/aging', soon: true },
-          { label: 'Customer Statements', href: '/financials/statements', soon: true },
+          { label: 'AR Open Balances', href: '/financials/ar' },
+          { label: 'AR Aging Report', href: '/financials/aging' },
+          { label: 'Customer Statements', href: '/financials/statements' },
         ],
       },
       {
@@ -161,8 +161,8 @@ export const tenantNav: NavMenu[] = [
       {
         heading: 'Reporting',
         items: [
-          { label: 'Sales Reports', href: '/financials/sales', soon: true },
-          { label: 'Revenue Forecasting', href: '/financials/forecast', soon: true },
+          { label: 'Sales Reports', href: '/financials/sales' },
+          { label: 'Revenue Forecasting', href: '/financials/forecast' },
         ],
       },
     ],
@@ -237,6 +237,7 @@ export function customerNav(basePath: string): NavMenu[] {
           items: [
             { label: 'Statements', href: `${basePath}/invoicing` },
             { label: 'Invoice History', href: `${basePath}/invoicing/history` },
+            { label: 'Documents', href: `${basePath}/invoicing/documents` },
           ],
         },
       ],
