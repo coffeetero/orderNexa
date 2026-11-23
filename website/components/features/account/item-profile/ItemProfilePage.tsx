@@ -486,11 +486,10 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
         {listOpen && (
           <Card><CardContent className="space-y-2 p-0">
             <div className="space-y-2 border-b p-3">
-              <div className="flex items-center justify-between gap-2">
+              <div className="-mx-3 flex items-center justify-between gap-2 border-b px-3 pb-3">
                 <h1 className="text-xl font-semibold">Items</h1>
                 <Button type="button" size="sm" className="gap-1" onClick={startNewItem} disabled={isLoading || isDetailLoading}><Plus className="h-4 w-4" />New</Button>
               </div>
-              <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search number or name" aria-label="Search items" />
               <div className="grid grid-cols-2 gap-x-4 gap-y-1">
                 {(['Active', 'Inactive'] as const).map((f) => (
                   <label key={f} className="flex items-center gap-1.5 text-sm">
@@ -506,6 +505,7 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
                 <option value="">Include All</option>
                 {categories.filter((c) => usedCategories.has(c.value)).map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
               </select>
+              <div className="pt-[30px]"><Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search number or name" aria-label="Search items" /></div>
             </div>
             <ul className="max-h-[70vh] divide-y overflow-y-auto">
               {visibleItems.map(({ it, group }, idx) => (
