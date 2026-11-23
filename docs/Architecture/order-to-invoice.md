@@ -140,3 +140,9 @@ A customer account is assigned one or more pricing books (`fnd_customer_priceboo
 - A book can be made for one customer (`fnd_pricebooks.owner_customer_id`) and still be assigned to other accounts. Books are managed at Inventory > Pricing Books; assignment stays on the Customer Pricing tab, which warns when a Default above a seasonal/promotional/introductory book will win by its order.
 - The dashboard To-Do's card (`fnd_todos_get`, approvers only) lists assignments that start within 14 days (or have started) but are not yet active and Approved.
 - Quantity price breaks (`min_quantity`) are not applied yet. Migration: `add_pricing_books.sql` (after `add_dashboard_cards.sql`); test: `database/tests/pricing_books_test.sql`.
+
+### Pricing book status, dates and disabling (add_pricebook_status_and_disable.sql)
+- A book has its own status (Draft, Scheduled, Approved), From/To dates, notes, creator and approver. Status is informational for now; pricing still uses the book's Active flag and the assignment's own status and dates. New assignments on the customer Pricing tab default to the book's dates and may be overridden.
+- Only a pricing approver can set a book to Approved (the approver and time are recorded). Disabling a book records who and when; enabling clears it.
+- Copy As New is a screen action: it opens a new unsaved book with the items and prices, status Draft, not active.
+- Company setting `fnd_tenants.pricebook_unused_years` (Application Settings > Pricing) is read by the future "book not used" health check (docs/backlog.md).

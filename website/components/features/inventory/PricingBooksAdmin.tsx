@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -10,19 +10,29 @@ import { Label } from '@/components/ui/label';
 import { adminCall, adminPost, useBanner } from '@/components/features/admin/adminShared';
 import { cn } from '@/lib/utils';
 
-interface BookRow { pricebook_id: number; pricebook_name: string; description: string | null; is_active: boolean; owner_customer_id: number | null; owner_customer_name: string | null; item_count: number; assigned_count: number }
-interface ItemLine { item_id: number; item_number: string; item_name: string; price: string; is_active: boolean; removed: boolean }
+interface BookRow {
+  pricebook_id: number; pricebook_name: string; description: string | null; is_active: boolean; status: string;
+  effective_start_date: string | null; effective_end_date: string | null; created_by_name: string | null; approved_by_name: string | null;
+  disabled_at: string | null; disabled_by_name: string | null; item_count: number; assigned_count: number;
+}
+interface ItemLine { item_id: number; item_number: string; item_name: string; category: string; price: string; is_active: boolean; removed: boolean }
 interface Assignment { customer_id: number; customer_name: string; assignment_type: string; status: string; is_active: boolean; effective_start_date: string; effective_end_date: string | null }
-interface CatalogItem { item_id: number; item_number: string; item_name: string }
-interface Account { customer_id: number; customer_name: string }
+interface CatalogItem { item_id: number; item_number: string; item_name: string; category: string | null }
+type ApiItem = { item_id: number; item_number: string; item_name: string; category: string | null; item_price: number | null; is_active: boolean };
 
-const blank = { pricebook_id: null as number | null, pricebook_name: '', description: '', is_active: true, owner_customer_id: '' };
+const STATUSES = ['Draft', 'Scheduled', 'Approved'];
+const NO_CATEGORY = 'No category';
+const toLine = (i: ApiItem): ItemLine => ({ item_id: i.item_id, item_number: i.item_number ?? '', item_name: i.item_name, category: i.category ?? NO_CATEGORY, price: i.item_price === null ? '' : String(i.item_price), is_active: i.is_active, removed: false });
+
+const blank = { pricebook_id: null as number | null, pricebook_name: '', description: '', is_active: true, status: 'Draft', effective_start_date: '', effective_end_date: '' };
+const snapOf = (f: typeof blank, ls: ItemLine[]) => JSON.stringify({ f, l: ls.map((l) => [l.item_id, l.price, l.is_active, l.removed]) });
+const fmtDate = (v: string | null) => (v ? v.slice(0, 10) : '');
+const formFrom = (b: BookRow) => ({ pricebook_id: b.pricebook_id, pricebook_name: b.pricebook_name, description: b.description ?? '', is_active: b.is_active, status: b.status, effective_start_date: fmtDate(b.effective_start_date), effective_end_date: fmtDate(b.effective_end_date) });
 
 export function PricingBooksAdmin({ tenantId }: { tenantId: number }) {
   const { notify, banner } = useBanner();
   const [books, setBooks] = useState<BookRow[]>([]);
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
-  const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedId, setSelectedId] = useState<number | 'new' | null>(null);
   const [form, setForm] = useState(blank);
   const [lines, setLines] = useState<ItemLine[]>([]);
@@ -30,6 +40,10 @@ export function PricingBooksAdmin({ tenantId }: { tenantId: number }) {
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState('');
   const [busy, setBusy] = useState(false);
+  const [includeDisabled, setIncludeDisabled] = useState(false);
+  const [baseline, setBaseline] = useState('');
+  const [detailsOpen, setDetailsOpen] = useState(true);
+  const [assignedOpen, setAssignedOpen] = useState(true);
 
   const loadBooks = useCallback(async () => {
     try { setBooks(await adminCall<BookRow[]>(`/api/pricebooks?tenant_id=${tenantId}`)); } catch (e) { notify((e as Error).message, 'error'); }
@@ -38,20 +52,31 @@ export function PricingBooksAdmin({ tenantId }: { tenantId: number }) {
   useEffect(() => {
     void loadBooks();
     adminCall<CatalogItem[]>(`/api/items?tenant_id=${tenantId}`).then(setCatalog).catch(() => {});
-    adminCall<Account[]>(`/api/pricebooks?tenant_id=${tenantId}&accounts=1`).then(setAccounts).catch(() => {});
   }, [tenantId, loadBooks]);
 
   const open = useCallback(async (id: number | 'new') => {
     setSelectedId(id); setQ(''); setFilter('');
-    if (id === 'new') { setForm(blank); setLines([]); setAssignments([]); return; }
+    if (id === 'new') { setForm(blank); setLines([]); setAssignments([]); setBaseline(snapOf(blank, [])); return; }
     const b = books.find((x) => x.pricebook_id === id);
-    if (b) setForm({ pricebook_id: b.pricebook_id, pricebook_name: b.pricebook_name, description: b.description ?? '', is_active: b.is_active, owner_customer_id: b.owner_customer_id ? String(b.owner_customer_id) : '' });
+    if (b) setForm(formFrom(b));
     try {
-      const d = await adminCall<{ items: { item_id: number; item_number: string; item_name: string; item_price: number | null; is_active: boolean }[]; assignments: Assignment[] }>(`/api/pricebooks?tenant_id=${tenantId}&pricebook_id=${id}`);
-      setLines(d.items.map((i) => ({ item_id: i.item_id, item_number: i.item_number ?? '', item_name: i.item_name, price: i.item_price === null ? '' : String(i.item_price), is_active: i.is_active, removed: false })));
+      const d = await adminCall<{ items: ApiItem[]; assignments: Assignment[] }>(`/api/pricebooks?tenant_id=${tenantId}&pricebook_id=${id}`);
+      const ls = d.items.map(toLine);
+      setLines(ls);
       setAssignments(d.assignments);
+      if (b) setBaseline(snapOf(formFrom(b), ls));
     } catch (e) { notify((e as Error).message, 'error'); }
   }, [books, tenantId, notify]);
+
+  const copyAsNew = () => {
+    if (typeof selectedId !== 'number') return;
+    setSelectedId('new');
+    setForm({ ...form, pricebook_id: null, pricebook_name: `Copy of ${form.pricebook_name}`, status: 'Draft', is_active: false });
+    setLines((ls) => ls.filter((l) => !l.removed));
+    setAssignments([]);
+    setBaseline('');
+    setQ(''); setFilter('');
+  };
 
   const inBook = useMemo(() => new Set(lines.filter((l) => !l.removed).map((l) => l.item_id)), [lines]);
   const matches = useMemo(() => {
@@ -59,21 +84,28 @@ export function PricingBooksAdmin({ tenantId }: { tenantId: number }) {
     if (!t) return [];
     return catalog.filter((c) => !inBook.has(c.item_id) && `${c.item_number} ${c.item_name}`.toLowerCase().includes(t)).slice(0, 8);
   }, [q, catalog, inBook]);
-  const shown = lines.filter((l) => !filter.trim() || `${l.item_number} ${l.item_name}`.toLowerCase().includes(filter.trim().toLowerCase()));
+  const shown = useMemo(() => lines
+    .filter((l) => !filter.trim() || `${l.item_number} ${l.item_name}`.toLowerCase().includes(filter.trim().toLowerCase()))
+    .sort((a, b) => (a.category === b.category ? a.item_number.localeCompare(b.item_number, undefined, { numeric: true }) : a.category === NO_CATEGORY ? 1 : b.category === NO_CATEGORY ? -1 : a.category.localeCompare(b.category))),
+  [lines, filter]);
+  const visibleBooks = books.filter((b) => includeDisabled || b.is_active || b.pricebook_id === selectedId);
+  const selectedBook = books.find((b) => b.pricebook_id === selectedId);
 
   const setLine = (id: number, p: Partial<ItemLine>) => setLines((ls) => ls.map((l) => (l.item_id === id ? { ...l, ...p } : l)));
   const addItem = (c: CatalogItem) => {
-    setLines((ls) => (ls.some((l) => l.item_id === c.item_id) ? ls.map((l) => (l.item_id === c.item_id ? { ...l, removed: false } : l)) : [...ls, { item_id: c.item_id, item_number: c.item_number, item_name: c.item_name, price: '', is_active: true, removed: false }]));
+    setLines((ls) => (ls.some((l) => l.item_id === c.item_id) ? ls.map((l) => (l.item_id === c.item_id ? { ...l, removed: false } : l)) : [...ls, { item_id: c.item_id, item_number: c.item_number, item_name: c.item_name, category: c.category ?? NO_CATEGORY, price: '', is_active: true, removed: false }]));
     setQ('');
   };
 
   const priceBad = (l: ItemLine) => !l.removed && (l.price.trim() === '' || !Number.isFinite(Number(l.price)) || Number(l.price) < 0);
-  const invalid = !form.pricebook_name.trim() || lines.some(priceBad);
+  const datesBad = !!form.effective_start_date && !!form.effective_end_date && form.effective_end_date < form.effective_start_date;
+  const dirty = snapOf(form, lines) !== baseline;
+  const invalid = !dirty || !form.pricebook_name.trim() || datesBad || lines.some(priceBad);
 
   async function save() {
     setBusy(true);
     try {
-      const id = await adminPost<number>('/api/pricebooks', { tenant_id: tenantId, pricebook: { ...form, owner_customer_id: form.owner_customer_id || null } });
+      const id = await adminPost<number>('/api/pricebooks', { tenant_id: tenantId, pricebook: form });
       const entries = lines.map((l) => (l.removed ? { item_id: l.item_id, remove: true } : { item_id: l.item_id, item_price: Number(l.price), is_active: l.is_active }));
       if (entries.length) await adminPost('/api/pricebooks/items', { tenant_id: tenantId, pricebook_id: id, entries });
       notify(`${form.pricebook_name} saved.`, 'success');
@@ -81,39 +113,42 @@ export function PricingBooksAdmin({ tenantId }: { tenantId: number }) {
       setBooks(list);
       const b = list.find((x) => x.pricebook_id === id);
       setSelectedId(id);
-      const d = await adminCall<{ items: { item_id: number; item_number: string; item_name: string; item_price: number | null; is_active: boolean }[]; assignments: Assignment[] }>(`/api/pricebooks?tenant_id=${tenantId}&pricebook_id=${id}`);
-      setForm({ pricebook_id: id, pricebook_name: b?.pricebook_name ?? form.pricebook_name, description: b?.description ?? form.description, is_active: b?.is_active ?? form.is_active, owner_customer_id: b?.owner_customer_id ? String(b.owner_customer_id) : '' });
-      setLines(d.items.map((i) => ({ item_id: i.item_id, item_number: i.item_number ?? '', item_name: i.item_name, price: i.item_price === null ? '' : String(i.item_price), is_active: i.is_active, removed: false })));
+      const d = await adminCall<{ items: ApiItem[]; assignments: Assignment[] }>(`/api/pricebooks?tenant_id=${tenantId}&pricebook_id=${id}`);
+      const ls = d.items.map(toLine);
+      if (b) { setForm(formFrom(b)); setBaseline(snapOf(formFrom(b), ls)); }
+      setLines(ls);
       setAssignments(d.assignments);
     } catch (e) { notify((e as Error).message, 'error'); } finally { setBusy(false); }
   }
 
   return (
     <div className="mx-auto max-w-7xl space-y-4 p-4 sm:p-6">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">Pricing Books</h1>
-          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            A pricing book is a list of items and prices. Assign books to a customer account on its Pricing tab; they are used in the order shown there, item by item, while active, Approved and within their dates for the delivery date.
-          </p>
-        </div>
-        <Button size="sm" className="gap-1.5" onClick={() => void open('new')}><Plus className="h-4 w-4" />New pricing book</Button>
-      </div>
+      <p className="max-w-3xl text-sm text-muted-foreground">
+        A pricing book is a list of items and prices. Assign books to a customer account on its Pricing tab; they are used in the order shown there, item by item, while active, Approved and within their dates for the delivery date.
+      </p>
       {banner}
 
       <div className="grid gap-4 lg:grid-cols-[18rem_1fr]">
-        <Card><CardContent className="p-0">
+        <Card><CardContent className="space-y-2 p-0">
+          <div className="space-y-2 border-b p-3">
+            <h1 className="text-xl font-semibold">Pricing Books</h1>
+            <div className="flex gap-2">
+              <Button size="sm" className="gap-1" onClick={() => void open('new')}><Plus className="h-4 w-4" />New</Button>
+              <Button size="sm" variant="outline" disabled={typeof selectedId !== 'number'} onClick={copyAsNew}>Copy As New</Button>
+            </div>
+            <label className="flex items-center gap-2 text-sm"><Checkbox checked={includeDisabled} onCheckedChange={(v) => setIncludeDisabled(v === true)} /> Include Disabled</label>
+          </div>
           <ul className="max-h-[70vh] divide-y overflow-y-auto">
-            {books.map((b) => (
+            {visibleBooks.map((b) => (
               <li key={b.pricebook_id}>
                 <button type="button" onClick={() => void open(b.pricebook_id)}
-                  className={cn('w-full px-3 py-2 text-left text-sm hover:bg-muted', selectedId === b.pricebook_id && 'bg-accent')}>
-                  <div className="flex items-center gap-2"><span className="flex-1 truncate font-medium">{b.pricebook_name}</span>{!b.is_active && <span className="text-[10px] uppercase text-muted-foreground">Inactive</span>}</div>
-                  <div className="text-xs text-muted-foreground">{b.item_count} items · {b.assigned_count} customer{b.assigned_count === 1 ? '' : 's'}{b.owner_customer_name ? ` · for ${b.owner_customer_name}` : ''}</div>
+                  className={cn('w-full px-3 py-2 text-left text-sm hover:bg-muted', !b.is_active && 'bg-muted/60 text-muted-foreground', selectedId === b.pricebook_id && 'bg-accent')}>
+                  <div className="flex items-center gap-2"><span className="flex-1 truncate font-medium">{b.pricebook_name}</span>{!b.is_active && <span className="text-[10px] uppercase">Disabled</span>}</div>
+                  <div className="text-xs text-muted-foreground">{b.status} · {b.item_count} items · {b.assigned_count} customer{b.assigned_count === 1 ? '' : 's'}</div>
                 </button>
               </li>
             ))}
-            {books.length === 0 && <li className="px-3 py-4 text-sm text-muted-foreground">No pricing books yet.</li>}
+            {visibleBooks.length === 0 && <li className="px-3 py-4 text-sm text-muted-foreground">No pricing books.</li>}
           </ul>
         </CardContent></Card>
 
@@ -123,20 +158,50 @@ export function PricingBooksAdmin({ tenantId }: { tenantId: number }) {
           <div className="space-y-4">
             <Card><CardContent className="space-y-3 pt-6">
               <div className="flex items-start justify-between gap-3">
-                <h2 className="text-lg font-medium">{selectedId === 'new' ? 'New pricing book' : form.pricebook_name}</h2>
+                <button type="button" className="flex items-center gap-1 text-left" aria-expanded={detailsOpen} onClick={() => setDetailsOpen((o) => !o)}>
+                  {detailsOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  <h2 className="text-lg font-medium">{selectedId === 'new' ? 'New pricing book' : form.pricebook_name} <span className="text-sm font-normal text-muted-foreground">Details</span></h2>
+                </button>
                 <Button size="sm" onClick={save} disabled={busy || invalid}>Save</Button>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2">
+              {detailsOpen && <div className="grid gap-3 sm:grid-cols-2">
                 <div><Label htmlFor="pb-name" className="text-xs">Name</Label><Input id="pb-name" value={form.pricebook_name} onChange={(e) => setForm({ ...form, pricebook_name: e.target.value })} /></div>
-                <div><Label htmlFor="pb-owner" className="text-xs">Made for customer (optional)</Label>
-                  <select id="pb-owner" className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm" value={form.owner_customer_id} onChange={(e) => setForm({ ...form, owner_customer_id: e.target.value })}>
-                    <option value="">Not specific to one customer</option>
-                    {accounts.map((a) => <option key={a.customer_id} value={a.customer_id}>{a.customer_name}</option>)}
+                <div><Label htmlFor="pb-status" className="text-xs">Status</Label>
+                  <select id="pb-status" className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+                    {STATUSES.map((st) => <option key={st} value={st}>{st}</option>)}
                   </select></div>
-                <div className="sm:col-span-2"><Label htmlFor="pb-desc" className="text-xs">Description</Label><Input id="pb-desc" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
+                <div><Label htmlFor="pb-from" className="text-xs">From</Label><Input id="pb-from" type="date" value={form.effective_start_date} onChange={(e) => setForm({ ...form, effective_start_date: e.target.value })} /></div>
+                <div><Label htmlFor="pb-to" className="text-xs">To</Label><Input id="pb-to" type="date" value={form.effective_end_date} onChange={(e) => setForm({ ...form, effective_end_date: e.target.value })} className={cn(datesBad && 'border-destructive')} /></div>
+                <div className="sm:col-span-2"><Label htmlFor="pb-desc" className="text-xs">Notes</Label><Input id="pb-desc" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
+                <div><Label className="text-xs">User</Label><div className="flex h-9 items-center text-sm">{selectedBook?.created_by_name ?? '—'}</div></div>
+                <div><Label className="text-xs">Approver</Label><div className="flex h-9 items-center text-sm">{selectedBook?.approved_by_name ?? '—'}</div></div>
                 <label className="flex items-center gap-2 text-sm"><Checkbox checked={form.is_active} onCheckedChange={(v) => setForm({ ...form, is_active: v === true })} /> Active</label>
-              </div>
+                {selectedBook && !selectedBook.is_active && selectedBook.disabled_at && (
+                  <div className="text-sm text-muted-foreground">Disabled {fmtDate(selectedBook.disabled_at)}{selectedBook.disabled_by_name ? ` by ${selectedBook.disabled_by_name}` : ''}</div>
+                )}
+              </div>}
             </CardContent></Card>
+
+            {selectedId !== 'new' && (
+              <Card><CardContent className="space-y-3 pt-6">
+                <button type="button" className="flex items-center gap-1" aria-expanded={assignedOpen} onClick={() => setAssignedOpen((o) => !o)}>
+                  {assignedOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  <h3 className="text-base font-medium">Assigned to ({assignments.length})</h3>
+                </button>
+                {assignedOpen && <div className="overflow-x-auto rounded-md border">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50 text-left text-xs"><tr><th className="px-3 py-2">Customer</th><th className="px-3 py-2">Type</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">From</th><th className="px-3 py-2">To</th><th className="px-3 py-2 text-center">Active</th></tr></thead>
+                    <tbody>
+                      {assignments.map((a, i) => (
+                        <tr key={i} className="border-t"><td className="px-3 py-1.5">{a.customer_name}</td><td className="px-3 py-1.5">{a.assignment_type}</td><td className="px-3 py-1.5">{a.status}</td>
+                          <td className="px-3 py-1.5">{a.effective_start_date}</td><td className="px-3 py-1.5">{a.effective_end_date ?? 'Open'}</td><td className="px-3 py-1.5 text-center">{a.is_active ? 'Yes' : 'No'}</td></tr>
+                      ))}
+                      {assignments.length === 0 && <tr><td colSpan={6} className="px-3 py-4 text-muted-foreground">Not assigned to any customer. Assign it on a customer&apos;s Pricing tab.</td></tr>}
+                    </tbody>
+                  </table>
+                </div>}
+              </CardContent></Card>
+            )}
 
             <Card><CardContent className="space-y-3 pt-6">
               <div className="flex flex-wrap items-center gap-3">
@@ -157,38 +222,25 @@ export function PricingBooksAdmin({ tenantId }: { tenantId: number }) {
                 <table className="w-full text-sm">
                   <thead className="bg-muted/50 text-left text-xs"><tr><th className="px-3 py-2">Item</th><th className="px-3 py-2 w-32 text-right">Price</th><th className="px-3 py-2 text-center">Active</th><th className="w-8" /></tr></thead>
                   <tbody>
-                    {shown.map((l) => (
-                      <tr key={l.item_id} className={cn('border-t', l.removed && 'opacity-40 line-through')}>
-                        <td className="px-3 py-1.5">{l.item_number} {l.item_name}</td>
-                        <td className="px-3 py-1.5"><Input type="number" min={0} step="0.01" value={l.price} disabled={l.removed} aria-label={`Price for ${l.item_name}`} onChange={(e) => setLine(l.item_id, { price: e.target.value })}
-                          className={cn('h-8 text-right', priceBad(l) && 'border-destructive')} /></td>
-                        <td className="px-3 py-1.5 text-center"><Checkbox checked={l.is_active} disabled={l.removed} onCheckedChange={(v) => setLine(l.item_id, { is_active: v === true })} aria-label={`${l.item_name} active`} /></td>
-                        <td className="px-1"><button type="button" aria-label={l.removed ? `Keep ${l.item_name}` : `Remove ${l.item_name}`} onClick={() => setLine(l.item_id, { removed: !l.removed })} className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></button></td>
-                      </tr>
+                    {shown.map((l, idx) => (
+                      <Fragment key={l.item_id}>
+                        {(idx === 0 || shown[idx - 1].category !== l.category) && (
+                          <tr className="border-t bg-muted/30"><td colSpan={4} className="px-3 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{l.category}</td></tr>
+                        )}
+                        <tr className={cn('border-t', l.removed && 'opacity-40 line-through')}>
+                          <td className="px-3 py-1.5">{l.item_number} {l.item_name}</td>
+                          <td className="px-3 py-1.5"><Input type="number" min={0} step="0.01" value={l.price} disabled={l.removed} aria-label={`Price for ${l.item_name}`} onChange={(e) => setLine(l.item_id, { price: e.target.value })}
+                            className={cn('h-8 text-right', priceBad(l) && 'border-destructive')} /></td>
+                          <td className="px-3 py-1.5 text-center"><Checkbox checked={l.is_active} disabled={l.removed} onCheckedChange={(v) => setLine(l.item_id, { is_active: v === true })} aria-label={`${l.item_name} active`} /></td>
+                          <td className="px-1"><button type="button" aria-label={l.removed ? `Keep ${l.item_name}` : `Remove ${l.item_name}`} onClick={() => setLine(l.item_id, { removed: !l.removed })} className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></button></td>
+                        </tr>
+                      </Fragment>
                     ))}
                     {lines.length === 0 && <tr><td colSpan={4} className="px-3 py-4 text-muted-foreground">No items yet. Search above to add one.</td></tr>}
                   </tbody>
                 </table>
               </div>
             </CardContent></Card>
-
-            {selectedId !== 'new' && (
-              <Card><CardContent className="space-y-3 pt-6">
-                <h3 className="text-base font-medium">Assigned to</h3>
-                <div className="overflow-x-auto rounded-md border">
-                  <table className="w-full text-sm">
-                    <thead className="bg-muted/50 text-left text-xs"><tr><th className="px-3 py-2">Customer</th><th className="px-3 py-2">Type</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">From</th><th className="px-3 py-2">To</th><th className="px-3 py-2 text-center">Active</th></tr></thead>
-                    <tbody>
-                      {assignments.map((a, i) => (
-                        <tr key={i} className="border-t"><td className="px-3 py-1.5">{a.customer_name}</td><td className="px-3 py-1.5">{a.assignment_type}</td><td className="px-3 py-1.5">{a.status}</td>
-                          <td className="px-3 py-1.5">{a.effective_start_date}</td><td className="px-3 py-1.5">{a.effective_end_date ?? 'Open'}</td><td className="px-3 py-1.5 text-center">{a.is_active ? 'Yes' : 'No'}</td></tr>
-                      ))}
-                      {assignments.length === 0 && <tr><td colSpan={6} className="px-3 py-4 text-muted-foreground">Not assigned to any customer. Assign it on a customer&apos;s Pricing tab.</td></tr>}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent></Card>
-            )}
           </div>
         )}
       </div>

@@ -307,7 +307,47 @@ function RunRowEditor({ row, tenantId, notify }: { row: RunRow; tenantId: number
   );
 }
 
-export type ProductionSection = 'codes' | 'methods' | 'numbering' | 'runs';
+function PricingEditor({ tenantId, notify }: { tenantId: number; notify: Notify }) {
+  const [years, setYears] = useState('1');
+  const [saved, setSaved] = useState('1');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    call<{ pricebook_unused_years: number }>(`/api/admin/pricing-settings?tenant_id=${tenantId}`)
+      .then((d) => { setYears(String(d.pricebook_unused_years)); setSaved(String(d.pricebook_unused_years)); })
+      .catch((e) => notify((e as Error).message, 'error'));
+  }, [tenantId, notify]);
+
+  const save = async () => {
+    setBusy(true);
+    try {
+      await post('/api/admin/pricing-settings', { tenant_id: tenantId, pricebook_unused_years: Number(years) });
+      setSaved(years);
+      notify('Pricing settings saved.', 'success');
+    } catch (e) {
+      notify((e as Error).message, 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const bad = !Number.isInteger(Number(years)) || Number(years) < 1 || Number(years) > 50;
+  return (
+    <>
+      <div className="mb-1 flex items-start justify-between gap-3">
+        <h2 className="text-lg font-medium">Pricing</h2>
+        <Button size="sm" onClick={save} disabled={busy || bad || years === saved}>Save</Button>
+      </div>
+      <p className="mb-3 text-xs text-muted-foreground">A pricing book counts as unused when none of its customers has ordered in this many years. Unused books are reported by the health checks.</p>
+      <div className="flex items-center gap-2 text-sm">
+        <Label htmlFor="pb-years" className="text-xs">Years without orders</Label>
+        <Input id="pb-years" type="number" min={1} max={50} step={1} className="w-24" value={years} onChange={(e) => setYears(e.target.value)} />
+      </div>
+    </>
+  );
+}
+
+export type ProductionSection = 'codes' | 'methods' | 'numbering' | 'pricing' | 'runs';
 
 export function ProductionSettings({ tenantId, section = 'codes' }: { tenantId: number; section?: ProductionSection }) {
   const [codes, setCodes] = useState<CodeRow[]>([]);
@@ -370,6 +410,12 @@ export function ProductionSettings({ tenantId, section = 'codes' }: { tenantId: 
       {section === 'numbering' && (
       <Card><CardContent className="pt-6">
         <FormatsEditor rows={sequences} tenantId={tenantId} notify={notify} />
+      </CardContent></Card>
+      )}
+
+      {section === 'pricing' && (
+      <Card><CardContent className="pt-6">
+        <PricingEditor tenantId={tenantId} notify={notify} />
       </CardContent></Card>
       )}
 

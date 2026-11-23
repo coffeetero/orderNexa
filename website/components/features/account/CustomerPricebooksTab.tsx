@@ -12,7 +12,7 @@ const ASSIGNMENT_TYPES = ['Default', 'Seasonal', 'Promotional', 'Introductory'] 
 // A book prices orders only when the assignment is active, Approved and the delivery date is inside its dates; books are tried in table order.
 const STATUSES = ['Draft', 'Pending Approval', 'Approved', 'Archived'] as const;
 
-interface Pricebook { pricebook_id: number; pricebook_name: string; }
+interface Pricebook { pricebook_id: number; pricebook_name: string; effective_start_date?: string | null; effective_end_date?: string | null; }
 
 interface AssignmentRow {
   _key: string;
@@ -346,9 +346,14 @@ export const CustomerPricebooksTab = forwardRef<CustomerPricebooksTabHandle, Cus
                         pricebooks={pricebooks}
                         value={row.pricebook_id}
                         name={row.pricebook_name}
-                        onChange={(id, name) => setRows((prev) =>
-                          prev.map((r) => r._key === row._key ? { ...r, pricebook_id: id, pricebook_name: name } : r)
-                        )}
+                        onChange={(id, name) => setRows((prev) => {
+                          const pb = pricebooks.find((b) => b.pricebook_id === id);
+                          return prev.map((r) => r._key === row._key ? {
+                            ...r, pricebook_id: id, pricebook_name: name,
+                            effective_start_date: r.effective_start_date || pb?.effective_start_date || '',
+                            effective_end_date: r.effective_end_date || pb?.effective_end_date || '',
+                          } : r);
+                        })}
                       />
                     </td>
                     <td className="px-3 py-1.5">

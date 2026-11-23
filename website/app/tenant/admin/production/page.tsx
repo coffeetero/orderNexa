@@ -6,7 +6,7 @@ export const metadata = {
   title: 'Application Settings — Admin',
 };
 
-const SECTIONS: ProductionSection[] = ['codes', 'methods', 'numbering', 'runs'];
+const SECTIONS: ProductionSection[] = ['codes', 'methods', 'numbering', 'pricing', 'runs'];
 
 export default async function AdminProductionPage({ searchParams }: { searchParams: { section?: string } }) {
   await requireArea('admin.production');

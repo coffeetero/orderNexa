@@ -183,6 +183,7 @@ export const tenantNav: NavMenu[] = [
               { key: 'codes', label: 'Production codes' },
               { key: 'methods', label: 'Delivery methods' },
               { key: 'numbering', label: 'Formats' },
+              { key: 'pricing', label: 'Pricing' },
               { key: 'runs', label: 'Upcoming runs' },
             ],
           },

@@ -92,8 +92,8 @@ BEGIN
   INSERT INTO _t VALUES ('items can be added, repriced and removed in a book', jsonb_array_length(j -> 'items') = 1 AND ((j -> 'items' -> 0) ->> 'item_price')::numeric = 9);
   BEGIN PERFORM fnd_pricebook_items_set(200000000002, (SELECT v FROM _ids WHERE k='nb'), jsonb_build_array(jsonb_build_object('item_id', (SELECT v FROM _ids WHERE k='ia'), 'item_price', -1))); r := false; EXCEPTION WHEN OTHERS THEN r := true; END;
   INSERT INTO _t VALUES ('a negative price is rejected', r);
-  INSERT INTO _t VALUES ('list shows the owner customer, item count and assigned count', EXISTS (
-    SELECT 1 FROM jsonb_array_elements(fnd_pricebooks_list_get(200000000002)) e WHERE e ->> 'pricebook_name' = 'zz High Volume' AND (e ->> 'item_count')::int = 2 AND (e ->> 'assigned_count')::int = 1 AND (e ->> 'owner_customer_id')::bigint = acc));
+  INSERT INTO _t VALUES ('list shows the item count and assigned count', EXISTS (
+    SELECT 1 FROM jsonb_array_elements(fnd_pricebooks_list_get(200000000002)) e WHERE e ->> 'pricebook_name' = 'zz High Volume' AND (e ->> 'item_count')::int = 2 AND (e ->> 'assigned_count')::int = 1));
   RESET ROLE;
 END $$;
 
