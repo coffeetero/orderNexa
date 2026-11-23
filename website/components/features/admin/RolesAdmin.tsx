@@ -79,7 +79,7 @@ export function RolesAdmin({ tenantId, audience }: { tenantId: number; audience:
 
   return (
     <div className="space-y-4 p-4 sm:p-6">
-      <PageHead title={audience === 'TENANT' ? 'Tenant Roles' : 'Customer Roles'}>
+      <PageHead title={audience === 'TENANT' ? 'Company Roles' : 'Customer Roles'}>
         A role is a named set of rights. For each area choose what the role may do; write, approve, void and delete all include read.
         Users get one or more roles.{' '}
         {audience === 'TENANT'

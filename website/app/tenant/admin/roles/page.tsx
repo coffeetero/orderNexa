@@ -3,7 +3,7 @@ import { getCurrentTenantId } from '@/lib/supabase/tenant';
 import { RolesAdmin } from '@/components/features/admin/RolesAdmin';
 
 export const metadata = {
-  title: 'Tenant Roles — Admin',
+  title: 'Company Roles — Admin',
 };
 
 export default async function AdminTenantRolesPage() {

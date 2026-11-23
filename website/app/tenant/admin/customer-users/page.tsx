@@ -1,0 +1,16 @@
+import { requireArea } from '@/lib/supabase/guard';
+import { getCurrentTenantId } from '@/lib/supabase/tenant';
+import { UsersAdmin } from '@/components/features/admin/UsersAdmin';
+
+export const metadata = {
+  title: 'Customer Users — Admin',
+};
+
+export default async function AdminCustomerUsersPage() {
+  await requireArea('admin.users');
+  const tenantId = await getCurrentTenantId();
+  if (tenantId === null) {
+    return <div className="p-6 text-sm text-muted-foreground">No tenant found for this user.</div>;
+  }
+  return <UsersAdmin tenantId={tenantId} audience="CUSTOMER" />;
+}

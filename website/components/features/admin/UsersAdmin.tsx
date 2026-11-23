@@ -9,7 +9,7 @@ interface UserRow { user_id: number; user_name: string | null; email: string | n
 interface Role { role_id: number; role_name: string; role_audience: string; is_active: boolean }
 interface Group { group_id: number; group_name: string; is_all_customers: boolean; is_active: boolean }
 
-export function UsersAdmin({ tenantId }: { tenantId: number }) {
+export function UsersAdmin({ tenantId, audience: pageAudience }: { tenantId: number; audience: 'TENANT' | 'CUSTOMER' }) {
   const { notify, banner } = useBanner();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
@@ -24,9 +24,9 @@ export function UsersAdmin({ tenantId }: { tenantId: number }) {
         adminCall<Role[]>(`/api/admin/roles?tenant_id=${tenantId}`),
         adminCall<Group[]>(`/api/admin/groups?tenant_id=${tenantId}`),
       ]);
-      setUsers(u); setRoles(r); setGroups(g);
+      setUsers(u.filter((x) => (x.user_type === 'CUSTOMER_USER') === (pageAudience === 'CUSTOMER'))); setRoles(r); setGroups(g);
     } catch (e) { notify((e as Error).message, 'error'); }
-  }, [tenantId, notify]);
+  }, [tenantId, pageAudience, notify]);
   useEffect(() => { void load(); }, [load]);
 
   const audience = sel?.user_type === 'CUSTOMER_USER' ? 'CUSTOMER' : 'TENANT';
@@ -44,7 +44,7 @@ export function UsersAdmin({ tenantId }: { tenantId: number }) {
 
   return (
     <div className="space-y-4 p-4 sm:p-6">
-      <PageHead title="Users">
+      <PageHead title={pageAudience === 'CUSTOMER' ? 'Customer Users' : 'Company Users'}>
         Give each person their roles and, for your own staff, the customer groups they can see. A user with no role can sign in but sees nothing;
         a staff user with no group sees no customers. New users are not created here yet.
       </PageHead>

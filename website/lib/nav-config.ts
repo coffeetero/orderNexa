@@ -189,13 +189,19 @@ export const tenantNav: NavMenu[] = [
         ],
       },
       {
-        heading: 'Access',
+        heading: 'Company',
         items: [
-          { label: 'Tenant Roles', href: '/admin/roles', area: 'admin.roles' },
-          { label: 'Customer Roles', href: '/admin/customer-roles', area: 'admin.customer-roles' },
+          { label: 'Roles', href: '/admin/roles', area: 'admin.roles' },
           { label: 'Users', href: '/admin/users', area: 'admin.users' },
-          { label: 'Customer Groups', href: '/admin/groups', area: 'admin.groups' },
           { label: 'Phone & Messaging', href: '/admin/channels', area: 'admin.channels' },
+        ],
+      },
+      {
+        heading: 'Customer',
+        items: [
+          { label: 'Customer Roles', href: '/admin/customer-roles', area: 'admin.customer-roles' },
+          { label: 'Customer Users', href: '/admin/customer-users', area: 'admin.users' },
+          { label: 'Customer Groups', href: '/admin/groups', area: 'admin.groups' },
         ],
       },
     ],
