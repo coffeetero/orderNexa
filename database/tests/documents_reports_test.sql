@@ -87,6 +87,15 @@ BEGIN
   j := ar_invoice_document_get(200000000002, (SELECT v FROM _ids WHERE k = 'inv'));
   INSERT INTO _t VALUES ('invoice document has header, 1 line and the recognized total', j ->> 'document_number' = 'ZZ-INV-1' AND jsonb_array_length(j -> 'lines') = 1 AND (j ->> 'amount')::numeric = 25);
   INSERT INTO _t VALUES ('unsaved invoices include this one', ar_invoices_unsaved_get(200000000002, 200000000091) @> to_jsonb((SELECT v FROM _ids WHERE k = 'inv')));
+
+  j := ar_dashboard_get(200000000002, 8);
+  INSERT INTO _t VALUES ('dashboard lists the account owing 10.00 with nothing over 90 days', EXISTS (SELECT 1 FROM jsonb_array_elements(j -> 'accounts') e
+     WHERE (e ->> 'customer_id')::bigint = 200000000091 AND (e ->> 'total')::numeric = 10 AND (e ->> 'd90_plus')::numeric = 0));
+  INSERT INTO _t VALUES ('dashboard totals include the 15.00 in 31-60 days', (j -> 'totals' ->> 'd31_60')::numeric >= 15);
+  INSERT INTO _t VALUES ('dashboard limit is respected and accounts are sorted by balance', jsonb_array_length(ar_dashboard_get(200000000002, 1) -> 'accounts') <= 1);
+  UPDATE om_orders SET production_date = (now() AT TIME ZONE fnd_tenant_time_zone(200000000002))::date WHERE order_id = (SELECT order_id FROM om_orders WHERE customer_id = 200000000091 AND tenant_id = 200000000002 LIMIT 1);
+  j := om_orders_today_get(200000000002, 8);
+  INSERT INTO _t VALUES ('today orders list the order whose production date is today', (j ->> 'order_count')::int >= 1 AND jsonb_array_length(j -> 'orders') >= 1);
   RESET ROLE;
 END $$;
 

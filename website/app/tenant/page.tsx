@@ -11,23 +11,43 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MetricCard } from '@/components/features/account/MetricCard';
-import { OrdersTable } from '@/components/features/account/OrdersTable';
-import { CustomersTable } from '@/components/features/account/CustomersTable';
-import {
-  mockTenantMetrics,
-  mockOrders,
-  mockCustomers,
-} from '@/lib/mock-data';
+import { mockTenantMetrics } from '@/lib/mock-data';
+import { createClient } from '@/lib/supabase/server';
+import { getCurrentTenantId } from '@/lib/supabase/tenant';
 
-export default function TenantDashboardPage() {
-  const recentOrders = mockOrders.slice(0, 5);
-  const topCustomers = mockCustomers.slice(0, 4);
+interface TodayOrder { order_id: number; order_number: string; customer_name: string | null; production_code: string | null; quantity: number | null; amount: number | null }
+interface TodayOrders { today: string; order_count: number; total_amount: number; orders: TodayOrder[] }
+interface Buckets { current_amt: number; d1_30: number; d31_60: number; d61_90: number; d90_plus: number; total: number }
+interface ArDashboard { as_of: string; totals: Buckets; accounts: { customer_id: string; customer_name: string; total: number; d90_plus: number }[] }
+
+const money = (v: number | null | undefined) => `$${Number(v ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+export const dynamic = 'force-dynamic';
+
+export default async function TenantDashboardPage() {
+  const supabase = createClient();
+  const tenantId = await getCurrentTenantId();
+  const [areasRes, ordersRes, arRes] = tenantId === null
+    ? [null, null, null]
+    : await Promise.all([
+        supabase.rpc('fnd_my_areas'),
+        supabase.rpc('om_orders_today_get', { p_tenant_id: tenantId, p_limit: 8 }),
+        supabase.rpc('ar_dashboard_get', { p_tenant_id: tenantId, p_limit: 8 }),
+      ]);
+  const areas = Array.isArray(areasRes?.data) ? (areasRes!.data as string[]) : [];
+  const todays = (ordersRes?.data ?? null) as TodayOrders | null;
+  const ar = (arRes?.data ?? null) as ArDashboard | null;
+  const showAr = areas.includes('financials.aging');
+  const showOrders = areas.includes('orders.manage') || areas.includes('orders.enter');
+  const dateLabel = todays
+    ? new Date(`${todays.today}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+    : '';
 
   return (
     <div className="space-y-6">
       <div>
         <p className="text-sm text-muted-foreground">
-          Monday, 16 December 2024 — Production day 351
+          {dateLabel}
         </p>
       </div>
 
@@ -67,12 +87,19 @@ export default function TenantDashboardPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="border-border/60 col-span-1 lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between pb-3">
-            <CardTitle
-              className="text-base font-semibold"
-              style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
-            >
-              Recent Orders
-            </CardTitle>
+            <div>
+              <CardTitle
+                className="text-base font-semibold"
+                style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+              >
+                Today&apos;s Orders
+              </CardTitle>
+              {todays && showOrders && (
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {todays.order_count} order{todays.order_count === 1 ? '' : 's'} for production today · {money(todays.total_amount)}
+                </p>
+              )}
+            </div>
             <Button asChild variant="ghost" size="sm" className="text-xs text-primary gap-1">
               <Link href="/manage-orders">
                 View all <ArrowRight className="h-3 w-3" />
@@ -80,7 +107,31 @@ export default function TenantDashboardPage() {
             </Button>
           </CardHeader>
           <CardContent className="p-0 pb-1">
-            <OrdersTable orders={recentOrders} compact />
+            {!showOrders ? (
+              <p className="px-6 py-4 text-sm text-muted-foreground">Orders are not available to your role.</p>
+            ) : !todays || todays.orders.length === 0 ? (
+              <p className="px-6 py-4 text-sm text-muted-foreground">No orders are scheduled for production today.</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="text-left text-xs text-muted-foreground">
+                  <tr><th className="px-6 py-2">Order</th><th className="px-3 py-2">Customer</th><th className="px-3 py-2">Production</th><th className="px-3 py-2 text-right">Qty</th><th className="px-6 py-2 text-right">Amount</th></tr>
+                </thead>
+                <tbody>
+                  {todays.orders.map((o) => (
+                    <tr key={o.order_id} className="border-t border-border/40">
+                      <td className="px-6 py-2 font-mono text-xs"><Link className="text-primary hover:underline" href={`/orders/${o.order_id}/edit`}>{o.order_number}</Link></td>
+                      <td className="px-3 py-2">{o.customer_name}</td>
+                      <td className="px-3 py-2 text-xs text-muted-foreground">{o.production_code}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{Number(o.quantity ?? 0).toLocaleString('en-US')}</td>
+                      <td className="px-6 py-2 text-right tabular-nums">{money(o.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            {todays && todays.order_count > todays.orders.length && (
+              <p className="px-6 pb-2 pt-1 text-xs text-muted-foreground">and {todays.order_count - todays.orders.length} more</p>
+            )}
           </CardContent>
         </Card>
 
@@ -136,40 +187,72 @@ export default function TenantDashboardPage() {
             </Button>
           </CardHeader>
           <CardContent className="p-0 pb-1">
-            <CustomersTable customers={topCustomers} />
+            {!showAr ? (
+              <p className="px-6 py-4 text-sm text-muted-foreground">Balances are not available to your role.</p>
+            ) : !ar || ar.accounts.length === 0 ? (
+              <p className="px-6 py-4 text-sm text-muted-foreground">No account has an open balance.</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="text-left text-xs text-muted-foreground">
+                  <tr><th className="px-6 py-2">Account</th><th className="px-3 py-2 text-right">Balance</th><th className="px-6 py-2 text-right">Over 90 days</th></tr>
+                </thead>
+                <tbody>
+                  {ar.accounts.map((a) => (
+                    <tr key={a.customer_id} className="border-t border-border/40">
+                      <td className="px-6 py-2">{a.customer_name}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{money(a.total)}</td>
+                      <td className={`px-6 py-2 text-right tabular-nums ${Number(a.d90_plus) > 0 ? 'font-medium text-destructive' : ''}`}>{money(a.d90_plus)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </CardContent>
         </Card>
 
         <Card className="border-border/60">
-          <CardHeader className="pb-3">
-            <CardTitle
-              className="text-base font-semibold"
-              style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
-            >
-              AR Summary
-            </CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <div>
+              <CardTitle
+                className="text-base font-semibold"
+                style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+              >
+                AR Aging
+              </CardTitle>
+              {ar && showAr && <p className="mt-0.5 text-xs text-muted-foreground">As of {ar.as_of}</p>}
+            </div>
+            <Button asChild variant="ghost" size="sm" className="text-xs text-primary gap-1">
+              <Link href="/financials/aging">
+                Report <ArrowRight className="h-3 w-3" />
+              </Link>
+            </Button>
           </CardHeader>
           <CardContent className="space-y-4">
-            {[
-              { label: 'Current (0–30 days)', amount: 8940, color: 'bg-success' },
-              { label: '31–60 days', amount: 5460, color: 'bg-warning' },
-              { label: '61–90 days', amount: 3800, color: 'bg-orange-500' },
-              { label: 'Over 90 days', amount: 3140, color: 'bg-destructive' },
-            ].map((bucket) => (
-              <div key={bucket.label} className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className={`h-2.5 w-2.5 rounded-full ${bucket.color}`} />
-                  <span className="text-sm text-foreground">{bucket.label}</span>
+            {!showAr || !ar ? (
+              <p className="text-sm text-muted-foreground">AR aging is not available to your role.</p>
+            ) : (
+              <>
+                {[
+                  { label: 'Current', amount: ar.totals.current_amt, color: 'bg-success' },
+                  { label: '1–30 days', amount: ar.totals.d1_30, color: 'bg-info' },
+                  { label: '31–60 days', amount: ar.totals.d31_60, color: 'bg-warning' },
+                  { label: '61–90 days', amount: ar.totals.d61_90, color: 'bg-orange-500' },
+                  { label: 'Over 90 days', amount: ar.totals.d90_plus, color: 'bg-destructive' },
+                ].map((bucket) => (
+                  <div key={bucket.label} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`h-2.5 w-2.5 rounded-full ${bucket.color}`} />
+                      <span className="text-sm text-foreground">{bucket.label}</span>
+                    </div>
+                    <span className="text-sm font-semibold tabular-nums text-foreground">{money(bucket.amount)}</span>
+                  </div>
+                ))}
+                <div className="pt-3 border-t border-border flex items-center justify-between">
+                  <span className="text-sm font-semibold text-foreground">Total AR</span>
+                  <span className="text-sm font-bold text-foreground tabular-nums">{money(ar.totals.total)}</span>
                 </div>
-                <span className="text-sm font-semibold tabular-nums text-foreground">
-                  ${bucket.amount.toLocaleString()}
-                </span>
-              </div>
-            ))}
-            <div className="pt-3 border-t border-border flex items-center justify-between">
-              <span className="text-sm font-semibold text-foreground">Total AR</span>
-              <span className="text-sm font-bold text-foreground tabular-nums">$21,340</span>
-            </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
