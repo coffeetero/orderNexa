@@ -165,6 +165,21 @@ export const tenantNav: NavMenu[] = [
       },
     ],
   },
+  {
+    label: 'Organizer',
+    requiresAnyArea: ['organizer.sheets'],
+    groups: [
+      {
+        items: [
+          { label: 'Sheets', href: '/organizer/sheets', area: 'organizer.sheets' },
+          { label: 'Documents', href: '/organizer/documents', soon: true },
+          { label: 'Calendar', href: '/organizer/calendar', soon: true },
+          { label: 'Contacts', href: '/organizer/contacts', soon: true },
+          { label: 'Tasks', href: '/organizer/tasks', soon: true },
+        ],
+      },
+    ],
+  },
   // The whole menu (and every page under /admin) needs an admin area; see requiresAnyArea. Appearance lives in the avatar menu.
   {
     label: 'Admin',
