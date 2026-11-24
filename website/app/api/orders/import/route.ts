@@ -8,7 +8,7 @@ const isDate = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{
 /**
  * GET  /api/orders/import?tenant_id=n&from=YYYY-MM-DD&to=YYYY-MM-DD → imports in that production date range (om_order_imports_get)
  * GET  /api/orders/import?tenant_id=n&id=n                          → one import with its rows and orders (om_order_import_get)
- * POST /api/orders/import { tenant_id, customer_id, production_date, production_code, file_name, rows: [{cus_no, item_number, item_desc, qty}] }
+ * POST /api/orders/import { tenant_id, customer_id, production_date, production_code, file_name, rows: [{cus_no, customer_name, department_event, item_number, item_desc, qty}] }
  *      → imports the file (om_order_import_upload); replaces a not-yet-approved import for the same customer, date and code
  */
 export async function GET(request: Request) {
@@ -30,7 +30,7 @@ export async function POST(request: Request) {
   const rows = (body.rows as unknown[]).map((r) => {
     const o = (r ?? {}) as Record<string, unknown>;
     const s = (v: unknown) => (v === null || v === undefined ? '' : String(v).slice(0, 200));
-    return { cus_no: s(o.cus_no), item_number: s(o.item_number), item_desc: s(o.item_desc), qty: s(o.qty) };
+    return { cus_no: s(o.cus_no), customer_name: s(o.customer_name), department_event: s(o.department_event), item_number: s(o.item_number), item_desc: s(o.item_desc), qty: s(o.qty) };
   });
   return adminRpc(body.tenant_id, 'om_order_import_upload', {
     p_payload: {

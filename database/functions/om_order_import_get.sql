@@ -29,7 +29,7 @@ BEGIN
         'rows', COALESCE((
             SELECT jsonb_agg(jsonb_build_object(
                      'row_number', r.row_number, 'cus_no', r.cus_no, 'item_number', r.item_number, 'item_desc', r.item_desc,
-                     'qty', r.qty_text, 'customer_name', rc.customer_name, 'item_name', it.item_name, 'unit_price', r.unit_price,
+                     'qty', r.qty_text, 'department_event', r.department_event, 'file_customer_name', r.customer_name, 'customer_name', rc.customer_name, 'item_name', it.item_name, 'unit_price', r.unit_price,
                      'amount', CASE WHEN r.severity IS DISTINCT FROM 'ERROR' THEN round(r.quantity * r.unit_price, 2) END,
                      'severity', r.severity, 'issue', r.issue, 'order_number', o.order_number) ORDER BY r.row_number)
               FROM om_order_import_rows r

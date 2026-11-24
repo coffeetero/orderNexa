@@ -1,7 +1,7 @@
 'use client';
 
 import '@univerjs/preset-sheets-core/lib/index.css';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +22,8 @@ export function SheetEditor({ tenantId, sheetId }: { tenantId: number; sheetId: 
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ text: string; error?: boolean } | null>(null);
   const [showHelp, setShowHelp] = useState(false);
+  const [confirmClose, setConfirmClose] = useState(false);
+  const router = useRouter();
 
   // load the sheet, then start the spreadsheet in the page
   useEffect(() => {
@@ -74,9 +76,9 @@ export function SheetEditor({ tenantId, sheetId }: { tenantId: number; sheetId: 
 
   const snapshot = () => api.current?.getActiveWorkbook()?.save() ?? null;
 
-  const save = useCallback(async () => {
+  const save = useCallback(async (): Promise<boolean> => {
     const book = api.current?.getActiveWorkbook()?.save();
-    if (!book || !meta) return;
+    if (!book || !meta) return false;
     setBusy(true);
     setMessage(null);
     try {
@@ -91,8 +93,10 @@ export function SheetEditor({ tenantId, sheetId }: { tenantId: number; sheetId: 
       setMeta((m) => (m ? { ...m, sheet_id: saved.sheet_id, version: saved.version } : m));
       setDirty(false);
       setMessage({ text: 'Saved' });
+      return true;
     } catch (e) {
       setMessage({ text: (e as Error).message, error: true });
+      return false;
     } finally {
       setBusy(false);
     }
@@ -132,13 +136,18 @@ export function SheetEditor({ tenantId, sheetId }: { tenantId: number; sheetId: 
     document.body.appendChild(frame);
   };
 
+  // Close: back to the list; with unsaved changes, ask first
+  const goToList = () => router.push('/organizer/sheets');
+  const close = () => (dirty ? setConfirmClose(true) : goToList());
+  const saveAndClose = async () => { if (await save()) goToList(); else setConfirmClose(false); };
+
   const setName = (sheet_name: string) => { setMeta((m) => (m ? { ...m, sheet_name } : m)); setDirty(true); };
   const setVisibility = (visibility: Meta['visibility']) => { setMeta((m) => (m ? { ...m, visibility } : m)); setDirty(true); };
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] flex-col gap-2 p-2">
+    <div className="flex h-full flex-col gap-2 p-2">
       <div className="flex flex-wrap items-center gap-2">
-        <Link href="/organizer/sheets" className="text-sm text-muted-foreground hover:underline">Sheets</Link>
+        <button type="button" onClick={close} className="text-sm text-muted-foreground hover:underline">Sheets</button>
         <span className="text-muted-foreground">/</span>
         <Input
           aria-label="Sheet name" className="h-8 w-64" value={meta?.sheet_name ?? ''} disabled={!meta?.is_owner}
@@ -160,8 +169,17 @@ export function SheetEditor({ tenantId, sheetId }: { tenantId: number; sheetId: 
           <Button size="sm" variant="outline" onClick={exportXlsx} disabled={!meta}>Export .xlsx</Button>
           <Button size="sm" variant="outline" disabled title="Sending needs the email connector">Send</Button>
           <Button size="sm" onClick={save} disabled={busy || !meta || !meta.sheet_name.trim()}>{busy ? 'Saving…' : 'Save'}</Button>
+          <Button size="sm" variant="outline" onClick={close}>Close</Button>
         </div>
       </div>
+      {confirmClose && (
+        <div role="alertdialog" aria-label="Unsaved changes" className="flex flex-wrap items-center gap-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-sm dark:border-amber-700 dark:bg-amber-950/40">
+          <span>This sheet has unsaved changes.</span>
+          <Button size="sm" onClick={saveAndClose} disabled={busy || !meta?.sheet_name.trim()}>Save and close</Button>
+          <Button size="sm" variant="outline" onClick={goToList}>Close without saving</Button>
+          <Button size="sm" variant="ghost" onClick={() => setConfirmClose(false)}>Cancel</Button>
+        </div>
+      )}
       {showHelp && (
         <div className="rounded-md border bg-muted/40 p-3 text-xs">
           <p className="mb-1 font-medium">Live BPS values (recalculated when the sheet opens; printed and exported copies keep the values of that moment)</p>

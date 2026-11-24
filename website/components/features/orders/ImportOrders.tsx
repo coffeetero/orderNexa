@@ -1,14 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CheckCircle2, Trash2, Upload } from 'lucide-react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
+import { CheckCircle2, ClipboardList, FileText, Trash2, Upload } from 'lucide-react';
+import type { CustomerOption } from '@/components/features/account/order-entry/OrderHeaderRow';
+import { AccountPicker } from '@/components/features/orders/AccountPicker';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toImportRows } from '@/lib/orders/import-csv';
 
-interface Account { customer_id: number; customer_name: string; customer_number: string | null }
 interface Code { value: string; label: string }
 type Status = 'IMPORTED' | 'ISSUES' | 'APPROVED';
 interface ImportSummary {
@@ -19,9 +20,9 @@ interface ImportSummary {
 interface ImportRowOut {
   row_number: number; cus_no: string | null; item_number: string | null; item_desc: string | null; qty: string | null;
   customer_name: string | null; item_name: string | null; unit_price: number | null; amount: number | null;
-  severity: 'ERROR' | 'WARNING' | null; issue: string | null; order_number: string | null;
+  severity: 'ERROR' | 'WARNING' | null; issue: string | null; order_number: string | null; department_event: string | null;
 }
-interface ImportOrder { order_id: number; order_number: string; customer_number: string | null; customer_name: string; lines: number; quantity: number; amount: number }
+interface ImportOrder { order_id: number; order_number: string; customer_number: string | null; customer_name: string; department_event: string | null; lines: number; quantity: number; amount: number }
 interface ImportDetail extends ImportSummary { delivery_date: string; run_status: string | null; rows: ImportRowOut[]; orders: ImportOrder[]; needs_reprocess?: boolean }
 
 const money = (v: unknown) => Number(v ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -42,10 +43,9 @@ async function call<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 export function ImportOrders({ tenantId }: { tenantId: number }) {
-  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [customers, setCustomers] = useState<CustomerOption[] | null>(null);
   const [codes, setCodes] = useState<Code[]>([]);
-  const [search, setSearch] = useState('');
-  const [accountId, setAccountId] = useState<number | null>(null);
+  const [account, setAccount] = useState<CustomerOption | null>(null);
   const [date, setDate] = useState(isoDay(1));
   const [code, setCode] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -56,6 +56,7 @@ export function ImportOrders({ tenantId }: { tenantId: number }) {
   const [issuesOnly, setIssuesOnly] = useState(false);
   const [recent, setRecent] = useState<ImportSummary[]>([]);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [view, setView] = useState<'file' | 'orders'>('file');
 
   const loadRecent = useCallback(() => {
     call<ImportSummary[]>(`/api/orders/import?tenant_id=${tenantId}&from=${isoDay(-14)}&to=${isoDay(30)}`)
@@ -63,19 +64,14 @@ export function ImportOrders({ tenantId }: { tenantId: number }) {
   }, [tenantId]);
 
   useEffect(() => {
-    call<Account[]>(`/api/reports/financial?tenant_id=${tenantId}`).then(setAccounts).catch((e: Error) => setMessage({ text: e.message, error: true }));
+    call<CustomerOption[]>(`/api/customers?tenant_id=${tenantId}&hierarchy=true&active=true`)
+      .then(setCustomers).catch((e: Error) => { setCustomers([]); setMessage({ text: e.message, error: true }); });
     call<{ production_codes: Code[] }>(`/api/production/defaults?tenant_id=${tenantId}`)
       .then((d) => { setCodes(d.production_codes); setCode((c) => c || d.production_codes[0]?.value || ''); })
       .catch((e: Error) => setMessage({ text: e.message, error: true }));
     loadRecent();
   }, [tenantId, loadRecent]);
 
-  const matches = useMemo(() => {
-    const t = search.trim().toLowerCase();
-    if (!t) return [];
-    return accounts.filter((a) => a.customer_name.toLowerCase().includes(t) || (a.customer_number ?? '').includes(t)).slice(0, 8);
-  }, [accounts, search]);
-  const account = accounts.find((a) => a.customer_id === accountId) ?? null;
 
   const upload = async () => {
     if (!account || !file || !code) return;
@@ -87,7 +83,7 @@ export function ImportOrders({ tenantId }: { tenantId: number }) {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tenant_id: tenantId, customer_id: account.customer_id, production_date: date, production_code: code, file_name: file.name, rows }),
       });
-      setDetail(d); setIssuesOnly(d.error_count > 0);
+      setDetail(d); setIssuesOnly(d.error_count > 0); setView('file');
       setMessage({ text: d.error_count > 0 ? `Imported with ${d.error_count} row${d.error_count === 1 ? '' : 's'} that need fixing.` : 'Imported. Review the orders and approve them.', error: false });
       setFile(null); if (fileInput.current) fileInput.current.value = '';
       loadRecent();
@@ -96,7 +92,9 @@ export function ImportOrders({ tenantId }: { tenantId: number }) {
     } finally { setBusy(false); }
   };
 
-  const open = async (id: number) => {
+  const open = async (id: number, v: 'file' | 'orders') => {
+    setView(v);
+    if (detail?.order_import_id === id) return;
     setBusy(true); setMessage(null); setConfirmDelete(false);
     try { const d = await call<ImportDetail>(`/api/orders/import?tenant_id=${tenantId}&id=${id}`); setDetail(d); setIssuesOnly(d.error_count > 0); }
     catch (e) { setMessage({ text: (e as Error).message, error: true }); }
@@ -143,22 +141,9 @@ export function ImportOrders({ tenantId }: { tenantId: number }) {
 
       <Card><CardContent className="space-y-4 pt-6">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[minmax(16rem,1fr)_10rem_10rem_minmax(14rem,1fr)_auto] lg:items-end">
-          <div className="relative">
+          <div>
             <Label htmlFor="imp-cust" className="text-xs">Customer account</Label>
-            <Input id="imp-cust" autoComplete="off" placeholder="Name or number" value={account && !search ? `${account.customer_number ?? ''} · ${account.customer_name}` : search}
-              onChange={(e) => { setSearch(e.target.value); setAccountId(null); }} />
-            {matches.length > 0 && !account && (
-              <ul className="absolute z-10 mt-1 w-full rounded-md border bg-popover text-sm shadow">
-                {matches.map((a) => (
-                  <li key={a.customer_id}>
-                    <button type="button" className="flex w-full justify-between gap-2 px-3 py-1.5 text-left hover:bg-accent"
-                      onClick={() => { setAccountId(a.customer_id); setSearch(''); }}>
-                      <span>{a.customer_name}</span><span className="text-muted-foreground">{a.customer_number}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <AccountPicker customers={customers} value={account} onChange={setAccount} id="imp-cust" />
           </div>
           <div><Label htmlFor="imp-date" className="text-xs">Production date</Label><Input id="imp-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
           <div>
@@ -173,8 +158,42 @@ export function ImportOrders({ tenantId }: { tenantId: number }) {
           </div>
           <Button onClick={upload} disabled={busy || !account || !file || !code} className="gap-1.5"><Upload className="h-4 w-4" />{busy ? 'Working…' : 'Upload'}</Button>
         </div>
-        <p className="text-xs text-muted-foreground">Columns: customer number, item number, item description, quantity. A header row is optional. Customer numbers must be the account or its departments and sites.</p>
+        <p className="text-xs text-muted-foreground">Columns: Cus no, Customer, Department/Event, Item no, Item description, Qty (the Export Orders layout); a header row is optional. Customer may be blank; when filled it is compared with the customer&rsquo;s name. Rows with different Department/Events become separate orders (resellers put their own customer code there). Customer numbers must be the account or its departments and sites.</p>
         {message && <p role="status" className={`text-sm ${message.error ? 'text-destructive' : 'text-foreground'}`}>{message.text}</p>}
+      </CardContent></Card>
+
+      <Card><CardContent className="space-y-3 pt-6">
+        <h2 className="text-lg font-medium">Recent imports</h2>
+        <p className="text-xs text-muted-foreground">Production dates from two weeks ago to a month ahead.</p>
+        {recent.length === 0 ? <p className="text-sm text-muted-foreground">No imports yet.</p> : (
+          <div className="overflow-auto rounded-md border">
+            <table className="w-full text-sm">
+              <thead className="bg-muted text-left text-xs">
+                <tr><th className="px-2 py-1.5">Production</th><th className="px-2 py-1.5">Customer</th><th className="px-2 py-1.5">File</th><th className="px-2 py-1.5 text-right">Orders</th><th className="px-2 py-1.5 text-right">Total</th><th className="px-2 py-1.5">Status</th><th className="px-2 py-1.5 text-right">View</th></tr>
+              </thead>
+              <tbody>
+                {recent.map((i) => (
+                  <tr key={i.order_import_id} className={`border-t ${detail?.order_import_id === i.order_import_id ? 'bg-accent' : ''}`}>
+                    <td className="px-2 py-1">{i.production_date} {i.production_code}</td>
+                    <td className="px-2 py-1">{i.customer_name}{i.customer_number ? ` (${i.customer_number})` : ''}</td>
+                    <td className="px-2 py-1">{i.file_name}</td>
+                    <td className="px-2 py-1 text-right">{i.order_count}</td>
+                    <td className="px-2 py-1 text-right">{money(i.total_amount)}</td>
+                    <td className="px-2 py-1"><Badge s={i.import_status} />{i.error_count > 0 && <span className="ml-2 text-xs text-destructive">{i.error_count} errors</span>}</td>
+                    <td className="whitespace-nowrap px-1 py-0.5 text-right">
+                      {([['file', FileText, 'File rows'], ['orders', ClipboardList, 'Orders created']] as const).map(([v, Icon, label]) => (
+                        <Button key={v} size="icon" variant={detail?.order_import_id === i.order_import_id && view === v ? 'secondary' : 'ghost'} className="h-8 w-8"
+                          aria-label={`${label}: ${i.customer_name} ${i.production_date}`} title={label} disabled={busy} onClick={() => open(i.order_import_id, v)}>
+                          <Icon className="h-4 w-4" />
+                        </Button>
+                      ))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </CardContent></Card>
 
       {detail && (
@@ -213,6 +232,7 @@ export function ImportOrders({ tenantId }: { tenantId: number }) {
             )}
           </div>
 
+          {view === 'file' && (<>
           <div className="flex items-center justify-between gap-2">
             <h3 className="text-sm font-medium">File rows</h3>
             <label className="flex items-center gap-2 text-sm">
@@ -224,7 +244,7 @@ export function ImportOrders({ tenantId }: { tenantId: number }) {
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-muted text-left text-xs">
                 <tr>
-                  <th className="px-2 py-1.5">Row</th><th className="px-2 py-1.5">Cus no</th><th className="px-2 py-1.5">Customer</th>
+                  <th className="px-2 py-1.5">Row</th><th className="px-2 py-1.5">Cus no</th><th className="px-2 py-1.5">Customer</th><th className="px-2 py-1.5">Event</th>
                   <th className="px-2 py-1.5">Item no</th><th className="px-2 py-1.5">Item</th><th className="px-2 py-1.5 text-right">Qty</th>
                   <th className="px-2 py-1.5 text-right">Price</th><th className="px-2 py-1.5 text-right">Amount</th><th className="px-2 py-1.5">Order</th><th className="px-2 py-1.5">Issue</th>
                 </tr>
@@ -235,6 +255,7 @@ export function ImportOrders({ tenantId }: { tenantId: number }) {
                     <td className="px-2 py-1 text-muted-foreground">{r.row_number}</td>
                     <td className="px-2 py-1">{r.cus_no}</td>
                     <td className="px-2 py-1">{r.customer_name}</td>
+                    <td className="px-2 py-1">{r.department_event}</td>
                     <td className="px-2 py-1">{r.item_number}</td>
                     <td className="px-2 py-1">{r.item_name ?? r.item_desc}</td>
                     <td className="px-2 py-1 text-right">{r.qty}</td>
@@ -244,56 +265,47 @@ export function ImportOrders({ tenantId }: { tenantId: number }) {
                     <td className={`px-2 py-1 ${r.severity === 'ERROR' ? 'text-destructive' : 'text-amber-700 dark:text-amber-400'}`}>{r.issue}</td>
                   </tr>
                 ))}
-                {rows.length === 0 && <tr><td colSpan={10} className="px-2 py-3 text-muted-foreground">No rows with issues.</td></tr>}
+                {rows.length === 0 && <tr><td colSpan={11} className="px-2 py-3 text-muted-foreground">No rows with issues.</td></tr>}
               </tbody>
             </table>
           </div>
+          </>)}
 
+          {view === 'orders' && (<>
           <h3 className="text-sm font-medium">Orders created</h3>
           <div className="overflow-auto rounded-md border">
             <table className="w-full text-sm">
               <thead className="bg-muted text-left text-xs">
-                <tr><th className="px-2 py-1.5">Order</th><th className="px-2 py-1.5">Cus no</th><th className="px-2 py-1.5">Customer</th><th className="px-2 py-1.5 text-right">Lines</th><th className="px-2 py-1.5 text-right">Qty</th><th className="px-2 py-1.5 text-right">Amount</th></tr>
+                <tr><th className="px-2 py-1.5">Item no</th><th className="px-2 py-1.5">Item</th><th className="px-2 py-1.5 text-right">Qty</th><th className="px-2 py-1.5 text-right">Amount</th></tr>
               </thead>
               <tbody>
-                {detail.orders.map((o) => (
-                  <tr key={o.order_id} className="border-t">
-                    <td className="px-2 py-1">{o.order_number}</td><td className="px-2 py-1">{o.customer_number}</td><td className="px-2 py-1">{o.customer_name}</td>
-                    <td className="px-2 py-1 text-right">{o.lines}</td><td className="px-2 py-1 text-right">{qty(o.quantity)}</td><td className="px-2 py-1 text-right">{money(o.amount)}</td>
-                  </tr>
-                ))}
-                {detail.orders.length === 0 && <tr><td colSpan={6} className="px-2 py-3 text-muted-foreground">No orders were created.</td></tr>}
+                {/* Sections: customer (from the order's customer_id), then order number + event, then its items from the file rows */}
+                {detail.orders.map((o, idx) => {
+                  const prev = detail.orders[idx - 1];
+                  const newCustomer = !prev || prev.customer_number !== o.customer_number || prev.customer_name !== o.customer_name;
+                  return (
+                    <Fragment key={o.order_id}>
+                      {newCustomer && (
+                        <tr className="border-t bg-muted/50"><td colSpan={4} className="px-2 py-1.5 font-semibold">{o.customer_name}{o.customer_number ? ` (${o.customer_number})` : ''}</td></tr>
+                      )}
+                      <tr className="border-t"><td colSpan={4} className="px-2 py-1 pl-4 font-medium">{o.order_number} {o.department_event ?? ''}</td></tr>
+                      {detail.rows.filter((r) => r.order_number === o.order_number).map((r) => (
+                        <tr key={r.row_number}>
+                          <td className="px-2 py-0.5 pl-8">{r.item_number}</td><td className="px-2 py-0.5">{r.item_name ?? r.item_desc}</td>
+                          <td className="px-2 py-0.5 text-right">{qty(r.qty)}</td><td className="px-2 py-0.5 text-right">{r.amount != null ? money(r.amount) : ''}</td>
+                        </tr>
+                      ))}
+                    </Fragment>
+                  );
+                })}
+                {detail.orders.length === 0 && <tr><td colSpan={4} className="px-2 py-3 text-muted-foreground">No orders were created.</td></tr>}
               </tbody>
             </table>
           </div>
+          </>)}
         </CardContent></Card>
       )}
 
-      <Card><CardContent className="space-y-3 pt-6">
-        <h2 className="text-lg font-medium">Recent imports</h2>
-        <p className="text-xs text-muted-foreground">Production dates from two weeks ago to a month ahead.</p>
-        {recent.length === 0 ? <p className="text-sm text-muted-foreground">No imports yet.</p> : (
-          <div className="overflow-auto rounded-md border">
-            <table className="w-full text-sm">
-              <thead className="bg-muted text-left text-xs">
-                <tr><th className="px-2 py-1.5">Production</th><th className="px-2 py-1.5">Customer</th><th className="px-2 py-1.5">File</th><th className="px-2 py-1.5 text-right">Orders</th><th className="px-2 py-1.5 text-right">Total</th><th className="px-2 py-1.5">Status</th></tr>
-              </thead>
-              <tbody>
-                {recent.map((i) => (
-                  <tr key={i.order_import_id} className="cursor-pointer border-t hover:bg-accent" onClick={() => open(i.order_import_id)}>
-                    <td className="px-2 py-1">{i.production_date} {i.production_code}</td>
-                    <td className="px-2 py-1">{i.customer_name}{i.customer_number ? ` (${i.customer_number})` : ''}</td>
-                    <td className="px-2 py-1">{i.file_name}</td>
-                    <td className="px-2 py-1 text-right">{i.order_count}</td>
-                    <td className="px-2 py-1 text-right">{money(i.total_amount)}</td>
-                    <td className="px-2 py-1"><Badge s={i.import_status} />{i.error_count > 0 && <span className="ml-2 text-xs text-destructive">{i.error_count} errors</span>}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </CardContent></Card>
     </div>
   );
 }

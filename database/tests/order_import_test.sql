@@ -120,6 +120,65 @@ BEGIN
      WHERE (x ->> 'order_import_id')::bigint = imp2));
 END $$;
 
+-- 8) export: a slot's orders as import rows, and the file imports back as the same orders (2033-03-14 → 2033-03-21 MORNING)
+DO $$
+DECLARE
+  t bigint := 200000000002; acc bigint := (SELECT v FROM _v WHERE k = 'account')::bigint;
+  dep bigint := (SELECT customer_id FROM fnd_customers WHERE tenant_id = 200000000002 AND customer_number = '15702');
+  it1 bigint := (SELECT item_id FROM fnd_items WHERE tenant_id = 200000000002 AND item_number = (SELECT v FROM _v WHERE k = 'item1') ORDER BY is_active DESC LIMIT 1);
+  it2 bigint := (SELECT item_id FROM fnd_items WHERE tenant_id = 200000000002 AND item_number = (SELECT v FROM _v WHERE k = 'item2') ORDER BY is_active DESC LIMIT 1);
+  slot jsonb := jsonb_build_object('production_date', '2033-03-14', 'production_code', 'MORNING');
+  ex jsonb; r jsonb; d boolean;
+BEGIN
+  PERFORM bps.om_orders_save(t, NULL, NULL, slot || jsonb_build_object('customer_id', acc, 'department_event', 'BEO', 'lines', jsonb_build_array(
+            jsonb_build_object('item_id', it1, 'quantity', 2, 'unit_price', 1), jsonb_build_object('item_id', it2, 'quantity', 3, 'unit_price', 1))));
+  PERFORM bps.om_orders_save(t, NULL, NULL, slot || jsonb_build_object('customer_id', acc, 'department_event', 'Lunch, 2nd floor', 'lines', jsonb_build_array(
+            jsonb_build_object('item_id', it1, 'quantity', 1.5, 'unit_price', 1))));
+  PERFORM bps.om_orders_save(t, NULL, NULL, slot || jsonb_build_object('customer_id', dep, 'lines', jsonb_build_array(
+            jsonb_build_object('item_id', it2, 'quantity', 4, 'unit_price', 1))));
+
+  ex := bps.om_order_export_get(t, acc, DATE '2033-03-14', 'morning');
+  INSERT INTO _t VALUES ('export has one row per order line of the account and its departments', jsonb_array_length(ex) = 4);
+  INSERT INTO _t VALUES ('export rows carry cus no, item, item name, quantity and event',
+     EXISTS (SELECT 1 FROM jsonb_array_elements(ex) x WHERE x ->> 'cus_no' = '15700' AND x ->> 'department_event' = 'LUNCH, 2ND FLOOR' AND x ->> 'qty' = '1.5'
+               AND x ->> 'item_desc' = (SELECT item_name FROM fnd_items WHERE item_id = it1))
+     AND EXISTS (SELECT 1 FROM jsonb_array_elements(ex) x WHERE x ->> 'cus_no' = '15702' AND x ->> 'qty' = '4'));
+  INSERT INTO _t VALUES ('export of an empty slot is an empty list', jsonb_array_length(bps.om_order_export_get(t, acc, DATE '2033-03-28', 'MORNING')) = 0);
+
+  r := bps.om_order_import_upload(t, jsonb_build_object('customer_id', acc, 'production_date', '2033-03-21', 'production_code', 'MORNING', 'rows', ex));
+  INSERT INTO _t VALUES ('the exported file imports with no errors or warnings', (r ->> 'error_count')::int = 0 AND (r ->> 'warning_count')::int = 0);
+  INSERT INTO _t VALUES ('the import makes one order per customer and event (3 orders)', (r ->> 'order_count')::int = 3);
+  INSERT INTO _t VALUES ('the imported orders match the exported ones (customer, event, item, quantity)', NOT EXISTS (
+     (SELECT o.customer_id, o.department_event, l.item_id, l.quantity FROM om_orders o JOIN om_order_lines l USING (order_id)
+       WHERE o.tenant_id = t AND o.production_date = '2033-03-14' AND o.production_code = 'MORNING'
+      EXCEPT
+      SELECT o.customer_id, o.department_event, l.item_id, l.quantity FROM om_orders o JOIN om_order_lines l USING (order_id)
+       WHERE o.order_import_id = (r ->> 'order_import_id')::bigint)
+     UNION ALL
+     (SELECT o.customer_id, o.department_event, l.item_id, l.quantity FROM om_orders o JOIN om_order_lines l USING (order_id)
+       WHERE o.order_import_id = (r ->> 'order_import_id')::bigint
+      EXCEPT
+      SELECT o.customer_id, o.department_event, l.item_id, l.quantity FROM om_orders o JOIN om_order_lines l USING (order_id)
+       WHERE o.tenant_id = t AND o.production_date = '2033-03-14' AND o.production_code = 'MORNING')));
+  INSERT INTO _t VALUES ('import rows keep the event', EXISTS (SELECT 1 FROM jsonb_array_elements(r -> 'rows') x WHERE x ->> 'department_event' = 'BEO'));
+
+  -- customer name column: blank is fine, a misspelling or the account's name passes, an unrelated name is a warning
+  r := bps.om_order_import_upload(t, jsonb_build_object('customer_id', acc, 'production_date', '2033-04-04', 'production_code', 'MORNING', 'rows', jsonb_build_array(
+         jsonb_build_object('cus_no', '15700', 'customer_name', '', 'item_number', (SELECT item_number FROM fnd_items WHERE item_id = it1), 'qty', '1'),
+         jsonb_build_object('cus_no', '15700', 'customer_name', regexp_replace((SELECT customer_name FROM fnd_customers WHERE customer_id = acc), 'IN', 'N'),
+                            'item_number', (SELECT item_number FROM fnd_items WHERE item_id = it1), 'qty', '1'),
+         jsonb_build_object('cus_no', '15702', 'customer_name', (SELECT lower(customer_name) FROM fnd_customers WHERE customer_id = acc),
+                            'item_number', (SELECT item_number FROM fnd_items WHERE item_id = it1), 'qty', '1'),
+         jsonb_build_object('cus_no', '15700', 'customer_name', 'Zebra Pizza Co', 'item_number', (SELECT item_number FROM fnd_items WHERE item_id = it1), 'qty', '1'))));
+  INSERT INTO _t VALUES ('customer name: blank, misspelled or the account name give no warning; an unrelated name warns',
+     (SELECT count(*) FROM jsonb_array_elements(r -> 'rows') x WHERE x ->> 'issue' LIKE 'Customer name differs%') = 1
+     AND EXISTS (SELECT 1 FROM jsonb_array_elements(r -> 'rows') x WHERE x ->> 'file_customer_name' = 'Zebra Pizza Co' AND x ->> 'severity' = 'WARNING')
+     AND (r ->> 'error_count')::int = 0);
+
+  BEGIN PERFORM bps.om_order_export_get(t, dep, DATE '2033-03-14', 'MORNING'); d := false; EXCEPTION WHEN OTHERS THEN d := true; END;
+  INSERT INTO _t VALUES ('export needs an account (not a department)', d);
+END $$;
+
 -- 7) a customer user cannot see imports
 RESET ROLE;
 SELECT set_config('request.jwt.claims', (bps.bps_access_token_hook(jsonb_build_object('user_id', '006f6c23-5efa-4f31-b0f3-b36ad4d587e7',
@@ -131,6 +190,8 @@ BEGIN
   INSERT INTO _t VALUES ('customer user sees no imports or import rows', (SELECT count(*) FROM om_order_imports) = 0 AND (SELECT count(*) FROM om_order_import_rows) = 0);
   BEGIN PERFORM bps.om_order_import_upload(200000000002, '{}'::jsonb); d := false; EXCEPTION WHEN OTHERS THEN d := true; END;
   INSERT INTO _t VALUES ('customer user cannot upload', d);
+  BEGIN PERFORM bps.om_order_export_get(200000000002, (SELECT v FROM _v WHERE k = 'account')::bigint, DATE '2033-03-14', 'MORNING'); d := false; EXCEPTION WHEN OTHERS THEN d := true; END;
+  INSERT INTO _t VALUES ('customer user cannot export', d);
 END $$;
 
 RESET ROLE;

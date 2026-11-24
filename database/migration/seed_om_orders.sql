@@ -44,8 +44,8 @@ BEGIN
     TRUNCATE TABLE om_orders CASCADE;
 
     -- Department orders are stored under their immediate parent customer.
-    -- Department/Event stays as the department name unless the final slot key
-    -- would duplicate another order, in which case it is suffixed with the order number.
+    -- Department/Event is the department name (for departments named ORDER: the old order's own name). When two orders of
+    -- one slot share it, the department number is added ("BEO 15702"); if that still repeats, the order number ("... #1174921").
     WITH order_source AS (
         SELECT
             trim(o.ordr_no::BIGINT::TEXT) AS order_number,
@@ -61,11 +61,13 @@ BEGIN
                 THEN parent.customer_name
                 ELSE cus.customer_name
             END AS customer_name,
+            -- Departments named ORDER are placeholders; the real department/event is on the old order (ordr.cus_name).
             CASE
-                WHEN UPPER(TRIM(cus.customer_type)) IN ('DEPARTMENT', 'LOCATION')
-                THEN COALESCE(NULLIF(UPPER(TRIM(cus.customer_name)), ''), '')
-                ELSE ''
+                WHEN UPPER(TRIM(cus.customer_type)) NOT IN ('DEPARTMENT', 'LOCATION') THEN ''
+                WHEN UPPER(TRIM(cus.customer_name)) = 'ORDER' THEN COALESCE(NULLIF(UPPER(TRIM(o.cus_name)), ''), 'ORDER')
+                ELSE COALESCE(NULLIF(UPPER(TRIM(cus.customer_name)), ''), '')
             END AS base_department_event,
+            cus.customer_number AS department_number,
             o.ordr_prdctn_dt::DATE AS order_date,
             COALESCE(o.ordr_prdctn_dt::DATE, o.ordr_dt::DATE, DATE '2000-01-01') AS production_date,
             NULLIF(UPPER(trim(o.ordr_prdctn_cd)), '') AS production_code,
@@ -132,21 +134,21 @@ BEGIN
         -- Not migrated: orders dated after tomorrow (the old system accepted entries with a wrong year).
         WHERE COALESCE(o.ordr_prdctn_dt::DATE, o.ordr_dt::DATE, DATE '2000-01-01') <= CURRENT_DATE + 1
     ),
-    duplicate_slots AS (
-        SELECT
-            tenant_id,
-            customer_id,
-            production_date,
-            production_code,
-            base_department_event
-        FROM order_source
-        GROUP BY
-            tenant_id,
-            customer_id,
-            production_date,
-            production_code,
-            base_department_event
-        HAVING COUNT(*) > 1
+    -- same event in one slot: add the department number; still the same: add the order number
+    step1 AS (
+        SELECT src.*,
+               CASE WHEN COUNT(*) OVER (PARTITION BY tenant_id, customer_id, production_date, production_code, base_department_event) > 1
+                     AND base_department_event <> ''
+                    THEN base_department_event || ' ' || department_number
+                    ELSE base_department_event END AS event1
+          FROM order_source src
+    ),
+    events AS (
+        SELECT step1.*,
+               CASE WHEN COUNT(*) OVER (PARTITION BY tenant_id, customer_id, production_date, production_code, event1) > 1
+                    THEN event1 || ' #' || order_number
+                    ELSE event1 END AS department_event
+          FROM step1
     )
     INSERT INTO om_orders (
         order_number,
@@ -168,11 +170,7 @@ BEGIN
         src.order_number,
         src.customer_id,
         src.customer_name,
-        CASE
-            WHEN dup.tenant_id IS NOT NULL
-            THEN src.base_department_event || ' #' || src.order_number
-            ELSE src.base_department_event
-        END,
+        src.department_event,
         src.order_date,
         src.production_date,
         src.production_code,
@@ -183,13 +181,7 @@ BEGIN
         src.tenant_id,
         'OWN_TRUCK',
         CASE WHEN src.production_date <= CURRENT_DATE THEN src.production_date::timestamptz END
-    FROM order_source src
-    LEFT JOIN duplicate_slots dup
-        ON dup.tenant_id = src.tenant_id
-       AND dup.customer_id IS NOT DISTINCT FROM src.customer_id
-       AND dup.production_date = src.production_date
-       AND dup.production_code IS NOT DISTINCT FROM src.production_code
-       AND dup.base_department_event = src.base_department_event;
+    FROM events src;
 
     GET DIAGNOSTICS v_inserted = ROW_COUNT;
     RAISE NOTICE 'om_orders: % rows inserted', v_inserted;

@@ -114,6 +114,7 @@ Status: first release built (see docs/Architecture/health-checks.md): two tables
 - Default event per customer (account or department), e.g. "Customer-###": `###` is a counter for that customer within the production date/code, so the invoice separates the orders; staff can overwrite it. Must be unique within the customer hierarchy. A department without its own default falls back to its own name (not the account's default, which would repeat the counter). Replaces pseudo "ORDER" departments and dummy walk-in customers. Column: `fnd_customers.default_department_event` (approved).
 - Migration: event = the department's real name/code without the "#order" suffix; when two departments share a name in one slot, name + department number (e.g. "BEO 15702"); departments named "ORDER" take the account's default event. Orders stay under the account, so AR and statements are unchanged. Old BPS check: a department never had two orders in one slot; 10,016 slots had different departments with the same name (7,718 "ORDER").
 - No `external_customer_number` for now (maybe later, for reseller customers set up as departments).
+- Done 2026-11-24 (migration events): departments named "ORDER" take the old order's own name (`ordr.cus_name`, e.g. Featherstone "R01 A1006502 0003"); other departments keep their name; same event in one slot → + department number, still the same → + " #order". Applied in place (`fix_om_orders_department_event.sql`, 137,688 orders) and in `seed_om_orders.sql`. Not a reload: truncating om_orders cascades to ar_transaction_lines.
 - Build order: (1) `is_reseller` and the import changes; (2) default event in Order Entry; (3) migration fix, reload, check Featherstone's events; (4) the 2-month warnings (need the corrected history). Until the client answers, a correction replaces the lines of the orders in the file and leaves orders missing from it alone.
 
 ## 7. Organizer menu and Sheets (proof of concept built 2026-11-24)
@@ -125,3 +126,14 @@ Status: first release built (see docs/Architecture/health-checks.md): two tables
 - Formulas other than BPS functions run in the browser (accepted exception to computations-in-database: free-form sheets, not business rules).
 - Built: `org_sheets` (sheet_id, tenant_id, owner_user_id, sheet_name, visibility, workbook, version, created/updated at/by), area `organizer.sheets`, functions `org_sheets_get`, `org_sheet_get`, `org_sheet_save`, `org_sheet_delete`, `org_sheet_bps_eval`; Organizer menu with Sheets (Documents, Calendar, Contacts, Tasks greyed out).
 - Follow-ups: Send (needs the email connector; the button is disabled); the grid stays light in dark mode; check the editor signed in on an iPad; consider "freeze values" and more BPS functions once the client uses it.
+
+## 8. Post Production (after go-live)
+
+### Customer email templates and mass emails (idea 2026-11-24, not designed)
+- Purpose: notices to many customers at once, e.g. "Dear {{customer_name}}, as always we truly appreciate your business. This Thanksgiving the cutoff time is 2 hours earlier."
+- Editor: an email template editor (open-source rich text such as TipTap, MIT) with "Insert field", not a Word-style editor. Emails are HTML; Univer Docs targets page layout and .docx and has no free merge fields. Word-style documents stay a separate Organizer item.
+- Fields filled by a database function (computations in the database), e.g. customer name, account number, cutoff time, delivery day.
+- Audience: all active customers, a customer group, a route, a delivery day or a production code.
+- Before sending: preview as a chosen customer; test send to yourself. After: a send log per customer (sent, failed, bounced) in the customer's history.
+- Needs the email connector (provider such as Resend, Postmark or Amazon SES, plus the bakery's domain set up so mail is not marked as spam).
+- Open questions: which contact receives notices (billing, ordering, or contacts flagged for notices); operational notices only or promotions too (unsubscribe rules); which fields; customers' country (CAN-SPAM or CASL); later the same template by text message (Phone & Messaging).

@@ -39,6 +39,7 @@ export const tenantNav: NavMenu[] = [
           { label: 'Enter Orders', href: '/orders' },
           { label: 'Manage Orders', href: '/manage-orders' },
           { label: 'Import Orders', href: '/orders/import' },
+          { label: 'Export Orders', href: '/orders/export' },
         ],
       },
       {

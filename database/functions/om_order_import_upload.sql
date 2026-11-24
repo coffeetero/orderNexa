@@ -2,11 +2,16 @@
 -- om_order_import_upload
 -- Imports a customer's order file for one account, production date and code. Staff only (row security applies).
 -- p_payload: { customer_id (the ACCOUNT), production_date, production_code, file_name,
---              rows: [{ cus_no, item_number, item_desc, qty }] }  -- data rows only, in file order
+--              rows: [{ cus_no, customer_name, department_event, item_number, item_desc, qty }] }  -- data rows only, in file order
+--   (the file layout Cus no, Customer, Department/Event, Item no, Item description, Qty, as om_order_export_get writes it)
+-- department_event: rows of one cus no with different events become separate orders with that event (a reseller's own
+-- customer code); blank = the usual default event.
+-- customer_name: optional; when filled and less than 40% similar (pg_trgm, ignoring case, punctuation and & vs AND) to both
+-- the customer's name and the account's name, a WARNING.
 -- Every row is kept in om_order_import_rows with what it matched and its issue:
 --   ERROR   customer number not found / not in this account, item not found / inactive, quantity not above 0, no price
---   WARNING the description differs from the item's name (the item number wins)
--- Rows without an ERROR become order lines: one order per cus no, saved through om_orders_save (numbering, run, totals),
+--   WARNING the description differs from the item's name (the item number wins); the customer name differs (see below)
+-- Rows without an ERROR become order lines: one order per cus no and event, saved through om_orders_save (numbering, run, totals),
 -- priced from the customer's pricing books for the delivery date (fnd_item_prices_map, as Order Entry). Orders are
 -- marked order_source 'Import' and import_status IMPORTED, or ISSUES when some of that customer's rows have errors.
 -- A not-yet-approved import for the same account, date and code is replaced (its orders deleted). Approved imports and
@@ -79,17 +84,19 @@ BEGIN
          WHERE c.tenant_id = p_tenant_id AND upper(btrim(c.customer_type)) <> 'ACCOUNT'
     ), src AS (
         SELECT ord::int AS row_number, NULLIF(btrim(r ->> 'cus_no'), '') AS cus_no, NULLIF(btrim(r ->> 'item_number'), '') AS item_number,
-               NULLIF(btrim(r ->> 'item_desc'), '') AS item_desc, NULLIF(btrim(r ->> 'qty'), '') AS qty_text
+               NULLIF(btrim(r ->> 'item_desc'), '') AS item_desc, NULLIF(btrim(r ->> 'qty'), '') AS qty_text,
+               NULLIF(upper(btrim(r ->> 'department_event')), '') AS department_event,
+               NULLIF(btrim(r ->> 'customer_name'), '') AS customer_name
           FROM jsonb_array_elements(v_rows) WITH ORDINALITY AS x(r, ord)
     )
-    INSERT INTO om_order_import_rows (tenant_id, order_import_id, row_number, cus_no, item_number, item_desc, qty_text,
+    INSERT INTO om_order_import_rows (tenant_id, order_import_id, row_number, cus_no, customer_name, item_number, item_desc, qty_text, department_event,
                                       customer_id, item_id, quantity, severity, issue)
-    SELECT p_tenant_id, v_import, s.row_number, s.cus_no, s.item_number, s.item_desc, s.qty_text,
+    SELECT p_tenant_id, v_import, s.row_number, s.cus_no, s.customer_name, s.item_number, s.item_desc, s.qty_text, s.department_event,
            cin.customer_id, it.item_id, q.qty,
            CASE WHEN e.issue IS NOT NULL THEN 'ERROR' WHEN w.issue IS NOT NULL THEN 'WARNING' END,
            COALESCE(e.issue, w.issue)
       FROM src s
-      LEFT JOIN LATERAL (SELECT c.customer_id FROM fnd_customers c WHERE c.tenant_id = p_tenant_id AND c.customer_number = s.cus_no
+      LEFT JOIN LATERAL (SELECT c.customer_id, c.customer_name FROM fnd_customers c WHERE c.tenant_id = p_tenant_id AND c.customer_number = s.cus_no
                             AND c.customer_id IN (SELECT customer_id FROM tree) LIMIT 1) cin ON TRUE
       LEFT JOIN LATERAL (SELECT EXISTS (SELECT 1 FROM fnd_customers c WHERE c.tenant_id = p_tenant_id AND c.customer_number = s.cus_no) AS found) cany ON TRUE
       LEFT JOIN LATERAL (SELECT i.item_id, i.item_name, i.is_active FROM fnd_items i WHERE i.tenant_id = p_tenant_id AND i.item_number = s.item_number
@@ -104,9 +111,19 @@ BEGIN
              WHEN NOT it.is_active THEN 'Item ' || s.item_number || ' is not active'
              WHEN q.qty IS NULL OR q.qty <= 0 THEN 'Quantity ' || COALESCE(s.qty_text, '(blank)') || ' is not a number above 0'
            END AS issue) e ON TRUE
-      LEFT JOIN LATERAL (SELECT CASE WHEN s.item_desc IS NOT NULL AND it.item_name IS NOT NULL
+      -- customer name check: normalised (upper case, & as AND, punctuation as spaces), then trigram similarity
+      LEFT JOIN LATERAL (SELECT
+             CASE WHEN s.customer_name IS NOT NULL AND cin.customer_id IS NOT NULL
+                   AND extensions.similarity(nm.f, nm.c) < 0.4 AND extensions.similarity(nm.f, nm.a) < 0.4
+                  THEN 'Customer name differs (' || cin.customer_name || ')' END AS name_issue
+             FROM (SELECT btrim(regexp_replace(regexp_replace(upper(replace(x.f, '&', ' AND ')), '[^A-Z0-9]+', ' ', 'g'), '\s+', ' ', 'g')) AS f,
+                          btrim(regexp_replace(regexp_replace(upper(replace(x.c, '&', ' AND ')), '[^A-Z0-9]+', ' ', 'g'), '\s+', ' ', 'g')) AS c,
+                          btrim(regexp_replace(regexp_replace(upper(replace(x.a, '&', ' AND ')), '[^A-Z0-9]+', ' ', 'g'), '\s+', ' ', 'g')) AS a
+                     FROM (SELECT COALESCE(s.customer_name, '') AS f, COALESCE(cin.customer_name, '') AS c,
+                                  COALESCE((SELECT customer_name FROM fnd_customers WHERE customer_id = v_account), '') AS a) x) nm) wn ON TRUE
+      LEFT JOIN LATERAL (SELECT NULLIF(concat_ws('; ', wn.name_issue, CASE WHEN s.item_desc IS NOT NULL AND it.item_name IS NOT NULL
                                       AND upper(regexp_replace(s.item_desc, '\s+', ' ', 'g')) <> upper(regexp_replace(it.item_name, '\s+', ' ', 'g'))
-                                     THEN 'Description differs from the item name (' || it.item_name || ')' END AS issue) w ON TRUE;
+                                     THEN 'Description differs from the item name (' || it.item_name || ')' END), '') AS issue) w ON TRUE;
 
     -- prices for the delivery date, per customer
     FOR v_cust IN SELECT DISTINCT customer_id FROM om_order_import_rows
@@ -120,18 +137,20 @@ BEGIN
      WHERE order_import_id = v_import AND item_id IS NOT NULL AND customer_id IS NOT NULL AND unit_price IS NULL
        AND severity IS DISTINCT FROM 'ERROR';
 
-    -- one order per customer from its good rows
-    FOR v_cust IN SELECT customer_id, bool_or(severity = 'ERROR') AS has_errors FROM om_order_import_rows
-                   WHERE order_import_id = v_import AND customer_id IS NOT NULL GROUP BY customer_id LOOP
+    -- one order per customer and event from its good rows
+    FOR v_cust IN SELECT customer_id, department_event, bool_or(severity = 'ERROR') AS has_errors FROM om_order_import_rows
+                   WHERE order_import_id = v_import AND customer_id IS NOT NULL GROUP BY customer_id, department_event LOOP
         SELECT jsonb_agg(jsonb_build_object('client_temp_id', r.order_import_row_id::text, 'item_id', r.item_id,
                                             'quantity', r.quantity, 'unit_price', r.unit_price, 'unit_discount', 0) ORDER BY r.row_number)
           INTO v_lines
           FROM om_order_import_rows r
-         WHERE r.order_import_id = v_import AND r.customer_id = v_cust.customer_id AND r.severity IS DISTINCT FROM 'ERROR';
+         WHERE r.order_import_id = v_import AND r.customer_id = v_cust.customer_id
+           AND r.department_event IS NOT DISTINCT FROM v_cust.department_event AND r.severity IS DISTINCT FROM 'ERROR';
         CONTINUE WHEN v_lines IS NULL;
         v_saved := bps.om_orders_save(p_tenant_id, NULL, NULL, jsonb_build_object(
                      'customer_id', v_cust.customer_id, 'order_date', CURRENT_DATE, 'production_date', v_date,
-                     'production_code', v_code, 'lines', v_lines));
+                     'production_code', v_code, 'lines', v_lines)
+                   || CASE WHEN v_cust.department_event IS NOT NULL THEN jsonb_build_object('department_event', v_cust.department_event) ELSE '{}'::jsonb END);
         UPDATE om_orders SET order_import_id = v_import, order_source = 'Import',
                              import_status = CASE WHEN v_cust.has_errors THEN 'ISSUES' ELSE 'IMPORTED' END
          WHERE order_id = (v_saved ->> 'order_id')::bigint;
