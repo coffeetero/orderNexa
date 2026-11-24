@@ -98,3 +98,9 @@ Status: first release built (see docs/Architecture/health-checks.md): two tables
 - Payments: 43,513 of 43,897 migrated. Amounts, application counts and applied amounts agree 100%. Skipped: 372 zero-amount and the 12 above.
 - Pump: `index_legacy_tables.sql` now runs first in seed_all.py (legacy tables have no indexes). Migration of the full history runs in about 2 minutes.
 - To check next: speed of the app's AR reports on 530,000 invoices (`ar_sales_report_get`, `ar_report_open_items`, `ar_customer_balance_get` call `ar_invoice_recognized_amount` per invoice).
+
+## 5. Import Orders follow-ups (built 2026-11-24)
+- Aggregator customers: the same import from the customer portal (an aggregator uploads hundreds of orders for its own customers). The import tables already hold the account; needs a portal page, a customer-side area and row security for portal users.
+- Approve is blocked while any row has an error; the fix is to correct the file and upload again (it replaces the unapproved import). Consider "approve without the rows that have errors" if staff ask for it.
+- `database/functions/om_items_get_v2.sql` is out of date: the deployed function takes production date and code and prices through `fnd_item_prices_map`. Refresh the file from the database.
+- Migration files old department orders under the account (department_event "ORDER #..."), while the old data has them under the department (e.g. 15702). Imports create them under the department, so the same customer's history and new orders are filed differently.

@@ -16,14 +16,14 @@ AS $$
       FROM om_order_lines ol
       JOIN om_orders o ON o.order_id = ol.order_id AND o.tenant_id = ol.tenant_id
       LEFT JOIN fnd_items i ON i.item_id = ol.item_id
-     WHERE o.tenant_id = p_tenant_id AND o.production_run_id = p_run_id AND ol.quantity <> 0 AND COALESCE(i.is_compound, false) = false
+     WHERE o.tenant_id = p_tenant_id AND o.production_run_id = p_run_id AND ol.quantity <> 0 AND COALESCE(o.import_status, 'APPROVED') = 'APPROVED' AND COALESCE(i.is_compound, false) = false
     UNION ALL
     SELECT ol.order_id, b.item_id, NULL::text, ol.quantity * b.quantity, true
       FROM om_order_lines ol
       JOIN om_orders o ON o.order_id = ol.order_id AND o.tenant_id = ol.tenant_id
       JOIN fnd_items p ON p.item_id = ol.item_id AND p.is_compound
       JOIN fnd_item_bom b ON b.parent_item_id = p.item_id AND b.tenant_id = p.tenant_id
-     WHERE o.tenant_id = p_tenant_id AND o.production_run_id = p_run_id AND ol.quantity <> 0
+     WHERE o.tenant_id = p_tenant_id AND o.production_run_id = p_run_id AND ol.quantity <> 0 AND COALESCE(o.import_status, 'APPROVED') = 'APPROVED'
 $$;
 
 REVOKE EXECUTE ON FUNCTION bps.om_run_item_quantities(bigint, bigint) FROM PUBLIC, anon;

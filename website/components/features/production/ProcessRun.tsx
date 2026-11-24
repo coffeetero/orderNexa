@@ -18,6 +18,7 @@ interface RunResult {
   orders: number;
   shipments: number;
   invoices: number;
+  orders_waiting_approval?: number;
 }
 
 export function ProcessRun({ tenantId }: { tenantId: number }) {
@@ -110,6 +111,11 @@ export function ProcessRun({ tenantId }: { tenantId: number }) {
               <span className="text-right tabular-nums">{r.shipments}</span>
               <span className="text-right tabular-nums">{r.invoices}</span>
               <span />
+              {(r.orders_waiting_approval ?? 0) > 0 && (
+                <span className="col-span-5 text-xs text-amber-700 dark:text-amber-400">
+                  {r.orders_waiting_approval} imported order{r.orders_waiting_approval === 1 ? ' is' : 's are'} waiting for approval and {r.orders_waiting_approval === 1 ? 'was' : 'were'} left out (Orders › Import Orders).
+                </span>
+              )}
             </div>
           ))}
         </CardContent></Card>

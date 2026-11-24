@@ -21,7 +21,8 @@ AS $function$
                'cutoff_local',      to_char(r.cutoff_at AT TIME ZONE bps.fnd_tenant_time_zone(r.tenant_id), 'YYYY-MM-DD"T"HH24:MI'),
                'time_zone',         bps.fnd_tenant_time_zone(r.tenant_id),
                'run_status',        r.run_status,
-               'order_count',       (SELECT COUNT(*) FROM om_orders o WHERE o.production_run_id = r.production_run_id)
+               'order_count',       (SELECT COUNT(*) FROM om_orders o WHERE o.production_run_id = r.production_run_id AND COALESCE(o.import_status, 'APPROVED') = 'APPROVED'),
+               'orders_waiting_approval', (SELECT COUNT(*) FROM om_orders o WHERE o.production_run_id = r.production_run_id AND o.import_status IN ('IMPORTED', 'ISSUES'))
            ) ORDER BY r.production_date DESC, r.production_code), '[]'::jsonb)
       FROM om_production_runs r
      WHERE r.tenant_id = p_tenant_id

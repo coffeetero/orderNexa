@@ -48,7 +48,7 @@ BEGIN
           LEFT JOIN om_production_runs r ON r.production_run_id = o.production_run_id
          WHERE o.tenant_id = p_tenant_id AND o.production_date BETWEEN p_from AND p_to
            AND (v_code IS NULL OR o.production_code = v_code)
-           AND o.customer_id = ANY (p_customer_ids) AND ol.quantity > 0
+           AND o.customer_id = ANY (p_customer_ids) AND ol.quantity > 0 AND COALESCE(o.import_status, 'APPROVED') = 'APPROVED'
     ), '[]'::jsonb));
 END;
 $function$;

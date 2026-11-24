@@ -50,7 +50,7 @@ BEGIN
               FROM om_orders o
               JOIN fnd_customers c ON c.customer_id = o.customer_id AND c.tenant_id = o.tenant_id
              WHERE o.tenant_id = p_tenant_id AND o.production_date BETWEEN p_from AND p_to
-               AND (v_code IS NULL OR o.production_code = v_code)
+               AND (v_code IS NULL OR o.production_code = v_code) AND COALESCE(o.import_status, 'APPROVED') = 'APPROVED'
              GROUP BY c.customer_id, c.customer_name, c.customer_number
           ) x;
     END IF;

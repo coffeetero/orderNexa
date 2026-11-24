@@ -9,7 +9,8 @@
 --      Lines: each order line with a quantity above zero (ITEM, net of discount) and each order's delivery charge (DELIVERY), ordered by
 --      department/event, order number, line. Invoices whose orders are gone are deleted (DRAFT) or CANCELLED (numbered).
 --   4. Invoice amounts = sum of lines.
--- Returns { production_run_id, orders, shipments, invoices }.
+-- Imported orders count only once their import is approved (om_orders.import_status APPROVED or not imported).
+-- Returns { production_run_id, orders, shipments, invoices, orders_waiting_approval }.
 -- ============================================================
 CREATE OR REPLACE FUNCTION bps.om_production_run_process(p_tenant_id bigint, p_production_run_id bigint)
 RETURNS jsonb
@@ -24,6 +25,7 @@ DECLARE
     v_orders  integer;
     v_ships   integer;
     v_invs    integer;
+    v_held    integer;
 BEGIN
     IF NOT bps.fnd_is_tenant_staff(p_tenant_id) THEN
         RAISE EXCEPTION 'Only tenant staff can process a run';
@@ -51,7 +53,7 @@ BEGIN
     FOR v_pair IN
         SELECT DISTINCT o.customer_id, bps.om_customer_delivery_method(p_tenant_id, o.customer_id) AS method
           FROM om_orders o
-         WHERE o.tenant_id = p_tenant_id AND o.production_run_id = p_production_run_id AND o.customer_id IS NOT NULL
+         WHERE o.tenant_id = p_tenant_id AND o.production_run_id = p_production_run_id AND o.customer_id IS NOT NULL AND COALESCE(o.import_status, 'APPROVED') = 'APPROVED'
     LOOP
         IF NOT EXISTS (
             SELECT 1 FROM om_shipments s
@@ -74,7 +76,7 @@ BEGIN
        AND s.ship_to_customer_id = o.customer_id
        AND s.delivery_method_code IS NOT DISTINCT FROM bps.om_customer_delivery_method(o.tenant_id, o.customer_id)
        AND s.shipment_status = 'PLANNED'
-     WHERE o.tenant_id = p_tenant_id AND o.production_run_id = p_production_run_id AND ol.quantity > 0;
+     WHERE o.tenant_id = p_tenant_id AND o.production_run_id = p_production_run_id AND ol.quantity > 0 AND COALESCE(o.import_status, 'APPROVED') = 'APPROVED';
 
     DELETE FROM om_shipments s
      WHERE s.production_run_id = p_production_run_id AND s.shipment_status = 'PLANNED'
@@ -85,7 +87,7 @@ BEGIN
     SELECT p_tenant_id, x.owner_id, 'INV', NULL, v_run.delivery_date, 0, 'DRAFT', p_production_run_id
       FROM (SELECT DISTINCT bps.om_customer_invoice_owner(p_tenant_id, o.customer_id) AS owner_id
               FROM om_orders o
-             WHERE o.tenant_id = p_tenant_id AND o.production_run_id = p_production_run_id AND o.customer_id IS NOT NULL) x
+             WHERE o.tenant_id = p_tenant_id AND o.production_run_id = p_production_run_id AND o.customer_id IS NOT NULL AND COALESCE(o.import_status, 'APPROVED') = 'APPROVED') x
      WHERE x.owner_id IS NOT NULL
     ON CONFLICT (tenant_id, customer_id, production_run_id)
         WHERE transaction_type = 'INV' AND production_run_id IS NOT NULL AND status <> 'CANCELLED'
@@ -118,7 +120,7 @@ BEGIN
             ON inv.tenant_id = o.tenant_id AND inv.production_run_id = o.production_run_id
            AND inv.transaction_type = 'INV' AND inv.status <> 'CANCELLED'
            AND inv.customer_id = bps.om_customer_invoice_owner(o.tenant_id, o.customer_id)
-         WHERE o.tenant_id = p_tenant_id AND o.production_run_id = p_production_run_id AND ol.quantity > 0
+         WHERE o.tenant_id = p_tenant_id AND o.production_run_id = p_production_run_id AND ol.quantity > 0 AND COALESCE(o.import_status, 'APPROVED') = 'APPROVED'
         UNION ALL
         SELECT inv.ar_transaction_id, o.order_id, o.order_number, o.department_event, o.customer_id, o.customer_name, o.po_number,
                NULL::bigint, 2, 'DELIVERY', NULL::bigint, 'Delivery', 1, o.delivery_charge, o.delivery_charge, NULL::bigint
@@ -127,7 +129,7 @@ BEGIN
             ON inv.tenant_id = o.tenant_id AND inv.production_run_id = o.production_run_id
            AND inv.transaction_type = 'INV' AND inv.status <> 'CANCELLED'
            AND inv.customer_id = bps.om_customer_invoice_owner(o.tenant_id, o.customer_id)
-         WHERE o.tenant_id = p_tenant_id AND o.production_run_id = p_production_run_id AND o.delivery_charge > 0
+         WHERE o.tenant_id = p_tenant_id AND o.production_run_id = p_production_run_id AND o.delivery_charge > 0 AND COALESCE(o.import_status, 'APPROVED') = 'APPROVED'
       ) src;
 
     UPDATE ar_transactions t
@@ -144,12 +146,14 @@ BEGIN
      WHERE t.tenant_id = p_tenant_id AND t.production_run_id = p_production_run_id AND t.transaction_type = 'INV'
        AND t.status IN ('OPEN', 'PARTIAL') AND NOT EXISTS (SELECT 1 FROM ar_transaction_lines l WHERE l.ar_transaction_id = t.ar_transaction_id);
 
-    SELECT COUNT(*) INTO v_orders FROM om_orders WHERE tenant_id = p_tenant_id AND production_run_id = p_production_run_id;
+    SELECT COUNT(*) FILTER (WHERE COALESCE(import_status, 'APPROVED') = 'APPROVED'), COUNT(*) FILTER (WHERE import_status IN ('IMPORTED', 'ISSUES'))
+      INTO v_orders, v_held FROM om_orders WHERE tenant_id = p_tenant_id AND production_run_id = p_production_run_id;
     SELECT COUNT(*) INTO v_ships  FROM om_shipments WHERE production_run_id = p_production_run_id;
     SELECT COUNT(*) INTO v_invs   FROM ar_transactions
      WHERE tenant_id = p_tenant_id AND production_run_id = p_production_run_id AND transaction_type = 'INV' AND status <> 'CANCELLED';
 
     RETURN jsonb_build_object('production_run_id', p_production_run_id, 'production_date', v_run.production_date,
-                              'production_code', v_run.production_code, 'orders', v_orders, 'shipments', v_ships, 'invoices', v_invs);
+                              'production_code', v_run.production_code, 'orders', v_orders, 'shipments', v_ships, 'invoices', v_invs,
+                              'orders_waiting_approval', v_held);
 END;
 $function$;

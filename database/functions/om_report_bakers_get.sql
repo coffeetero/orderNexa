@@ -35,13 +35,13 @@ BEGIN
                'production_date',     r.production_date,
                'production_code',     r.production_code,
                'delivery_date',       r.delivery_date,
-               'order_count',         (SELECT COUNT(*) FROM om_orders o WHERE o.production_run_id = r.production_run_id),
+               'order_count',         (SELECT COUNT(*) FROM om_orders o WHERE o.production_run_id = r.production_run_id AND COALESCE(o.import_status, 'APPROVED') = 'APPROVED'),
                'total_quantity',      (SELECT COALESCE(SUM(q.quantity), 0) FROM om_run_item_quantities(p_tenant_id, r.production_run_id) q),
                'compounds',           COALESCE((SELECT jsonb_agg(jsonb_build_object('item_number', c.item_number, 'item_name', c.item_name, 'quantity', c.qty, 'order_count', c.orders) ORDER BY c.item_number)
                                           FROM (SELECT i.item_number, i.item_name, SUM(ol.quantity) AS qty, COUNT(DISTINCT ol.order_id) AS orders
                                                   FROM om_order_lines ol JOIN om_orders o ON o.order_id = ol.order_id AND o.tenant_id = ol.tenant_id
                                                   JOIN fnd_items i ON i.item_id = ol.item_id AND i.is_compound
-                                                 WHERE o.production_run_id = r.production_run_id AND ol.quantity <> 0
+                                                 WHERE o.production_run_id = r.production_run_id AND ol.quantity <> 0 AND COALESCE(o.import_status, 'APPROVED') = 'APPROVED'
                                                  GROUP BY i.item_id, i.item_number, i.item_name) c), '[]'::jsonb),
                'last_printed_at',     r.baker_sheet_printed_at,
                'changed_since_print', r.baker_sheet_printed_at IS NOT NULL AND (

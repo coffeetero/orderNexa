@@ -38,7 +38,7 @@ export const tenantNav: NavMenu[] = [
         items: [
           { label: 'Enter Orders', href: '/orders' },
           { label: 'Manage Orders', href: '/manage-orders' },
-          { label: 'Import Orders', href: '/orders/import', soon: true },
+          { label: 'Import Orders', href: '/orders/import' },
         ],
       },
       {
