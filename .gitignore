@@ -7,3 +7,10 @@ database/migration/.env
 
 # Local Python environment
 .venv/
+
+# macOS folder metadata
+.DS_Store
+
+# Cloud credentials and production customer reports (keep local only)
+supabase setup/
+docs/reportsFromOldBPS/
