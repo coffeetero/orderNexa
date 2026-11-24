@@ -21,3 +21,5 @@ BEGIN
   IF v IS NULL THEN RAISE EXCEPTION 'Sheet not found'; END IF;
   RETURN v;
 END $function$;
+REVOKE EXECUTE ON FUNCTION bps.org_sheet_get(bigint, bigint) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION bps.org_sheet_get(bigint, bigint) TO authenticated, service_role, bps_dev;

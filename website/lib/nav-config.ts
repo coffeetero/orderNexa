@@ -74,6 +74,7 @@ export const tenantNav: NavMenu[] = [
           { label: "Baker's Report", href: '/production/report' },
           { label: 'Mixing Sheets', href: '/production/mixing', soon: true },
           { label: 'Packing Labels', href: '/production/labels' },
+          { label: 'Print Invoices', href: '/production/invoices' },
           { label: 'Packaging List', href: '/production/packaging' },
           { label: 'Route Delivery Report', href: '/production/routes' },
         ],

@@ -307,23 +307,41 @@ function RunRowEditor({ row, tenantId, notify }: { row: RunRow; tenantId: number
   );
 }
 
+type PrintFormats = { customer_number_mask: string; item_number_mask: string; invoice_footer_note: string; invoice_tagline: string };
+const EMPTY_FORMATS: PrintFormats = { customer_number_mask: '', item_number_mask: '', invoice_footer_note: '', invoice_tagline: '' };
+
+/** Number masks (statements, invoices) and the invoice footer wording. */
 function CustomerNumberMaskEditor({ tenantId, notify }: { tenantId: number; notify: Notify }) {
-  const [mask, setMask] = useState('');
-  const [saved, setSaved] = useState('');
+  const [f, setF] = useState<PrintFormats>(EMPTY_FORMATS);
+  const [saved, setSaved] = useState<PrintFormats>(EMPTY_FORMATS);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    call<{ customer_number_mask: string | null }>(`/api/admin/format-settings?tenant_id=${tenantId}`)
-      .then((d) => { setMask(d.customer_number_mask ?? ''); setSaved(d.customer_number_mask ?? ''); })
+    call<Partial<Record<keyof PrintFormats, string | null>>>(`/api/admin/format-settings?tenant_id=${tenantId}`)
+      .then((d) => {
+        const v: PrintFormats = {
+          customer_number_mask: d.customer_number_mask ?? '', item_number_mask: d.item_number_mask ?? '',
+          invoice_footer_note: d.invoice_footer_note ?? '', invoice_tagline: d.invoice_tagline ?? '',
+        };
+        setF(v); setSaved(v);
+      })
       .catch((e) => notify((e as Error).message, 'error'));
   }, [tenantId, notify]);
 
+  const trimmed: PrintFormats = {
+    customer_number_mask: f.customer_number_mask.trim(), item_number_mask: f.item_number_mask.trim(),
+    invoice_footer_note: f.invoice_footer_note.trim(), invoice_tagline: f.invoice_tagline.trim(),
+  };
   const save = async () => {
     setBusy(true);
     try {
-      await post('/api/admin/format-settings', { tenant_id: tenantId, customer_number_mask: mask.trim() || null });
-      setSaved(mask.trim());
-      notify('Customer number mask saved.', 'success');
+      await post('/api/admin/format-settings', {
+        tenant_id: tenantId,
+        customer_number_mask: trimmed.customer_number_mask || null, item_number_mask: trimmed.item_number_mask || null,
+        invoice_footer_note: trimmed.invoice_footer_note || null, invoice_tagline: trimmed.invoice_tagline || null,
+      });
+      setSaved(trimmed);
+      notify('Print formats saved.', 'success');
     } catch (e) {
       notify((e as Error).message, 'error');
     } finally {
@@ -331,17 +349,34 @@ function CustomerNumberMaskEditor({ tenantId, notify }: { tenantId: number; noti
     }
   };
 
-  const bad = mask.trim() !== '' && (!mask.includes('#') || mask.trim().length > 30);
+  const badMask = (m: string) => m !== '' && (!m.includes('#') || m.length > 30);
+  const bad = badMask(trimmed.customer_number_mask) || badMask(trimmed.item_number_mask);
+  const unchanged = (Object.keys(trimmed) as (keyof PrintFormats)[]).every((k) => trimmed[k] === saved[k]);
+  const set = (k: keyof PrintFormats) => (e: React.ChangeEvent<HTMLInputElement>) => setF((p) => ({ ...p, [k]: e.target.value }));
   return (
     <div className="mt-6 border-t pt-4">
       <div className="mb-1 flex items-start justify-between gap-3">
-        <h3 className="text-base font-medium">Customer number mask</h3>
-        <Button size="sm" onClick={save} disabled={busy || bad || mask.trim() === saved}>Save</Button>
+        <h3 className="text-base font-medium">Print formats</h3>
+        <Button size="sm" onClick={save} disabled={busy || bad || unchanged}>Save</Button>
       </div>
-      <p className="mb-3 text-xs text-muted-foreground">How customer numbers print on statements. Each # takes the next digit; other characters print as typed; digits beyond the mask are left off (###-## prints 11200 as 112-00). Leave empty to print the number as stored.</p>
-      <div className="flex items-center gap-2 text-sm">
-        <Label htmlFor="cust-mask" className="text-xs">Mask</Label>
-        <Input id="cust-mask" className="w-40" maxLength={30} placeholder="###-##" value={mask} onChange={(e) => setMask(e.target.value)} />
+      <p className="mb-3 text-xs text-muted-foreground">How numbers print on statements and invoices. Each # takes the next digit; other characters print as typed; digits beyond the mask are left off (###-## prints 11200 as 112-00). Leave a mask empty to print the number as stored. The footer note and tagline print at the bottom of every invoice page; leave empty to print nothing.</p>
+      <div className="grid gap-3 text-sm sm:grid-cols-2">
+        <div className="flex items-center gap-2">
+          <Label htmlFor="cust-mask" className="w-36 text-xs">Customer number mask</Label>
+          <Input id="cust-mask" className="w-40" maxLength={30} placeholder="###-##" value={f.customer_number_mask} onChange={set('customer_number_mask')} />
+        </div>
+        <div className="flex items-center gap-2">
+          <Label htmlFor="item-mask" className="w-36 text-xs">Item number mask</Label>
+          <Input id="item-mask" className="w-40" maxLength={30} placeholder="###-##" value={f.item_number_mask} onChange={set('item_number_mask')} />
+        </div>
+        <div className="flex items-center gap-2 sm:col-span-2">
+          <Label htmlFor="inv-note" className="w-36 shrink-0 text-xs">Invoice footer note</Label>
+          <Input id="inv-note" maxLength={300} placeholder="e.g. allergen statement" value={f.invoice_footer_note} onChange={set('invoice_footer_note')} />
+        </div>
+        <div className="flex items-center gap-2 sm:col-span-2">
+          <Label htmlFor="inv-tagline" className="w-36 shrink-0 text-xs">Invoice tagline</Label>
+          <Input id="inv-tagline" className="max-w-sm" maxLength={100} value={f.invoice_tagline} onChange={set('invoice_tagline')} />
+        </div>
       </div>
     </div>
   );

@@ -158,6 +158,8 @@ export interface OrderHeaderListRow {
   customer_name?: string;
   top_customer_id?: number;
   top_customer_name?: string;
+  /** Set for imported orders: IMPORTED / ISSUES (waiting for approval) or APPROVED. */
+  import_status?: string | null;
 }
 
 /** An item row returned by om_items_get, used in the Item combobox. */

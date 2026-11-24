@@ -5,6 +5,7 @@ import { bakersPdf, type BakersData } from '@/lib/pdf/bakers';
 import { deliveryPdf, type DeliveryData } from '@/lib/pdf/delivery';
 import { labelsPdf, type LabelsData } from '@/lib/pdf/labels';
 import { packagingPdf, type PackagingData } from '@/lib/pdf/packaging';
+import { invoicesPdf, type InvoicesData } from '@/lib/pdf/invoices';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -20,9 +21,10 @@ function pdfResponse(bytes: Uint8Array, filename: string): Response {
 const fail = (message: string, status = 400) => NextResponse.json({ error: message }, { status });
 
 /**
- * POST /api/reports/run { report: 'bakers'|'labels'|'packaging'|'delivery', tenant_id, from, to, production_code?, customer_ids? }
+ * POST /api/reports/run { report: 'bakers'|'labels'|'packaging'|'invoices'|'delivery', tenant_id, from, to, production_code?, customer_ids? }
  * → application/pdf. The data and every total come from the database functions (om_report_*); this route only draws them.
- * Labels and Packaging need customer_ids. Printing records the print time on the runs; Packaging also numbers the invoices.
+ * Labels, Packaging and Invoices need customer_ids. Invoices prints issued invoices (ar_invoices_print_get) and changes nothing.
+ * Printing records the print time on the runs; Packaging also numbers the invoices.
  */
 export async function POST(request: Request) {
   let body: Record<string, unknown>;
@@ -33,12 +35,12 @@ export async function POST(request: Request) {
   }
   const report = typeof body.report === 'string' ? body.report : '';
   const tenantId = toInt(body.tenant_id);
-  if (!['bakers', 'labels', 'packaging', 'delivery'].includes(report) || tenantId === null || !isDate(body.from) || !isDate(body.to)) {
+  if (!['bakers', 'labels', 'packaging', 'invoices', 'delivery'].includes(report) || tenantId === null || !isDate(body.from) || !isDate(body.to)) {
     return fail('report, tenant_id, from and to (YYYY-MM-DD) are required');
   }
   const code = typeof body.production_code === 'string' && body.production_code.trim() !== '' ? body.production_code : null;
   const ids = Array.isArray(body.customer_ids) ? body.customer_ids.map(toInt).filter((n): n is number => n !== null) : [];
-  if ((report === 'labels' || report === 'packaging') && ids.length === 0) return fail('Select at least one customer');
+  if ((report === 'labels' || report === 'packaging' || report === 'invoices') && ids.length === 0) return fail('Select at least one customer');
 
   const auth = await requireStaff();
   if (!auth.ok) return auth.response;
@@ -70,6 +72,13 @@ export async function POST(request: Request) {
     const { data, error } = await supabase.rpc('om_report_packaging_issue', { ...args, p_customer_ids: ids });
     if (error) return fail(error.message);
     return pdfResponse(await packagingPdf(data as PackagingData, label), name);
+  }
+  if (report === 'invoices') {
+    const { data, error } = await supabase.rpc('ar_invoices_print_get', { ...args, p_customer_ids: ids });
+    if (error) return fail(error.message);
+    const d = data as InvoicesData;
+    if (!d.invoices.length) return fail('No issued invoices for the selected customers and dates.');
+    return pdfResponse(await invoicesPdf(d), name);
   }
   const { data, error } = await supabase.rpc('om_report_delivery_get', args);
   if (error) return fail(error.message);

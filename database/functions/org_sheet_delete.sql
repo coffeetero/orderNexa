@@ -14,3 +14,5 @@ BEGIN
   IF NOT FOUND THEN RAISE EXCEPTION 'Only the owner can delete this sheet'; END IF;
   RETURN jsonb_build_object('deleted', p_sheet_id);
 END $function$;
+REVOKE EXECUTE ON FUNCTION bps.org_sheet_delete(bigint, bigint) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION bps.org_sheet_delete(bigint, bigint) TO authenticated, service_role, bps_dev;

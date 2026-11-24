@@ -59,6 +59,7 @@ BEGIN
                 'delivery_amount',  o.delivery_charge,
                 'production_run_id', o.production_run_id,
                 'department_event', o.department_event,
+                'import_status',    o.import_status,
                 'amount',           o.amount,
                 'total_quantity',   o.quantity,
                 'discount_amount',  o.discount_amount,
@@ -86,6 +87,7 @@ BEGIN
                 'delivery_amount',  o.delivery_charge,
                 'production_run_id', o.production_run_id,
                 'department_event', o.department_event,
+                'import_status',    o.import_status,
                 'amount',           o.amount,
                 'total_quantity',   o.quantity,
                 'discount_amount',  o.discount_amount,
@@ -190,6 +192,7 @@ BEGIN
             'production_date',  o.production_date,
             'production_code',  o.production_code,
             'department_event', o.department_event,
+            'import_status',    o.import_status,
             'amount',           o.amount,
             'customer_id',      o.customer_id,
             'customer_name',    o.customer_name

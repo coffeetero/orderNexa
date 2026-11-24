@@ -50,3 +50,5 @@ BEGIN
                                     'version', s.version, 'is_owner', s.owner_user_id = v_user, 'updated_at', s.updated_at)
             FROM org_sheets s WHERE s.sheet_id = v_id);
 END $function$;
+REVOKE EXECUTE ON FUNCTION bps.org_sheet_save(bigint, jsonb) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION bps.org_sheet_save(bigint, jsonb) TO authenticated, service_role, bps_dev;

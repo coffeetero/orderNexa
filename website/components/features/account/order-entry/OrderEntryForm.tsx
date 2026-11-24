@@ -60,6 +60,7 @@ function normalizeOrderHeaderRow(raw: Record<string, unknown>): OrderHeaderListR
     amount: Number(raw.amount ?? 0),
     total_quantity: Number(raw.total_quantity ?? 0),
     customer_id: Number(raw.customer_id ?? 0),
+    import_status: raw.import_status !== undefined && raw.import_status !== null ? String(raw.import_status) : null,
     customer_number:
       raw.customer_number !== undefined && raw.customer_number !== null
         ? String(raw.customer_number)
@@ -199,6 +200,11 @@ export function OrderEntryForm({
   const [orderPickCandidates, setOrderPickCandidates] = useState<OrderHeaderListRow[]>([]);
   const [isLoadingOrderPickCandidates, setIsLoadingOrderPickCandidates] = useState(false);
   const [departmentEventOptions, setDepartmentEventOptions] = useState<DepartmentEventOption[]>([]);
+  // Customers with an order in the selected production date + code (coloured and sorted first in the customer list)
+  const [customerIdsWithOrders, setCustomerIdsWithOrders] = useState<Set<number>>(new Set());
+  const [slotRefresh, setSlotRefresh] = useState(0);
+  // Import status of the order on screen (imported orders wait for approval in Import Orders)
+  const [importStatus, setImportStatus] = useState<string | null>(null);
   const [selectedDepartmentEventId, setSelectedDepartmentEventId] = useState<string | null>(null);
   const [isLoadingDepartmentEvents, setIsLoadingDepartmentEvents] = useState(false);
   const [productionCodes, setProductionCodes] = useState<{ value: string; label: string }[]>([]);
@@ -435,6 +441,7 @@ export function OrderEntryForm({
       }
       if (gen !== undefined && gen !== slotLookupGenerationRef.current) return;
       const loadedDraft = mapOrderToDraft(json.data);
+      setImportStatus(typeof json.data.import_status === 'string' ? json.data.import_status : null);
       if (opts?.preserveSelectedCustomer && selectedCustomerId !== null) {
         loadedDraft.customer_id = selectedCustomerId;
         loadedDraft.customer_name = selectedCustomerName;
@@ -583,6 +590,19 @@ export function OrderEntryForm({
     [tenantId, draft.production_date, draft.production_code],
   );
 
+  // ── Customers with orders in the selected slot (refreshed when the slot changes and after each save) ──
+  useEffect(() => {
+    if (!tenantId || !draft.production_date || !draft.production_code) { setCustomerIdsWithOrders(new Set()); return; }
+    let cancelled = false;
+    fetchOrderHeaders(null, draft.production_code)
+      .then((rows) => { if (!cancelled) setCustomerIdsWithOrders(new Set(rows.map((r) => r.customer_id))); })
+      .catch(() => { if (!cancelled) setCustomerIdsWithOrders(new Set()); });
+    return () => { cancelled = true; };
+  }, [tenantId, draft.production_date, draft.production_code, slotRefresh, fetchOrderHeaders]);
+
+  useEffect(() => { if (!draft.order_id) setImportStatus(null); }, [draft.order_id]);
+
+
   const handleDepartmentEventListRequest = useCallback(async () => {
     if (!tenantId || !draft.customer_id || !draft.production_date) {
       setDepartmentEventOptions([]);
@@ -629,6 +649,7 @@ export function OrderEntryForm({
             total_quantity: r.total_quantity ?? 0,
             amount: r.amount ?? 0,
             is_new: false,
+            import_status: r.import_status ?? null,
           }));
         // Merge: existing entries replace matching local stubs; new dept events are appended
         const merged = localOptions.map(local =>
@@ -746,7 +767,8 @@ export function OrderEntryForm({
     (customer: CustomerOption | null) => {
       setShouldFocusItemWhenReady(false);
       setCustomer(customer?.customer_id ?? null, customer?.customer_name ?? '');
-      setField('department_event', getDefaultDepartmentEvent(customer?.customer_id ?? null));
+      // Left empty: the clerk types the department/event; Enter on a blank field starts a new order with the default event.
+      setField('department_event', '');
       setDepartmentEventOptions([]);
       setSelectedDepartmentEventId(null);
       setIsLoadingDepartmentEvents(false);
@@ -757,7 +779,7 @@ export function OrderEntryForm({
       setField('lines', []);
       setField('total_amount', 0);
     },
-    [getDefaultDepartmentEvent, setCustomer, setField],
+    [setCustomer, setField],
   );
 
   // ── Sidebar / breadcrumb integration ───────────────────────────────────
@@ -837,7 +859,10 @@ export function OrderEntryForm({
     [setField],
   );
 
-  const handleDepartmentEventCommit = useCallback(
+  // Department/Event + Enter: the typed text is looked up in this customer's orders for the production date and code.
+  // Exact event (ignoring case and spaces) → that order; else one order containing the text → that order; several → list
+  // them with "new order" first; none → a new order with the text. Blank → a new order with the default event.
+  const startNewOrderWithEvent = useCallback(
     (value: string) => {
       setSelectedDepartmentEventId(null);
       setField('department_event', value.toUpperCase());
@@ -845,9 +870,41 @@ export function OrderEntryForm({
       setField('order_number', 'New Order');
       setField('po_number', '');
       setField('order_ref', 'New Order');
+      setImportStatus(null);
       setShouldFocusItemWhenReady(true);
     },
     [setField],
+  );
+
+  const handleDepartmentEventCommit = useCallback(
+    async (value: string) => {
+      const norm = (v: string) => v.toUpperCase().replace(/\s+/g, ' ').trim();
+      const text = norm(value);
+      if (!text || !draft.customer_id) { startNewOrderWithEvent(getDefaultDepartmentEvent(draft.customer_id)); return; }
+      let rows: OrderHeaderListRow[] = [];
+      try { rows = (await fetchOrderHeaders(draft.customer_id)).filter((r) => r.department_event); }
+      catch { startNewOrderWithEvent(text); return; }
+      const toOption = (r: OrderHeaderListRow): DepartmentEventOption => ({
+        id: String(r.order_id), order_id: r.order_id, order_number: r.order_number ?? null,
+        department_event: (r.department_event ?? '').toUpperCase(), total_quantity: r.total_quantity ?? 0,
+        amount: r.amount ?? 0, is_new: false, import_status: r.import_status ?? null,
+      });
+      const exact = rows.find((r) => norm(r.department_event ?? '') === text);
+      const contains = exact ? [exact] : rows.filter((r) => norm(r.department_event ?? '').includes(text));
+      if (contains.length === 1) { handleDepartmentEventSelectRef.current?.(toOption(contains[0])); return; }
+      if (contains.length === 0) { startNewOrderWithEvent(text); return; }
+      const newOption: DepartmentEventOption = {
+        id: `new:${text}`, order_id: null, order_number: null, department_event: text, total_quantity: 0, amount: 0, is_new: true,
+      };
+      // nothing from a previously opened order stays on screen while the clerk picks
+      startNewOrderWithEvent(text);
+      setShouldFocusItemWhenReady(false);
+      setField('lines', []);
+      setField('total_amount', 0);
+      setDepartmentEventOptions([newOption, ...contains.map(toOption)]);
+      showStatusMessage({ text: `${contains.length} orders match "${text}". Pick one with the arrow keys, or the first line for a new order.`, type: 'success' });
+    },
+    [draft.customer_id, fetchOrderHeaders, getDefaultDepartmentEvent, setField, showStatusMessage, startNewOrderWithEvent],
   );
 
   const handleDepartmentEventSelect = useCallback(
@@ -889,6 +946,9 @@ export function OrderEntryForm({
     },
     [loadOrderById, setField],
   );
+
+  const handleDepartmentEventSelectRef = useRef<((option: DepartmentEventOption | null) => void) | null>(null);
+  handleDepartmentEventSelectRef.current = handleDepartmentEventSelect;
 
   // An item no pricing book prices on the delivery date: ask before adding it (the price can then be typed, or left at 0).
   const [unpricedPrompt, setUnpricedPrompt] = useState<{ item: OrderEntryItem; quantity: number } | null>(null);
@@ -1077,6 +1137,7 @@ export function OrderEntryForm({
       reset({ preserveProductionSlot: true });
       setDepartmentEventOptions([]);
       setSelectedDepartmentEventId(null);
+      setSlotRefresh((n) => n + 1);
       requestAnimationFrame(() => focusCustomer());
     } finally {
       setIsSaving(false);
@@ -1186,6 +1247,7 @@ export function OrderEntryForm({
             productionDateInputRef={productionDateInputRef}
             productionCodeTriggerRef={productionCodeTriggerRef}
             departmentEventOptions={departmentEventOptions}
+            customerIdsWithOrders={customerIdsWithOrders}
             selectedDepartmentEventId={selectedDepartmentEventId}
             isLoadingDepartmentEvents={isLoadingDepartmentEvents}
             onCustomerChange={handleCustomerChange}
@@ -1218,6 +1280,12 @@ export function OrderEntryForm({
               timeZone: cutoff.time_zone ?? undefined,
             }).format(new Date(cutoff.effective_cutoff_at))}
             {cutoff.is_open ? '' : ' — closed to customers (staff can still save)'}
+          </p>
+        )}
+
+        {draft.order_id && (importStatus === 'IMPORTED' || importStatus === 'ISSUES') && (
+          <p role="status" className="mt-1 rounded bg-amber-100 px-2 py-1 text-xs font-medium text-amber-900 dark:bg-amber-950/60 dark:text-amber-200">
+            Imported order — waiting for approval in Orders › Import Orders. Uploading that file again replaces this order and any changes made here.
           </p>
         )}
 

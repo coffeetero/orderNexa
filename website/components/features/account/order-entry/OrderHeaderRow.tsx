@@ -35,6 +35,7 @@ export interface DepartmentEventOption {
   total_quantity: number;
   amount: number;
   is_new: boolean;
+  import_status?: string | null;
 }
 
 interface OrderHeaderRowProps {
@@ -48,6 +49,8 @@ interface OrderHeaderRowProps {
   productionDateInputRef: React.RefObject<HTMLInputElement>;
   productionCodeTriggerRef: React.RefObject<HTMLButtonElement>;
   departmentEventOptions: DepartmentEventOption[];
+  /** Customers that already have an order for the production date and code (coloured, and their account sorted to the top). */
+  customerIdsWithOrders?: Set<number>;
   selectedDepartmentEventId: string | null;
   isLoadingDepartmentEvents: boolean;
   onCustomerChange: (customer: CustomerOption | null) => void;
@@ -100,6 +103,7 @@ export function OrderHeaderRow({
   productionDateInputRef,
   productionCodeTriggerRef,
   departmentEventOptions,
+  customerIdsWithOrders,
   selectedDepartmentEventId,
   isLoadingDepartmentEvents,
   onCustomerChange,
@@ -123,6 +127,22 @@ export function OrderHeaderRow({
   const customerById = useMemo(() => {
     return new Map(customers.map((customer) => [customer.customer_id, customer]));
   }, [customers]);
+
+  // Accounts (top of the hierarchy) with an order anywhere in their group: sorted first, so the clerk sees them at the top.
+  const topIdsWithOrders = useMemo(() => {
+    const out = new Set<number>();
+    customerIdsWithOrders?.forEach((id) => {
+      let cur = customerById.get(id);
+      while (cur?.customer_parent_id && customerById.has(cur.customer_parent_id)) cur = customerById.get(cur.customer_parent_id);
+      if (cur) out.add(cur.customer_id);
+    });
+    return out;
+  }, [customerIdsWithOrders, customerById]);
+  const topIdOf = (c: CustomerOption) => {
+    let cur = c;
+    while (cur.customer_parent_id && customerById.has(cur.customer_parent_id)) cur = customerById.get(cur.customer_parent_id)!;
+    return cur.customer_id;
+  };
 
   const getCustomerLabel = (customer: CustomerOption) =>
     customer.customer_number
@@ -181,7 +201,11 @@ export function OrderHeaderRow({
               `${c.customer_number ?? ''} ${c.customer_name}`
             }
             getParentId={(c) => c.customer_parent_id}
-            getSortKey={(c) => c.sort_path}
+            getSortKey={(c) => `${topIdsWithOrders.has(topIdOf(c)) ? '0' : '1'}|${c.sort_path}`}
+            getItemLabelClassName={(c) =>
+              customerIdsWithOrders?.has(c.customer_id) || (topIdsWithOrders.has(c.customer_id) && !c.customer_parent_id)
+                ? 'text-sky-700 dark:text-sky-300'
+                : undefined}
             placeholder="Search number or name…"
             disabled={isLoadingCustomers}
             loading={isLoadingCustomers}
@@ -208,6 +232,7 @@ export function OrderHeaderRow({
             inputValue={draft.department_event}
             onInputValueChange={onDepartmentEventInputChange}
             onInputCommit={onDepartmentEventCommit}
+            enterCommitsText
             onChange={onDepartmentEventSelect}
             onListOpenRequest={onDepartmentEventListRequest}
             listRequestKey={departmentEventListRequestKey}

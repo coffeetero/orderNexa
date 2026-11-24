@@ -113,3 +113,5 @@ BEGIN
   END LOOP;
   RETURN v_out;
 END $function$;
+REVOKE EXECUTE ON FUNCTION bps.org_sheet_bps_eval(bigint, jsonb) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION bps.org_sheet_bps_eval(bigint, jsonb) TO authenticated, service_role, bps_dev;

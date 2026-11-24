@@ -20,3 +20,5 @@ AS $function$
     LEFT JOIN bps.fnd_users ub ON ub.user_id = s.updated_by
    WHERE s.tenant_id = p_tenant_id
 $function$;
+REVOKE EXECUTE ON FUNCTION bps.org_sheets_get(bigint) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION bps.org_sheets_get(bigint) TO authenticated, service_role, bps_dev;

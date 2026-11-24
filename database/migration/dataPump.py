@@ -25,7 +25,7 @@ Additional options:
     --schema               Destination PostgreSQL schema (default: public)
     --tables               Comma-separated list of tables to sync (default: see DEFAULT_TABLES)
     --transactions-since   YYYY-MM-DD (required if the sync includes ordr, ordr_detail, ar, or pmt_detail):
-                               ordr: date filter AND COALESCE(ordr_amt,0) <> 0
+                               ordr: date filter AND (ordr_amt <> 0 OR ordr_qty_sold <> 0)  ($0 sample orders included)
                                ordr_detail: lines for those orders; only if sold and returned qty both <> 0
                                ar: ar_trn_date >= date
                                pmt_detail: rows whose ar row (pd_ar_trn_id) has ar_trn_date >= date
@@ -300,16 +300,17 @@ def _select_sql_for_table(table: str, since: datetime.date | None) -> tuple[str,
     Order date filter uses COALESCE(ordr_dt, ordr_prdctn_dt): ordr_dt is the logical
     order date, but some rows only have ordr_prdctn_dt.
 
-    ordr: exclude zero COALESCE(ordr_amt, 0). ordr_detail: include only if
+    ordr: keep orders with an amount OR a quantity (all-sample $0 orders are real orders; only empty ones are skipped).
+    ordr_detail: include only if
     COALESCE(od_qty_returned,0) <> 0 AND COALESCE(od_qty_sold,0) <> 0 (per legacy
-    column names); parent orders must also pass the ordr amount filter via ordr_no.
+    column names); parent orders must also pass the ordr filter via ordr_no.
 
     AR uses ar_trn_date. pmt_detail is filtered via join to ar on pd_ar_trn_id.
 
     Other tables (e.g. customer, item, route) use SELECT * even when *since* is set.
     """
     if table == "ordr":
-        amt = "COALESCE(ordr_amt, 0) <> 0"
+        amt = "(COALESCE(ordr_amt, 0) <> 0 OR COALESCE(ordr_qty_sold, 0) <> 0)"
         if since is not None:
             return (
                 "SELECT * FROM ordr WHERE COALESCE(ordr_dt, ordr_prdctn_dt) >= ? "
@@ -322,7 +323,7 @@ def _select_sql_for_table(table: str, since: datetime.date | None) -> tuple[str,
         qty = (
             "COALESCE(od.od_qty_sold, 0) <> 0"
         )
-        parent_amt = "COALESCE(o.ordr_amt, 0) <> 0"
+        parent_amt = "(COALESCE(o.ordr_amt, 0) <> 0 OR COALESCE(o.ordr_qty_sold, 0) <> 0)"
         if since is not None:
             return (
                 "SELECT od.* FROM ordr_detail AS od "

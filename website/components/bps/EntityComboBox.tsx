@@ -41,7 +41,7 @@ export type EntityComboBoxProps<T> = {
   getLabel: (item: T) => string;
   /** Optional class applied to the row label text only. */
   getItemLabelClassName?: (item: T) => string | undefined;
-  /** Semantic weight applied to the row label; takes precedence over getItemLabelClassName. */
+  /** Semantic weight applied to the row label; getItemLabelClassName is applied after it (e.g. a colour). */
   getItemWeight?: (item: T) => ItemWeight | undefined;
   /** Text shown in the inline search input after selection; defaults to getLabel. */
   getInputLabel?: (item: T) => string;
@@ -54,6 +54,8 @@ export type EntityComboBoxProps<T> = {
   onInputValueChange?: (value: string) => void;
   /** Called when Enter is pressed while no selectable row is available. */
   onInputCommit?: (value: string) => void;
+  /** With alwaysOpen: Enter commits the typed text (onInputCommit) unless the user picked a row with the arrow keys since typing. */
+  enterCommitsText?: boolean;
   /** Sort visible rows; defaults to stable order by getId. */
   getSortKey?: (item: T) => string;
   placeholder?: string;
@@ -162,6 +164,7 @@ export function EntityComboBox<T>({
   inputValue,
   onInputValueChange,
   onInputCommit,
+  enterCommitsText = false,
   getSortKey,
   placeholder = 'Select…',
   disabled,
@@ -517,8 +520,12 @@ export function EntityComboBox<T>({
     });
   }, [autoFocus, disabled, focusSearchInput, loading]);
 
+  // Arrow keys used since the last typing (enterCommitsText: Enter then picks the highlighted row instead of the text)
+  const arrowNavigatedRef = React.useRef(false);
+
   const handleQueryChange = React.useCallback(
     (next: string) => {
+      arrowNavigatedRef.current = false;
       cancelBlurRestoreTimer();
       if (isInputControlled) {
         onInputValueChange?.(next);
@@ -621,6 +628,13 @@ export function EntityComboBox<T>({
         return;
       }
 
+      if (event.key === 'Enter' && enterCommitsText && !arrowNavigatedRef.current) {
+        event.preventDefault();
+        event.stopPropagation();
+        onInputCommit?.(currentInputValue);
+        return;
+      }
+
       if (event.key === 'Enter' && rows.length === 0) {
         event.preventDefault();
         onInputCommit?.(currentInputValue);
@@ -640,6 +654,7 @@ export function EntityComboBox<T>({
       if (event.key === 'ArrowDown') {
         event.preventDefault();
         event.stopPropagation();
+        arrowNavigatedRef.current = true;
         if (listCollapsed) {
           if (listOpenRequestKeyRef.current !== listRequestKey) {
             listOpenRequestKeyRef.current = listRequestKey;
@@ -665,6 +680,7 @@ export function EntityComboBox<T>({
       if (event.key === 'ArrowUp' && !listCollapsed) {
         event.preventDefault();
         event.stopPropagation();
+        arrowNavigatedRef.current = true;
         if (selectableRowIndexes.length > 0) {
           setActiveRowIndex((current) => {
             const currentPosition = selectableRowIndexes.indexOf(current);
@@ -683,6 +699,7 @@ export function EntityComboBox<T>({
       clearSelection,
       commitSelection,
       currentInputValue,
+      enterCommitsText,
       inputHasFullSelection,
       isInputControlled,
       listCollapsed,
@@ -744,7 +761,8 @@ export function EntityComboBox<T>({
               <span
                 className={cn(
                   'min-w-0 flex-1 truncate font-mono text-xs leading-none',
-                  getItemWeight ? WEIGHT_CLASS[getItemWeight(item) ?? 'regular'] : getItemLabelClassName?.(item),
+                  getItemWeight ? WEIGHT_CLASS[getItemWeight(item) ?? 'regular'] : undefined,
+                  getItemLabelClassName?.(item),
                 )}
                 style={{ paddingLeft: level * 10 }}
               >

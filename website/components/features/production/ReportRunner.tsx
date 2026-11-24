@@ -7,7 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-export type ReportKind = 'bakers' | 'labels' | 'packaging' | 'delivery';
+export type ReportKind = 'bakers' | 'labels' | 'packaging' | 'invoices' | 'delivery';
 
 interface Defaults {
   from_date: string;
@@ -27,7 +27,7 @@ interface Props {
   title: string;
   description: string;
   /** When set, the user first lists customers and ticks the ones to include (none are ticked by default). */
-  customerBasis?: 'ORDER' | 'INVOICE';
+  customerBasis?: 'ORDER' | 'INVOICE' | 'PRINT';
   customerColumnLabel?: string;
 }
 
@@ -166,7 +166,9 @@ export function ReportRunner({ tenantId, report, title, description, customerBas
             <p className="text-sm text-muted-foreground">
               {customerBasis === 'INVOICE'
                 ? 'No invoices for these dates. Process the run first (Production > Process Run).'
-                : 'No orders for these dates.'}
+                : customerBasis === 'PRINT'
+                  ? 'No issued invoices for these dates. Draft invoices get their numbers when the Packaging List is printed.'
+                  : 'No orders for these dates.'}
             </p>
           ) : (
             <>
