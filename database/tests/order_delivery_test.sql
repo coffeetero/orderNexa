@@ -57,8 +57,8 @@ BEGIN
   INSERT INTO _id SELECT 'inv_a', ar_transaction_id FROM ar_transactions WHERE customer_id = a AND transaction_type = 'INV';
   INSERT INTO _id SELECT 'inv_b', ar_transaction_id FROM ar_transactions WHERE customer_id = b AND transaction_type = 'INV';
 
-  INSERT INTO _t VALUES ('before shipping nothing is receivable', ar_invoice_recognized_amount((SELECT v FROM _id WHERE k='inv_a')) = 0
-      AND (ar_customer_balance_get(200000000002, a)->>'balance')::numeric = 0);
+  INSERT INTO _t VALUES ('an issued invoice counts in AR at its amount even before shipping',
+      (ar_customer_balance_get(200000000002, a)->>'balance')::numeric = (SELECT amount FROM ar_transactions WHERE ar_transaction_id = (SELECT v FROM _id WHERE k='inv_a')));
   INSERT INTO _t VALUES ('the carrier customer got a CARRIER shipment that requires tracking', sb->>'delivery_method_code' = 'CARRIER' AND (sb->>'requires_tracking')::boolean);
 END $$;
 
@@ -103,20 +103,18 @@ BEGIN
   INSERT INTO _t VALUES ('confirm: order line fulfilled_quantity follows what shipped',
       (SELECT fulfilled_quantity = 8 FROM om_order_lines WHERE order_id = o1 AND item_description = 'Roll')
       AND (SELECT fulfilled_quantity = 5 FROM om_order_lines WHERE order_id = o1 AND item_description = 'Loaf'));
-  INSERT INTO _t VALUES ('recognized = shipped x price (8x2 + 5x4) + the order delivery charge 6 = 42', ar_invoice_recognized_amount(ia) = 42);
-  INSERT INTO _t VALUES ('the unshipped carrier invoice still recognises nothing', ar_invoice_recognized_amount(ib) = 0);
-  INSERT INTO _t VALUES ('balance of customer A is 42 (invoice printed total stays 46)', (ar_customer_balance_get(200000000002, a)->>'balance')::numeric = 42
-      AND (SELECT amount FROM ar_transactions WHERE ar_transaction_id = ia) = 46);
+  INSERT INTO _t VALUES ('a short shipment does not change the invoice: balance of customer A stays the invoice amount 46',
+      (ar_customer_balance_get(200000000002, a)->>'balance')::numeric = 46 AND (SELECT amount FROM ar_transactions WHERE ar_transaction_id = ia) = 46);
 
   r := om_shipment_confirm(200000000002, v_other, '{"shipment_status":"DELIVERED","tracking_reference":"1Z999","carrier":"UPS","delivery_cost":12.5}'::jsonb);
   INSERT INTO _t VALUES ('carrier shipment: tracking, carrier and cost stored, DELIVERED',
       (SELECT shipment_status = 'DELIVERED' AND tracking_reference = '1Z999' AND carrier = 'UPS' AND delivery_cost = 12.5 FROM om_shipments WHERE shipment_id = v_other));
-  INSERT INTO _t VALUES ('carrier invoice is now receivable (3 x 10 = 30)', ar_invoice_recognized_amount(ib) = 30 AND (ar_customer_balance_get(200000000002, b)->>'balance')::numeric = 30);
+  INSERT INTO _t VALUES ('carrier invoice counts at its amount (3 x 10 = 30)', (ar_customer_balance_get(200000000002, b)->>'balance')::numeric = 30);
   -- repeat to move SHIPPED -> DELIVERED keeps the original ship time
   PERFORM pg_sleep(0.01);
   PERFORM om_shipment_confirm(200000000002, v_ship, '{"shipment_status":"DELIVERED"}'::jsonb);
   INSERT INTO _t VALUES ('SHIPPED can be moved to DELIVERED without changing the shipped quantities',
-      (SELECT shipment_status = 'DELIVERED' FROM om_shipments WHERE shipment_id = v_ship) AND ar_invoice_recognized_amount(ia) = 42);
+      (SELECT shipment_status = 'DELIVERED' FROM om_shipments WHERE shipment_id = v_ship) );
 END $$;
 
 DO $$
@@ -164,7 +162,7 @@ BEGIN
   lk := ar_document_lookup(200000000002, lower(num));
   INSERT INTO _t VALUES ('lookup by invoice number (case-insensitive) returns the invoice with lines and credits',
       jsonb_array_length(lk->'invoices') = 1 AND jsonb_array_length(lk->'invoices'->0->'lines') = 3 AND jsonb_array_length(lk->'invoices'->0->'credits') = 2
-      AND (lk->'invoices'->0->>'credited_amount')::numeric = 16 AND (lk->'invoices'->0->>'recognized_amount')::numeric = 42);
+      AND (lk->'invoices'->0->>'credited_amount')::numeric = 16 AND (lk->'invoices'->0->>'recognized_amount')::numeric = 46);
   INSERT INTO _t VALUES ('lookup shows shipped and credited quantities per line',
       EXISTS (SELECT 1 FROM jsonb_array_elements(lk->'invoices'->0->'lines') l WHERE l->>'item_description' = 'Roll' AND (l->>'shipped_quantity')::numeric = 8 AND (l->>'credited_quantity')::numeric = 8));
   SELECT order_number INTO o1num FROM om_orders WHERE order_id = (SELECT v FROM _id WHERE k='o1');

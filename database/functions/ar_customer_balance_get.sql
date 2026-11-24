@@ -29,7 +29,7 @@ BEGIN
         SELECT t.ar_transaction_id, t.transaction_type, t.amount FROM ar_transactions t
          WHERE t.tenant_id = p_tenant_id AND t.customer_id IN (SELECT customer_id FROM tree) AND t.status NOT IN ('DRAFT', 'CANCELLED')
     )
-    SELECT COALESCE(SUM(bps.ar_invoice_recognized_amount(d.ar_transaction_id)) FILTER (WHERE d.transaction_type = 'INV'), 0),
+    SELECT COALESCE(SUM(d.amount) FILTER (WHERE d.transaction_type = 'INV'), 0),
            COALESCE(SUM(d.amount) FILTER (WHERE d.transaction_type = 'CM'), 0),
            COALESCE((SELECT SUM(pa.applied_amount) FROM ar_payment_applications pa WHERE pa.tenant_id = p_tenant_id
                         AND pa.ar_transaction_id IN (SELECT ar_transaction_id FROM docs WHERE transaction_type = 'INV')), 0)

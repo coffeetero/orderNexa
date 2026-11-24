@@ -27,7 +27,7 @@ BEGIN
         SELECT jsonb_agg(jsonb_build_object(
                    'ar_transaction_id', t.ar_transaction_id, 'document_number', t.document_number, 'status', t.status,
                    'customer_name', c.customer_name, 'delivery_date', t.transaction_date, 'amount', t.amount,
-                   'recognized_amount', bps.ar_invoice_recognized_amount(t.ar_transaction_id),
+                   'recognized_amount', CASE WHEN t.status IN ('DRAFT', 'CANCELLED') THEN 0 ELSE t.amount END,
                    'credited_amount', COALESCE((SELECT -SUM(ct.amount) FROM ar_transactions ct WHERE ct.applies_to_ar_transaction_id = t.ar_transaction_id AND ct.status <> 'CANCELLED'), 0),
                    'lines', COALESCE((SELECT jsonb_agg(jsonb_build_object(
                                 'ar_transaction_line_id', l.ar_transaction_line_id, 'source_type', l.source_type,

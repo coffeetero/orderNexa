@@ -276,7 +276,7 @@ BEGIN
       AND EXISTS (SELECT 1 FROM ar_transaction_lines l
                    WHERE l.tenant_id = v_tenant_id AND l.ar_transaction_id = arTrx.ar_transaction_id AND l.order_id IS NOT NULL);
 
-    -- 5b) The amount due in the old system is ar_trn_amt + invoice discount + allowance (payments were applied against it).
+    -- 5b) The amount due in the old system is ar_trn_amt + invoice discount + allowance + terms discount (payments were applied against it).
     --     Any gap between the lines and that amount becomes one explicit adjustment line, so the total matches the old invoice
     --     and the difference stays visible for review.
     INSERT INTO ar_transaction_lines (
@@ -300,8 +300,8 @@ BEGIN
     INNER JOIN ar a ON a.ar_trn_id = arTrx.legacy_ar_id
     CROSS JOIN LATERAL (
         SELECT COALESCE(SUM(l.amount), 0) AS lines_total, COALESCE(MAX(l.line_number), 0) AS max_ln,
-               (COALESCE(a.ar_trn_amt, 0) + COALESCE(a.ar_trn_discount_amt, 0) + COALESCE(a.ar_trn_allowance_amt, 0)) AS target,
-               (COALESCE(a.ar_trn_amt, 0) + COALESCE(a.ar_trn_discount_amt, 0) + COALESCE(a.ar_trn_allowance_amt, 0)) - COALESCE(SUM(l.amount), 0) AS gap
+               (COALESCE(a.ar_trn_amt, 0) + COALESCE(a.ar_trn_discount_amt, 0) + COALESCE(a.ar_trn_allowance_amt, 0) + COALESCE(a.ar_trn_terms_discount_amt, 0)) AS target,
+               (COALESCE(a.ar_trn_amt, 0) + COALESCE(a.ar_trn_discount_amt, 0) + COALESCE(a.ar_trn_allowance_amt, 0) + COALESCE(a.ar_trn_terms_discount_amt, 0)) - COALESCE(SUM(l.amount), 0) AS gap
           FROM ar_transaction_lines l
          WHERE l.tenant_id = v_tenant_id AND l.ar_transaction_id = arTrx.ar_transaction_id
     ) x

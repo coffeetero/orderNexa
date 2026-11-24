@@ -95,6 +95,7 @@ def main() -> int:
         conn.commit()
 
         seed_paths: list[tuple[str, Path]] = []
+        seed_paths.append(("index_legacy_tables.sql", HERE / "index_legacy_tables.sql"))
         if BOOTSTRAP_SQL.is_file():
             seed_paths.append((BOOTSTRAP_SQL.name, BOOTSTRAP_SQL))
         else:

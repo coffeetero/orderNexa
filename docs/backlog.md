@@ -91,3 +91,10 @@ Status: first release built (see docs/Architecture/health-checks.md): two tables
 - Textbook: cash applies to invoices only; a credit memo applies to an invoice through a credit application, never as negative cash. The old data does not say which invoice the credit reduced, so history cannot be converted that way without guessing.
 - To do: a credit application concept (credit memo to invoice, with amount and date), a rule to restore the check `applied_amount > 0`, and a one-time clean-up of the negative rows with Alpine's accountant. The negative rows are the only ones below zero today (1 row), so they are easy to find.
 - Same section: the 21 over-applied invoices (second payment on an invoice already paid) stay as in the old data until the manager reviews them.
+
+### Full-history reconciliation (pump since 2000-01-01, 2026-11-23): items for the Alpine manager
+- Invoices: 530,305 migrated; amounts agree 100% with the old amount due (old amount + invoice discount + allowance + terms discount). Open balance agrees for 99.89%. The 592 that differ: 262 over-applied (payments applied above the invoice, net -103,857.77), 329 closed in the old system (balance 0) with no payment application (317 have none at all; 2000 to 2019, 56 customers, total about 33,500), 1 not shipped yet (405.90).
+- AR for customers that are not in the customer table: 481 invoices (38,560.97) and 12 payments (customer 165 for 10 payments in 2001 and 2002, and customer 0 for a pair of 10.10 entries). Not migrated; the customers were probably deleted.
+- Payments: 43,513 of 43,897 migrated. Amounts, application counts and applied amounts agree 100%. Skipped: 372 zero-amount and the 12 above.
+- Pump: `index_legacy_tables.sql` now runs first in seed_all.py (legacy tables have no indexes). Migration of the full history runs in about 2 minutes.
+- To check next: speed of the app's AR reports on 530,000 invoices (`ar_sales_report_get`, `ar_report_open_items`, `ar_customer_balance_get` call `ar_invoice_recognized_amount` per invoice).
