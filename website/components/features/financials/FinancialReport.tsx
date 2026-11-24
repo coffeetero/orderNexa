@@ -104,7 +104,6 @@ export function FinancialReport({ tenantId, kind }: { tenantId: number; kind: Re
             </>
           ) : (
             <>
-              {kind === 'statements' && <div><Label htmlFor="from" className="text-xs">Statement from</Label><Input id="from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></div>}
               <div><Label htmlFor="asof" className="text-xs">As of date</Label><Input id="asof" type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)} /></div>
             </>
           )}

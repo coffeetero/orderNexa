@@ -68,10 +68,12 @@ BEGIN
   INSERT INTO _t VALUES ('aging puts the invoice in 31-60 and the credit in 1-30', (a ->> 'd31_60')::numeric = 15 AND (a ->> 'd1_30')::numeric = -5 AND (a ->> 'total')::numeric = 10);
   INSERT INTO _t VALUES ('aging totals add up', ((j -> 'totals') ->> 'total')::numeric = 10);
 
-  j := ar_statement_get(200000000002, (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 156), current_date, current_date - 60);
-  INSERT INTO _t VALUES ('statement from before the invoice: opening 0, closing 10, 3 entries', (j ->> 'opening_balance')::numeric = 0 AND (j ->> 'closing_balance')::numeric = 10 AND jsonb_array_length(j -> 'entries') = 3);
-  j := ar_statement_get(200000000002, (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 156), current_date, current_date - 30);
-  INSERT INTO _t VALUES ('statement carries the earlier invoice as opening 25 and a running balance', (j ->> 'opening_balance')::numeric = 25 AND ((j -> 'entries' -> 0) ->> 'balance')::numeric = 15 AND (j ->> 'closing_balance')::numeric = 10);
+  j := ar_statement_get(200000000002, (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 156), current_date);
+  INSERT INTO _t VALUES ('open-item statement: total due 10 equals the aging total', (j ->> 'total_due')::numeric = 10 AND (j -> 'aging' ->> 'total')::numeric = 10);
+  INSERT INTO _t VALUES ('statement lists the open invoice (15) and the credit (-5), not the applied payment',
+     (SELECT count(*) FROM jsonb_array_elements(j -> 'weeks') w, jsonb_array_elements(w -> 'items') i) = 2
+     AND EXISTS (SELECT 1 FROM jsonb_array_elements(j -> 'weeks') w, jsonb_array_elements(w -> 'items') i WHERE i ->> 'number' = 'ZZ-INV-1' AND (i ->> 'open')::numeric = 15));
+  INSERT INTO _t VALUES ('week subtotals add up to the total due', (SELECT SUM((w ->> 'subtotal')::numeric) FROM jsonb_array_elements(j -> 'weeks') w) = 10);
 
   j := ar_sales_report_get(200000000002, acc, current_date - 60, current_date);
   a := j -> 'accounts' -> 0;

@@ -57,18 +57,22 @@ export function agingSpec(data: Json, company: string): PdfSpec {
 
 export function statementSpec(data: Json, company: string): PdfSpec {
   const g = data.aging ?? {};
+  const rows: string[][] = [];
+  for (const w of data.weeks as Json[]) {
+    for (const i of w.items as Json[]) rows.push([day(i.date), TYPE_NAME[i.type] ?? i.type, i.number, money(i.amount), money(i.open)]);
+    rows.push(['', '', '', 'Week subtotal', money(w.subtotal)]);
+  }
   return {
     title: `Statement - ${label(data)}`, company,
-    subtitle: [`Statement period ${day(data.from)} to ${day(data.as_of)}  (as of ${day(data.as_of)})`],
+    subtitle: [`Statement date ${day(data.as_of)}   Total due ${money(data.total_due)}`, 'Open items: invoices, credits and unapplied payments not yet settled.'],
     sections: [
       {
         columns: [
-          { label: 'Date', width: 12 }, { label: 'Type', width: 14 }, { label: 'Number', width: 18 },
-          { label: 'Charges', width: 14, align: 'right' }, { label: 'Credits', width: 14, align: 'right' }, { label: 'Balance', width: 14, align: 'right' },
+          { label: 'Date', width: 14 }, { label: 'Type', width: 16 }, { label: 'Number', width: 20 },
+          { label: 'Amount', width: 16, align: 'right' }, { label: 'Open amount', width: 16, align: 'right' },
         ],
-        note: `Opening balance ${money(data.opening_balance)}`,
-        rows: (data.entries as Json[]).map((e) => [day(e.date), TYPE_NAME[e.type] ?? e.type, e.number, Number(e.charge) ? money(e.charge) : '', Number(e.credit) ? money(e.credit) : '', money(e.balance)]),
-        footer: ['', '', 'Amount due', '', '', money(data.closing_balance)],
+        rows,
+        footer: ['', '', '', 'Total due', money(data.total_due)],
       },
       {
         heading: 'Aging of open items',

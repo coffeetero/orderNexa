@@ -52,7 +52,6 @@ export async function POST(request: Request) {
   if (kind === 'sales' ? !isDate(from) || !isDate(to) : !isDate(asOf)) {
     return NextResponse.json({ error: kind === 'sales' ? 'from and to dates are required' : 'as_of date is required' }, { status: 400 });
   }
-  if (kind === 'statements' && !isDate(from)) return NextResponse.json({ error: 'from date is required' }, { status: 400 });
 
   const auth = await requireStaff();
   if (!auth.ok) return auth.response;
@@ -72,13 +71,13 @@ export async function POST(request: Request) {
   if (kind === 'statements') {
     const specs = [];
     for (const id of customerIds) {
-      const { data, error } = await supabase.rpc('ar_statement_get', { p_tenant_id: tenantId, p_account_id: id, p_as_of: asOf, p_from: from });
+      const { data, error } = await supabase.rpc('ar_statement_get', { p_tenant_id: tenantId, p_account_id: id, p_as_of: asOf });
       if (error) return fail(error.message);
       const spec = statementSpec(data, company);
       specs.push(spec);
       pieces.push({
         customerId: id, title: `Statement ${data.customer_name} - as of ${asOf}`, fileName: `statement-${data.customer_number ?? id}-${asOf}.pdf`,
-        bytes: await renderSpecs([spec]), parameters: { kind, from, as_of: asOf, customer_ids: [id], customer_names: [data.customer_name] },
+        bytes: await renderSpecs([spec]), parameters: { kind, as_of: asOf, customer_ids: [id], customer_names: [data.customer_name] },
       });
     }
     combined = await renderSpecs(specs);
