@@ -9,7 +9,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { createClient } from '@/lib/supabase/client';
-import { parseTenantSubdomain } from '@/lib/tenant-subdomain';
 
 const supabase = createClient();
 
@@ -42,89 +41,17 @@ function LoginForm() {
 
     if (authData?.user) {
       try {
-
-        // STEP 1: Get the core user profile
-        const { data: profile, error: profileError } = await supabase
-          .from('fnd_users')
-          .select('user_type, user_id')
-          .eq('auth_user_id', authData.user.id)
-          .maybeSingle();
-
-        if (profileError) {
-          console.error("❌ [Stage 2] Database Query Error:", {
-            code: profileError.code,
-            message: profileError.message,
-            hint: profileError.hint
-          });
-        }
-
-        if (!profile) {
-          console.warn("⚠️ [Stage 2] No BPS profile found for this account.");
+        // Where this user starts (decided server-side by /api/auth/landing)
+        const res = await fetch('/api/auth/landing');
+        const landing = await res.json().catch(() => ({}));
+        if (!res.ok || !landing.href) {
           await supabase.auth.signOut();
-          setError('Access Denied: User record not found.');
+          setError(landing.error ?? 'Access Denied: User record not found.');
           setLoading(false);
           return;
         }
-
         router.refresh();
-
-        // STEP 2: Handle Redirection
-        if (profile.user_type === 'TENANCY_USER') {
-          router.replace('/dashboard');
-        }
-        else if (profile.user_type === 'CUSTOMER_USER') {
-          // The customer portal is only served on a tenant host (e.g. alpine.ordernexa.com).
-          if (!parseTenantSubdomain(window.location.host)) {
-            await supabase.auth.signOut();
-            setError("Customer accounts sign in from your bakery's own web address, not this one.");
-            setLoading(false);
-            return;
-          }
-          
-          // STEP 3: Separate query for Customer Link
-          const { data: linkData, error: linkError } = await supabase
-            .from('fnd_user_customers')
-            .select('customer_id')
-            .eq('user_id', profile.user_id)
-            .maybeSingle();
-
-          if (linkError) {
-            console.error("❌ [Stage 3] Link Table Error:", linkError);
-          }
-
-          if (!linkData?.customer_id) {
-            console.error("⚠️ [Stage 3] Link missing for user_id:", profile.user_id);
-            setError('Configuration error: No customer assigned to this user.');
-            setLoading(false);
-            return;
-          }
-
-
-          // STEP 4: Direct lookup for the slug
-          const { data: customer, error: customerError } = await supabase
-            .from('fnd_customers')
-            .select('account_slug')
-            .eq('customer_id', linkData.customer_id)
-            .maybeSingle();
-
-          if (customerError) {
-            console.error("❌ [Stage 4] Slug lookup Error:", customerError);
-          }
-
-          const finalSlug = customer?.account_slug;
-
-          if (finalSlug) {
-            router.replace(`/${finalSlug}`);
-          } else {
-            console.error("⚠️ [Stage 4] Final slug was null or undefined.");
-            setError('Configuration error: Account slug not found.');
-            setLoading(false);
-          }
-        } else {
-          await supabase.auth.signOut();
-          setError('Access Denied: Unrecognized account type.');
-          setLoading(false);
-        }
+        router.replace(landing.href);
       } catch (err) {
         console.error('🔥 [Critical] Login Logic failed:', err);
         setError('An unexpected error occurred during login.');
@@ -159,7 +86,10 @@ function LoginForm() {
                 <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
               </div>
               <div className="space-y-1.5 text-left">
-                <Label htmlFor="password">Password</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password">Password</Label>
+                  <Link href="/forgot-password" className="text-xs text-muted-foreground hover:text-foreground">Forgot password?</Link>
+                </div>
                 <div className="relative">
                   <Input id="password" type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} required />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">

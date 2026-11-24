@@ -1,13 +1,24 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { Copy, Mail, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { AccountPicker } from '@/components/features/orders/AccountPicker';
+import type { CustomerOption } from '@/components/features/account/order-entry/OrderHeaderRow';
 import { adminCall, adminPost, PageHead, useBanner } from './adminShared';
 
-interface UserRow { user_id: number; user_name: string | null; email: string | null; user_type: string; is_active: boolean; role_ids: number[]; group_ids: number[]; customers: string[] }
+type InviteStatus = 'ACTIVE' | 'INVITED' | 'NOT_INVITED';
+interface UserRow { user_id: number; user_name: string | null; email: string | null; user_type: string; is_active: boolean; status: InviteStatus; invited_at: string | null; role_ids: number[]; group_ids: number[]; customers: string[] }
 interface Role { role_id: number; role_name: string; role_audience: string; is_active: boolean }
 interface Group { group_id: number; group_name: string; is_all_customers: boolean; is_active: boolean }
+interface NewUser { email: string; user_name: string; account: CustomerOption | null; role_ids: number[]; group_ids: number[] }
+interface InviteResult { sent: boolean; email: string; link?: string; reason?: string }
+
+const STATUS_LABEL: Record<InviteStatus, string> = { ACTIVE: 'Signed in', INVITED: 'Invited', NOT_INVITED: 'Not invited' };
+const shortDate = (v: string | null) => (v ? new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '');
 
 export function UsersAdmin({ tenantId, audience: pageAudience }: { tenantId: number; audience: 'TENANT' | 'CUSTOMER' }) {
   const { notify, banner } = useBanner();
@@ -15,6 +26,9 @@ export function UsersAdmin({ tenantId, audience: pageAudience }: { tenantId: num
   const [roles, setRoles] = useState<Role[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [sel, setSel] = useState<UserRow | null>(null);
+  const [adding, setAdding] = useState<NewUser | null>(null);
+  const [customers, setCustomers] = useState<CustomerOption[] | null>(null);
+  const [invite, setInvite] = useState<InviteResult | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -24,13 +38,23 @@ export function UsersAdmin({ tenantId, audience: pageAudience }: { tenantId: num
         adminCall<Role[]>(`/api/admin/roles?tenant_id=${tenantId}`),
         adminCall<Group[]>(`/api/admin/groups?tenant_id=${tenantId}`),
       ]);
-      setUsers(u.filter((x) => (x.user_type === 'CUSTOMER_USER') === (pageAudience === 'CUSTOMER'))); setRoles(r); setGroups(g);
-    } catch (e) { notify((e as Error).message, 'error'); }
+      const mine = u.filter((x) => (x.user_type === 'CUSTOMER_USER') === (pageAudience === 'CUSTOMER'));
+      setUsers(mine); setRoles(r); setGroups(g);
+      return mine;
+    } catch (e) { notify((e as Error).message, 'error'); return []; }
   }, [tenantId, pageAudience, notify]);
   useEffect(() => { void load(); }, [load]);
 
-  const audience = sel?.user_type === 'CUSTOMER_USER' ? 'CUSTOMER' : 'TENANT';
+  // the customer accounts list is only needed to add a customer user
+  useEffect(() => {
+    if (pageAudience !== 'CUSTOMER' || !adding || customers !== null) return;
+    adminCall<CustomerOption[]>(`/api/customers?tenant_id=${tenantId}&hierarchy=true&active=true`)
+      .then(setCustomers).catch((e: Error) => { setCustomers([]); notify(e.message, 'error'); });
+  }, [pageAudience, adding, customers, tenantId, notify]);
+
+  const audience = pageAudience;
   const flip = (list: number[], id: number, on: boolean) => (on ? [...list, id] : list.filter((x) => x !== id));
+  const pick = (u: UserRow) => { setSel(u); setAdding(null); setInvite(null); };
 
   async function save() {
     if (!sel) return;
@@ -42,23 +66,82 @@ export function UsersAdmin({ tenantId, audience: pageAudience }: { tenantId: num
     } catch (e) { notify((e as Error).message, 'error'); } finally { setBusy(false); }
   }
 
+  async function create() {
+    if (!adding) return;
+    setBusy(true);
+    try {
+      const userId = await adminPost<number>('/api/admin/users/create', {
+        tenant_id: tenantId, email: adding.email, user_name: adding.user_name,
+        user_type: pageAudience === 'CUSTOMER' ? 'CUSTOMER_USER' : 'TENANCY_USER',
+        customer_id: adding.account?.customer_id ?? null, role_ids: adding.role_ids, group_ids: adding.group_ids,
+      });
+      notify(`${adding.user_name} added. Send the invite when you are ready.`, 'success');
+      const list = await load();
+      setAdding(null);
+      setSel(list.find((u) => u.user_id === userId) ?? null);
+    } catch (e) { notify((e as Error).message, 'error'); } finally { setBusy(false); }
+  }
+
+  async function sendInvite() {
+    if (!sel) return;
+    setBusy(true); setInvite(null);
+    try {
+      const r = await adminPost<InviteResult>('/api/admin/users/invite', { tenant_id: tenantId, user_id: sel.user_id });
+      setInvite(r);
+      notify(r.sent ? `Invite sent to ${r.email}.` : `Invite created for ${r.email}, but no email was sent: ${r.reason ?? ''}`, r.sent ? 'success' : 'error');
+      const list = await load();
+      setSel(list.find((u) => u.user_id === sel.user_id) ?? null);
+    } catch (e) { notify((e as Error).message, 'error'); } finally { setBusy(false); }
+  }
+
+  async function copyLink(link: string) {
+    try { await navigator.clipboard.writeText(link); notify('Link copied.', 'success'); } catch { notify('Copy failed — select the link and copy it.', 'error'); }
+  }
+
+  const roleList = (chosen: number[], set: (ids: number[]) => void) => (
+    <div>
+      <div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Roles</div>
+      {roles.filter((r) => r.role_audience === audience && r.is_active).map((r) => (
+        <label key={r.role_id} className="flex items-center gap-2 py-0.5 text-sm">
+          <Checkbox checked={chosen.includes(r.role_id)} onCheckedChange={(v) => set(flip(chosen, r.role_id, v === true))} /> {r.role_name}
+        </label>
+      ))}
+    </div>
+  );
+  const groupList = (chosen: number[], set: (ids: number[]) => void) => audience === 'TENANT' && (
+    <div>
+      <div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Customer groups</div>
+      {groups.filter((g) => g.is_active).map((g) => (
+        <label key={g.group_id} className="flex items-center gap-2 py-0.5 text-sm">
+          <Checkbox checked={chosen.includes(g.group_id)} onCheckedChange={(v) => set(flip(chosen, g.group_id, v === true))} /> {g.group_name}
+        </label>
+      ))}
+    </div>
+  );
+
   return (
     <div className="space-y-4 p-2 sm:p-3">
       <PageHead title={pageAudience === 'CUSTOMER' ? 'Customer Users' : 'Company Users'}>
         Give each person their roles and, for your own staff, the customer groups they can see. A user with no role can sign in but sees nothing;
-        a staff user with no group sees no customers. New users are not created here yet.
+        a staff user with no group sees no customers. Add a user, then send them an invite to choose their password.
       </PageHead>
       {banner}
+      <div className="flex justify-end">
+        <Button size="sm" onClick={() => { setSel(null); setInvite(null); setAdding({ email: '', user_name: '', account: null, role_ids: [], group_ids: [] }); }}>
+          <UserPlus className="mr-1.5 h-4 w-4" /> Add user
+        </Button>
+      </div>
       <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
         <div className="overflow-x-auto rounded-md border">
           <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-left text-xs"><tr><th className="px-3 py-2">User</th><th className="px-3 py-2">Type</th><th className="px-3 py-2">Roles</th><th className="px-3 py-2">Status</th></tr></thead>
+            <thead className="bg-muted/50 text-left text-xs"><tr><th className="px-3 py-2">User</th><th className="px-3 py-2">Type</th><th className="px-3 py-2">Roles</th><th className="px-3 py-2">Sign-in</th><th className="px-3 py-2">Status</th></tr></thead>
             <tbody>
               {users.map((u) => (
-                <tr key={u.user_id} onClick={() => setSel(u)} className={`cursor-pointer border-t hover:bg-muted ${sel?.user_id === u.user_id ? 'bg-muted' : ''}`}>
+                <tr key={u.user_id} onClick={() => pick(u)} className={`cursor-pointer border-t hover:bg-muted ${sel?.user_id === u.user_id ? 'bg-muted' : ''}`}>
                   <td className="px-3 py-2"><div className="font-medium">{u.user_name ?? '—'}</div><div className="text-xs text-muted-foreground">{u.email}{u.customers.length ? ` · ${u.customers.join(', ')}` : ''}</div></td>
                   <td className="px-3 py-2">{u.user_type === 'CUSTOMER_USER' ? 'Customer' : 'Staff'}</td>
                   <td className="px-3 py-2">{roles.filter((r) => u.role_ids.includes(r.role_id)).map((r) => r.role_name).join(', ') || <span className="text-muted-foreground">none</span>}</td>
+                  <td className="px-3 py-2"><span className={u.status === 'ACTIVE' ? '' : 'text-amber-700 dark:text-amber-400'}>{STATUS_LABEL[u.status]}</span>{u.status === 'INVITED' && <div className="text-xs text-muted-foreground">{shortDate(u.invited_at)}</div>}</td>
                   <td className="px-3 py-2">{u.is_active ? 'Active' : 'Inactive'}</td>
                 </tr>
               ))}
@@ -66,31 +149,44 @@ export function UsersAdmin({ tenantId, audience: pageAudience }: { tenantId: num
           </table>
         </div>
 
-        {sel ? (
+        {adding ? (
           <div className="space-y-4 rounded-md border p-4">
-            <div><div className="font-medium">{sel.user_name ?? sel.email}</div><div className="text-xs text-muted-foreground">{audience === 'TENANT' ? 'Staff' : 'Customer'} user</div></div>
-            <label className="flex items-center gap-2 text-sm"><Checkbox checked={sel.is_active} onCheckedChange={(v) => setSel({ ...sel, is_active: v === true })} /> Active in this tenancy</label>
-            <div>
-              <div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Roles</div>
-              {roles.filter((r) => r.role_audience === audience && r.is_active).map((r) => (
-                <label key={r.role_id} className="flex items-center gap-2 py-0.5 text-sm">
-                  <Checkbox checked={sel.role_ids.includes(r.role_id)} onCheckedChange={(v) => setSel({ ...sel, role_ids: flip(sel.role_ids, r.role_id, v === true) })} /> {r.role_name}
-                </label>
-              ))}
-            </div>
-            {audience === 'TENANT' && (
-              <div>
-                <div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Customer groups</div>
-                {groups.filter((g) => g.is_active).map((g) => (
-                  <label key={g.group_id} className="flex items-center gap-2 py-0.5 text-sm">
-                    <Checkbox checked={sel.group_ids.includes(g.group_id)} onCheckedChange={(v) => setSel({ ...sel, group_ids: flip(sel.group_ids, g.group_id, v === true) })} /> {g.group_name}
-                  </label>
-                ))}
+            <div className="font-medium">New {audience === 'TENANT' ? 'staff' : 'customer'} user</div>
+            <div className="space-y-1.5"><Label htmlFor="nu-email">Email</Label><Input id="nu-email" type="email" value={adding.email} onChange={(e) => setAdding({ ...adding, email: e.target.value })} /></div>
+            <div className="space-y-1.5"><Label htmlFor="nu-name">Name</Label><Input id="nu-name" value={adding.user_name} onChange={(e) => setAdding({ ...adding, user_name: e.target.value })} /></div>
+            {audience === 'CUSTOMER' && (
+              <div className="space-y-1.5"><Label htmlFor="nu-acct">Customer account</Label>
+                <AccountPicker customers={customers} value={adding.account} onChange={(a) => setAdding({ ...adding, account: a })} id="nu-acct" />
               </div>
             )}
+            {roleList(adding.role_ids, (ids) => setAdding({ ...adding, role_ids: ids }))}
+            {groupList(adding.group_ids, (ids) => setAdding({ ...adding, group_ids: ids }))}
+            <div className="flex gap-2"><Button onClick={create} disabled={busy}>Add user</Button><Button variant="outline" onClick={() => setAdding(null)}>Cancel</Button></div>
+          </div>
+        ) : sel ? (
+          <div className="space-y-4 rounded-md border p-4">
+            <div><div className="font-medium">{sel.user_name ?? sel.email}</div><div className="text-xs text-muted-foreground">{audience === 'TENANT' ? 'Staff' : 'Customer'} user · {sel.email}</div></div>
+            <div className="space-y-2 rounded-md bg-muted/40 p-3 text-sm">
+              <div>{STATUS_LABEL[sel.status]}{sel.status === 'INVITED' && ` on ${shortDate(sel.invited_at)}`}</div>
+              <Button size="sm" variant="outline" onClick={sendInvite} disabled={busy || !sel.is_active}>
+                <Mail className="mr-1.5 h-4 w-4" /> {sel.status === 'NOT_INVITED' ? 'Send invite' : sel.status === 'INVITED' ? 'Resend invite' : 'Send sign-in email'}
+              </Button>
+              {invite?.link && (
+                <div className="space-y-1">
+                  <div className="text-xs text-muted-foreground">Email is not set up yet. Pass this one-time link on yourself:</div>
+                  <div className="flex items-center gap-1">
+                    <Input readOnly value={invite.link} onFocus={(e) => e.currentTarget.select()} className="h-8 text-xs" />
+                    <Button size="sm" variant="ghost" onClick={() => copyLink(invite.link!)} aria-label="Copy link"><Copy className="h-4 w-4" /></Button>
+                  </div>
+                </div>
+              )}
+            </div>
+            <label className="flex items-center gap-2 text-sm"><Checkbox checked={sel.is_active} onCheckedChange={(v) => setSel({ ...sel, is_active: v === true })} /> Active in this tenancy</label>
+            {roleList(sel.role_ids, (ids) => setSel({ ...sel, role_ids: ids }))}
+            {groupList(sel.group_ids, (ids) => setSel({ ...sel, group_ids: ids }))}
             <div className="flex gap-2"><Button onClick={save} disabled={busy}>Save</Button><Button variant="outline" onClick={() => setSel(null)}>Cancel</Button></div>
           </div>
-        ) : <p className="text-sm text-muted-foreground">Choose a user to edit their access.</p>}
+        ) : <p className="text-sm text-muted-foreground">Choose a user to edit their access, or add a new one.</p>}
       </div>
     </div>
   );

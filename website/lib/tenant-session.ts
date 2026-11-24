@@ -24,7 +24,8 @@ export function decodeTenantClaims(accessToken: string | null | undefined): Tena
   }
 }
 
-/** Paths that never need a tenancy (public pages and the picker itself). */
+/** Paths that never need a tenancy (public pages, the picker itself, and accepting an invite / resetting a password). */
 export function isTenantFreePath(pathname: string): boolean {
-  return pathname === '/' || pathname === '/login' || pathname === '/select-tenant' || pathname.startsWith('/select-tenant/');
+  return pathname === '/' || pathname === '/login' || pathname === '/forgot-password' || pathname === '/select-tenant'
+    || pathname.startsWith('/select-tenant/') || pathname.startsWith('/auth/');
 }
