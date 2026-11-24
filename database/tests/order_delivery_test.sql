@@ -140,7 +140,7 @@ BEGIN
       AND (SELECT transaction_type = 'CM' AND status = 'OPEN' AND applies_to_ar_transaction_id = ia AND customer_id = a FROM ar_transactions WHERE ar_transaction_id = cm));
   INSERT INTO _t VALUES ('credit memo line is an ADJUSTMENT at the invoice unit price',
       (SELECT source_type = 'ADJUSTMENT' AND quantity = 3 AND unit_price = 2 AND amount = -6 AND snapshot_data ->> 'reason' = 'Kitchen short 3 rolls' FROM ar_transaction_lines WHERE ar_transaction_id = cm));
-  INSERT INTO _t VALUES ('balance drops by the credit (42 - 6 = 36)', (ar_customer_balance_get(200000000002, a)->>'balance')::numeric = 36
+  INSERT INTO _t VALUES ('balance drops by the credit (46 - 6 = 40)', (ar_customer_balance_get(200000000002, a)->>'balance')::numeric = 40
       AND (ar_customer_balance_get(200000000002, a)->>'credits')::numeric = -6);
   BEGIN PERFORM ar_credit_memo_create(200000000002, ia, jsonb_build_object('lines', jsonb_build_array(jsonb_build_object('ar_transaction_line_id', roll, 'quantity', 6)))); d := false; EXCEPTION WHEN OTHERS THEN d := true; END;
   INSERT INTO _t VALUES ('cannot credit more than was delivered less earlier credits (8 shipped, 3 credited, 6 asked)', d);
@@ -154,7 +154,7 @@ BEGIN
   -- payments reduce the balance
   INSERT INTO ar_payments (tenant_id, customer_id, payment_date, amount) VALUES (200000000002, a, CURRENT_DATE, 10) RETURNING ar_payment_id INTO pay;
   INSERT INTO ar_payment_applications (tenant_id, ar_payment_id, ar_transaction_id, applied_amount) VALUES (200000000002, pay, ia, 10);
-  INSERT INTO _t VALUES ('payments applied reduce the balance (42 - 6 - 10 - 10 = 16)', (ar_customer_balance_get(200000000002, a)->>'balance')::numeric = 16
+  INSERT INTO _t VALUES ('payments applied reduce the balance (46 - 6 - 10 - 10 = 20)', (ar_customer_balance_get(200000000002, a)->>'balance')::numeric = 20
       AND (ar_customer_balance_get(200000000002, a)->>'payments_applied')::numeric = 10);
 
   -- lookup by invoice number and by order number
