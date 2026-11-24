@@ -77,3 +77,17 @@ Status: first release built (see docs/Architecture/health-checks.md): two tables
 - Roles refactor: `fnd_roles.owner_customer_id` causes `TRUNCATE fnd_customers CASCADE` to wipe roles, role access and user roles. Move customer ownership into a table `fnd_customer_roles` and update the 7 functions, 5 policies, tests and the Roles page that use the column.
 - Migration: seeds still truncate or delete. Split a one-time reset step from the migration, make every seed an upsert by legacy id, then run the incremental pump without truncates.
 - Migration data to check: 106 invoices whose line total differs from the header (largest 567.08); 7 of 1,296 legacy payments not migrated; 16,193 invoices have no loaded orders (single total line).
+
+### Migration reconciliation: items for the Alpine manager (found 2026-11-23, window 2025-01-01; recheck after the wider window)
+- 9 invoices whose order detail lines differ from the order and AR amount: 523935, 525168, 525881, 525882 (looks swapped with 525881), 526310, 533169, 535715, 545814, and 523128 (AR is 65.00 above the order, explained by the -65.00 allowance). Also 524048: the AR row has no amount.
+- 21 invoices over-applied in `pmt_detail` (a second payment applied to an invoice already paid, for example 532679 and 529782). The old balance ignores the excess. Decision pending: cap the application at the invoice's open amount, leave the excess as an unapplied payment (customer credit), and list the invoices.
+- 4 AR invoices with money and no orders in the window: 523738 (65.00), 524235 (183.00), 526050 (allowance -171.60), 527555 (allowance -4.60). Check again with the earlier window.
+- 7 payments dated 2031 and 2043 (customers 330, 183, 526, 226, 159, 311, 445, total 5,598.70) and one 2039 invoice (10262, 0.00) are skipped by the future-date cutoff. They have no application rows in the loaded data.
+- 16,188 AR invoices with no orders and an amount of 0 or blank are not worth migrating (to filter out).
+- Reconciled so far (old open balance vs new): AR&C Bakery Dist matches exactly. The Harvard Club differs by 86.86 (the swapped pair). Hoboken, Bel Pane, Healthy Bakery and Healthy Bakery NYC differ because of over-applied payments and window edges.
+
+### AR: replace the negative payment application with textbook credit application (decided 2026-11-23)
+- For the conversion, a payment that nets a credit is stored as a negative `ar_payment_applications.applied_amount` (check changed from `> 0` to `<> 0`, `relax_ar_payment_application_sign.sql`). Balances equal the old system, but this is not textbook accounting. Example: payment 45875 (1,508.47) applies 1,719.67 to invoices and nets credit invoice 532260 (-211.20) as a -211.20 application.
+- Textbook: cash applies to invoices only; a credit memo applies to an invoice through a credit application, never as negative cash. The old data does not say which invoice the credit reduced, so history cannot be converted that way without guessing.
+- To do: a credit application concept (credit memo to invoice, with amount and date), a rule to restore the check `applied_amount > 0`, and a one-time clean-up of the negative rows with Alpine's accountant. The negative rows are the only ones below zero today (1 row), so they are easy to find.
+- Same section: the 21 over-applied invoices (second payment on an invoice already paid) stay as in the old data until the manager reviews them.

@@ -276,6 +276,38 @@ BEGIN
       AND EXISTS (SELECT 1 FROM ar_transaction_lines l
                    WHERE l.tenant_id = v_tenant_id AND l.ar_transaction_id = arTrx.ar_transaction_id AND l.order_id IS NOT NULL);
 
+    -- 5b) The amount due in the old system is ar_trn_amt + invoice discount + allowance (payments were applied against it).
+    --     Any gap between the lines and that amount becomes one explicit adjustment line, so the total matches the old invoice
+    --     and the difference stays visible for review.
+    INSERT INTO ar_transaction_lines (
+        tenant_id, ar_transaction_id, line_number, source_type, item_description,
+        quantity, unit_price, amount, order_id, item_id, snapshot_data
+    )
+    SELECT
+        arTrx.tenant_id,
+        arTrx.ar_transaction_id,
+        x.max_ln + 1,
+        'ADJUSTMENT',
+        'Legacy adjustment to match the old invoice amount',
+        1::NUMERIC(14,4),
+        x.gap::NUMERIC(14,4),
+        x.gap::NUMERIC(14,4),
+        NULL::BIGINT,
+        NULL::BIGINT,
+        jsonb_build_object('seed', 'line_legacy_adjustment', 'legacy_ar_trn_id', arTrx.legacy_ar_id,
+                           'legacy_amount_due', x.target, 'lines_total', x.lines_total)
+    FROM ar_transactions arTrx
+    INNER JOIN ar a ON a.ar_trn_id = arTrx.legacy_ar_id
+    CROSS JOIN LATERAL (
+        SELECT COALESCE(SUM(l.amount), 0) AS lines_total, COALESCE(MAX(l.line_number), 0) AS max_ln,
+               (COALESCE(a.ar_trn_amt, 0) + COALESCE(a.ar_trn_discount_amt, 0) + COALESCE(a.ar_trn_allowance_amt, 0)) AS target,
+               (COALESCE(a.ar_trn_amt, 0) + COALESCE(a.ar_trn_discount_amt, 0) + COALESCE(a.ar_trn_allowance_amt, 0)) - COALESCE(SUM(l.amount), 0) AS gap
+          FROM ar_transaction_lines l
+         WHERE l.tenant_id = v_tenant_id AND l.ar_transaction_id = arTrx.ar_transaction_id
+    ) x
+    WHERE arTrx.tenant_id = v_tenant_id
+      AND ABS(x.gap) > 0.005;
+
     -- 6) The invoice total is what its lines add up to (after discount and allowance)
     UPDATE ar_transactions t SET amount = x.total
       FROM (SELECT ar_transaction_id, SUM(amount) AS total FROM ar_transaction_lines WHERE tenant_id = v_tenant_id GROUP BY ar_transaction_id) x

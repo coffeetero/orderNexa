@@ -58,7 +58,7 @@ BEGIN
           pmt.tenant_id,
           pmt.ar_payment_id,
           arTrx.ar_transaction_id AS ar_transaction_id, -- (ar invoice_id)
-          ABS(COALESCE(pmtDtl.pd_pmt_amt, 0))::NUMERIC(14,4)
+          (-COALESCE(pmtDtl.pd_pmt_amt, 0))::NUMERIC(14,4)   -- signed: a positive old row nets a credit and is stored negative
         FROM ar_payments pmt
         INNER JOIN ar arSrc
           ON arSrc.ar_trn_id = pmt.legacy_ar_trn_id
@@ -66,7 +66,8 @@ BEGIN
           ON pmtDtl.pd_pmt_no = arSrc.ar_trn_ref
         INNER JOIN ar_transactions arTrx
           ON arTrx.legacy_ar_id = pmtDtl.pd_ar_trn_id
-          AND arTrx.tenant_id = pmt.tenant_id;
+          AND arTrx.tenant_id = pmt.tenant_id
+        WHERE COALESCE(pmtDtl.pd_pmt_amt, 0) <> 0;
 
         GET DIAGNOSTICS v_inserted = ROW_COUNT;
         RAISE NOTICE 'ar_payment_applications: inserted % rows', v_inserted;
