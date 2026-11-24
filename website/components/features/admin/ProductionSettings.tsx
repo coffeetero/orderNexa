@@ -307,6 +307,46 @@ function RunRowEditor({ row, tenantId, notify }: { row: RunRow; tenantId: number
   );
 }
 
+function CustomerNumberMaskEditor({ tenantId, notify }: { tenantId: number; notify: Notify }) {
+  const [mask, setMask] = useState('');
+  const [saved, setSaved] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    call<{ customer_number_mask: string | null }>(`/api/admin/format-settings?tenant_id=${tenantId}`)
+      .then((d) => { setMask(d.customer_number_mask ?? ''); setSaved(d.customer_number_mask ?? ''); })
+      .catch((e) => notify((e as Error).message, 'error'));
+  }, [tenantId, notify]);
+
+  const save = async () => {
+    setBusy(true);
+    try {
+      await post('/api/admin/format-settings', { tenant_id: tenantId, customer_number_mask: mask.trim() || null });
+      setSaved(mask.trim());
+      notify('Customer number mask saved.', 'success');
+    } catch (e) {
+      notify((e as Error).message, 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const bad = mask.trim() !== '' && (!mask.includes('#') || mask.trim().length > 30);
+  return (
+    <div className="mt-6 border-t pt-4">
+      <div className="mb-1 flex items-start justify-between gap-3">
+        <h3 className="text-base font-medium">Customer number mask</h3>
+        <Button size="sm" onClick={save} disabled={busy || bad || mask.trim() === saved}>Save</Button>
+      </div>
+      <p className="mb-3 text-xs text-muted-foreground">How customer numbers print on statements. Each # takes the next digit; other characters print as typed; digits beyond the mask are left off (###-## prints 11200 as 112-00). Leave empty to print the number as stored.</p>
+      <div className="flex items-center gap-2 text-sm">
+        <Label htmlFor="cust-mask" className="text-xs">Mask</Label>
+        <Input id="cust-mask" className="w-40" maxLength={30} placeholder="###-##" value={mask} onChange={(e) => setMask(e.target.value)} />
+      </div>
+    </div>
+  );
+}
+
 function PricingEditor({ tenantId, notify }: { tenantId: number; notify: Notify }) {
   const [years, setYears] = useState('1');
   const [saved, setSaved] = useState('1');
@@ -410,6 +450,7 @@ export function ProductionSettings({ tenantId, section = 'codes' }: { tenantId: 
       {section === 'numbering' && (
       <Card><CardContent className="pt-6">
         <FormatsEditor rows={sequences} tenantId={tenantId} notify={notify} />
+        <CustomerNumberMaskEditor tenantId={tenantId} notify={notify} />
       </CardContent></Card>
       )}
 

@@ -31,6 +31,7 @@ export function FinancialReport({ tenantId, kind }: { tenantId: number; kind: Re
   const [to, setTo] = useState(today());
   const [lookback, setLookback] = useState('8');
   const [horizon, setHorizon] = useState('4');
+  const [includeCredits, setIncludeCredits] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
   const [result, setResult] = useState<Result | null>(null);
@@ -72,7 +73,7 @@ export function FinancialReport({ tenantId, kind }: { tenantId: number; kind: Re
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tenant_id: tenantId, kind, customer_ids: Array.from(selected), as_of: asOf, from, to,
-          lookback_weeks: Number(lookback), horizon_weeks: Number(horizon), save,
+          lookback_weeks: Number(lookback), horizon_weeks: Number(horizon), include_credits: includeCredits, save,
         }),
       });
       const j = (await res.json()) as { data?: { title: string; file_name: string; pdf_base64: string; saved_ids: number[] }; error?: string };
@@ -105,6 +106,12 @@ export function FinancialReport({ tenantId, kind }: { tenantId: number; kind: Re
           ) : (
             <>
               <div><Label htmlFor="asof" className="text-xs">As of date</Label><Input id="asof" type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)} /></div>
+              {kind === 'statements' && (
+                <label className="flex h-10 items-center gap-2 text-sm">
+                  <input type="checkbox" checked={includeCredits} onChange={(e) => setIncludeCredits(e.target.checked)} className="h-4 w-4 rounded border-input" />
+                  Include Credits
+                </label>
+              )}
             </>
           )}
           {kind === 'forecast' && (

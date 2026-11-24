@@ -3,8 +3,9 @@ import { createClient } from '@/lib/supabase/server';
 import { requireStaff, toInt } from '@/lib/api/nav';
 import { readBody } from '@/lib/api/admin-rpc';
 import {
-  REPORT_TYPES, agingSpec, forecastSpec, openBalancesSpec, renderSpecs, salesSpec, statementSpec, type ReportKind,
+  REPORT_TYPES, agingSpec, forecastSpec, openBalancesSpec, renderSpecs, salesSpec, type ReportKind,
 } from '@/lib/reports/financial';
+import { statementPdf } from '@/lib/reports/statement-pdf';
 
 export const dynamic = 'force-dynamic';
 
@@ -69,18 +70,18 @@ export async function POST(request: Request) {
   let title: string;
 
   if (kind === 'statements') {
-    const specs = [];
+    const includeCredits = body?.include_credits === true;
+    const all = [];
     for (const id of customerIds) {
-      const { data, error } = await supabase.rpc('ar_statement_get', { p_tenant_id: tenantId, p_account_id: id, p_as_of: asOf });
+      const { data, error } = await supabase.rpc('ar_statement_get', { p_tenant_id: tenantId, p_account_id: id, p_as_of: asOf, p_include_credits: includeCredits });
       if (error) return fail(error.message);
-      const spec = statementSpec(data, company);
-      specs.push(spec);
+      all.push(data);
       pieces.push({
         customerId: id, title: `Statement ${data.customer_name} - as of ${asOf}`, fileName: `statement-${data.customer_number ?? id}-${asOf}.pdf`,
-        bytes: await renderSpecs([spec]), parameters: { kind, as_of: asOf, customer_ids: [id], customer_names: [data.customer_name] },
+        bytes: await statementPdf([data]), parameters: { kind, as_of: asOf, include_credits: includeCredits, customer_ids: [id], customer_names: [data.customer_name] },
       });
     }
-    combined = await renderSpecs(specs);
+    combined = await statementPdf(all);
     title = `${base.title}s - as of ${asOf}`;
   } else {
     let data;

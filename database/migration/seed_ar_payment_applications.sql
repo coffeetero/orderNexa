@@ -52,13 +52,15 @@ BEGIN
           tenant_id,
           ar_payment_id,
           ar_transaction_id,
-          applied_amount
+          applied_amount,
+          applied_at
         )
         SELECT DISTINCT ON (pmt.ar_payment_id, pmtDtl.ctid)
           pmt.tenant_id,
           pmt.ar_payment_id,
           arTrx.ar_transaction_id AS ar_transaction_id, -- (ar invoice_id)
-          (-COALESCE(pmtDtl.pd_pmt_amt, 0))::NUMERIC(14,4)   -- signed: a positive old row nets a credit and is stored negative
+          (-COALESCE(pmtDtl.pd_pmt_amt, 0))::NUMERIC(14,4),  -- signed: a positive old row nets a credit and is stored negative
+          pmt.payment_date::timestamptz                      -- the old system has no application date; as-of reports need the payment date
         FROM ar_payments pmt
         INNER JOIN ar arSrc
           ON arSrc.ar_trn_id = pmt.legacy_ar_trn_id

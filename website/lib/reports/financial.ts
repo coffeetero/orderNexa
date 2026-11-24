@@ -55,37 +55,6 @@ export function agingSpec(data: Json, company: string): PdfSpec {
   };
 }
 
-export function statementSpec(data: Json, company: string): PdfSpec {
-  const g = data.aging ?? {};
-  const rows: string[][] = [];
-  for (const w of data.weeks as Json[]) {
-    for (const i of w.items as Json[]) rows.push([day(i.date), TYPE_NAME[i.type] ?? i.type, i.number, money(i.amount), money(i.open)]);
-    rows.push(['', '', '', 'Week subtotal', money(w.subtotal)]);
-  }
-  return {
-    title: `Statement - ${label(data)}`, company,
-    subtitle: [`Statement date ${day(data.as_of)}   Total due ${money(data.total_due)}`, 'Open items: invoices, credits and unapplied payments not yet settled.'],
-    sections: [
-      {
-        columns: [
-          { label: 'Date', width: 14 }, { label: 'Type', width: 16 }, { label: 'Number', width: 20 },
-          { label: 'Amount', width: 16, align: 'right' }, { label: 'Open amount', width: 16, align: 'right' },
-        ],
-        rows,
-        footer: ['', '', '', 'Total due', money(data.total_due)],
-      },
-      {
-        heading: 'Aging of open items',
-        columns: [
-          { label: 'Current', width: 1, align: 'right' }, { label: '1-30', width: 1, align: 'right' }, { label: '31-60', width: 1, align: 'right' },
-          { label: '61-90', width: 1, align: 'right' }, { label: 'Over 90', width: 1, align: 'right' }, { label: 'Total', width: 1, align: 'right' },
-        ],
-        rows: [[money(g.current_amt), money(g.d1_30), money(g.d31_60), money(g.d61_90), money(g.d90_plus), money(g.total)]],
-      },
-    ],
-  };
-}
-
 export function salesSpec(data: Json, company: string): PdfSpec {
   const t = data.totals;
   const accounts: Json[] = data.accounts;

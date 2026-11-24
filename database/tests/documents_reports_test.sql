@@ -69,7 +69,10 @@ BEGIN
   INSERT INTO _t VALUES ('aging totals add up', ((j -> 'totals') ->> 'total')::numeric = 10);
 
   j := ar_statement_get(200000000002, (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 156), current_date);
-  INSERT INTO _t VALUES ('open-item statement: total due 10 equals the aging total', (j ->> 'total_due')::numeric = 10 AND (j -> 'aging' ->> 'total')::numeric = 10);
+  INSERT INTO _t VALUES ('statement without credits (default) lists only the open invoice: total due 15', (j ->> 'total_due')::numeric = 15
+     AND (SELECT count(*) FROM jsonb_array_elements(j -> 'weeks') w, jsonb_array_elements(w -> 'items') i) = 1);
+  j := ar_statement_get(200000000002, (SELECT customer_id FROM bps.fnd_customers WHERE tenant_id = 200000000002 AND legacy_id = 156), current_date, true);
+  INSERT INTO _t VALUES ('open-item statement with credits: total due 10 equals the aging total', (j ->> 'total_due')::numeric = 10 AND (j -> 'aging' ->> 'total')::numeric = 10);
   INSERT INTO _t VALUES ('statement lists the open invoice (15) and the credit (-5), not the applied payment',
      (SELECT count(*) FROM jsonb_array_elements(j -> 'weeks') w, jsonb_array_elements(w -> 'items') i) = 2
      AND EXISTS (SELECT 1 FROM jsonb_array_elements(j -> 'weeks') w, jsonb_array_elements(w -> 'items') i WHERE i ->> 'number' = 'ZZ-INV-1' AND (i ->> 'open')::numeric = 15));
