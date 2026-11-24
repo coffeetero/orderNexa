@@ -74,6 +74,34 @@ BEGIN
     GET DIAGNOSTICS v_inserted = ROW_COUNT;
     RAISE NOTICE 'ar_transactions: inserted % rows (from om_orders + ordr; check transaction_type literal in seed file)', v_inserted;
 
+    -- Old credits (CRE) become credit memos and old debits (DEB) invoices. The old system applied them to invoices with $0
+    -- payments, so seed_ar_payment_applications links them like any invoice. Numbered CR-/DB- + old reference (or old id),
+    -- so they cannot collide with invoice numbers. seed_ar_transaction_lines gives each one a legacy adjustment line.
+    INSERT INTO ar_transactions (
+        tenant_id, customer_id, transaction_type, document_number, transaction_date, due_date,
+        currency_code, amount, legacy_ar_id, status
+    )
+    SELECT
+        c.tenant_id,
+        c.customer_id,
+        CASE a.ar_trn_type WHEN 'CRE' THEN 'CM' ELSE 'INV' END,
+        CASE a.ar_trn_type WHEN 'CRE' THEN 'CR-' ELSE 'DB-' END || COALESCE(a.ar_trn_ref::BIGINT::TEXT, a.ar_trn_id::TEXT),
+        COALESCE(a.ar_trn_date, DATE '2000-01-01'),
+        COALESCE(a.ar_trn_date, DATE '2000-01-01'),
+        'USD',
+        COALESCE(a.ar_trn_amt, 0)::NUMERIC(14,4),
+        a.ar_trn_id::BIGINT,
+        CASE WHEN COALESCE(a.ar_trn_bal, 0) = 0 THEN 'CLOSED' ELSE 'OPEN' END
+    FROM ar a
+    INNER JOIN fnd_customers c
+        ON c.tenant_id = v_tenant_id
+       AND c.legacy_id = a.cus_id::INT
+    WHERE a.ar_trn_type IN ('CRE', 'DEB')
+      AND COALESCE(a.ar_trn_date, DATE '2000-01-01') <= CURRENT_DATE + 1;
+
+    GET DIAGNOSTICS v_inserted = ROW_COUNT;
+    RAISE NOTICE 'ar_transactions: inserted % old credits/debits', v_inserted;
+
     -- DONT KNOW WHY WE NEED THIS
     -- IF to_regclass('bps.ar') IS NOT NULL THEN
     --     UPDATE ar_transactions t

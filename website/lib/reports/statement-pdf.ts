@@ -92,7 +92,7 @@ export async function statementPdf(statements: Json[]): Promise<Uint8Array> {
       y -= ROW + (wi < weeks.length - 1 ? 4 : 0);
     });
 
-    // aging of open items (all open items, credits included, so its total can differ from Ttl Balance when credits are left out)
+    // aging of the items listed above (follows Include Credits, so its total equals Ttl Balance)
     room(4);
     y -= 10;
     const g = s.aging ?? {};
@@ -101,10 +101,6 @@ export async function statementPdf(statements: Json[]): Promise<Uint8Array> {
     AG.forEach(([label], i) => bar([COL.date[0] + i * w + 1, COL.date[0] + (i + 1) * w - 1], label));
     y -= 11;
     AG.forEach(([, v], i) => { const c: [number, number] = [COL.date[0] + i * w + 1, COL.date[0] + (i + 1) * w - 1]; box(c); center(money(v), c, 7.5, font); });
-    if (!s.include_credits) {
-      y -= 14;
-      text('Aging includes credits and unapplied payments.', COL.date[0], 6.5);
-    }
 
     pages.forEach((p, i) => {
       const label = `Page ${i + 1} of ${pages.length}`;

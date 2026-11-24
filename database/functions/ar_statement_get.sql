@@ -2,7 +2,7 @@
 -- ar_statement_get
 -- Open-item statement for an account as of a date, like the old BPS statement: every invoice that still has money owing,
 -- grouped by week (Monday to Sunday) with a subtotal per week. With p_include_credits, credit memos, over-applied invoices
--- and unapplied payments are listed too, and total_due then equals the aging total.
+-- and unapplied payments are listed too. The aging covers the same items, so its total always equals total_due.
 -- customer_number_display applies the company's customer number mask (fnd_tenants.customer_number_mask).
 -- Returns { customer_id, customer_name, customer_number, customer_number_display, address_lines, as_of, include_credits,
 --   weeks: [{ week_start, week_end, subtotal, items: [{ date, type, number, amount, open }] }], total_due, aging }.
@@ -36,6 +36,16 @@ BEGIN
     SELECT i.*, date_trunc('week', i.transaction_date)::date AS week_start
       FROM bps.ar_report_open_items(p_tenant_id, ARRAY[p_account_id], p_as_of) i
      WHERE i.open_amount > 0 OR (p_include_credits AND i.open_amount < 0)
+  ), aging AS (
+    -- same buckets as ar_aging_get, over the items this statement lists
+    SELECT jsonb_build_object(
+      'current_amt', COALESCE(SUM(open_amount) FILTER (WHERE days_past_due <= 0), 0),
+      'd1_30',       COALESCE(SUM(open_amount) FILTER (WHERE days_past_due BETWEEN 1 AND 30), 0),
+      'd31_60',      COALESCE(SUM(open_amount) FILTER (WHERE days_past_due BETWEEN 31 AND 60), 0),
+      'd61_90',      COALESCE(SUM(open_amount) FILTER (WHERE days_past_due BETWEEN 61 AND 90), 0),
+      'd90_plus',    COALESCE(SUM(open_amount) FILTER (WHERE days_past_due > 90), 0),
+      'total',       COALESCE(SUM(open_amount), 0)) AS g
+      FROM items
   ), weeks AS (
     SELECT week_start, SUM(open_amount) AS subtotal,
            jsonb_agg(jsonb_build_object('date', transaction_date, 'type', transaction_type, 'number', document_number,
@@ -44,10 +54,9 @@ BEGIN
   )
   SELECT COALESCE(jsonb_agg(jsonb_build_object('week_start', week_start, 'week_end', week_start + 6, 'subtotal', subtotal, 'items', items)
                             ORDER BY week_start), '[]'::jsonb),
-         COALESCE(SUM(subtotal), 0)
-    INTO v_weeks, v_total FROM weeks;
-
-  SELECT (bps.ar_aging_get(p_tenant_id, ARRAY[p_account_id], p_as_of) -> 'totals') INTO v_aging;
+         COALESCE(SUM(subtotal), 0),
+         (SELECT g FROM aging)
+    INTO v_weeks, v_total, v_aging FROM weeks;
   RETURN jsonb_build_object('customer_id', v_cust.customer_id, 'customer_name', v_cust.customer_name, 'customer_number', v_cust.customer_number,
     'customer_number_display', v_cust.number_display,
     'address_lines', COALESCE((SELECT jsonb_agg(l) FROM regexp_split_to_table(btrim(v_address), '\s*\n\s*') l WHERE l <> ''), '[]'::jsonb),

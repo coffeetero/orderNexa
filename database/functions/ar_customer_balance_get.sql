@@ -32,7 +32,7 @@ BEGIN
     SELECT COALESCE(SUM(d.amount) FILTER (WHERE d.transaction_type = 'INV'), 0),
            COALESCE(SUM(d.amount) FILTER (WHERE d.transaction_type = 'CM'), 0),
            COALESCE((SELECT SUM(pa.applied_amount) FROM ar_payment_applications pa WHERE pa.tenant_id = p_tenant_id
-                        AND pa.ar_transaction_id IN (SELECT ar_transaction_id FROM docs WHERE transaction_type = 'INV')), 0)
+                        AND pa.ar_transaction_id IN (SELECT ar_transaction_id FROM docs)), 0)
       INTO v_inv, v_cred, v_pay
       FROM docs d;
 

@@ -8,7 +8,8 @@
 --   customer_id   ← ar.cus_id → fnd_customers.legacy_id → fnd_customers.customer_id
 --   payment_date  ← ar.ar_trn_date
 --   payment_number← 'PMT' || trim(ar_trn_ref)
---   amount        ← abs(ar_trn_amt); rows with amount 0 are skipped (CHECK amount > 0)
+--   amount        ← abs(ar_trn_amt); $0 rows are kept only when pmt_detail applies them (the old system moved money
+--                   between invoices with $0 payments; run allow_zero_ar_payments.sql first)
 --   payment_method← ar_trn_desc: ACH, CASH, MISC, WIRE, ZELLE; if numeric only → ACH
 --   reference_number ← ar_trn_desc when numeric only, else NULL
 --   legacy_ar_trn_id ← ar.ar_trn_id
@@ -82,7 +83,8 @@ BEGIN
             ON cus.tenant_id = v_tenant_id
            AND cus.legacy_id = a.cus_id::INT
         WHERE upper(trim(both from coalesce(a.ar_trn_type::text, ''))) = 'PMT'
-          AND ABS(COALESCE(a.ar_trn_amt, 0)) > 0
+          AND (ABS(COALESCE(a.ar_trn_amt, 0)) > 0
+               OR EXISTS (SELECT 1 FROM pmt_detail d WHERE d.pd_pmt_no = a.ar_trn_ref AND COALESCE(d.pd_pmt_amt, 0) <> 0))
           -- Not migrated: entries dated after tomorrow (the old system accepted entries with a wrong year).
           AND COALESCE(a.ar_trn_date, DATE '2000-01-01') <= CURRENT_DATE + 1;
 

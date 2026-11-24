@@ -21,8 +21,9 @@ AS $function$
     SELECT tree.account_id, t.ar_transaction_id, t.document_number, t.transaction_type, t.transaction_date,
            COALESCE(t.due_date, t.transaction_date) AS due_date,
            t.amount AS amount,
-           CASE t.transaction_type WHEN 'INV' THEN COALESCE((SELECT SUM(pa.applied_amount) FROM bps.ar_payment_applications pa
-                 WHERE pa.tenant_id = p_tenant_id AND pa.ar_transaction_id = t.ar_transaction_id AND pa.applied_at::date <= p_as_of), 0) ELSE 0 END AS paid
+           -- applications count on credit memos too: the old BPS applied credits to invoices through $0 payments
+           COALESCE((SELECT SUM(pa.applied_amount) FROM bps.ar_payment_applications pa
+                 WHERE pa.tenant_id = p_tenant_id AND pa.ar_transaction_id = t.ar_transaction_id AND pa.applied_at::date <= p_as_of), 0) AS paid
       FROM bps.ar_transactions t JOIN tree ON tree.customer_id = t.customer_id
      WHERE t.tenant_id = p_tenant_id AND t.status NOT IN ('DRAFT','CANCELLED') AND t.transaction_type IN ('INV','CM') AND t.transaction_date <= p_as_of
     UNION ALL
