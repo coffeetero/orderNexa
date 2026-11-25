@@ -1,0 +1,232 @@
+<title>BPS Design Directions</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=Geist:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: a slim control strip above one live BPS screen. The strip follows the viewer's theme; the screen carries its own direction, mode and density tokens. */
+:root{--pg:#eef0f2;--pg-fg:#1a1d21;--pg-2:#5b626c;--pg-line:#d5d9de;--pg-card:#fff;--pg-on:#1a1d21;--pg-on-fg:#fff}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--pg:#101214;--pg-fg:#e9ebee;--pg-2:#9aa1ab;--pg-line:#2a2e34;--pg-card:#191c20;--pg-on:#e9ebee;--pg-on-fg:#101214;color-scheme:dark}}
+:root[data-theme="dark"]{--pg:#101214;--pg-fg:#e9ebee;--pg-2:#9aa1ab;--pg-line:#2a2e34;--pg-card:#191c20;--pg-on:#e9ebee;--pg-on-fg:#101214;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--pg);color:var(--pg-fg);font:13px/1.45 Inter,system-ui,sans-serif;padding-block:14px 28px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.strip{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin-bottom:10px}
+.strip h1{font-size:15px;font-weight:600;margin:0 6px 0 0}
+.grp{display:flex;align-items:center;gap:6px}
+.grp>span{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--pg-2)}
+.seg{display:inline-flex;border:1px solid var(--pg-line);border-radius:6px;overflow:hidden;background:var(--pg-card)}
+.seg button{font:inherit;font-weight:500;border:0;background:none;color:var(--pg-fg);padding:5px 10px;cursor:pointer;border-left:1px solid var(--pg-line)}
+.seg button:first-child{border-left:0}
+.seg button[aria-pressed="true"]{background:var(--pg-on);color:var(--pg-on-fg)}
+.seg button:focus-visible,.app button:focus-visible,.app input:focus-visible,.app select:focus-visible{outline:2px solid var(--focus,#3b6cf6);outline-offset:1px}
+.blurb{color:var(--pg-2);margin:0 0 10px;max-width:110ch}
+.blurb b{color:var(--pg-fg);font-weight:600}
+.note{color:var(--pg-2);font-size:12px;margin-top:10px}
+
+/* ---------- the BPS screen ---------- */
+.app{
+  /* A · Ledger light */
+  --bg:#f4f5f8;--surface:#fff;--side:#eceef3;--line:#dde0e7;--line-2:#c9cdd6;--text:#14171d;--text-2:#465061;--text-3:#6b7485;
+  --accent:#2c49d6;--accent-fg:#fff;--bar:#fff;--bar-fg:#14171d;--bar-2:#465061;--bar-line:#dde0e7;
+  --pos:#0a7447;--warn:#9a5700;--neg:#bf2f28;--info:#1b5cc0;--focus:#2c49d6;
+  --font:Inter,system-ui,sans-serif;--r:4px;
+  --fs:13px;--row:28px;--ctl:28px;--pad:10px;--gap:10px;
+  container-type:inline-size;border:1px solid var(--line-2);border-radius:8px;overflow:hidden;background:var(--bg);color:var(--text);
+  font:var(--fs)/1.4 var(--font);font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;
+}
+.app[data-density="comfortable"]{--fs:14px;--row:36px;--ctl:34px;--pad:14px;--gap:14px}
+.app[data-dir="a"][data-mode="dark"]{--bg:#0e1015;--surface:#161920;--side:#12141a;--line:#252933;--line-2:#333845;--text:#e7e9ef;--text-2:#b1b7c4;--text-3:#8a91a1;--accent:#8497ff;--accent-fg:#0e1015;--bar:#161920;--bar-fg:#e7e9ef;--bar-2:#b1b7c4;--bar-line:#252933;--pos:#4cc38a;--warn:#e2a43a;--neg:#f0766d;--info:#6ea8ff;--focus:#8497ff}
+.app[data-dir="b"]{--bg:#f5f3f0;--surface:#fffefc;--side:#ede9e3;--line:#e1dbd3;--line-2:#cfc7bc;--text:#1e1915;--text-2:#544a41;--text-3:#7a6e63;--accent:#a3451c;--accent-fg:#fff;--bar:#fffefc;--bar-fg:#1e1915;--bar-2:#544a41;--bar-line:#e1dbd3;--pos:#2d6e3e;--warn:#8f5a00;--neg:#b3312a;--info:#2a5fa8;--focus:#a3451c;--font:"IBM Plex Sans",system-ui,sans-serif;--r:6px}
+.app[data-dir="b"][data-mode="dark"]{--bg:#161310;--surface:#1f1b17;--side:#1a1613;--line:#322c26;--line-2:#433b33;--text:#efe9e2;--text-2:#c4b9ad;--text-3:#978b7e;--accent:#e58d60;--accent-fg:#1a120c;--bar:#1f1b17;--bar-fg:#efe9e2;--bar-2:#c4b9ad;--bar-line:#322c26;--pos:#7cc48c;--warn:#e0aa4a;--neg:#ee8177;--info:#7fb0ee;--focus:#e58d60}
+.app[data-dir="c"]{--bg:#f3f5f4;--surface:#fff;--side:#e9edeb;--line:#dce1de;--line-2:#c6cdc9;--text:#131715;--text-2:#47504c;--text-3:#6c7672;--accent:#0c6f67;--accent-fg:#fff;--bar:#18201d;--bar-fg:#f1f4f3;--bar-2:#a9b4af;--bar-line:#18201d;--pos:#1a7a3c;--warn:#955a00;--neg:#bd2f2f;--info:#1f5fb5;--focus:#0c6f67;--font:Geist,system-ui,sans-serif;--r:3px}
+.app[data-dir="c"][data-mode="dark"]{--bg:#0d1110;--surface:#151a18;--side:#111514;--line:#242d29;--line-2:#323d38;--text:#e8ecea;--text-2:#b0bab5;--text-3:#87928d;--accent:#3fcab7;--accent-fg:#07120f;--bar:#080b0a;--bar-fg:#e8ecea;--bar-2:#9aa6a1;--bar-line:#242d29;--pos:#5fcf82;--warn:#e2a640;--neg:#f27b74;--info:#72a9f5;--focus:#3fcab7}
+
+.app button,.app input,.app select{font:inherit;color:inherit}
+.bar{display:flex;align-items:center;gap:4px;height:44px;padding:0 12px;background:var(--bar);color:var(--bar-fg);border-bottom:1px solid var(--bar-line)}
+.brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;margin-right:14px;white-space:nowrap}
+.mark{width:22px;height:22px;border-radius:var(--r);background:var(--accent);color:var(--accent-fg);display:grid;place-items:center;font-size:12px;font-weight:700}
+.menu{display:flex;gap:2px;min-width:0;overflow:hidden}
+.menu a{padding:5px 9px;border-radius:var(--r);color:var(--bar-2);font-weight:500;white-space:nowrap;text-decoration:none}
+.menu a[aria-current]{color:var(--bar-fg);box-shadow:inset 0 -2px 0 var(--accent)}
+.bar .sp{flex:1}
+.find{display:flex;align-items:center;gap:8px;height:28px;padding:0 8px;border:1px solid color-mix(in srgb,var(--bar-2) 35%,transparent);border-radius:var(--r);color:var(--bar-2);font-size:12px;white-space:nowrap}
+kbd{font:500 10px/1 var(--font);border:1px solid color-mix(in srgb,currentColor 35%,transparent);border-radius:3px;padding:2px 4px}
+.me{width:26px;height:26px;border-radius:50%;background:color-mix(in srgb,var(--accent) 22%,var(--bar));color:var(--bar-fg);display:grid;place-items:center;font-size:11px;font-weight:600;margin-left:8px}
+.body{display:flex;min-height:640px}
+.side{width:208px;flex:none;background:var(--side);border-right:1px solid var(--line);padding:10px 8px;display:flex;flex-direction:column;gap:14px}
+.side h4{font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--text-3);margin:0 0 4px;padding:0 8px}
+.side a{display:flex;justify-content:space-between;gap:8px;height:var(--row);align-items:center;padding:0 8px;border-radius:var(--r);color:var(--text-2);text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.side a.on{background:color-mix(in srgb,var(--accent) 12%,var(--side));color:var(--text);font-weight:600}
+.side a small{color:var(--text-3);font-size:11px}
+.main{flex:1;min-width:0;padding:var(--pad) calc(var(--pad) + 4px) calc(var(--pad) + 6px);display:flex;flex-direction:column;gap:var(--gap)}
+.head{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
+.head h2{font-size:18px;font-weight:600;letter-spacing:-.01em;margin:0}
+.crumb{font-size:12px;color:var(--text-3)}
+.head .sp{flex:1}
+.btn{height:var(--ctl);padding:0 10px;border:1px solid var(--line-2);border-radius:var(--r);background:var(--surface);font-weight:500;cursor:pointer;white-space:nowrap}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.btn.ghost{border-color:transparent;background:none;color:var(--text-2)}
+.inp{height:var(--ctl);padding:0 8px;border:1px solid var(--line-2);border-radius:var(--r);background:var(--surface);min-width:0;width:100%}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:calc(var(--r) + 2px);min-width:0}
+.ph{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px var(--pad);border-bottom:1px solid var(--line)}
+.ph h3{font-size:13px;font-weight:600;margin:0}
+.ph span{font-size:12px;color:var(--text-3)}
+.lab{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3)}
+
+/* KPI strip: one panel, hairline dividers, no card-per-number */
+.kpis{display:grid;grid-template-columns:repeat(5,1fr)}
+.kpi{padding:var(--pad) calc(var(--pad) + 2px);border-left:1px solid var(--line);min-width:0}
+.kpi:first-child{border-left:0}
+.kpi b{display:block;font-size:22px;font-weight:600;letter-spacing:-.02em;line-height:1.25;margin-top:2px}
+.kpi i{font-style:normal;font-size:12px;color:var(--text-3)}
+.up{color:var(--pos);font-weight:600}.dn{color:var(--neg);font-weight:600}
+.cols{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:var(--gap)}
+.stack{display:flex;flex-direction:column;gap:var(--gap);min-width:0}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--text-3);text-align:left;height:var(--row);padding:0 var(--pad);border-bottom:1px solid var(--line);white-space:nowrap;background:color-mix(in srgb,var(--side) 55%,var(--surface))}
+td{height:var(--row);padding:0 var(--pad);border-bottom:1px solid var(--line);white-space:nowrap}
+tbody tr:last-child td{border-bottom:0}
+tbody tr:hover td{background:color-mix(in srgb,var(--accent) 5%,var(--surface))}
+.r{text-align:right}
+.id{color:var(--accent);font-weight:500}
+.mut{color:var(--text-3)}
+tfoot td{font-weight:600;border-top:1px solid var(--line-2);border-bottom:0;background:color-mix(in srgb,var(--side) 55%,var(--surface))}
+.pill{display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 7px;border-radius:10px;font-size:12px;font-weight:500;color:var(--c);background:color-mix(in srgb,var(--c) 12%,var(--surface))}
+.pill::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--c)}
+.p-pos{--c:var(--pos)}.p-warn{--c:var(--warn)}.p-neg{--c:var(--neg)}.p-info{--c:var(--info)}.p-mut{--c:var(--text-3)}
+.bars{padding:6px var(--pad) var(--pad);display:grid;gap:2px}
+.barrow{display:grid;grid-template-columns:minmax(0,150px) 1fr 48px;gap:10px;align-items:center;height:var(--row)}
+.barrow span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.track{height:8px;border-radius:2px;background:color-mix(in srgb,var(--text-3) 14%,var(--surface))}
+.track u{display:block;height:100%;border-radius:2px;background:var(--accent)}
+.aging{display:grid;grid-template-columns:repeat(4,1fr);border-top:0}
+.aging div{padding:8px var(--pad);border-left:1px solid var(--line)}
+.aging div:first-child{border-left:0}
+.aging b{display:block;font-size:15px;font-weight:600}
+.tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tools .inp{width:240px}
+.chip{display:inline-flex;align-items:center;gap:6px;height:var(--ctl);padding:0 9px;border:1px solid var(--line-2);border-radius:var(--r);background:var(--surface);color:var(--text-2);white-space:nowrap}
+.chip b{color:var(--text);font-weight:500}
+.pg{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px var(--pad);border-top:1px solid var(--line);color:var(--text-3);font-size:12px}
+.form{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px var(--gap);padding:var(--pad)}
+.f{display:grid;gap:3px;min-width:0}.f.w2{grid-column:span 2}
+.f label{font-size:12px;font-weight:500;color:var(--text-2)}
+.qty{width:64px;text-align:right}
+.tot{display:grid;gap:4px;padding:var(--pad)}
+.tot div{display:flex;justify-content:space-between}
+.tot .big{font-size:16px;font-weight:600;border-top:1px solid var(--line);padding-top:6px;margin-top:2px}
+@container (max-width:1000px){.side{display:none}.kpis{grid-template-columns:repeat(3,1fr)}.kpi:nth-child(4){border-left:0}.kpi:nth-child(n+4){border-top:1px solid var(--line)}.cols{grid-template-columns:1fr}.find kbd,.find span{display:none}}
+@container (max-width:620px){.menu{display:none}.kpis{grid-template-columns:repeat(2,1fr)}.kpi{border-top:1px solid var(--line)}.kpi:nth-child(-n+2){border-top:0}.kpi:nth-child(odd){border-left:0}.kpi:nth-child(4){border-left:1px solid var(--line)}.form{grid-template-columns:repeat(2,minmax(0,1fr))}.tools .inp{width:100%}.barrow{grid-template-columns:minmax(0,110px) 1fr 44px}}
+</style>
+
+<div class="strip">
+  <h1>BPS design directions</h1>
+  <div class="grp"><span>Direction</span><div class="seg" data-k="dir"><button data-v="a">A · Ledger</button><button data-v="b">B · Hearth</button><button data-v="c">C · Graphite</button></div></div>
+  <div class="grp"><span>Screen</span><div class="seg" data-k="screen"><button data-v="dash">Dashboard</button><button data-v="list">Orders</button><button data-v="form">Order entry</button></div></div>
+  <div class="grp"><span>Theme</span><div class="seg" data-k="mode"><button data-v="light">Light</button><button data-v="dark">Dark</button></div></div>
+  <div class="grp"><span>Density</span><div class="seg" data-k="density"><button data-v="compact">Compact</button><button data-v="comfortable">Comfortable</button></div></div>
+</div>
+<p class="blurb" id="blurb"></p>
+
+<div class="app" id="app" data-dir="a" data-mode="light" data-density="compact">
+  <div class="bar">
+    <div class="brand"><span class="mark">A</span>Alpine Bakery</div>
+    <nav class="menu" id="menu"></nav>
+    <span class="sp"></span>
+    <div class="find"><span>Find customer, order, invoice</span><kbd>⌘K</kbd></div>
+    <div class="me">GM</div>
+  </div>
+  <div class="body">
+    <aside class="side">
+      <div><h4>Quick access</h4><a class="on" href="#">New order<small>N</small></a><a href="#">Standing orders</a><a href="#">Production report</a><a href="#">Enter payment</a><a href="#">AR aging</a></div>
+      <div><h4>Recent</h4><a href="#">Order 48213</a><a href="#">Harbor Street Café</a><a href="#">Invoice 91277</a><a href="#">Maple &amp; Rye Market</a></div>
+    </aside>
+    <main class="main" id="main"></main>
+  </div>
+</div>
+<p class="note">Sample data for layout only. Resize the window to see the screen reorganize: the sidebar folds away, the figures regroup, tables scroll inside their own panel.</p>
+
+<script>
+const $=s=>document.querySelector(s);
+const money=n=>(n<0?'(':'')+'$'+Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})+(n<0?')':'');
+const BLURB={
+ a:'<b>A · Ledger.</b> Cool slate neutrals with one ink-blue accent, set in Inter. Reads like a precise financial tool: crisp 4px corners, hairline dividers, white work surfaces. The safest fit for office and accounting screens.',
+ b:'<b>B · Hearth.</b> Keeps the bakery warmth, cleaned up: warm grey ground, true white panels, one copper accent, set in IBM Plex Sans. Closest to what staff know today, with far stronger contrast and hierarchy.',
+ c:'<b>C · Graphite.</b> A dark graphite top bar over a light work area, one teal accent, set in Geist. The most distinctive identity and the strongest separation between navigation and work; sharpest corners, tightest feel.'};
+const MENU=['Dashboard','Orders','Production','Invoicing','Financials','Inventory','Customers','Organizer','Admin'];
+const CUST=['Harbor Street Café','Maple & Rye Market','Northgate Deli','Bluebird Diner','Cedar Hill Grocers','Third Ward Bistro','Lakeside Country Club','Union Coffee Co.','Riverbend Catering','Ferry Road Market','Old Mill Tavern','Pinecrest School Dist.','Summit Hotel','Greenway Co-op'];
+const ROUTE=['R1 North','R2 Shore','R3 Downtown','R4 West','Pickup'];
+const STAT=[['Confirmed','p-info'],['In production','p-warn'],['Delivered','p-pos'],['Invoiced','p-pos'],['On hold','p-neg'],['Draft','p-mut']];
+const ITEMS=[['Sourdough Boule 24 oz',612],['Baguette 22 in',540],['Brioche Bun 4 in (12 pk)',398],['Multigrain Sandwich Loaf',276],['Ciabatta Roll (6 pk)',231]];
+const orders=CUST.map((c,i)=>({no:48213-i,c,route:ROUTE[i%5],lines:3+(i*5)%9,units:24+(i*37)%180,amt:86.4+((i*7919)%64000)/100,st:STAT[(i*2+i%3)%6]}));
+const pill=s=>`<span class="pill ${s[1]}">${s[0]}</span>`;
+const orow=o=>`<tr><td class="id">${o.no}</td><td>${o.c}</td><td class="mut">11/25/2026</td><td>${o.route}</td><td class="r">${o.lines}</td><td class="r">${o.units}</td><td class="r">${money(o.amt)}</td><td>${pill(o.st)}</td></tr>`;
+const OHEAD='<thead><tr><th>Order</th><th>Customer</th><th>Production</th><th>Route</th><th class="r">Lines</th><th class="r">Units</th><th class="r">Amount</th><th>Status</th></tr></thead>';
+
+const SCREENS={
+dash:()=>`
+ <div class="head"><h2>Dashboard</h2><span class="crumb">Wednesday, November 25, 2026</span><span class="sp"></span><button class="btn">Production report</button><button class="btn pri">New order</button></div>
+ <div class="panel kpis">
+  <div class="kpi"><span class="lab">Revenue, month to date</span><b>$184,206.40</b><i><span class="up">▲ 6.2%</span> vs $173,451.10 last month</i></div>
+  <div class="kpi"><span class="lab">Orders today</span><b>142</b><i><span class="up">▲ 4.4%</span> vs 136 yesterday</i></div>
+  <div class="kpi"><span class="lab">Units today</span><b>6,318</b><i><span class="dn">▼ 2.1%</span> vs 6,453 yesterday</i></div>
+  <div class="kpi"><span class="lab">Active customers, 30 days</span><b>217</b><i><span class="up">▲ 1.9%</span> vs 213 prior 30</i></div>
+  <div class="kpi"><span class="lab">Average order</span><b>$61.74</b><i><span class="dn">▼ 0.8%</span> vs $62.24 last month</i></div>
+ </div>
+ <div class="cols">
+  <div class="panel"><div class="ph"><h3>Orders for production today</h3><span>142 orders · 6,318 units</span></div>
+   <div class="tw"><table>${OHEAD}<tbody>${orders.slice(0,11).map(orow).join('')}</tbody></table></div>
+   <div class="pg"><span>Showing 11 of 142</span><button class="btn ghost">View all orders →</button></div></div>
+  <div class="stack">
+   <div class="panel"><div class="ph"><h3>Production summary</h3><span>Top 5 items by units</span></div>
+    <div class="bars">${ITEMS.map(([n,q])=>`<div class="barrow"><span>${n}</span><div class="track"><u style="width:${Math.round(q/612*100)}%"></u></div><span class="r">${q}</span></div>`).join('')}</div></div>
+   <div class="panel"><div class="ph"><h3>Receivables</h3><span>Open balance $96,412.85</span></div>
+    <div class="aging"><div><span class="lab">Current</span><b>$61,208.10</b></div><div><span class="lab">1–30</span><b>$22,940.55</b></div><div><span class="lab">31–60</span><b>$8,114.20</b></div><div><span class="lab">Over 60</span><b style="color:var(--neg)">$4,150.00</b></div></div></div>
+   <div class="panel"><div class="ph"><h3>Needs attention</h3><span>3</span></div>
+    <table><tbody><tr><td>${pill(['On hold','p-neg'])}</td><td>Old Mill Tavern, over credit limit</td><td class="r mut">$1,240.00</td></tr><tr><td>${pill(['Late','p-warn'])}</td><td>R2 Shore not yet dispatched</td><td class="r mut">18 stops</td></tr><tr><td>${pill(['Review','p-info'])}</td><td>4 standing orders end this week</td><td class="r mut">Fri</td></tr></tbody></table></div>
+  </div>
+ </div>`,
+list:()=>`
+ <div class="head"><h2>Orders</h2><span class="crumb">Orders › All orders</span><span class="sp"></span><button class="btn">Import</button><button class="btn">Export</button><button class="btn pri">New order</button></div>
+ <div class="tools"><input class="inp" id="q" placeholder="Search order, customer, PO" aria-label="Search orders"><span class="chip">Production <b>Today</b></span><span class="chip">Route <b>All</b></span><span class="chip">Status <b>Open</b></span><button class="btn ghost">Clear filters</button></div>
+ <div class="panel"><div class="tw"><table>${OHEAD}<tbody>${orders.map(orow).join('')}</tbody>
+  <tfoot><tr><td colspan="4">14 orders on this page</td><td class="r">${orders.reduce((a,o)=>a+o.lines,0)}</td><td class="r">${orders.reduce((a,o)=>a+o.units,0).toLocaleString()}</td><td class="r">${money(orders.reduce((a,o)=>a+o.amt,0))}</td><td></td></tr></tfoot></table></div>
+  <div class="pg"><span>1–14 of 142 · ↑↓ move · Enter open · N new</span><span><button class="btn ghost">‹ Prev</button><button class="btn ghost">Next ›</button></span></div></div>`,
+form:()=>`
+ <div class="head"><h2>New order</h2><span class="crumb">Orders › New</span>${pill(['Draft','p-mut'])}<span class="sp"></span><button class="btn ghost">Cancel</button><button class="btn">Save draft</button><button class="btn pri">Save and confirm</button></div>
+ <div class="cols">
+  <div class="stack">
+   <div class="panel"><div class="ph"><h3>Order details</h3><span>Required fields marked *</span></div>
+    <div class="form">
+     <div class="f w2"><label for="c1">Customer *</label><input class="inp" id="c1" value="Harbor Street Café"></div>
+     <div class="f w2"><label for="c2">Ship to</label><input class="inp" id="c2" value="Main kitchen, 14 Harbor St"></div>
+     <div class="f"><label for="c3">Production date *</label><input class="inp" id="c3" value="11/26/2026"></div>
+     <div class="f"><label for="c4">Delivery date</label><input class="inp" id="c4" value="11/27/2026"></div>
+     <div class="f"><label for="c5">Route</label><select class="inp" id="c5"><option>R2 Shore</option></select></div>
+     <div class="f"><label for="c6">PO number</label><input class="inp" id="c6" value="HS-20418"></div>
+    </div></div>
+   <div class="panel"><div class="ph"><h3>Items</h3><span>5 lines · Tab moves across, Enter adds a line</span></div>
+    <div class="tw"><table><thead><tr><th>Item</th><th>Description</th><th class="r">Qty</th><th>Unit</th><th class="r">Price</th><th class="r">Amount</th></tr></thead><tbody>
+     ${ITEMS.map(([n],i)=>{const q=[24,36,10,12,8][i],p=[4.85,2.4,7.2,5.1,4.4][i];return `<tr><td class="id">${[1104,1210,2307,1418,1522][i]}</td><td>${n}</td><td class="r"><input class="inp qty" id="q${i}" value="${q}" aria-label="Quantity"></td><td class="mut">${i==2||i==4?'pk':'ea'}</td><td class="r">${money(p)}</td><td class="r">${money(q*p)}</td></tr>`}).join('')}
+    </tbody></table></div><div class="pg"><button class="btn ghost">+ Add item</button><span>90 units</span></div></div>
+  </div>
+  <div class="stack">
+   <div class="panel"><div class="ph"><h3>Totals</h3></div><div class="tot"><div><span class="mut">Subtotal</span><span>$371.20</span></div><div><span class="mut">Discount (2%)</span><span>($7.42)</span></div><div><span class="mut">Delivery</span><span>$0.00</span></div><div class="big"><span>Total</span><span>$363.78</span></div></div></div>
+   <div class="panel"><div class="ph"><h3>Customer account</h3><span>Net 15</span></div><div class="tot"><div><span class="mut">Open balance</span><span>$2,184.60</span></div><div><span class="mut">Credit limit</span><span>$5,000.00</span></div><div><span class="mut">Oldest invoice</span><span>12 days</span></div><div><span class="mut">Status</span>${pill(['Good standing','p-pos'])}</div></div></div>
+  </div>
+ </div>`};
+
+const state={dir:'a',screen:'dash',mode:matchMedia('(prefers-color-scheme: dark)').matches||document.documentElement.dataset.theme==='dark'?'dark':'light',density:'compact'};
+try{Object.assign(state,JSON.parse(localStorage.getItem('bpsdd')||'{}'))}catch(e){}
+function render(){
+  const app=$('#app');app.dataset.dir=state.dir;app.dataset.mode=state.mode;app.dataset.density=state.density;
+  $('#blurb').innerHTML=BLURB[state.dir];
+  const cur={dash:'Dashboard',list:'Orders',form:'Orders'}[state.screen];
+  $('#menu').innerHTML=MENU.map(m=>`<a href="#"${m===cur?' aria-current="page"':''}>${m}</a>`).join('');
+  $('#main').innerHTML=SCREENS[state.screen]();
+  document.querySelectorAll('.seg').forEach(s=>s.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(state[s.dataset.k]===b.dataset.v))));
+  try{localStorage.setItem('bpsdd',JSON.stringify(state))}catch(e){}
+}
+document.querySelectorAll('.seg').forEach(s=>s.addEventListener('click',e=>{const b=e.target.closest('button');if(b){state[s.dataset.k]=b.dataset.v;render()}}));
+$('#app').addEventListener('click',e=>{if(e.target.closest('a'))e.preventDefault()});
+render();
+</script>

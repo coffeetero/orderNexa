@@ -6,7 +6,7 @@ import {
   accountAppearance, bakeryOverride, deviceAppearance, resolveAppearance, themePreview, writeCookie,
   DEFAULT_APPEARANCE, DEFAULT_MODE, readAppearance, toLocal, readLocal, type AppearancePrefs, type LocalAppearance,
 } from '@/lib/theme/prefs';
-import { DEFAULT_THEME, variantOf, type ThemeDef, type ThemeMode } from '@/lib/theme/themes';
+import { BAKERY_THEME, variantOf, type ThemeDef, type ThemeMode } from '@/lib/theme/themes';
 
 const AppearanceContext = createContext<{ last: LocalAppearance | null }>({ last: null });
 
@@ -54,7 +54,7 @@ export function useAppearanceState(): AppearanceState {
   const osDark = useOsDark();
   const current = resolveAppearance({ preview: null, device, account, last });
   let shown = resolveAppearance({ preview, device, account, last });
-  if (override) shown = { mode: shown.mode, theme: DEFAULT_THEME };
+  if (override) shown = { mode: shown.mode, theme: BAKERY_THEME };
   const h = htmlMode(shown.theme, shown.mode);
   const mode: ThemeMode = h === 'system' ? (osDark ? 'dark' : 'light') : h;
   return { current, shown, mode, account, device, preview, osDark };
@@ -104,7 +104,7 @@ export function AccountAppearanceLoader() {
   return null;
 }
 
-/** Keeps the default (Bakery) colours while mounted: the customer portal does not follow staff themes. */
+/** Keeps the Bakery colours while mounted: the customer portal does not follow staff themes. */
 export function ForceBakery() {
   useLayoutEffect(() => { bakeryOverride.set(true); return () => bakeryOverride.set(false); }, []);
   return null;

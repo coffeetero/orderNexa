@@ -9,7 +9,7 @@ import {
   APPEARANCE_COOKIE, DEFAULT_MODE, cookieValue, readAppearance, readCookie, resolveAppearance, toLocal,
 } from '@/lib/theme/prefs';
 import {
-  BAKERY_ID, BUILTIN_THEMES, DEFAULT_THEME, PRESET_THEMES, findTheme, isBuiltinId, readTheme, variantOf, type ThemeDef,
+  BAKERY_ID, BAKERY_THEME, BUILTIN_THEMES, DEFAULT_THEME, HEARTH_ID, PRESET_THEMES, findTheme, isBuiltinId, readTheme, variantOf, type ThemeDef,
 } from '@/lib/theme/themes';
 import { BAKERY_TOKENS, BPS_TOKENS, deriveBps } from '@/lib/theme/tokens';
 
@@ -23,7 +23,7 @@ function cssVars(selector: string): Record<string, string> {
   return Object.fromEntries(Array.from(body.matchAll(/(--[a-z0-9-]+):\s*([^;]+);/g)).map((m) => [m[1], m[2].trim()]));
 }
 
-describe('Bakery (default) is pinned to the colours BPS has always used', () => {
+describe('Bakery is pinned to the colours BPS has always used', () => {
   it('matches globals.css :root exactly for every token it sets', () => {
     const css = cssVars(':root');
     for (const k of BPS_TOKENS) expect(BAKERY_TOKENS.light[k], `light ${k}`).toBe(css[k]);
@@ -33,8 +33,8 @@ describe('Bakery (default) is pinned to the colours BPS has always used', () => 
     for (const k of BPS_TOKENS) expect(BAKERY_TOKENS.dark[k], `dark ${k}`).toBe(css[k]);
   });
   it('deriveBps returns the pinned tokens for Bakery', () => {
-    expect(deriveBps(DEFAULT_THEME, 'light').tokens).toEqual(BAKERY_TOKENS.light);
-    expect(deriveBps(DEFAULT_THEME, 'dark').tokens).toEqual(BAKERY_TOKENS.dark);
+    expect(deriveBps(BAKERY_THEME, 'light').tokens).toEqual(BAKERY_TOKENS.light);
+    expect(deriveBps(BAKERY_THEME, 'dark').tokens).toEqual(BAKERY_TOKENS.dark);
   });
 });
 
@@ -124,7 +124,7 @@ describe('page output', () => {
 describe('preferences', () => {
   it('BPS defaults to light (it never followed the system)', () => {
     expect(DEFAULT_MODE).toBe('light');
-    expect(readAppearance(null)).toEqual({ mode: 'light', themeId: BAKERY_ID, custom: [] });
+    expect(readAppearance(null)).toEqual({ mode: 'light', themeId: HEARTH_ID, custom: [] });
   });
   it('readAppearance drops unknown modes/themes, built-in ids as own themes, and caps own themes', () => {
     const own = (i: number): ThemeDef => ({ v: 1, id: `user-${i}`, label: `Mine ${i}`, inputs: { light: { 'surface-0': '#ffffff', 'text-primary': '#000000' } } });
@@ -133,7 +133,7 @@ describe('preferences', () => {
       custom: [{ ...own(0), id: 'nord' }, ...Array.from({ length: 30 }, (_, i) => own(i + 1)), { v: 1, id: 'bad', label: 'x', inputs: { light: { 'surface-0': 'red' } } }],
     });
     expect(r.mode).toBe('light');
-    expect(r.themeId).toBe(BAKERY_ID);
+    expect(r.themeId).toBe(HEARTH_ID);
     expect(r.custom.length).toBe(20);
     expect(r.custom.some((t) => t.id === 'nord' || t.id === 'bad')).toBe(false);
   });
@@ -151,7 +151,7 @@ describe('preferences', () => {
   });
   it('the default choice needs no cookie', () => {
     expect(cookieValue({ mode: 'light', theme: DEFAULT_THEME })).toBeNull();
-    expect(toLocal({ mode: 'dark', theme: DEFAULT_THEME })).toEqual({ mode: 'dark', themeId: BAKERY_ID });
+    expect(toLocal({ mode: 'dark', theme: DEFAULT_THEME })).toEqual({ mode: 'dark', themeId: HEARTH_ID });
   });
   it('resolveAppearance: try-on > device > account > last > default', () => {
     const last = { mode: 'dark' as const, theme: findTheme('nord')! };
@@ -169,7 +169,8 @@ describe('preferences', () => {
 });
 
 describe('built-in themes', () => {
-  it('are Bakery, Clay, High contrast, Sepia', () => {
-    expect(BUILTIN_THEMES.map((t) => t.id)).toEqual(['bakery', 'clay', 'high-contrast', 'sepia']);
+  it('are Ledger, Hearth (the default), Graphite, Bakery, Clay, High contrast, Sepia', () => {
+    expect(DEFAULT_THEME.id).toBe(HEARTH_ID);
+    expect(BUILTIN_THEMES.map((t) => t.id)).toEqual(['ledger', 'hearth', 'graphite', 'bakery', 'clay', 'high-contrast', 'sepia']);
   });
 });

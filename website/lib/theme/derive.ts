@@ -21,7 +21,7 @@
  *      focus ring 3:1 (UI parts). A failing colour keeps its hue and moves in lightness (away from the surfaces) until it passes.
  */
 import { AA_TEXT, AA_UI, contrast, ensureContrast, fromHsl, mix, onColor, rgba, shiftLightness, toHsl } from './color';
-import { DEFAULT_THEME, type ThemeMode, type ThemeSeeds } from './themes';
+import { BAKERY_THEME, type ThemeMode, type ThemeSeeds } from './themes';
 
 /** Intermediate tokens produced by the derivation. Fonts, spacing and charts are never themed. */
 export const THEME_TOKENS = [
@@ -59,7 +59,7 @@ export interface DerivedTheme { tokens: TokenMap; /** the variant shown */ mode:
 const W = '#ffffff', B = '#000000';
 
 export function deriveSeeds(seeds: ThemeSeeds, dark: boolean): { tokens: TokenMap; fixes: Fix[] } {
-  const fallback = DEFAULT_THEME.inputs[dark ? 'dark' : 'light']!;
+  const fallback = BAKERY_THEME.inputs[dark ? 'dark' : 'light']!;
   const fixes: Fix[] = [];
   const fix = (token: ThemeToken, fg: string, bgs: string[], min: number): string => {
     const r = ensureContrast(fg, bgs, min);
@@ -127,7 +127,7 @@ export function fixesMessage(fixes: Fix[]): string | null {
 }
 /** All 11 seeds of a variant (for the colour editor): missing ones filled with what the derivation would use. */
 export function completeSeeds(seeds: ThemeSeeds, dark: boolean): Required<ThemeSeeds> {
-  const fb = DEFAULT_THEME.inputs[dark ? 'dark' : 'light']!;
+  const fb = BAKERY_THEME.inputs[dark ? 'dark' : 'light']!;
   const t = deriveSeeds(seeds, dark).tokens;
   return {
     accent: seeds.accent ?? fb.accent!, danger: seeds.danger ?? fb.danger!, success: seeds.success ?? fb.success!, warning: seeds.warning ?? fb.warning!, pro: seeds.pro ?? fb.pro!,

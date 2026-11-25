@@ -111,6 +111,26 @@
   }
 }
 
+@layer base {
+  /* Graphite: a dark top bar in both modes. The bar re-defines the tokens its contents use; menus open outside it and keep the page colours. */
+  @media screen {
+    :root[data-bps-theme='graphite'] .bps-topnav {
+      --background: 156 14% 11%;
+      --foreground: 150 10% 95%;
+      --muted: 156 10% 18%;
+      --muted-foreground: 153 7% 68%;
+      --accent: 156 10% 20%;
+      --accent-foreground: 150 10% 95%;
+      --primary: 172 56% 52%;
+      --border: 156 10% 20%;
+      --ring: 172 56% 52%;
+      color: hsl(var(--foreground));
+    }
+  }
+  /* Figures line up in columns. */
+  th, td { font-variant-numeric: tabular-nums; }
+}
+
 @layer utilities {
   .font-serif {
     font-family: 'Georgia', 'Times New Roman', serif;

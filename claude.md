@@ -9,6 +9,11 @@
 - Use the Supabase connector to access supabase database.
 - application needs to be progressive
 
+## UI Design Rules
+- Before creating or modifying any screen, component, theme or style in `website/`, use the `bps-ui-design` skill and follow `docs/design/BPS-UI-UX-GUIDELINES.md`.
+- Theme and shared component styling are separate from screen layout and workflow. Layout, density and workflow changes need explicit approval per screen, after a mockup.
+- Do not reorganize Order Entry or other protected screens without explicit approval.
+
 ## 1. Think Before Coding
 **Don't assume. Don't hide confusion. Surface tradeoffs.**
 

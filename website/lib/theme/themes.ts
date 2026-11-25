@@ -24,13 +24,31 @@ export const CUSTOM_LIMIT = 20;
 
 /*
  * Built-in themes. Palette inspirations (colours re-picked by hand, names neutral):
- * - Bakery: BPS's own colours (globals.css), the default; its tokens are pinned to today's exact values (tokens.ts BAKERY_TOKENS).
+ * - Ledger, Hearth, Graphite: the BPS identity themes (docs/design/BPS-UI-UX-GUIDELINES.md). Hearth is the default.
+ *   Ledger: cool slate, ink-blue accent. Hearth: warm grey, white panels, copper accent. Graphite: green-grey, teal accent, dark top bar
+ *   (the bar's colours are in globals.css, `.bps-topnav`).
+ * - Bakery: BPS's original colours (globals.css); its tokens are pinned to those exact values (tokens.ts BAKERY_TOKENS). Printing and the
+ *   customer portal still use it.
  * - Clay: inspired by Anthropic's Claude look (warm ivory paper, clay/terracotta accent).
  * - High contrast: accessibility (black on white / white on black, saturated roles; well past WCAG AAA for body text).
  * - Sepia: warm paper, inspired by e-reader sepia modes.
  */
 export const BAKERY_ID = 'bakery';
+export const LEDGER_ID = 'ledger';
+export const HEARTH_ID = 'hearth';
 export const BUILTIN_THEMES: ThemeDef[] = [
+  { v: 1, id: LEDGER_ID, label: 'Ledger', inputs: {
+    light: { accent: '#2c49d6', danger: '#bf2f28', success: '#0a7447', warning: '#9a5700', pro: '#1b5cc0', 'surface-0': '#f4f5f8', 'surface-1': '#eceef3', 'surface-2': '#ffffff', 'text-primary': '#14171d', 'text-secondary': '#465061', 'text-muted': '#6b7485' },
+    dark: { accent: '#8497ff', danger: '#f0766d', success: '#4cc38a', warning: '#e2a43a', pro: '#6ea8ff', 'surface-0': '#0e1015', 'surface-1': '#12141a', 'surface-2': '#161920', 'text-primary': '#e7e9ef', 'text-secondary': '#b1b7c4', 'text-muted': '#8a91a1' },
+  } },
+  { v: 1, id: HEARTH_ID, label: 'Hearth', inputs: {
+    light: { accent: '#a3451c', danger: '#b3312a', success: '#2d6e3e', warning: '#8f5a00', pro: '#2a5fa8', 'surface-0': '#f5f3f0', 'surface-1': '#ede9e3', 'surface-2': '#fffefc', 'text-primary': '#1e1915', 'text-secondary': '#544a41', 'text-muted': '#7a6e63' },
+    dark: { accent: '#e58d60', danger: '#ee8177', success: '#7cc48c', warning: '#e0aa4a', pro: '#7fb0ee', 'surface-0': '#161310', 'surface-1': '#1a1613', 'surface-2': '#1f1b17', 'text-primary': '#efe9e2', 'text-secondary': '#c4b9ad', 'text-muted': '#978b7e' },
+  } },
+  { v: 1, id: 'graphite', label: 'Graphite', inputs: {
+    light: { accent: '#0c6f67', danger: '#bd2f2f', success: '#1a7a3c', warning: '#955a00', pro: '#1f5fb5', 'surface-0': '#f3f5f4', 'surface-1': '#e9edeb', 'surface-2': '#ffffff', 'text-primary': '#131715', 'text-secondary': '#47504c', 'text-muted': '#6c7672' },
+    dark: { accent: '#3fcab7', danger: '#f27b74', success: '#5fcf82', warning: '#e2a640', pro: '#72a9f5', 'surface-0': '#0d1110', 'surface-1': '#111514', 'surface-2': '#151a18', 'text-primary': '#e8ecea', 'text-secondary': '#b0bab5', 'text-muted': '#87928d' },
+  } },
   { v: 1, id: BAKERY_ID, label: 'Bakery', inputs: {
     light: { accent: '#7e4925', danger: '#dc2828', success: '#059467', warning: '#db7706', pro: '#0284c5', 'surface-0': '#faf8f5', 'surface-1': '#efebe7', 'surface-2': '#f6f3ee', 'text-primary': '#251d18', 'text-secondary': '#3d3129', 'text-muted': '#8d7768' },
     dark: { accent: '#cca35c', danger: '#d54444', success: '#36d399', warning: '#fbbd23', pro: '#38bdfa', 'surface-0': '#1e1915', 'surface-1': '#342d27', 'surface-2': '#29231e', 'text-primary': '#f0ece6', 'text-secondary': '#e2dbcf', 'text-muted': '#a49784' },
@@ -53,7 +71,9 @@ export const PRESET_THEMES: ThemeDef[] = [...BUILTIN_THEMES, ...CURATED_THEMES];
 export const isBuiltinId = (id: string): boolean => PRESET_THEMES.some((t) => t.id === id);
 export const isCuratedId = (id: string): boolean => CURATED_THEMES.some((t) => t.id === id);
 export const findTheme = (id: string, custom: ThemeDef[] = []): ThemeDef | undefined => PRESET_THEMES.find((t) => t.id === id) ?? custom.find((t) => t.id === id);
-export const DEFAULT_THEME = BUILTIN_THEMES[0]!;
+export const DEFAULT_THEME = BUILTIN_THEMES.find((t) => t.id === HEARTH_ID)!;
+/** BPS's original theme: the fallback for a theme's missing colours, and what printing and the customer portal show. */
+export const BAKERY_THEME = BUILTIN_THEMES.find((t) => t.id === BAKERY_ID)!;
 
 /** The variant shown for a wanted mode: that mode, else the theme's only one. */
 export function variantOf(theme: ThemeDef, want: ThemeMode): { seeds: ThemeSeeds; mode: ThemeMode } {

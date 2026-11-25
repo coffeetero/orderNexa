@@ -1,21 +1,11 @@
 import Link from 'next/link';
-import {
-  DollarSign,
-  ShoppingCart,
-  Users,
-  ChefHat,
-  Receipt,
-  TrendingUp,
-  ArrowRight,
-} from 'lucide-react';
+import { Suspense, cache } from 'react';
+import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MetricCard } from '@/components/features/account/MetricCard';
-import type { DashboardMetric } from '@/lib/types';
 import { createClient } from '@/lib/supabase/server';
 import { getCurrentTenantId } from '@/lib/supabase/tenant';
 
-interface TodayOrder { order_id: number; order_number: string; customer_name: string | null; production_code: string | null; quantity: number | null; amount: number | null }
+interface TodayOrder { order_id: number; order_number: string; customer_name: string | null; production_code: string | null; quantity: number | null; amount: number | null; line_count?: number; status?: string }
 interface TodayOrders { today: string; order_count: number; total_amount: number; orders: TodayOrder[] }
 interface Todo { kind: string; customer_name: string; pricebook_name: string; assignment_type: string; status: string; is_active: boolean; effective_start_date: string; days_until_start: number }
 interface Buckets { current_amt: number; d1_30: number; d31_60: number; d61_90: number; d90_plus: number; total: number }
@@ -26,267 +16,300 @@ interface ArDashboard { as_of: string; totals: Buckets; accounts: { customer_id:
 /** Whole-dollar or count display with the sign in front of the $ ("-$35,355", not "$-35,355"). */
 const whole = (v: number, prefix = '') => `${v < 0 ? '-' : ''}${prefix}${Math.abs(Math.round(v)).toLocaleString('en-US')}`;
 
-/** A metric card from a figure and its comparison. */
-function metric(label: string, c: Compare | undefined, changeLabel: string, prefix?: string): DashboardMetric {
-  return { label, value: whole(Number(c?.value ?? 0), prefix), change: c?.change_pct == null ? undefined : Number(c.change_pct), changeLabel };
+interface Figure { label: string; value: string; change?: number; note: string }
+/** A headline figure from a value and its comparison. */
+function figure(label: string, c: Compare | undefined, period: string, prefix?: string): Figure {
+  return { label, value: whole(Number(c?.value ?? 0), prefix), change: c?.change_pct == null ? undefined : Number(c.change_pct), note: `vs ${whole(Number(c?.previous ?? 0), prefix)} ${period}` };
 }
 
-const money = (v: number | null | undefined) => `$${Number(v ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+/** A titled panel: heading, optional sub-line and link on one compact row, then its content. */
+function Panel({ title, sub, href, linkLabel, className, children }: { title: string; sub?: React.ReactNode; href?: string; linkLabel?: string; className?: string; children: React.ReactNode }) {
+  return (
+    <section className={`min-w-0 overflow-hidden rounded-lg border border-border bg-card text-card-foreground shadow-sm ${className ?? ''}`}>
+      <div className="flex min-h-[40px] items-center justify-between gap-3 border-b border-border px-4 py-1.5">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-3">
+          <h2 className="text-sm font-semibold">{title}</h2>
+          {sub && <span className="text-xs text-muted-foreground">{sub}</span>}
+        </div>
+        {href && (
+          <Link href={href} className="inline-flex shrink-0 items-center gap-1 rounded text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            {linkLabel} <ArrowRight className="h-3 w-3" />
+          </Link>
+        )}
+      </div>
+      {children}
+    </section>
+  );
+}
+const TH = 'h-8 whitespace-nowrap bg-muted/50 px-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground';
+const TD = 'px-4 py-1.5';
+/** Order stage (from om_orders_today_get): label and status colour. */
+const STAGE: Record<string, { label: string; cls: string; dot: string }> = {
+  INVOICED: { label: 'Invoiced', cls: 'bg-success-soft text-success', dot: 'bg-success' },
+  SHIPPED: { label: 'Shipped', cls: 'bg-info-soft text-info', dot: 'bg-info' },
+  IN_PRODUCTION: { label: 'In production', cls: 'bg-warning-soft text-warning', dot: 'bg-warning' },
+  OPEN: { label: 'Open', cls: 'bg-muted text-muted-foreground', dot: 'bg-muted-foreground' },
+};
+const EMPTY = 'px-4 py-3 text-sm text-muted-foreground';
+
+/** Money with the sign in front of the $ ("-$5,768.69"). */
+const money = (v: number | null | undefined) => { const n = Number(v ?? 0); return `${n < 0 ? '-' : ''}$${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`; };
 
 export const dynamic = 'force-dynamic';
+
+/** AR figures, read once per request and shared by the Outstanding AR figure and both AR panels, which stream in after the rest. */
+const loadAr = cache(async (tenantId: number): Promise<ArDashboard | null> => {
+  const { data } = await createClient().rpc('ar_dashboard_get', { p_tenant_id: tenantId, p_limit: 8 });
+  return (data ?? null) as ArDashboard | null;
+});
+
+/** One cell of the key-figures strip. */
+function FigureCell({ f }: { f: Figure }) {
+  return (
+    <div className="min-w-0 border-b border-r border-border px-4 py-3">
+      <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-muted-foreground" title={f.label}>{f.label}</p>
+      <p className="mt-0.5 text-2xl font-semibold tabular-nums tracking-tight">{f.value}</p>
+      <p className="mt-0.5 text-xs text-muted-foreground">
+        {f.change !== undefined && (
+          <span className={`mr-1.5 font-semibold tabular-nums ${f.change >= 0 ? 'text-success' : 'text-destructive'}`}>
+            {f.change >= 0 ? '▲' : '▼'} {Math.abs(f.change)}%
+          </span>
+        )}
+        {f.note}
+      </p>
+    </div>
+  );
+}
+
+/** Placeholder of the same size while AR figures load. */
+function Pending({ label, rows = 0 }: { label?: string; rows?: number }) {
+  if (label) {
+    return (
+      <div className="min-w-0 border-b border-r border-border px-4 py-3" aria-busy="true">
+        <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+        <p className="mt-1.5 h-6 w-28 animate-pulse rounded bg-muted" />
+        <p className="mt-1.5 h-3 w-36 animate-pulse rounded bg-muted" />
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-2 px-4 py-3" aria-busy="true" aria-label="Loading">
+      {Array.from({ length: rows }, (_, i) => <div key={i} className="h-5 animate-pulse rounded bg-muted/70" />)}
+    </div>
+  );
+}
+
+async function ArFigure({ tenantId }: { tenantId: number }) {
+  const ar = await loadAr(tenantId);
+  if (!ar) return null;
+  return <FigureCell f={{ label: 'Outstanding AR', value: whole(Number(ar.totals.total), '$'), note: `over 90 days: ${whole(Number(ar.totals.d90_plus), '$')}` }} />;
+}
+
+async function CustomerAccounts({ tenantId }: { tenantId: number }) {
+  const ar = await loadAr(tenantId);
+  if (!ar || ar.accounts.length === 0) return <p className={EMPTY}>No account has an open balance.</p>;
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead className="text-left">
+          <tr><th className={TH}>Account</th><th className={`${TH} text-right`}>Balance</th><th className={`${TH} text-right`}>Over 90 days</th></tr>
+        </thead>
+        <tbody>
+          {ar.accounts.map((a) => (
+            <tr key={a.customer_id} className="border-t border-border hover:bg-muted/40">
+              <td className={TD}>{a.customer_name}</td>
+              <td className={`${TD} text-right`}>{money(a.total)}</td>
+              <td className={`${TD} text-right ${Number(a.d90_plus) > 0 ? 'font-medium text-destructive' : 'text-muted-foreground'}`}>{money(a.d90_plus)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+async function ArAging({ tenantId }: { tenantId: number }) {
+  const ar = await loadAr(tenantId);
+  if (!ar) return <p className={EMPTY}>AR aging is not available.</p>;
+  return (
+    <table className="w-full text-sm">
+      <tbody>
+        {[
+          { label: 'Current', amount: ar.totals.current_amt, color: 'bg-success' },
+          { label: '1–30 days', amount: ar.totals.d1_30, color: 'bg-info' },
+          { label: '31–60 days', amount: ar.totals.d31_60, color: 'bg-warning' },
+          { label: '61–90 days', amount: ar.totals.d61_90, color: 'bg-destructive opacity-60' },
+          { label: 'Over 90 days', amount: ar.totals.d90_plus, color: 'bg-destructive' },
+        ].map((bucket) => (
+          <tr key={bucket.label} className="border-b border-border">
+            <td className={TD}><span className="flex items-center gap-2"><span className={`h-2 w-2 shrink-0 rounded-full ${bucket.color}`} />{bucket.label}</span></td>
+            <td className={`${TD} text-right font-medium`}>{money(bucket.amount)}</td>
+          </tr>
+        ))}
+        <tr className="bg-muted/50 font-semibold">
+          <td className={TD}>Total AR</td>
+          <td className={`${TD} text-right`}>{money(ar.totals.total)}</td>
+        </tr>
+      </tbody>
+    </table>
+  );
+}
 
 export default async function TenantDashboardPage() {
   const supabase = createClient();
   const tenantId = await getCurrentTenantId();
-  const [areasRes, ordersRes, arRes, todoRes, metricsRes] = tenantId === null
-    ? [null, null, null, null, null]
+  if (tenantId !== null) void loadAr(tenantId);   // start the AR read now; its panels wait for it, the rest of the page does not
+  const [areasRes, ordersRes, todoRes, metricsRes] = tenantId === null
+    ? [null, null, null, null]
     : await Promise.all([
         supabase.rpc('fnd_my_areas'),
         supabase.rpc('om_orders_today_get', { p_tenant_id: tenantId, p_limit: 8 }),
-        supabase.rpc('ar_dashboard_get', { p_tenant_id: tenantId, p_limit: 8 }),
         supabase.rpc('fnd_todos_get', { p_tenant_id: tenantId }),
         supabase.rpc('om_dashboard_metrics_get', { p_tenant_id: tenantId }),
       ]);
   const areas = Array.isArray(areasRes?.data) ? (areasRes!.data as string[]) : [];
   const todays = (ordersRes?.data ?? null) as TodayOrders | null;
-  const ar = (arRes?.data ?? null) as ArDashboard | null;
   const m = (metricsRes?.data ?? null) as Metrics | null;
   const todos = (Array.isArray(todoRes?.data) ? todoRes!.data : []) as Todo[];
-  const showAr = areas.includes('financials.aging');
+  const showAr = tenantId !== null && areas.includes('financials.aging');
   const showOrders = areas.includes('orders.manage') || areas.includes('orders.enter');
   const dateLabel = todays
     ? new Date(`${todays.today}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
     : '';
 
+  const figures: Figure[] = [
+    ...(showAr ? [figure('Revenue, month to date', m?.revenue, 'last month', '$')] : []),
+    ...(showOrders ? [
+      figure('Orders today', m?.orders, 'yesterday'),
+      figure('Units today', m?.units, 'yesterday'),
+      figure('Active customers, 30 days', m?.customers, 'prior 30'),
+      figure('Average order', m?.avg_order, 'last month', '$'),
+    ] : []),
+  ];
+
   return (
-    <div className="space-y-6">
-      <div>
-        <p className="text-sm text-muted-foreground">
-          {dateLabel}
-        </p>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
-        {showAr && (
-          <MetricCard metric={metric('Revenue This Month', m?.revenue, 'invoiced, vs same days last month', '$')} icon={DollarSign} accentColor="bg-success/10 text-success" />
-        )}
+    <div className="space-y-3 py-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <h1 className="text-lg font-semibold tracking-tight">Dashboard</h1>
+        <p className="text-sm text-muted-foreground">{dateLabel}</p>
         {showOrders && (
-          <>
-            <MetricCard metric={metric("Today's Orders", m?.orders, 'for production, vs yesterday')} icon={ShoppingCart} accentColor="bg-info/10 text-info" />
-            <MetricCard metric={metric('Active Customers', m?.customers, 'ordered in 30 days, vs prior 30')} icon={Users} accentColor="bg-primary/10 text-primary" />
-            <MetricCard metric={metric('Units in Production', m?.units, 'today, vs yesterday')} icon={ChefHat} accentColor="bg-warning/10 text-warning" />
-          </>
-        )}
-        {showAr && ar && (
-          <MetricCard
-            metric={{ label: 'Outstanding AR', value: whole(Number(ar.totals.total), '$'), changeLabel: `over 90 days: ${whole(Number(ar.totals.d90_plus), '$')}` }}
-            icon={Receipt}
-            accentColor="bg-orange-500/10 text-orange-600 dark:text-orange-400"
-          />
-        )}
-        {showOrders && (
-          <MetricCard metric={metric('Avg Order Value', m?.avg_order, 'this month, vs same days last month', '$')} icon={TrendingUp} accentColor="bg-violet-500/10 text-violet-600 dark:text-violet-400" />
+          <div className="ml-auto flex gap-2">
+            <Button asChild variant="outline" size="sm"><Link href="/production/report">Production report</Link></Button>
+            {areas.includes('orders.enter') && <Button asChild size="sm"><Link href="/orders/new">New order</Link></Button>}
+          </div>
         )}
       </div>
 
-      {todos.length > 0 && (
-        <Card className="border-warning/40">
-          <CardHeader className="pb-3">
-            <CardTitle
-              className="text-base font-semibold"
-              style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
-            >
-              To-Do&apos;s
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0 pb-1">
-            <ul className="divide-y divide-border/40">
-              {todos.map((t, i) => (
-                <li key={i} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-6 py-2 text-sm">
-                  <span className="font-medium">{t.pricebook_name}</span>
-                  <span className="text-muted-foreground">{t.assignment_type} for {t.customer_name}</span>
-                  <span className="text-muted-foreground">
-                    {t.days_until_start > 0 ? `starts in ${t.days_until_start} day${t.days_until_start === 1 ? '' : 's'}` : t.days_until_start === 0 ? 'starts today' : `started ${-t.days_until_start} day${t.days_until_start === -1 ? '' : 's'} ago`}
-                    {' '}({t.effective_start_date})
-                  </span>
-                  <span className="ml-auto rounded bg-warning/15 px-2 py-0.5 text-xs text-warning">{t.is_active ? t.status : `${t.status}, inactive`}</span>
-                </li>
-              ))}
-            </ul>
-            <p className="px-6 pb-2 pt-1 text-xs text-muted-foreground">These pricing books are not in effect yet. Approve and activate them on the customer&apos;s Pricing tab.</p>
-          </CardContent>
-        </Card>
+      {(figures.length > 0 || showAr) && (
+        <section aria-label="Key figures" className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+          <div className="-mb-px -mr-px grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
+            {figures.map((f) => <FigureCell key={f.label} f={f} />)}
+            {showAr && (
+              <Suspense fallback={<Pending label="Outstanding AR" />}>
+                <ArFigure tenantId={tenantId!} />
+              </Suspense>
+            )}
+          </div>
+        </section>
       )}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Card className="border-border/60 col-span-1 lg:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between pb-3">
-            <div>
-              <CardTitle
-                className="text-base font-semibold"
-                style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
-              >
-                Today&apos;s Orders
-              </CardTitle>
-              {todays && showOrders && (
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {todays.order_count} order{todays.order_count === 1 ? '' : 's'} for production today · {money(todays.total_amount)}
-                </p>
-              )}
-            </div>
-            <Button asChild variant="ghost" size="sm" className="text-xs text-primary gap-1">
-              <Link href="/manage-orders">
-                View all <ArrowRight className="h-3 w-3" />
-              </Link>
-            </Button>
-          </CardHeader>
-          <CardContent className="p-0 pb-1">
-            {!showOrders ? (
-              <p className="px-6 py-4 text-sm text-muted-foreground">Orders are not available to your role.</p>
-            ) : !todays || todays.orders.length === 0 ? (
-              <p className="px-6 py-4 text-sm text-muted-foreground">No orders are scheduled for production today.</p>
-            ) : (
+      {todos.length > 0 && (
+        <Panel title="To-Do's" sub="Pricing books not in effect yet. Approve and activate them on the customer's Pricing tab." className="border-warning/50">
+          <ul className="divide-y divide-border">
+            {todos.map((t, i) => (
+              <li key={i} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-1.5 text-sm">
+                <span className="font-medium">{t.pricebook_name}</span>
+                <span className="text-muted-foreground">{t.assignment_type} for {t.customer_name}</span>
+                <span className="text-muted-foreground">
+                  {t.days_until_start > 0 ? `starts in ${t.days_until_start} day${t.days_until_start === 1 ? '' : 's'}` : t.days_until_start === 0 ? 'starts today' : `started ${-t.days_until_start} day${t.days_until_start === -1 ? '' : 's'} ago`}
+                  {' '}({t.effective_start_date})
+                </span>
+                <span className="ml-auto rounded bg-warning-soft px-2 py-0.5 text-xs font-medium text-warning">{t.is_active ? t.status : `${t.status}, inactive`}</span>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      )}
+
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+        <Panel
+          className="lg:col-span-2"
+          title="Today's Orders"
+          sub={todays && showOrders ? `${todays.order_count} order${todays.order_count === 1 ? '' : 's'} for production today · ${money(todays.total_amount)}` : undefined}
+          href="/manage-orders" linkLabel="View all"
+        >
+          {!showOrders ? (
+            <p className={EMPTY}>Orders are not available to your role.</p>
+          ) : !todays || todays.orders.length === 0 ? (
+            <p className={EMPTY}>No orders are scheduled for production today.</p>
+          ) : (
+            <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="text-left text-xs text-muted-foreground">
-                  <tr><th className="px-6 py-2">Order</th><th className="px-3 py-2">Customer</th><th className="px-3 py-2">Production</th><th className="px-3 py-2 text-right">Qty</th><th className="px-6 py-2 text-right">Amount</th></tr>
+                <thead className="text-left">
+                  <tr><th className={TH}>Order</th><th className={TH}>Customer</th><th className={TH}>Production</th><th className={`${TH} text-right`}>Lines</th><th className={`${TH} text-right`}>Qty</th><th className={`${TH} text-right`}>Amount</th><th className={TH}>Status</th></tr>
                 </thead>
                 <tbody>
                   {todays.orders.map((o) => (
-                    <tr key={o.order_id} className="border-t border-border/40">
-                      <td className="px-6 py-2 font-mono text-xs"><Link className="text-primary hover:underline" href={`/orders/${o.order_id}/edit`}>{o.order_number}</Link></td>
-                      <td className="px-3 py-2">{o.customer_name}</td>
-                      <td className="px-3 py-2 text-xs text-muted-foreground">{o.production_code}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{Number(o.quantity ?? 0).toLocaleString('en-US')}</td>
-                      <td className="px-6 py-2 text-right tabular-nums">{money(o.amount)}</td>
+                    <tr key={o.order_id} className="border-t border-border hover:bg-muted/40">
+                      <td className={TD}><Link className="font-medium text-primary hover:underline" href={`/orders/${o.order_id}/edit`}>{o.order_number}</Link></td>
+                      <td className={TD}>{o.customer_name}</td>
+                      <td className={`${TD} text-muted-foreground`}>{o.production_code}</td>
+                      <td className={`${TD} text-right`}>{Number(o.line_count ?? 0).toLocaleString('en-US')}</td>
+                      <td className={`${TD} text-right`}>{Number(o.quantity ?? 0).toLocaleString('en-US')}</td>
+                      <td className={`${TD} text-right`}>{money(o.amount)}</td>
+                      <td className={TD}>
+                        {STAGE[o.status ?? ''] && (
+                          <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${STAGE[o.status!].cls}`}>
+                            <span className={`h-1.5 w-1.5 rounded-full ${STAGE[o.status!].dot}`} />{STAGE[o.status!].label}
+                          </span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            )}
-            {todays && todays.order_count > todays.orders.length && (
-              <p className="px-6 pb-2 pt-1 text-xs text-muted-foreground">and {todays.order_count - todays.orders.length} more</p>
-            )}
-          </CardContent>
-        </Card>
+            </div>
+          )}
+          {todays && showOrders && todays.order_count > todays.orders.length && (
+            <p className="border-t border-border px-4 py-1.5 text-xs text-muted-foreground">and {todays.order_count - todays.orders.length} more</p>
+          )}
+        </Panel>
 
-        <Card className="border-border/60">
-          <CardHeader className="pb-3">
-            <CardTitle
-              className="text-base font-semibold"
-              style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
-            >
-              Production Summary
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {!showOrders ? (
-              <p className="text-sm text-muted-foreground">Production is not available to your role.</p>
-            ) : !m || m.top_items.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Nothing is scheduled for production today.</p>
-            ) : (
-              <>
-                <p className="text-xs text-muted-foreground">Items with the most units for production today</p>
-                {m.top_items.map((item) => (
-                  <div key={item.item_description}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-medium text-foreground">{item.item_description}</span>
-                      <span className="text-xs text-muted-foreground tabular-nums">{Number(item.quantity).toLocaleString('en-US')}</span>
-                    </div>
-                    <div className="h-1.5 w-full rounded-full bg-muted">
-                      <div className="h-1.5 rounded-full bg-primary transition-all" style={{ width: `${item.pct}%` }} />
-                    </div>
-                  </div>
-                ))}
-              </>
-            )}
-          </CardContent>
-        </Card>
+        <Panel title="Production Summary" sub="Most units for production today">
+          {!showOrders ? (
+            <p className={EMPTY}>Production is not available to your role.</p>
+          ) : !m || m.top_items.length === 0 ? (
+            <p className={EMPTY}>Nothing is scheduled for production today.</p>
+          ) : (
+            <ul className="space-y-2 px-4 py-3">
+              {m.top_items.map((item) => (
+                <li key={item.item_description} className="flex items-center gap-3 text-sm">
+                  <span className="w-2/5 shrink-0 truncate" title={item.item_description}>{item.item_description}</span>
+                  <span className="h-2 min-w-0 flex-1 rounded-sm bg-muted"><span className="block h-2 rounded-sm bg-primary" style={{ width: `${item.pct}%` }} /></span>
+                  <span className="w-14 shrink-0 text-right tabular-nums">{Number(item.quantity).toLocaleString('en-US')}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card className="border-border/60">
-          <CardHeader className="flex flex-row items-center justify-between pb-3">
-            <CardTitle
-              className="text-base font-semibold"
-              style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
-            >
-              Customer Accounts
-            </CardTitle>
-            <Button asChild variant="ghost" size="sm" className="text-xs text-primary gap-1">
-              <Link href="/customers">
-                View all <ArrowRight className="h-3 w-3" />
-              </Link>
-            </Button>
-          </CardHeader>
-          <CardContent className="p-0 pb-1">
-            {!showAr ? (
-              <p className="px-6 py-4 text-sm text-muted-foreground">Balances are not available to your role.</p>
-            ) : !ar || ar.accounts.length === 0 ? (
-              <p className="px-6 py-4 text-sm text-muted-foreground">No account has an open balance.</p>
-            ) : (
-              <table className="w-full text-sm">
-                <thead className="text-left text-xs text-muted-foreground">
-                  <tr><th className="px-6 py-2">Account</th><th className="px-3 py-2 text-right">Balance</th><th className="px-6 py-2 text-right">Over 90 days</th></tr>
-                </thead>
-                <tbody>
-                  {ar.accounts.map((a) => (
-                    <tr key={a.customer_id} className="border-t border-border/40">
-                      <td className="px-6 py-2">{a.customer_name}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{money(a.total)}</td>
-                      <td className={`px-6 py-2 text-right tabular-nums ${Number(a.d90_plus) > 0 ? 'font-medium text-destructive' : ''}`}>{money(a.d90_plus)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+        <Panel className="lg:col-span-2" title="Customer Accounts" sub="Largest open balances" href="/customers" linkLabel="View all">
+          {!showAr ? (
+            <p className={EMPTY}>Balances are not available to your role.</p>
+          ) : (
+            <Suspense fallback={<Pending rows={8} />}><CustomerAccounts tenantId={tenantId!} /></Suspense>
+          )}
+        </Panel>
 
-        <Card className="border-border/60">
-          <CardHeader className="flex flex-row items-center justify-between pb-3">
-            <div>
-              <CardTitle
-                className="text-base font-semibold"
-                style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
-              >
-                AR Aging
-              </CardTitle>
-              {ar && showAr && <p className="mt-0.5 text-xs text-muted-foreground">As of {ar.as_of}</p>}
-            </div>
-            <Button asChild variant="ghost" size="sm" className="text-xs text-primary gap-1">
-              <Link href="/financials/aging">
-                Report <ArrowRight className="h-3 w-3" />
-              </Link>
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {!showAr || !ar ? (
-              <p className="text-sm text-muted-foreground">AR aging is not available to your role.</p>
-            ) : (
-              <>
-                {[
-                  { label: 'Current', amount: ar.totals.current_amt, color: 'bg-success' },
-                  { label: '1–30 days', amount: ar.totals.d1_30, color: 'bg-info' },
-                  { label: '31–60 days', amount: ar.totals.d31_60, color: 'bg-warning' },
-                  { label: '61–90 days', amount: ar.totals.d61_90, color: 'bg-orange-500' },
-                  { label: 'Over 90 days', amount: ar.totals.d90_plus, color: 'bg-destructive' },
-                ].map((bucket) => (
-                  <div key={bucket.label} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <div className={`h-2.5 w-2.5 rounded-full ${bucket.color}`} />
-                      <span className="text-sm text-foreground">{bucket.label}</span>
-                    </div>
-                    <span className="text-sm font-semibold tabular-nums text-foreground">{money(bucket.amount)}</span>
-                  </div>
-                ))}
-                <div className="pt-3 border-t border-border flex items-center justify-between">
-                  <span className="text-sm font-semibold text-foreground">Total AR</span>
-                  <span className="text-sm font-bold text-foreground tabular-nums">{money(ar.totals.total)}</span>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
+        <Panel title="AR Aging" sub={showAr && todays ? `As of ${todays.today}` : undefined} href="/financials/aging" linkLabel="Report">
+          {!showAr ? (
+            <p className={EMPTY}>AR aging is not available to your role.</p>
+          ) : (
+            <Suspense fallback={<Pending rows={6} />}><ArAging tenantId={tenantId!} /></Suspense>
+          )}
+        </Panel>
       </div>
     </div>
   );

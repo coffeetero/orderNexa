@@ -265,7 +265,7 @@ export function AppearanceSettings({ fetchText = fetchPublicText }: { fetchText?
           <CardDescription>Click a theme to try it on the whole app.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
-          {group('Built-in', 'Made for BPS. Bakery is the default.', BUILTIN_THEMES)}
+          {group('Built-in', 'Made for BPS. Hearth is the default.', BUILTIN_THEMES)}
           {group('Curated', 'Popular palettes, picked for BPS from the Claude Code theme gallery (ccthemes by livlign, MIT).', CURATED_THEMES)}
           {group('Yours', 'Themes you made or imported. They follow your account.', acct.custom)}
         </CardContent>

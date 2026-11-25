@@ -8,7 +8,7 @@ A nightly checker for setup and data consistency. Findings are logged and shown 
 - Access area `admin.health` (read = see and open the page and heart, write = run checks and mark fixed, approve = enable/disable a check).
 
 ## Checks
-Each check is a function `fnd_hc_<code>(tenant)` returning findings. Add a check by writing the function and adding a row to `fnd_health_catalog()`. Current checks: users without a role, accounts without a pricing book / contact / address, compound items without components or with inactive components, pricing books not used (Information, also refreshes `last_used_date`), orders without a pricing book (Error, before Production Run), orders with unpriced lines (before Production Run), payments applied for more than received (Error), items not ordered (Information, also refreshes `last_ordered_date`).
+Each check is a function `fnd_hc_<code>(tenant)` returning findings. Add a check by writing the function and adding a row to `fnd_health_catalog()`. Current checks: users without a role, accounts without a pricing book / contact / address, compound items without components or with inactive components, pricing books not used (Information, also refreshes `last_used_date`), orders without a pricing book (Error, before Production Run), orders with unpriced lines (before Production Run), payments applied for more than received (Error), items not ordered (Information, also refreshes `last_ordered_date`), open balances out of step with a full recalculation (`ar_open_items_drift`, Error).
 
 ## Running
 - `fnd_health_run(tenant, trigger, check_code?)` runs the enabled checks. The page and API (`/api/admin/health`) call it with trigger Manual.

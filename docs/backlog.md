@@ -98,6 +98,12 @@ Status: first release built (see docs/Architecture/health-checks.md): two tables
 - Payments: 43,513 of 43,897 migrated. Amounts, application counts and applied amounts agree 100%. Skipped: 372 zero-amount and the 12 above.
 - Pump: `index_legacy_tables.sql` now runs first in seed_all.py (legacy tables have no indexes). Migration of the full history runs in about 2 minutes.
 - To check next: speed of the app's AR reports on 530,000 invoices (`ar_sales_report_get`, `ar_report_open_items`, `ar_customer_balance_get` call `ar_invoice_recognized_amount` per invoice).
+  - Done 2026-11-25 for open items: `bps.ar_open_items` (migration/add_ar_open_items.sql) holds only documents with money open, kept by triggers. Dashboard AR call 0.45 s → 0.01 s; aging and statements for today use it too. Health check `ar_open_items_drift`. Still slow: `ar_sales_report_get`, `ar_customer_balance_get` (not yet checked).
+
+### AR troubleshooting and write-off screen (idea 2026-11-25, not designed)
+- Built on `bps.ar_open_items`: list old documents that are still open (e.g. a 2022 invoice or a 2000 payment), show their history (invoice, applications, reversals, credits) so a user can see why the balance remains.
+- Actions: write off an invoice remainder to an allowance, zero out an unapplied payment, or apply it to an invoice. Needs: approval rules, an allowance/write-off document type, audit, and how write-offs show on statements and in the sales report.
+- Would clear most of the about -$191,000 of old negative items behind the negative Outstanding AR (see the reconciliation above).
 
 ## 5. Import Orders follow-ups (built 2026-11-24)
 - Aggregator customers: the same import from the customer portal (an aggregator uploads hundreds of orders for its own customers). The import tables already hold the account; needs a portal page, a customer-side area and row security for portal users.

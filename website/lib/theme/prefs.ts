@@ -90,7 +90,7 @@ export function writeCookie(a: LocalAppearance): void {
   } catch { /* not remembered */ }
 }
 
-/** What is shown: try-on, else this device's override, else the account's choice, else the cookie (last applied), else Bakery / Light. */
+/** What is shown: try-on, else this device's override, else the account's choice, else the cookie (last applied), else the default theme / Light. */
 export function resolveAppearance(a: { preview: ThemeDef | null; device: LocalAppearance | null; account: AppearancePrefs | undefined; last: LocalAppearance | null }): LocalAppearance {
   const base: LocalAppearance = a.device
     ?? (a.account ? { mode: a.account.mode, theme: findTheme(a.account.themeId, a.account.custom) ?? DEFAULT_THEME } : null)
