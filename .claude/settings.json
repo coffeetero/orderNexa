@@ -12,7 +12,8 @@
       "NotebookEdit",
       "Agent",
       "mcp__ccd_directory__request_directory",
-      "Skill"
+      "Skill",
+      "Bash(database/apply-to-cloud.sh:*)"
     ],
     "deny": [
       "Bash(rm -rf *)",
