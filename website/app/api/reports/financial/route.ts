@@ -15,6 +15,7 @@ const toB64 = (b: Uint8Array) => Buffer.from(b).toString('base64');
 /**
  * GET /api/reports/financial?tenant_id=n[&with_invoices=1&from=YYYY-MM-DD&to=YYYY-MM-DD] → active Accounts the caller may report on (the customer picker).
  * With with_invoices only accounts that have an issued invoice in the period (from and to are each optional).
+ * With open=1&as_of=YYYY-MM-DD: only accounts with something open on that date, each with its balance (AR Open Balances).
  */
 export async function GET(request: Request) {
   const q = new URL(request.url).searchParams;
@@ -25,6 +26,13 @@ export async function GET(request: Request) {
   const from = q.get('from');
   const to = q.get('to');
   if ((from && !isDate(from)) || (to && !isDate(to))) return NextResponse.json({ error: 'from and to must be YYYY-MM-DD' }, { status: 400 });
+  if (q.get('open') === '1') {
+    const asOf = q.get('as_of');
+    if (!isDate(asOf)) return NextResponse.json({ error: 'as_of must be YYYY-MM-DD' }, { status: 400 });
+    const r = await createClient().rpc('ar_open_accounts_get', { p_tenant_id: tenantId, p_as_of: asOf });
+    if (r.error) return NextResponse.json({ error: r.error.message }, { status: 400 });
+    return NextResponse.json({ data: r.data });
+  }
   const { data, error } = await createClient().rpc('fnd_report_accounts_get', {
     p_tenant_id: tenantId, p_with_invoices: q.get('with_invoices') === '1', p_from: from || null, p_to: to || null,
   });

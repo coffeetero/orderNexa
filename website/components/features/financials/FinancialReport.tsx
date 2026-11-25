@@ -1,16 +1,17 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Download, Play, Printer, Save } from 'lucide-react';
+import { ChevronDown, ChevronUp, Download, Play, Printer, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CustomerPicker, type PickAccount } from './CustomerPicker';
+import { OpenItemsDetail } from './OpenItemsDetail';
 import type { ReportKind } from '@/lib/reports/financial';
 
 const CONFIG: Record<ReportKind, { title: string; help: string }> = {
-  ar: { title: 'AR Open Balances', help: 'Unpaid invoices and credits for the selected customers, as of a date.' },
+  ar: { title: 'AR Open Balances', help: 'Customers with something open on a date. Click a name to see its open items below; tick customers to put them in the report.' },
   aging: { title: 'AR Aging Report', help: 'What each selected customer owes, by how far past due it is.' },
   statements: { title: 'Customer Statements', help: 'One statement per selected customer. Saving keeps each customer’s statement with its own as-of date.' },
   sales: { title: 'Sales Reports', help: 'Invoiced sales, credits and items for the selected customers over a date range.' },
@@ -36,15 +37,24 @@ export function FinancialReport({ tenantId, kind }: { tenantId: number; kind: Re
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const frame = useRef<HTMLIFrameElement>(null);
+  // AR Open Balances: the customer whose open items show below, and whether the first section is folded
+  const [activeId, setActiveId] = useState<number | null>(null);
+  const [collapsed, setCollapsed] = useState(false);
+  const openList = kind === 'ar';
 
-  // AR Open Balances, AR Aging and Sales list only active accounts that have an invoice in the period (up to the as-of date, or from-to).
-  const needsInvoices = kind === 'ar' || kind === 'aging' || kind === 'sales';
+  // AR Aging and Sales list only active accounts that have an invoice in the period (up to the as-of date, or from-to).
+  // AR Open Balances lists only accounts with something open on the as-of date, with the balance.
+  const needsInvoices = kind === 'aging' || kind === 'sales';
+  const listAsOf = openList ? asOf : '';
   const periodFrom = kind === 'sales' ? from : '';
   const periodTo = kind === 'sales' ? to : asOf;
 
   useEffect(() => {
     const qs = new URLSearchParams({ tenant_id: String(tenantId) });
-    if (needsInvoices) {
+    if (openList) {
+      if (!listAsOf) return;
+      qs.set('open', '1'); qs.set('as_of', listAsOf);
+    } else if (needsInvoices) {
       qs.set('with_invoices', '1');
       if (periodFrom) qs.set('from', periodFrom);
       if (periodTo) qs.set('to', periodTo);
@@ -58,10 +68,11 @@ export function FinancialReport({ tenantId, kind }: { tenantId: number; kind: Re
         const list = j.data ?? [];
         setAccounts(list);
         setSelected((prev) => new Set(Array.from(prev).filter((id) => list.some((a) => a.customer_id === id))));
+        setActiveId((prev) => (prev !== null && list.some((a) => a.customer_id === prev) ? prev : null));
       })
       .catch((e: Error) => live && setMessage({ text: e.message, error: true }));
     return () => { live = false; };
-  }, [tenantId, needsInvoices, periodFrom, periodTo]);
+  }, [tenantId, needsInvoices, periodFrom, periodTo, openList, listAsOf]);
 
   useEffect(() => () => { if (result) URL.revokeObjectURL(result.url); }, [result]);
 
@@ -89,6 +100,8 @@ export function FinancialReport({ tenantId, kind }: { tenantId: number; kind: Re
   }
 
   const none = selected.size === 0;
+  const active = accounts?.find((a) => a.customer_id === activeId) ?? null;
+  const openAccount = (id: number) => { setActiveId(id); setCollapsed(true); };
   return (
     <div className="mx-auto max-w-5xl space-y-4 p-2 sm:p-3">
       <div>
@@ -96,7 +109,19 @@ export function FinancialReport({ tenantId, kind }: { tenantId: number; kind: Re
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{cfg.help}</p>
       </div>
 
-      <Card><CardContent className="space-y-4 pt-6">
+      <Card>
+        {openList && (
+          <div className="flex min-h-[40px] items-center gap-3 border-b border-border px-4 py-1.5">
+            <h2 className="text-sm font-semibold">Customers</h2>
+            <span className="min-w-0 truncate text-xs text-muted-foreground">
+              As of {asOf}{accounts ? ` · ${accounts.length} with an open balance` : ''}{active ? ` · showing ${active.customer_name}` : ''}{selected.size ? ` · ${selected.size} in report` : ''}
+            </span>
+            <Button variant="ghost" size="sm" className="ml-auto h-7 gap-1 px-2 text-xs" onClick={() => setCollapsed((c) => !c)} aria-expanded={!collapsed} aria-controls="ar-customers">
+              {collapsed ? <><ChevronDown className="h-4 w-4" />Show</> : <><ChevronUp className="h-4 w-4" />Hide</>}
+            </Button>
+          </div>
+        )}
+        {!(openList && collapsed) && <CardContent id="ar-customers" className={`space-y-4 ${openList ? 'pt-4' : 'pt-6'}`}>
         <div className="flex flex-wrap items-end gap-4">
           {kind === 'sales' ? (
             <>
@@ -123,9 +148,14 @@ export function FinancialReport({ tenantId, kind }: { tenantId: number; kind: Re
           <Button onClick={() => run(false)} disabled={busy || none} className="ml-auto gap-1.5"><Play className="h-4 w-4" />{busy ? 'Running…' : 'Run'}</Button>
         </div>
         {needsInvoices && <p className="text-xs text-muted-foreground">Only active customers with an invoice {kind === 'sales' ? 'in this period' : 'on or before the as-of date'} are listed.</p>}
-        {accounts === null ? <p className="text-sm text-muted-foreground">Loading customers…</p> : <CustomerPicker accounts={accounts} selected={selected} onChange={setSelected} />}
+        {accounts === null ? <p className="text-sm text-muted-foreground">Loading customers…</p>
+          : openList ? <CustomerPicker accounts={accounts} selected={selected} onChange={setSelected} onOpen={openAccount} activeId={activeId} />
+          : <CustomerPicker accounts={accounts} selected={selected} onChange={setSelected} />}
         {message && <p role="status" className={`text-sm ${message.error ? 'text-destructive' : 'text-foreground'}`}>{message.text}</p>}
-      </CardContent></Card>
+      </CardContent>}
+      </Card>
+
+      {openList && activeId !== null && <OpenItemsDetail tenantId={tenantId} accountId={activeId} asOf={asOf} />}
 
       {result && (
         <Card><CardContent className="space-y-3 pt-6">
