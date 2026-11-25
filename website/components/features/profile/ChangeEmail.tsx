@@ -30,7 +30,7 @@ export function ChangeEmail() {
       const j = (await res.json().catch(() => ({}))) as { data?: { sent: boolean; email: string; link?: string }; error?: string };
       if (!res.ok || !j.data) throw new Error(j.error ?? 'The request could not be sent.');
       setMessage(j.data.sent
-        ? { text: `We sent a link to ${j.data.email}. Your sign-in email changes when you open it (within 24 hours).`, error: false }
+        ? { text: `We sent a link to ${j.data.email}. Your sign-in email changes when you open it (within 24 hours). Your password stays the same.`, error: false }
         : { text: 'Email is not set up here, so no message was sent. Open this link to confirm:', error: false, link: j.data.link });
       setEditing(false); setNext('');
     } catch (err) {
@@ -58,7 +58,12 @@ export function ChangeEmail() {
             <Button type="button" size="sm" variant="ghost" onClick={() => { setEditing(false); setNext(''); }}>Cancel</Button>
           </form>
         )}
-        {editing && <p className="text-xs text-muted-foreground">Your roles and companies stay the same. Your current address gets a notice once the change is made.</p>}
+        {editing && (
+          <div className="rounded-md border border-info/30 bg-info-soft px-3 py-2">
+            <p className="text-base font-semibold text-foreground">Your password stays the same.</p>
+            <p className="text-xs text-muted-foreground">Only the address you sign in with changes. Your roles and companies stay the same, and your current address gets a notice once the change is made.</p>
+          </div>
+        )}
         {message && (
           <p role="status" className={`text-sm ${message.error ? 'text-destructive' : 'text-foreground'}`}>
             {message.text}{message.link && <> <a href={message.link} className="break-all text-primary underline">{message.link}</a></>}

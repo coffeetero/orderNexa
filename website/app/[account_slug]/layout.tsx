@@ -65,12 +65,15 @@ export default async function AccountSlugLayout({
   }
 
   const basePath = `/${account_slug}`;
+  const { data: areaData } = await supabase.rpc('fnd_my_areas');
+  const areas = Array.isArray(areaData) ? (areaData as string[]) : [];
 
   return (
     <CustomerLayoutShell
       timeoutMinutes={timeoutMinutes}
       basePath={basePath}
       userName={access.userName}
+      areas={areas}
     >
       {children}
     </CustomerLayoutShell>

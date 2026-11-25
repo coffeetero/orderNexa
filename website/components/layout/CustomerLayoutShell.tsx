@@ -5,14 +5,17 @@ import { useRouter } from 'next/navigation';
 import { TopNav } from '@/components/layout/TopNav';
 import { SessionTimeout } from '@/components/auth/SessionTimeout';
 import { createClient } from '@/lib/supabase/client';
-import { customerNav } from '@/lib/nav-config';
+import { customerNav, visibleMenus } from '@/lib/nav-config';
 import { ForceDefaultTheme } from '@/components/theme/AppearanceProvider';
+import { ActivityPing } from '@/components/layout/ActivityPing';
 
 type CustomerLayoutShellProps = {
   children: React.ReactNode;
   timeoutMinutes: number;
   basePath: string;
   userName?: string | null;
+  /** Areas the user may read; menus that need other areas (e.g. Users) are hidden. */
+  areas?: string[] | null;
   /** Shown under the user name — the customer account this user belongs to. */
 };
 
@@ -21,10 +24,11 @@ export function CustomerLayoutShell({
   timeoutMinutes,
   basePath,
   userName,
+  areas = null,
 }: CustomerLayoutShellProps) {
   const router = useRouter();
   const [authChecked, setAuthChecked] = useState(false);
-  const menus = useMemo(() => customerNav(basePath), [basePath]);
+  const menus = useMemo(() => visibleMenus(customerNav(basePath), areas), [basePath, areas]);
 
   useEffect(() => {
     let isMounted = true;
@@ -62,6 +66,7 @@ export function CustomerLayoutShell({
   return (
     <div className="flex h-screen flex-col overflow-hidden">
       <ForceDefaultTheme />
+      <ActivityPing />
       <SessionTimeout timeoutMinutes={timeoutMinutes} />
 
       <TopNav

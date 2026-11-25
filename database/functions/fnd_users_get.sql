@@ -2,7 +2,9 @@
 -- fnd_users_get (Admin > Users / Customer Users)
 -- Users of the tenancy with their roles, groups and customers, plus invite status:
 --   is_user_admin: can manage users (see fnd_user_admin_ids);
---   status: ACTIVE (has signed in) | INVITED (invite sent, not accepted yet) | NOT_INVITED; invited_at.
+--   status: ACTIVE (has signed in) | INVITED (invite sent, not accepted yet) | NOT_INVITED; invited_at;
+--   ended: the account was ended and its email released (record kept for history);
+--   last_active_at, last_place, last_ip: when and from where (approximate) they last used BPS (fnd_user_last_activity).
 -- Supersedes the version in migration/add_access_admin_functions.sql.
 -- ============================================================
 CREATE OR REPLACE FUNCTION bps.fnd_users_get(p_tenant_id bigint)
@@ -15,6 +17,10 @@ AS $function$
       'user_id', u.user_id, 'user_name', u.user_name, 'email', u.email, 'user_type', u.user_type,
       'is_active', ut.is_active AND u.is_active,
       'invited_at', u.invited_at,
+      'ended', u.ended_at IS NOT NULL,
+      'last_active_at', la.last_active_at,
+      'last_place', NULLIF(concat_ws(', ', la.last_city, la.last_region, la.last_country), ''),
+      'last_ip', la.last_ip,
       'is_user_admin', u.user_id IN (SELECT bps.fnd_user_admin_ids(p_tenant_id)),
       'status', CASE WHEN bps.fnd_auth_user_signed_in(u.auth_user_id) THEN 'ACTIVE'
                      WHEN u.invited_at IS NOT NULL THEN 'INVITED' ELSE 'NOT_INVITED' END,
@@ -25,5 +31,6 @@ AS $function$
                               WHERE uc.user_id = u.user_id AND uc.tenant_id = p_tenant_id AND uc.is_active), '[]'::jsonb))
     ORDER BY u.user_type, u.user_name), '[]'::jsonb)
   FROM bps.fnd_user_tenants ut JOIN bps.fnd_users u ON u.user_id = ut.user_id
+  LEFT JOIN bps.fnd_user_last_activity(p_tenant_id) la ON la.user_id = u.user_id
   WHERE ut.tenant_id = p_tenant_id
 $function$;

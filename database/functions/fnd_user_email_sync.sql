@@ -16,7 +16,8 @@ CREATE OR REPLACE FUNCTION bps.fnd_user_email_sync()
 AS $function$
 BEGIN
   IF NEW.email IS DISTINCT FROM OLD.email AND NEW.email IS NOT NULL THEN
-    UPDATE bps.fnd_users SET email = NEW.email WHERE auth_user_id = NEW.id AND email IS DISTINCT FROM NEW.email;
+    -- an ended account keeps its email for history (its retired sign-in gets a placeholder address)
+    UPDATE bps.fnd_users SET email = NEW.email WHERE auth_user_id = NEW.id AND ended_at IS NULL AND email IS DISTINCT FROM NEW.email;
   END IF;
   RETURN NEW;
 END
@@ -34,7 +35,7 @@ CREATE OR REPLACE FUNCTION bps.fnd_email_available(p_email text, p_auth_user_id 
  SECURITY DEFINER
  SET search_path TO 'bps', 'public'
 AS $function$
-  SELECT NOT EXISTS (SELECT 1 FROM bps.fnd_users u WHERE lower(u.email) = lower(btrim(p_email)) AND u.deleted_at IS NULL
+  SELECT NOT EXISTS (SELECT 1 FROM bps.fnd_users u WHERE lower(u.email) = lower(btrim(p_email)) AND u.deleted_at IS NULL AND u.ended_at IS NULL
                        AND u.auth_user_id IS DISTINCT FROM p_auth_user_id)
      AND NOT EXISTS (SELECT 1 FROM auth.users a WHERE lower(a.email) = lower(btrim(p_email)) AND a.id <> p_auth_user_id)
 $function$;

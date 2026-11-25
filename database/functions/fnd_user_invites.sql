@@ -56,10 +56,14 @@ $function$;
 REVOKE EXECUTE ON FUNCTION bps.fnd_customer_slug_ensure(bigint, bigint) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION bps.fnd_customer_slug_ensure(bigint, bigint) TO service_role, bps_dev;
 
--- Adds a user to the tenancy with roles, and for staff their customer groups. A customer user belongs to one
--- customer account, which gets a portal address (account_slug) when it has none. An email is one person: when it
--- already belongs to a user of another tenancy the add is refused (only a direct database session, i.e. OrderNexa,
--- may attach that person to a second tenancy). Needs admin.users write. Returns the user_id.
+-- Adds a user to the company with roles, and for staff their customer groups. A customer user belongs to one customer
+-- account, which gets a portal address (account_slug) when it has none. An email is one person (one active, not ended
+-- user): when it already belongs to a user of another company the add is refused (only a direct database session, i.e.
+-- OrderNexa, may attach that person to a second company). Needs migration/add_customer_user_admin.sql.
+-- Staff (admin.users write) add staff or customer users, as before. Customer administrators (portal.users write) add customer
+-- users to their own account, with customer roles they may give (fnd_portal_roles_get); p_customer_id is then their account.
+-- An email held by staff of this company is refused with a message for the person adding (a customer administrator is not
+-- told who holds it); the website then records an EMAIL_REUSE_ATTEMPT (fnd_email_conflict_record), which Alpine sees.
 CREATE OR REPLACE FUNCTION bps.fnd_user_create(p_tenant_id bigint, p_email text, p_user_name text, p_user_type text,
                                                p_customer_id bigint, p_role_ids bigint[], p_group_ids bigint[])
 RETURNS bigint
@@ -68,32 +72,59 @@ SECURITY DEFINER
 SET search_path TO 'bps', 'public'
 AS $function$
 DECLARE
-    v_email text := lower(btrim(p_email));
-    v_name  text := NULLIF(btrim(p_user_name), '');
-    v_type  text := upper(btrim(p_user_type));
-    v_me    bigint := bps.fnd_current_user_id();
-    v_uid   bigint;
-    v_old   record;
-    v_cus   record;
+    v_email   text := lower(btrim(p_email));
+    v_name    text := NULLIF(btrim(p_user_name), '');
+    v_type    text := upper(btrim(p_user_type));
+    v_me      bigint := bps.fnd_current_user_id();
+    v_staff   boolean := bps.fnd_has_access('admin.users', 'W');
+    v_portal  bigint[] := bps.fnd_portal_admin_accounts();
+    v_company text := (SELECT tenant_name FROM bps.fnd_tenants WHERE tenant_id = p_tenant_id);
+    v_uid     bigint;
+    v_old     record;
+    v_cus     record;
+    v_cid     bigint := p_customer_id;
+    r         bigint;
 BEGIN
     PERFORM bps.fnd_assert_active_tenant(p_tenant_id);
-    IF NOT bps.fnd_has_access('admin.users', 'W') THEN
+    IF NOT v_staff AND cardinality(v_portal) = 0 THEN
         RAISE EXCEPTION 'You are not allowed to add users' USING ERRCODE = '42501';
+    END IF;
+    IF NOT v_staff THEN   -- a customer administrator: customer users of their own account only
+        v_type := 'CUSTOMER_USER';
+        IF v_cid IS NULL OR NOT (v_cid = ANY (v_portal)) THEN v_cid := v_portal[1]; END IF;
+        IF EXISTS (SELECT 1 FROM unnest(COALESCE(p_role_ids, '{}')) x
+                    WHERE x NOT IN (SELECT (e ->> 'role_id')::bigint FROM jsonb_array_elements(bps.fnd_portal_roles_get(p_tenant_id)) e)) THEN
+            RAISE EXCEPTION 'One of the roles cannot be given here';
+        END IF;
     END IF;
     IF v_email IS NULL OR v_email !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' THEN RAISE EXCEPTION 'A valid email is required'; END IF;
     IF v_name IS NULL THEN RAISE EXCEPTION 'A name is required'; END IF;
     IF v_type NOT IN ('TENANCY_USER', 'CUSTOMER_USER') THEN RAISE EXCEPTION 'Unknown user type %', p_user_type; END IF;
     IF v_type = 'CUSTOMER_USER' THEN
         SELECT customer_id, customer_name, customer_number, account_slug INTO v_cus
-          FROM bps.fnd_customers WHERE customer_id = p_customer_id AND tenant_id = p_tenant_id;
+          FROM bps.fnd_customers WHERE customer_id = v_cid AND tenant_id = p_tenant_id;
         IF NOT FOUND THEN RAISE EXCEPTION 'Choose the customer account this user belongs to'; END IF;
     END IF;
 
-    SELECT user_id, user_type INTO v_old FROM bps.fnd_users WHERE lower(email) = v_email AND deleted_at IS NULL;
+    SELECT u.user_id, u.user_type, u.user_name,
+           EXISTS (SELECT 1 FROM bps.fnd_user_tenants t WHERE t.user_id = u.user_id AND t.tenant_id = p_tenant_id) AS here,
+           EXISTS (SELECT 1 FROM bps.fnd_user_tenants t WHERE t.user_id = u.user_id AND t.tenant_id = p_tenant_id AND t.is_active) AND u.is_active AS active_here
+      INTO v_old
+      FROM bps.fnd_users u WHERE lower(u.email) = v_email AND u.deleted_at IS NULL AND u.ended_at IS NULL;
     IF FOUND THEN
-        IF EXISTS (SELECT 1 FROM bps.fnd_user_tenants WHERE user_id = v_old.user_id AND tenant_id = p_tenant_id) THEN
-            RAISE EXCEPTION 'A user with this email already exists';
+        IF v_old.here AND v_old.user_type = 'TENANCY_USER' THEN
+            IF NOT v_staff THEN
+                RAISE EXCEPTION 'This email cannot be used yet: it belongs to an existing account at %. Ask % to close that account, then try again. % has been notified.',
+                    v_company, v_company, v_company USING DETAIL = 'EMAIL_HELD_BY_STAFF';
+            ELSIF v_old.active_here THEN
+                RAISE EXCEPTION 'This email belongs to %, an active staff member here. If they have left, deactivate them on Company Users first.',
+                    COALESCE(v_old.user_name, v_email) USING DETAIL = 'EMAIL_HELD_BY_STAFF';
+            ELSE
+                RAISE EXCEPTION 'This email belongs to %, a former staff member. Release the email to add a new account with it (their history stays under their old record).',
+                    COALESCE(v_old.user_name, v_email) USING DETAIL = 'EMAIL_HELD_BY_FORMER_STAFF:' || v_old.user_id;
+            END IF;
         END IF;
+        IF v_old.here THEN RAISE EXCEPTION 'A user with this email already exists'; END IF;
         IF NOT bps.fnd_is_trusted() THEN
             RAISE EXCEPTION 'This email is already in use. Contact OrderNexa if this person needs access here too.';
         END IF;
@@ -114,7 +145,13 @@ BEGIN
         PERFORM bps.fnd_customer_slug_ensure(p_tenant_id, v_cus.customer_id);
     END IF;
 
-    PERFORM bps.fnd_user_access_save(p_tenant_id, v_uid, p_role_ids, p_group_ids, true);
+    IF v_staff THEN
+        PERFORM bps.fnd_user_access_save(p_tenant_id, v_uid, p_role_ids, p_group_ids, true);
+    ELSE
+        FOREACH r IN ARRAY COALESCE(p_role_ids, '{}') LOOP
+            INSERT INTO bps.fnd_user_roles (tenant_id, user_id, role_id) VALUES (p_tenant_id, v_uid, r);
+        END LOOP;
+    END IF;
     RETURN v_uid;
 END
 $function$;
@@ -133,7 +170,8 @@ AS $function$
 DECLARE v_out jsonb;
 BEGIN
     PERFORM bps.fnd_assert_active_tenant(p_tenant_id);
-    IF NOT bps.fnd_has_access('admin.users', 'W') THEN
+    -- staff user administrators, or a customer administrator for a user of their own account
+    IF NOT (bps.fnd_has_access('admin.users', 'W') OR bps.fnd_portal_can_manage(p_tenant_id, p_user_id)) THEN
         RAISE EXCEPTION 'You are not allowed to invite users' USING ERRCODE = '42501';
     END IF;
     SELECT jsonb_build_object('user_id', u.user_id, 'email', u.email, 'user_name', u.user_name, 'user_type', u.user_type,
@@ -167,7 +205,8 @@ AS $function$
 DECLARE v_auth uuid;
 BEGIN
     PERFORM bps.fnd_assert_active_tenant(p_tenant_id);
-    IF NOT bps.fnd_has_access('admin.users', 'W') THEN
+    -- staff user administrators, or a customer administrator for a user of their own account
+    IF NOT (bps.fnd_has_access('admin.users', 'W') OR bps.fnd_portal_can_manage(p_tenant_id, p_user_id)) THEN
         RAISE EXCEPTION 'You are not allowed to invite users' USING ERRCODE = '42501';
     END IF;
     SELECT u.auth_user_id INTO v_auth FROM bps.fnd_users u

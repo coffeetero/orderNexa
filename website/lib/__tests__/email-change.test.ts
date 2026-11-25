@@ -36,6 +36,7 @@ describe('email change emails', () => {
     expect(e.to).toBe('new@example.com');
     expect(e.text).toContain('https://x/auth/confirm-email?token=abc');
     expect(e.from).toBe('"OrderNexa" <invites@ordernexa.com>');
+    expect(e.text).toMatch(/PASSWORD STAYS THE SAME/);
   });
   it('notice names the new address and says to contact the administrator', () => {
     const e = emailChangedNotice({ ...who, to: 'old@example.com' }, 'new@example.com', 'https://x/login');

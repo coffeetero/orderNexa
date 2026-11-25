@@ -38,7 +38,7 @@ Every UI change belongs to one of four layers. Say which layer a change is in be
 - **Order Entry** (`/orders/new`, `/orders/[id]/edit`): optimized for heads-down, high-speed data entry.
 - Treat any other entry or production-floor screen as protected until the owner says otherwise.
 
-**Screens approved for layout change so far:** Dashboard (2026-11-25), AR Open Balances (2026-11-25).
+**Screens approved for layout change so far:** Dashboard (2026-11-25), AR Open Balances (2026-11-25), Admin › Company/Customer Users (Show inactive, Last activity; 2026-11-25), Customer portal › Users (new, 2026-11-25).
 
 ## 3. Target screens
 
@@ -171,4 +171,6 @@ Before calling UI work done:
 | 2026-11-25 | Dashboard layout redesign approved and implemented. |
 | 2026-11-25 | Order Entry declared a protected screen. |
 | 2026-11-25 | Hearth is the default for everyone until they choose another theme; the customer portal shows Hearth too (it was fixed to Bakery). Printing stays Bakery light. |
+| 2026-11-25 | Admin › Users: Show inactive users checkbox (off by default, says how many are hidden), Last activity column (time and approximate place), "Active in this company" wording; ended accounts labeled Ended. |
+| 2026-11-25 | Customer portal › Users for customer administrators (list, add, role, invite, deactivate; never their own access), styled like the approved Dashboard panels. |
 | 2026-11-25 | AR Open Balances: list only customers with an open balance (with the balance), click a name for its open items below (each with the payments and credits applied and what else they covered), collapsible first section that folds when a customer is opened. |

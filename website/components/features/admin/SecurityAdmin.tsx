@@ -12,6 +12,7 @@ interface Settings {
   min_password_length: number;
   password_max_age_days: number;
   password_history_count: number;
+  inactive_alert_days: number;
 }
 
 const FIELDS: { key: keyof Settings; label: string; help: string; min: number; max: number; unit: string }[] = [
@@ -19,6 +20,7 @@ const FIELDS: { key: keyof Settings; label: string; help: string; min: number; m
   { key: 'min_password_length', label: 'Minimum password length', help: 'Shortest password a person may choose.', min: 8, max: 128, unit: 'characters' },
   { key: 'password_max_age_days', label: 'Force a password change every', help: 'Days before a password must be changed. 0 means never.', min: 0, max: 730, unit: 'days' },
   { key: 'password_history_count', label: 'Passwords that cannot be reused', help: 'How many of a person’s previous passwords are refused. 0 means reuse is allowed.', min: 0, max: 24, unit: 'passwords' },
+  { key: 'inactive_alert_days', label: 'Ask about staff inactive for', help: 'Working days (Monday to Friday) without using BPS before Company Administrators see a To-Do asking whether the person is still with the company.', min: 1, max: 60, unit: 'working days' },
 ];
 
 export function SecurityAdmin({ tenantId }: { tenantId: number }) {
@@ -32,6 +34,7 @@ export function SecurityAdmin({ tenantId }: { tenantId: number }) {
       setForm({
         idle_timeout_minutes: String(s.idle_timeout_minutes), min_password_length: String(s.min_password_length),
         password_max_age_days: String(s.password_max_age_days), password_history_count: String(s.password_history_count),
+        inactive_alert_days: String(s.inactive_alert_days ?? 3),
       });
     } catch (e) { notify((e as Error).message, 'error'); }
   }, [tenantId, notify]);

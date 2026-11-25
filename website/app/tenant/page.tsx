@@ -1,13 +1,14 @@
 import Link from 'next/link';
 import { Suspense, cache } from 'react';
 import { ArrowRight } from 'lucide-react';
+import { SecurityTodo, type SecuritySignal } from '@/components/features/dashboard/SecurityTodo';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase/server';
 import { getCurrentTenantId } from '@/lib/supabase/tenant';
 
 interface TodayOrder { order_id: number; order_number: string; customer_name: string | null; production_code: string | null; quantity: number | null; amount: number | null; line_count?: number; status?: string }
 interface TodayOrders { today: string; order_count: number; total_amount: number; orders: TodayOrder[] }
-interface Todo { kind: string; customer_name: string; pricebook_name: string; assignment_type: string; status: string; is_active: boolean; effective_start_date: string; days_until_start: number }
+interface Todo { kind: 'PRICEBOOK_NOT_IN_EFFECT'; customer_name: string; pricebook_name: string; assignment_type: string; status: string; is_active: boolean; effective_start_date: string; days_until_start: number }
 interface Buckets { current_amt: number; d1_30: number; d31_60: number; d61_90: number; d90_plus: number; total: number }
 interface Compare { value: number; previous: number; change_pct: number | null }
 interface Metrics { today: string; revenue: Compare; orders: Compare; customers: Compare; units: Compare; avg_order: Compare; top_items: { item_description: string; quantity: number; pct: number }[] }
@@ -170,7 +171,9 @@ export default async function TenantDashboardPage() {
   const areas = Array.isArray(areasRes?.data) ? (areasRes!.data as string[]) : [];
   const todays = (ordersRes?.data ?? null) as TodayOrders | null;
   const m = (metricsRes?.data ?? null) as Metrics | null;
-  const todos = (Array.isArray(todoRes?.data) ? todoRes!.data : []) as Todo[];
+  const allTodos = (Array.isArray(todoRes?.data) ? todoRes!.data : []) as (Todo | SecuritySignal)[];
+  const signals = allTodos.filter((t): t is SecuritySignal => t.kind === 'INACTIVE_USER' || t.kind === 'NEW_LOCATION' || t.kind === 'EMAIL_REUSE');
+  const todos = allTodos.filter((t): t is Todo => t.kind === 'PRICEBOOK_NOT_IN_EFFECT');
   const showAr = tenantId !== null && areas.includes('financials.aging');
   const showOrders = areas.includes('orders.manage') || areas.includes('orders.enter');
   const dateLabel = todays
@@ -213,8 +216,14 @@ export default async function TenantDashboardPage() {
         </section>
       )}
 
-      {todos.length > 0 && (
-        <Panel title="To-Do's" sub="Pricing books not in effect yet. Approve and activate them on the customer's Pricing tab." className="border-warning/50">
+      {(todos.length > 0 || signals.length > 0) && (
+        <Panel title="To-Do's" sub={`${todos.length + signals.length} item${todos.length + signals.length === 1 ? '' : 's'} need attention`} className="border-warning/50">
+          {signals.length > 0 && (
+            <ul className="divide-y divide-border border-b border-border" aria-label="Security">
+              {signals.map((sg) => <SecurityTodo key={`${sg.kind}-${sg.user_id}-${sg.city ?? ''}-${sg.event_id ?? ''}`} tenantId={tenantId!} signal={sg} />)}
+            </ul>
+          )}
+          {todos.length > 0 && <p className="px-4 pt-2 text-xs text-muted-foreground">Pricing books not in effect yet. Approve and activate them on the customer&apos;s Pricing tab.</p>}
           <ul className="divide-y divide-border">
             {todos.map((t, i) => (
               <li key={i} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-1.5 text-sm">

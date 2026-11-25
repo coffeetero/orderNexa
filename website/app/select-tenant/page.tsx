@@ -29,7 +29,7 @@ function Picker() {
       body: JSON.stringify({ tenant_id: t.tenant_id }),
     });
     if (!res.ok) {
-      setError((await res.json().catch(() => ({}))).error ?? 'Could not select that tenancy.');
+      setError((await res.json().catch(() => ({}))).error ?? 'Could not open that company.');
       setBusy(false);
       return;
     }

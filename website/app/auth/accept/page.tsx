@@ -72,11 +72,13 @@ function AcceptForm() {
       <div className="space-y-4 text-center">
         <p role="alert" className="text-sm">
           This link has expired or was already used.{' '}
-          {type === 'invite' ? 'Ask the person who invited you to send a new invite.' : 'Ask for a new link below.'}
+          {type === 'invite'
+            ? "If you've already set your password, sign in. Otherwise ask the person who invited you to send a new invite."
+            : "If you've already chosen a new password, sign in. Otherwise ask for a new link."}
         </p>
         <div className="flex justify-center gap-4 text-sm">
-          <Link href="/forgot-password" className="font-medium text-primary hover:underline">Forgot password</Link>
-          <Link href="/login" className="text-muted-foreground hover:text-foreground">Back to sign in</Link>
+          <Link href="/login" className="font-medium text-primary hover:underline">Sign in</Link>
+          <Link href="/forgot-password" className="text-muted-foreground hover:text-foreground">Forgot password</Link>
         </div>
       </div>
     );

@@ -193,6 +193,12 @@ Built and merged: Dashboard real data, Customers Import/Export, Inventory › Nu
 - An authenticator-app code after the password (Supabase Auth supports TOTP). Strongest protection against someone who knows a user's email and guesses or reuses a password.
 - To decide: required for Company Administrators, or offered to anyone; how a user who lost their phone gets back in (recovery codes, or an admin reset).
 
+### Security signals for customer administrators (agreed 2026-11-25, waits for the customer portal)
+- Built for staff (2026-11-25): activity, IP and approximate place recorded for everyone (`fnd_user_access_log`, 180 days); Company Administrators get To-Dos for staff inactive N working days and staff using BPS from a new city, with Deactivate / Still with us / Expected; nobody can clear a signal about themselves.
+- Done 2026-11-25: customer portal › Users (customer administrators add, invite, change role, deactivate their own people; role Customer Staff added). Email held by bakery staff is refused with a clear message and Alpine gets an EMAIL_REUSE To-Do (`fnd_security_events`); Alpine can deactivate and release the email (old record ended, kept for history; new account gets a new user number and password).
+- Still to do: inactivity / new-place To-Dos for each customer's administrator about their own users. Needs a real portal home page (it shows sample data today).
+- Possibly later: an alert when a deactivated person tries to sign in; a monthly access review email.
+
 ### Usernames as an optional sign-in name (idea 2026-11-25, parked)
 - Owner's reasons: an account name is less known than an email; one person could have e.g. moraglen-alpine and moraglen-tomcat.
 - Findings: Supabase allows one account per email, so two usernames on one email share one password; the company is already chosen at sign-in (or by the company web address). The real uses are privacy and, later, staff without email.

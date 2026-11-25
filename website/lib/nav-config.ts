@@ -271,6 +271,8 @@ export function customerNav(basePath: string): NavMenu[] {
         },
       ],
     },
+    // customer administrators: their own people (who may sign in for their business)
+    { label: 'Users', href: `${basePath}/users`, requiresAnyArea: ['portal.users'] },
   ];
 }
 

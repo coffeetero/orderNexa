@@ -67,7 +67,8 @@ export function resetEmail(w: Who, link: string): Email {
 /** Change of sign-in email, sent to the NEW address: the change happens when the link is opened. Staff only for now. */
 export function emailChangeEmail(w: Who, link: string): Email {
   return build(w, 'Confirm your new OrderNexa email', 'Confirm your new email',
-    [`You asked to use ${w.to} to sign in to OrderNexa. Confirm it to make the change; your access stays the same.`,
+    [`You asked to use ${w.to} to sign in to OrderNexa. Confirm it to make the change.`,
+      'YOUR PASSWORD STAYS THE SAME. Keep using your current password with the new email. Your access does not change.',
       'If you did not ask for this, ignore this email and nothing changes.'],
     { label: 'Confirm new email', href: link },
     'This link works for 24 hours.');
@@ -76,7 +77,7 @@ export function emailChangeEmail(w: Who, link: string): Email {
 /** After the change, sent to the OLD address, so a change the person did not make is noticed. */
 export function emailChangedNotice(w: Who, newEmail: string, signInUrl: string): Email {
   return build(w, 'Your OrderNexa sign-in email was changed', 'Your sign-in email was changed',
-    [`Your OrderNexa sign-in email was changed to ${newEmail}. From now on, sign in with the new address.`,
+    [`Your OrderNexa sign-in email was changed to ${newEmail}. From now on, sign in with the new address and your current password; the password did not change.`,
       'If you did not make this change, contact your administrator straight away.'],
     { label: 'Sign in', href: signInUrl },
     'This is a notice only; you do not need to do anything if you made the change.');
