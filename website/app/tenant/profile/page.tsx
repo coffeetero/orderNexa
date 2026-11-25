@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { createClient } from '@/lib/supabase/client';
+import { ChangeEmail } from '@/components/features/profile/ChangeEmail';
 
 interface UserPreferences {
   time_zone: string;
@@ -149,6 +150,8 @@ export default function TenantProfilePage() {
           </div>
         </CardContent>
       </Card>
+
+      <ChangeEmail />
     </div>
   );
 }

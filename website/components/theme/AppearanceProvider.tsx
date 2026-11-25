@@ -3,10 +3,10 @@
 import { createContext, useContext, useEffect, useLayoutEffect, useState, useSyncExternalStore } from 'react';
 import { applyToDocument, htmlMode, type ModeChoice } from '@/lib/theme/apply';
 import {
-  accountAppearance, bakeryOverride, deviceAppearance, resolveAppearance, themePreview, writeCookie,
+  accountAppearance, defaultThemeOverride, deviceAppearance, resolveAppearance, themePreview, writeCookie,
   DEFAULT_APPEARANCE, DEFAULT_MODE, readAppearance, toLocal, readLocal, type AppearancePrefs, type LocalAppearance,
 } from '@/lib/theme/prefs';
-import { BAKERY_THEME, variantOf, type ThemeDef, type ThemeMode } from '@/lib/theme/themes';
+import { DEFAULT_THEME, variantOf, type ThemeDef, type ThemeMode } from '@/lib/theme/themes';
 
 const AppearanceContext = createContext<{ last: LocalAppearance | null }>({ last: null });
 
@@ -16,7 +16,7 @@ const sub = <T,>(s: { subscribe: (l: () => void) => () => void; get: () => T }, 
 const usePreview = sub<ThemeDef | null>(themePreview, null);
 const useDevice = sub<LocalAppearance | null>(deviceAppearance, null);
 const useAccount = sub<AppearancePrefs | undefined>(accountAppearance, undefined);
-const useOverride = sub<boolean>(bakeryOverride, false);
+const useOverride = sub<boolean>(defaultThemeOverride, false);
 
 /** Follows the operating system's light/dark setting. */
 export function useOsDark(): boolean {
@@ -54,7 +54,7 @@ export function useAppearanceState(): AppearanceState {
   const osDark = useOsDark();
   const current = resolveAppearance({ preview: null, device, account, last });
   let shown = resolveAppearance({ preview, device, account, last });
-  if (override) shown = { mode: shown.mode, theme: BAKERY_THEME };
+  if (override) shown = { mode: shown.mode, theme: DEFAULT_THEME };
   const h = htmlMode(shown.theme, shown.mode);
   const mode: ThemeMode = h === 'system' ? (osDark ? 'dark' : 'light') : h;
   return { current, shown, mode, account, device, preview, osDark };
@@ -104,9 +104,9 @@ export function AccountAppearanceLoader() {
   return null;
 }
 
-/** Keeps the Bakery colours while mounted: the customer portal does not follow staff themes. */
-export function ForceBakery() {
-  useLayoutEffect(() => { bakeryOverride.set(true); return () => bakeryOverride.set(false); }, []);
+/** Keeps the default theme (Hearth) while mounted: the customer portal does not follow staff themes. */
+export function ForceDefaultTheme() {
+  useLayoutEffect(() => { defaultThemeOverride.set(true); return () => defaultThemeOverride.set(false); }, []);
   return null;
 }
 

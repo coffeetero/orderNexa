@@ -28,7 +28,7 @@ export const CUSTOM_LIMIT = 20;
  *   Ledger: cool slate, ink-blue accent. Hearth: warm grey, white panels, copper accent. Graphite: green-grey, teal accent, dark top bar
  *   (the bar's colours are in globals.css, `.bps-topnav`).
  * - Bakery: BPS's original colours (globals.css); its tokens are pinned to those exact values (tokens.ts BAKERY_TOKENS). Printing and the
- *   customer portal still use it.
+ *   Printing still uses it; the customer portal shows the default theme (Hearth).
  * - Clay: inspired by Anthropic's Claude look (warm ivory paper, clay/terracotta accent).
  * - High contrast: accessibility (black on white / white on black, saturated roles; well past WCAG AAA for body text).
  * - Sepia: warm paper, inspired by e-reader sepia modes.
@@ -72,7 +72,7 @@ export const isBuiltinId = (id: string): boolean => PRESET_THEMES.some((t) => t.
 export const isCuratedId = (id: string): boolean => CURATED_THEMES.some((t) => t.id === id);
 export const findTheme = (id: string, custom: ThemeDef[] = []): ThemeDef | undefined => PRESET_THEMES.find((t) => t.id === id) ?? custom.find((t) => t.id === id);
 export const DEFAULT_THEME = BUILTIN_THEMES.find((t) => t.id === HEARTH_ID)!;
-/** BPS's original theme: the fallback for a theme's missing colours, and what printing and the customer portal show. */
+/** BPS's original theme: the fallback for a theme's missing colours, and what printing shows. */
 export const BAKERY_THEME = BUILTIN_THEMES.find((t) => t.id === BAKERY_ID)!;
 
 /** The variant shown for a wanted mode: that mode, else the theme's only one. */

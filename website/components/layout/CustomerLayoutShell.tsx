@@ -6,7 +6,7 @@ import { TopNav } from '@/components/layout/TopNav';
 import { SessionTimeout } from '@/components/auth/SessionTimeout';
 import { createClient } from '@/lib/supabase/client';
 import { customerNav } from '@/lib/nav-config';
-import { ForceBakery } from '@/components/theme/AppearanceProvider';
+import { ForceDefaultTheme } from '@/components/theme/AppearanceProvider';
 
 type CustomerLayoutShellProps = {
   children: React.ReactNode;
@@ -61,7 +61,7 @@ export function CustomerLayoutShell({
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
-      <ForceBakery />
+      <ForceDefaultTheme />
       <SessionTimeout timeoutMinutes={timeoutMinutes} />
 
       <TopNav

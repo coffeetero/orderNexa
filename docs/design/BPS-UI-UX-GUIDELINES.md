@@ -59,7 +59,7 @@ Architecture (`website/lib/theme/`): a theme is data only, 11 hex seed colors pe
 | **Hearth** (default) | Warm grey, white panels | Copper |
 | **Graphite** | Green-grey, dark top bar in both modes | Teal |
 
-Bakery (the original look), Clay, Sepia, High contrast and the curated catalog remain available. Bakery is still what **printing** and the **customer portal** use; changing either is a separate decision.
+Bakery (the original look), Clay, Sepia, High contrast and the curated catalog remain available. **Printing** still uses Bakery's fixed light colours. The **customer portal** shows the default theme (Hearth) whatever a device last chose; customers cannot pick a theme.
 
 **Semantic tokens** (use these Tailwind names, never raw palette colors):
 
@@ -170,4 +170,5 @@ Before calling UI work done:
 | 2026-11-25 | Inter stays the single application font; no per-theme fonts. |
 | 2026-11-25 | Dashboard layout redesign approved and implemented. |
 | 2026-11-25 | Order Entry declared a protected screen. |
+| 2026-11-25 | Hearth is the default for everyone until they choose another theme; the customer portal shows Hearth too (it was fixed to Bakery). Printing stays Bakery light. |
 | 2026-11-25 | AR Open Balances: list only customers with an open balance (with the balance), click a name for its open items below (each with the payments and credits applied and what else they covered), collapsible first section that folds when a customer is opened. |

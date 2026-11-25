@@ -189,6 +189,15 @@ Built and merged: Dashboard real data, Customers Import/Export, Inventory › Nu
 
 ## 11. Security risks
 
+### Second sign-in step (MFA) for Company Administrators (idea 2026-11-25, not built)
+- An authenticator-app code after the password (Supabase Auth supports TOTP). Strongest protection against someone who knows a user's email and guesses or reuses a password.
+- To decide: required for Company Administrators, or offered to anyone; how a user who lost their phone gets back in (recovery codes, or an admin reset).
+
+### Usernames as an optional sign-in name (idea 2026-11-25, parked)
+- Owner's reasons: an account name is less known than an email; one person could have e.g. moraglen-alpine and moraglen-tomcat.
+- Findings: Supabase allows one account per email, so two usernames on one email share one password; the company is already chosen at sign-in (or by the company web address). The real uses are privacy and, later, staff without email.
+- If built: new column `fnd_users.username` (unique across BPS), sign-in accepts email or username (resolved on the server, without revealing whether a name exists, with a limit on failed tries).
+
 ### Account recovery codes stored in the project folder (found 2026-11-25)
 - `docs/vercel/` holds the Vercel account's recovery codes in a plain text file. Anyone with the file can take over the Vercel account (and so the hosted site and its environment variables).
 - Done: `docs/vercel/` is in `.gitignore`, so it cannot be committed.

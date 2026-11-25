@@ -100,5 +100,5 @@ export function resolveAppearance(a: { preview: ThemeDef | null; device: LocalAp
 
 /** The signed-in staff user's saved choice (undefined until loaded, or when this user has no account preferences, e.g. a customer). */
 export const accountAppearance = store<AppearancePrefs | undefined>(() => undefined);
-/** While true the Bakery theme is shown whatever was chosen (the customer portal keeps the default look). */
-export const bakeryOverride = store<boolean>(() => false);
+/** While true the default theme (Hearth) is shown whatever was chosen on this device: the customer portal keeps the default look. */
+export const defaultThemeOverride = store<boolean>(() => false);

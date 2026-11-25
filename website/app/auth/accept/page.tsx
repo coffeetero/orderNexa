@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Eye, EyeOff, KeyRound } from 'lucide-react';
@@ -14,7 +14,8 @@ const supabase = createClient();
 
 /**
  * Landing page of invite and password-reset emails. The one-time token is used only when the person submits, so mail
- * scanners that open links do not use it up.
+ * scanners that open links do not use it up. On opening, the page looks up whose link it is without using it
+ * (/api/auth/link): it shows that email, or says at once that the link no longer works.
  */
 function AcceptForm() {
   const router = useRouter();
@@ -26,6 +27,22 @@ function AcceptForm() {
   const [show, setShow] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  // whose link this is: undefined while checking, null when the link no longer works
+  const [linkEmail, setLinkEmail] = useState<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    if (!tokenHash) return;
+    let live = true;
+    fetch(`/api/auth/link?${new URLSearchParams({ token_hash: tokenHash, type })}`)
+      .then((r) => r.json())
+      .then((j: { valid?: boolean; email?: string; error?: string }) => {
+        if (!live) return;
+        // if the check itself fails, let the person try: the link is still verified on submit
+        setLinkEmail(j.error ? '' : j.valid && j.email ? j.email : null);
+      })
+      .catch(() => live && setLinkEmail(''));
+    return () => { live = false; };
+  }, [tokenHash, type]);
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -50,8 +67,27 @@ function AcceptForm() {
   if (!tokenHash) {
     return <p className="text-sm text-muted-foreground">This link is incomplete. Open it again from your email.</p>;
   }
+  if (linkEmail === null) {
+    return (
+      <div className="space-y-4 text-center">
+        <p role="alert" className="text-sm">
+          This link has expired or was already used.{' '}
+          {type === 'invite' ? 'Ask the person who invited you to send a new invite.' : 'Ask for a new link below.'}
+        </p>
+        <div className="flex justify-center gap-4 text-sm">
+          <Link href="/forgot-password" className="font-medium text-primary hover:underline">Forgot password</Link>
+          <Link href="/login" className="text-muted-foreground hover:text-foreground">Back to sign in</Link>
+        </div>
+      </div>
+    );
+  }
   return (
     <form onSubmit={submit} className="space-y-4">
+      <div className="min-h-[40px] text-center text-sm text-muted-foreground" aria-live="polite">
+        {linkEmail === undefined ? 'Checking your link…' : linkEmail ? (
+          <>{type === 'invite' ? 'Choosing the password for' : 'New password for'}<br /><span className="font-medium text-foreground break-all">{linkEmail}</span></>
+        ) : null}
+      </div>
       <div className="space-y-1.5 text-left">
         <Label htmlFor="password">New password</Label>
         <div className="relative">
