@@ -156,7 +156,18 @@ Built: Add user, invite / resend, accept page, forgot password, edit user (name,
 - Medium: 23 staff pages have no per-area guard; a session token is committed in `.claude/worktrees/dazzling-heyrovsky-7d6ad1/.claude/settings.local.json` (untrack it); no security headers; lint is skipped in builds.
 - Low: `fn_audit_log` and `handle_new_user` have no search_path; dead `handle_*` functions; 5 junk `v_*` tables in bps (also in cloud); the access-token hook ignores `deleted_at`; raw database errors reach the browser; about 6 redundant indexes (~100 MB).
 
-## 9. Post Production (after go-live)
+## 9. Overnight build 2026-11-24 follow-ups (local only, not in the cloud)
+Built and merged: Dashboard real data, Customers Import/Export, Inventory › Nutrition Labels, Financials › Manage Payments, Organizer › Contacts. Each has a migration in database/migration (add_customer_import_export, add_nutrition_labels, add_manage_payments, add_organizer_contacts) plus function files; apply them to the cloud with the user-invite files.
+- Approve the new tables and columns (listed in the morning report).
+- Outstanding AR shows negative on the dashboard (-$35k, -$192k over 90 days): legacy negative payment applications (section 4). Fix before Alpine sees it.
+- Customer import can change a customer's type and parent: keep or restrict.
+- Repo file database/functions/fnd_customers_save.sql inserts `fnd_contacts.contact_name` (column no longer exists); the live local function does not. Bring the file in line before it is reapplied anywhere.
+- Nutrition Labels: test real printouts (page breaks); tabular and linear layouts are approximations; no version history; last save wins.
+- Manage Payments: deposit batches, edit payment header, refunds of unapplied cash, payment number on the Admin numbering screen; tighten delete policies on ar_payments / ar_payment_applications; measure the AR report (0.8 → 1.1 s locally) on the cloud.
+- Contacts: no PERSON contacts exist yet (migrated customer data has only ADDRESSES / OTHER_CONTACTS rows), so the address book starts empty; consider converting OTHER_CONTACTS into people. Not done: per-user favourites, structured address parts, picking related people from contacts, photos in export. Contacts users can edit customer person contacts in their scope without customer-profile write access.
+- Tests failing before tonight and still failing: rls_test (legacy tables, order visibility), documents_reports_test (om_shipments.production_run_id).
+
+## 10. Post Production (after go-live)
 
 ### Customer email templates and mass emails (idea 2026-11-24, not designed)
 - Purpose: notices to many customers at once, e.g. "Dear {{customer_name}}, as always we truly appreciate your business. This Thanksgiving the cutoff time is 2 hours earlier."
