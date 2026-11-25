@@ -187,7 +187,7 @@ export function UsersAdmin({ tenantId, audience: pageAudience }: { tenantId: num
       <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
         <div className="overflow-x-auto rounded-md border">
           <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-left text-xs"><tr><th className="px-3 py-2">User</th><th className="px-3 py-2">Type</th><th className="px-3 py-2">Roles</th><th className="px-3 py-2">Sign-in</th><th className="px-3 py-2">Last activity</th><th className="px-3 py-2">Status</th></tr></thead>
+            <thead className="bg-muted/50 text-left text-xs"><tr><th className="px-3 py-2">User</th><th className="px-3 py-2">Type</th><th className="px-3 py-2">Roles</th><th className="px-3 py-2">Sign-in</th>{pageAudience === 'TENANT' && <th className="px-3 py-2">Last activity</th>}<th className="px-3 py-2">Status</th></tr></thead>
             <tbody>
               {users.filter((u) => showInactive || u.is_active || u.user_id === sel?.user_id).map((u) => (
                 <tr key={u.user_id} onClick={() => pick(u)} className={`cursor-pointer border-t hover:bg-muted ${sel?.user_id === u.user_id ? 'bg-muted' : ''} ${u.is_active ? '' : 'text-muted-foreground'}`}>
@@ -195,12 +195,13 @@ export function UsersAdmin({ tenantId, audience: pageAudience }: { tenantId: num
                   <td className="px-3 py-2">{u.user_type === 'CUSTOMER_USER' ? 'Customer' : 'Staff'}</td>
                   <td className="px-3 py-2">{roles.filter((r) => u.role_ids.includes(r.role_id)).map((r) => r.role_name).join(', ') || <span className="text-muted-foreground">none</span>}</td>
                   <td className="px-3 py-2"><span className={u.status === 'ACTIVE' ? '' : 'text-amber-700 dark:text-amber-400'}>{STATUS_LABEL[u.status]}</span>{u.status === 'INVITED' && <div className="text-xs text-muted-foreground">{shortDate(u.invited_at)}</div>}</td>
-                  <td className="px-3 py-2">
+                  {/* a customer's users' activity belongs to that customer (second-level support sees name, email, role, status) */}
+                  {pageAudience === 'TENANT' && <td className="px-3 py-2">
                     {u.last_active_at ? (
                       <><div className="whitespace-nowrap">{new Date(u.last_active_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</div>
                         {(u.last_place || u.last_ip) && <div className="text-xs text-muted-foreground" title={u.last_ip ? `IP ${u.last_ip}` : undefined}>{u.last_place ?? `IP ${u.last_ip}`}</div>}</>
                     ) : <span className="text-muted-foreground">never</span>}
-                  </td>
+                  </td>}
                   <td className="px-3 py-2">{u.ended ? 'Ended' : u.is_active ? 'Active' : 'Inactive'}</td>
                 </tr>
               ))}

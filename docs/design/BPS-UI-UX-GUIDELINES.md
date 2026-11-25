@@ -173,4 +173,5 @@ Before calling UI work done:
 | 2026-11-25 | Hearth is the default for everyone until they choose another theme; the customer portal shows Hearth too (it was fixed to Bakery). Printing stays Bakery light. |
 | 2026-11-25 | Admin › Users: Show inactive users checkbox (off by default, says how many are hidden), Last activity column (time and approximate place), "Active in this company" wording; ended accounts labeled Ended. |
 | 2026-11-25 | Customer portal › Users for customer administrators (list, add, role, invite, deactivate; never their own access), styled like the approved Dashboard panels. |
+| 2026-11-25 | Privacy line for customer users: the bakery (second-level support) sees their name, email, role, account and status and can deactivate them; their activity times, IP addresses and places are visible only to their own customer administrator. Customer Users has no Last activity column. |
 | 2026-11-25 | AR Open Balances: list only customers with an open balance (with the balance), click a name for its open items below (each with the payments and credits applied and what else they covered), collapsible first section that folds when a customer is opened. |
