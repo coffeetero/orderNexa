@@ -121,7 +121,7 @@ export const tenantNav: NavMenu[] = [
         heading: 'Nutrition',
         items: [
           { label: 'Nutritional Analysis', href: '/inventory/nutrition', soon: true },
-          { label: 'Nutrition Labels', href: '/inventory/labels', soon: true },
+          { label: 'Nutrition Labels', href: '/inventory/labels' },
         ],
       },
       {
