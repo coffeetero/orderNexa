@@ -11,7 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MetricCard } from '@/components/features/account/MetricCard';
-import { mockTenantMetrics } from '@/lib/mock-data';
+import type { DashboardMetric } from '@/lib/types';
 import { createClient } from '@/lib/supabase/server';
 import { getCurrentTenantId } from '@/lib/supabase/tenant';
 
@@ -19,7 +19,17 @@ interface TodayOrder { order_id: number; order_number: string; customer_name: st
 interface TodayOrders { today: string; order_count: number; total_amount: number; orders: TodayOrder[] }
 interface Todo { kind: string; customer_name: string; pricebook_name: string; assignment_type: string; status: string; is_active: boolean; effective_start_date: string; days_until_start: number }
 interface Buckets { current_amt: number; d1_30: number; d31_60: number; d61_90: number; d90_plus: number; total: number }
+interface Compare { value: number; previous: number; change_pct: number | null }
+interface Metrics { today: string; revenue: Compare; orders: Compare; customers: Compare; units: Compare; avg_order: Compare; top_items: { item_description: string; quantity: number; pct: number }[] }
 interface ArDashboard { as_of: string; totals: Buckets; accounts: { customer_id: string; customer_name: string; total: number; d90_plus: number }[] }
+
+/** Whole-dollar or count display with the sign in front of the $ ("-$35,355", not "$-35,355"). */
+const whole = (v: number, prefix = '') => `${v < 0 ? '-' : ''}${prefix}${Math.abs(Math.round(v)).toLocaleString('en-US')}`;
+
+/** A metric card from a figure and its comparison. */
+function metric(label: string, c: Compare | undefined, changeLabel: string, prefix?: string): DashboardMetric {
+  return { label, value: whole(Number(c?.value ?? 0), prefix), change: c?.change_pct == null ? undefined : Number(c.change_pct), changeLabel };
+}
 
 const money = (v: number | null | undefined) => `$${Number(v ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -28,17 +38,19 @@ export const dynamic = 'force-dynamic';
 export default async function TenantDashboardPage() {
   const supabase = createClient();
   const tenantId = await getCurrentTenantId();
-  const [areasRes, ordersRes, arRes, todoRes] = tenantId === null
-    ? [null, null, null, null]
+  const [areasRes, ordersRes, arRes, todoRes, metricsRes] = tenantId === null
+    ? [null, null, null, null, null]
     : await Promise.all([
         supabase.rpc('fnd_my_areas'),
         supabase.rpc('om_orders_today_get', { p_tenant_id: tenantId, p_limit: 8 }),
         supabase.rpc('ar_dashboard_get', { p_tenant_id: tenantId, p_limit: 8 }),
         supabase.rpc('fnd_todos_get', { p_tenant_id: tenantId }),
+        supabase.rpc('om_dashboard_metrics_get', { p_tenant_id: tenantId }),
       ]);
   const areas = Array.isArray(areasRes?.data) ? (areasRes!.data as string[]) : [];
   const todays = (ordersRes?.data ?? null) as TodayOrders | null;
   const ar = (arRes?.data ?? null) as ArDashboard | null;
+  const m = (metricsRes?.data ?? null) as Metrics | null;
   const todos = (Array.isArray(todoRes?.data) ? todoRes!.data : []) as Todo[];
   const showAr = areas.includes('financials.aging');
   const showOrders = areas.includes('orders.manage') || areas.includes('orders.enter');
@@ -55,36 +67,26 @@ export default async function TenantDashboardPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
-        <MetricCard
-          metric={mockTenantMetrics.totalRevenue}
-          icon={DollarSign}
-          accentColor="bg-success/10 text-success"
-        />
-        <MetricCard
-          metric={mockTenantMetrics.totalOrders}
-          icon={ShoppingCart}
-          accentColor="bg-info/10 text-info"
-        />
-        <MetricCard
-          metric={mockTenantMetrics.activeCustomers}
-          icon={Users}
-          accentColor="bg-primary/10 text-primary"
-        />
-        <MetricCard
-          metric={mockTenantMetrics.productionToday}
-          icon={ChefHat}
-          accentColor="bg-warning/10 text-warning"
-        />
-        <MetricCard
-          metric={mockTenantMetrics.outstandingAR}
-          icon={Receipt}
-          accentColor="bg-orange-500/10 text-orange-600 dark:text-orange-400"
-        />
-        <MetricCard
-          metric={mockTenantMetrics.avgOrderValue}
-          icon={TrendingUp}
-          accentColor="bg-violet-500/10 text-violet-600 dark:text-violet-400"
-        />
+        {showAr && (
+          <MetricCard metric={metric('Revenue This Month', m?.revenue, 'invoiced, vs same days last month', '$')} icon={DollarSign} accentColor="bg-success/10 text-success" />
+        )}
+        {showOrders && (
+          <>
+            <MetricCard metric={metric("Today's Orders", m?.orders, 'for production, vs yesterday')} icon={ShoppingCart} accentColor="bg-info/10 text-info" />
+            <MetricCard metric={metric('Active Customers', m?.customers, 'ordered in 30 days, vs prior 30')} icon={Users} accentColor="bg-primary/10 text-primary" />
+            <MetricCard metric={metric('Units in Production', m?.units, 'today, vs yesterday')} icon={ChefHat} accentColor="bg-warning/10 text-warning" />
+          </>
+        )}
+        {showAr && ar && (
+          <MetricCard
+            metric={{ label: 'Outstanding AR', value: whole(Number(ar.totals.total), '$'), changeLabel: `over 90 days: ${whole(Number(ar.totals.d90_plus), '$')}` }}
+            icon={Receipt}
+            accentColor="bg-orange-500/10 text-orange-600 dark:text-orange-400"
+          />
+        )}
+        {showOrders && (
+          <MetricCard metric={metric('Avg Order Value', m?.avg_order, 'this month, vs same days last month', '$')} icon={TrendingUp} accentColor="bg-violet-500/10 text-violet-600 dark:text-violet-400" />
+        )}
       </div>
 
       {todos.length > 0 && (
@@ -177,28 +179,26 @@ export default async function TenantDashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {[
-              { label: 'Baguette Tradition', qty: 420, unit: 'pcs', pct: 68 },
-              { label: 'Pain de Campagne', qty: 180, unit: 'loaves', pct: 45 },
-              { label: 'Croissant au Beurre', qty: 360, unit: 'pcs', pct: 72 },
-              { label: 'Focaccia Genovese', qty: 90, unit: 'pcs', pct: 30 },
-              { label: 'Pane di Altamura', qty: 60, unit: 'loaves', pct: 25 },
-            ].map((item) => (
-              <div key={item.label}>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-medium text-foreground">{item.label}</span>
-                  <span className="text-xs text-muted-foreground tabular-nums">
-                    {item.qty} {item.unit}
-                  </span>
-                </div>
-                <div className="h-1.5 w-full rounded-full bg-muted">
-                  <div
-                    className="h-1.5 rounded-full bg-primary transition-all"
-                    style={{ width: `${item.pct}%` }}
-                  />
-                </div>
-              </div>
-            ))}
+            {!showOrders ? (
+              <p className="text-sm text-muted-foreground">Production is not available to your role.</p>
+            ) : !m || m.top_items.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nothing is scheduled for production today.</p>
+            ) : (
+              <>
+                <p className="text-xs text-muted-foreground">Items with the most units for production today</p>
+                {m.top_items.map((item) => (
+                  <div key={item.item_description}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-medium text-foreground">{item.item_description}</span>
+                      <span className="text-xs text-muted-foreground tabular-nums">{Number(item.quantity).toLocaleString('en-US')}</span>
+                    </div>
+                    <div className="h-1.5 w-full rounded-full bg-muted">
+                      <div className="h-1.5 rounded-full bg-primary transition-all" style={{ width: `${item.pct}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

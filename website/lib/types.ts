@@ -97,15 +97,6 @@ export interface DashboardMetric {
   suffix?: string;
 }
 
-export interface TenantDashboardMetrics {
-  totalRevenue: DashboardMetric;
-  totalOrders: DashboardMetric;
-  activeCustomers: DashboardMetric;
-  productionToday: DashboardMetric;
-  outstandingAR: DashboardMetric;
-  avgOrderValue: DashboardMetric;
-}
-
 export interface CustomerDashboardMetrics {
   totalOrders: DashboardMetric;
   openInvoices: DashboardMetric;

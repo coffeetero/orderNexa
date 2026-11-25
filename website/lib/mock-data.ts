@@ -4,7 +4,6 @@ import type {
   Item,
   Invoice,
   Payment,
-  TenantDashboardMetrics,
   CustomerDashboardMetrics,
   Product,
 } from './types';
@@ -295,48 +294,6 @@ export const mockPayments: Payment[] = [
     paidAt: '2024-12-15',
   },
 ];
-
-export const mockTenantMetrics: TenantDashboardMetrics = {
-  totalRevenue: {
-    label: 'Revenue This Month',
-    value: 48620,
-    change: 12.4,
-    changeLabel: 'vs last month',
-    prefix: '$',
-  },
-  totalOrders: {
-    label: "Today's Orders",
-    value: 47,
-    change: 8.2,
-    changeLabel: 'vs yesterday',
-  },
-  activeCustomers: {
-    label: 'Active Customers',
-    value: 134,
-    change: 3.1,
-    changeLabel: 'vs last month',
-  },
-  productionToday: {
-    label: 'Units in Production',
-    value: 1840,
-    change: -2.4,
-    changeLabel: 'vs yesterday',
-  },
-  outstandingAR: {
-    label: 'Outstanding AR',
-    value: 21340,
-    change: -5.8,
-    changeLabel: 'vs last week',
-    prefix: '$',
-  },
-  avgOrderValue: {
-    label: 'Avg Order Value',
-    value: 284,
-    change: 4.7,
-    changeLabel: 'vs last month',
-    prefix: '$',
-  },
-};
 
 export const mockCustomerMetrics: CustomerDashboardMetrics = {
   totalOrders: {
