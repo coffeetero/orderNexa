@@ -170,8 +170,8 @@ export function UsersAdmin({ tenantId, audience: pageAudience }: { tenantId: num
           <p>{release.message}</p>
           <p className="text-xs text-muted-foreground">Releasing ends their old account for good: it stays in history under their old user number, and their old sign-in stops working. The new account gets its own user number and a new password.</p>
           <div className="flex gap-2">
-            <Button size="sm" onClick={releaseAndAdd} disabled={busy}>{busy ? 'Releasing…' : 'Release email and add'}</Button>
             <Button size="sm" variant="ghost" onClick={() => setRelease(null)} disabled={busy}>Cancel</Button>
+            <Button size="sm" onClick={releaseAndAdd} disabled={busy}>{busy ? 'Releasing…' : 'Release email and add'}</Button>
           </div>
         </div>
       )}
@@ -221,7 +221,7 @@ export function UsersAdmin({ tenantId, audience: pageAudience }: { tenantId: num
             )}
             {roleList(adding.role_ids, (ids) => setAdding({ ...adding, role_ids: ids }))}
             {groupList(adding.group_ids, (ids) => setAdding({ ...adding, group_ids: ids }))}
-            <div className="flex gap-2"><Button onClick={create} disabled={busy}>Add user</Button><Button variant="outline" onClick={() => setAdding(null)}>Cancel</Button></div>
+            <div className="flex gap-2"><Button variant="outline" onClick={() => setAdding(null)}>Cancel</Button><Button onClick={create} disabled={busy}>Add user</Button></div>
           </div>
         ) : sel ? (
           <div className="space-y-4 rounded-md border p-4">
@@ -238,7 +238,7 @@ export function UsersAdmin({ tenantId, audience: pageAudience }: { tenantId: num
             )}
             <div className="space-y-2 rounded-md bg-muted/40 p-3 text-sm">
               <div>{STATUS_LABEL[sel.status]}{sel.status === 'INVITED' && ` on ${shortDate(sel.invited_at)}`}</div>
-              <Button size="sm" variant="outline" onClick={sendInvite} disabled={busy || !sel.is_active || sel.email !== users.find((u) => u.user_id === sel.user_id)?.email}>
+              <Button size="sm" onClick={sendInvite} disabled={busy || !sel.is_active || sel.email !== users.find((u) => u.user_id === sel.user_id)?.email}>
                 <Mail className="mr-1.5 h-4 w-4" /> {sel.status === 'NOT_INVITED' ? 'Send invite' : sel.status === 'INVITED' ? 'Resend invite' : 'Send sign-in email'}
               </Button>
               {invite?.link && (
@@ -254,7 +254,7 @@ export function UsersAdmin({ tenantId, audience: pageAudience }: { tenantId: num
             <label className="flex items-center gap-2 text-sm"><Checkbox checked={sel.is_active} onCheckedChange={(v) => setSel({ ...sel, is_active: v === true })} /> Active in this company</label>
             {roleList(sel.role_ids, (ids) => setSel({ ...sel, role_ids: ids }))}
             {groupList(sel.group_ids, (ids) => setSel({ ...sel, group_ids: ids }))}
-            <div className="flex gap-2"><Button onClick={save} disabled={busy}>Save</Button><Button variant="outline" onClick={() => setSel(null)}>Cancel</Button></div>
+            <div className="flex gap-2"><Button variant="outline" onClick={() => setSel(null)}>Cancel</Button><Button onClick={save} disabled={busy}>Save</Button></div>
           </div>
         ) : <p className="text-sm text-muted-foreground">Choose a user to edit them, or add a new one.</p>}
       </div>

@@ -153,8 +153,8 @@ export function PortalUsers() {
                   ))}
                 </fieldset>
                 <div className="flex gap-2">
+                  <Button type="button" size="sm" variant="outline" onClick={() => setAdding(null)}>Cancel</Button>
                   <Button type="submit" size="sm" disabled={busy}>{busy ? 'Adding…' : 'Add user'}</Button>
-                  <Button type="button" size="sm" variant="ghost" onClick={() => setAdding(null)}>Cancel</Button>
                 </div>
               </form>
             ) : sel && (
@@ -167,7 +167,7 @@ export function PortalUsers() {
                   <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">This is you. Another administrator of your business can change your access.</p>
                 ) : (
                   <>
-                    <Button size="sm" variant="outline" onClick={invite} disabled={busy || !sel.is_active || dirty}>
+                    <Button size="sm" onClick={invite} disabled={busy || !sel.is_active || dirty}>
                       <Mail className="mr-1.5 h-4 w-4" />{sel.status === 'ACTIVE' ? 'Send sign-in email' : sel.status === 'INVITED' ? 'Send the invite again' : 'Send invite'}
                     </Button>
                     <label className="flex items-center gap-2 text-sm"><Checkbox checked={sel.is_active} onCheckedChange={(v) => setSel({ ...sel, is_active: v === true })} /> Active</label>
@@ -181,8 +181,8 @@ export function PortalUsers() {
                       ))}
                     </fieldset>
                     <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => setSel(null)}>Cancel</Button>
                       <Button size="sm" onClick={save} disabled={busy || !dirty}>{busy ? 'Saving…' : 'Save'}</Button>
-                      <Button size="sm" variant="ghost" onClick={() => setSel(null)}>Close</Button>
                     </div>
                     <p className="text-xs text-muted-foreground">Someone who left? Untick Active and save: they can no longer sign in for your business.</p>
                   </>

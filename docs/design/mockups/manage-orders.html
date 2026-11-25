@@ -1,0 +1,167 @@
+<title>Manage Orders Redesign</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: the redesigned Manage Orders screen in the Hearth theme (light/dark follow the viewer), with a note panel below listing each change and its kind. */
+:root{--bg:#f5f3f0;--surface:#fffefc;--side:#ede9e3;--line:#e1dbd3;--line2:#cfc7bc;--text:#1e1915;--text2:#544a41;--text3:#7a6e63;--accent:#a3451c;--accent-fg:#fff;--pos:#2d6e3e;--warn:#8f5a00;--info:#2a5fa8;--neg:#b3312a;--focus:#a3451c}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#161310;--surface:#1f1b17;--side:#1a1613;--line:#322c26;--line2:#433b33;--text:#efe9e2;--text2:#c4b9ad;--text3:#978b7e;--accent:#e58d60;--accent-fg:#1a120c;--pos:#7cc48c;--warn:#e0aa4a;--info:#7fb0ee;--neg:#ee8177;--focus:#e58d60;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#161310;--surface:#1f1b17;--side:#1a1613;--line:#322c26;--line2:#433b33;--text:#efe9e2;--text2:#c4b9ad;--text3:#978b7e;--accent:#e58d60;--accent-fg:#1a120c;--pos:#7cc48c;--warn:#e0aa4a;--info:#7fb0ee;--neg:#ee8177;--focus:#e58d60;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font:14px/1.4 Inter,system-ui,sans-serif;font-variant-numeric:tabular-nums;padding-block:16px 32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+.wrap{max-width:1500px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+.head{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
+.head h1{font-size:18px;font-weight:600;margin:0;letter-spacing:-.01em}
+.muted{color:var(--text3)}
+.sp{flex:1}
+.btn{height:36px;padding:0 12px;border-radius:6px;border:1px solid var(--line2);background:var(--surface);font-weight:500;cursor:pointer;white-space:nowrap}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:0 1px 2px rgb(0 0 0 / .04);min-width:0;overflow:hidden}
+/* filter bar */
+.filters{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center;padding:10px 12px}
+.seg{display:inline-flex;border:1px solid var(--line2);border-radius:6px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:none;padding:0 11px;height:34px;cursor:pointer;border-left:1px solid var(--line2);color:var(--text2);font-weight:500}
+.seg button:first-child{border-left:0}
+.seg button[aria-pressed="true"]{background:color-mix(in srgb,var(--accent) 14%,var(--surface));color:var(--text)}
+.range{display:inline-flex;align-items:center;gap:6px}
+.range[hidden]{display:none}
+.date{height:34px;border:1px solid var(--line2);border-radius:6px;background:var(--surface);padding:0 8px}
+.listbar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line)}
+.search{height:34px;border:1px solid var(--line2);border-radius:6px;background:var(--surface);padding:0 10px;min-width:240px;flex:1;max-width:360px}
+.sel{height:34px;border:1px solid var(--line2);border-radius:6px;background:var(--surface);padding:0 8px}
+.lab{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text3)}
+/* summary strip */
+.strip{display:grid;grid-template-columns:repeat(6,minmax(0,1fr))}
+.fig{padding:5px 12px;border-left:1px solid var(--line);min-width:0;background:none;border-top:0;border-right:0;border-bottom:0;text-align:center;cursor:pointer}
+.fig:first-child{border-left:0}
+.fig b{display:block;font-size:17px;line-height:22px;font-weight:600;letter-spacing:-.01em}
+.fig[aria-pressed="true"]{box-shadow:inset 0 -2px 0 var(--accent)}
+.fig.static{cursor:default}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:1px}
+/* table */
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px;line-height:20px}   /* same as the Dashboard: 14px rows, 11px headings */
+th{height:32px;padding:0 12px;text-align:left;white-space:nowrap;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);background:color-mix(in srgb,var(--side) 60%,var(--surface));border-bottom:1px solid var(--line)}
+th.sort{cursor:pointer}
+th .arr{color:var(--accent)}
+td{padding:6px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+tbody tr:hover td{background:color-mix(in srgb,var(--accent) 5%,var(--surface));cursor:pointer}
+tr.group td{background:color-mix(in srgb,var(--side) 45%,var(--surface));font-weight:600;font-size:13px;cursor:default}
+.r{text-align:right}
+.id{color:var(--accent);font-weight:500}
+.pill{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 8px;border-radius:11px;font-size:12px;font-weight:500;color:var(--c);background:color-mix(in srgb,var(--c) 13%,var(--surface))}
+.pill::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--c)}
+.foot{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;color:var(--text3);font-size:13px}
+.kbd{border:1px solid var(--line2);border-radius:4px;padding:1px 5px;font-size:11px}
+/* notes */
+.notes{padding:14px 16px}
+.notes h2{font-size:14px;margin:0 0 8px}
+.notes table td,.notes table th{white-space:normal;vertical-align:top}
+.tag{display:inline-block;font-size:11px;font-weight:600;padding:2px 7px;border-radius:9px;color:var(--c);background:color-mix(in srgb,var(--c) 14%,var(--surface))}
+.t-c{--c:var(--info)}.t-l{--c:var(--warn)}.t-w{--c:var(--accent)}.t-d{--c:var(--pos)}
+@media (max-width:700px){.strip{grid-template-columns:repeat(3,minmax(0,1fr))}.fig:nth-child(4){border-left:0}.fig:nth-child(n+4){border-top:1px solid var(--line)}}
+@media (max-width:440px){.strip{grid-template-columns:repeat(2,minmax(0,1fr))}.fig{border-top:1px solid var(--line)}.fig:nth-child(odd){border-left:0}.search{min-width:0;max-width:none}}
+</style>
+
+<div class="wrap">
+  <div class="head">
+    <h1>Manage Orders</h1>
+    <span class="muted">Production Wednesday, Nov 25, 2026 · 74 orders</span>
+  </div>
+
+  <div class="panel filters" role="search">
+    <select class="sel" id="day" aria-label="Production date">
+      <option>Yesterday</option><option selected>Today</option><option>Tomorrow</option><option>This week</option><option>Next week</option><option value="custom">Custom range…</option>
+    </select>
+    <select class="sel" aria-label="Shift">
+      <option selected>All shifts</option><option>Morning</option><option>Lunch</option><option>Dinner</option><option>Special</option>
+    </select>
+    <span id="range" class="range" hidden>
+      <input class="date" type="date" value="2026-11-25" aria-label="From">
+      <span class="muted">to</span>
+      <input class="date" type="date" value="2026-11-25" aria-label="To">
+    </span>
+    <select class="sel" id="group" aria-label="Group the list">
+      <option value="sh" selected>Group by Shift</option><option value="c">Group by Customer</option><option value="st">Group by Status</option><option value="">No grouping</option>
+    </select>
+  </div>
+
+  <div class="panel strip" aria-label="Summary">
+    <button class="fig" aria-pressed="true"><span class="lab">All orders</span><b>74</b></button>
+    <button class="fig"><span class="lab"><span class="dot" style="background:var(--text3)"></span>Open</span><b>9</b></button>
+    <button class="fig"><span class="lab"><span class="dot" style="background:var(--warn)"></span>In production</span><b>41</b></button>
+    <button class="fig"><span class="lab"><span class="dot" style="background:var(--info)"></span>Shipped</span><b>18</b></button>
+    <button class="fig"><span class="lab"><span class="dot" style="background:var(--pos)"></span>Invoiced</span><b>6</b></button>
+    <div class="fig static"><span class="lab">Amount</span><b>$9,846.20</b></div>
+  </div>
+
+  <div class="panel">
+    <div class="listbar">
+      <input class="search" placeholder="Search order #, customer, department   ( / )" aria-label="Search orders">
+    </div>
+    <div class="tw">
+      <table>
+        <thead><tr>
+          <th class="sort">Order <span class="arr">↓</span></th><th class="sort">Customer</th><th>Department / event</th><th>Shift</th>
+          <th class="r">Lines</th><th class="r sort">Amount</th><th>Status</th>
+        </tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div class="foot"><span><span id="showing">Showing 1–50 of 74</span> · <span class="kbd">↑</span> <span class="kbd">↓</span> move · <span class="kbd">Enter</span> open · <span class="kbd">/</span> search</span><span><button class="btn" id="prev">‹ Previous</button> <button class="btn" id="next">Next ›</button></span></div>
+  </div>
+
+  <div class="panel notes">
+    <h2>What changes, and what kind of change</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Change</th><th>Kind</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>Real orders from the database (production date, shift, department/event, lines, amount), loaded page by page from the server</td><td><span class="tag t-d">Data</span></td><td>The page shows sample orders today. About 60–90 orders a day, 595,000 in total, so it filters and pages on the server.</td></tr>
+        <tr><td>Status from what really happened to the order: Open → In production → Shipped → Invoiced (same rule as the Dashboard)</td><td><span class="tag t-d">Data</span></td><td>"Pending, Packed, Dispatched" do not exist in BPS data.</td></tr>
+        <tr><td>Remove Route column; add Shift and Department / event</td><td><span class="tag t-l">Layout</span></td><td>Orders have no route; shift and department are how the bakery works.</td></tr>
+        <tr><td>Filter bar: a Day dropdown (Today by default; Yesterday, Tomorrow, This week, Next week, or Custom range… which shows From / To dates), then a Shift dropdown (All shifts by default); the search box sits right above the list</td><td><span class="tag t-w">Workflow</span></td><td>Replaces the dead Filter button; compact, and the day that matters is the default.</td></tr>
+        <tr><td>Compact summary strip in one panel, one line (orders by status, amount; no units); clicking a status filters the list</td><td><span class="tag t-l">Layout</span></td><td>Same pattern as the approved Dashboard; replaces four separate cards with made-up numbers.</td></tr>
+        <tr><td>Group dropdown: Group by Shift (default), Customer or Status, or No grouping; a subtotal row (orders, lines, amount) per group</td><td><span class="tag t-w">Workflow</span></td><td>Production thinks in shifts; the office also looks by customer or by status.</td></tr>
+        <tr><td>Sortable columns, 50 per page, keyboard: ↑↓ Enter, / search</td><td><span class="tag t-w">Workflow</span></td><td>Office staff work this list all day.</td></tr>
+        <tr><td>Remove the Filter and Export buttons; no New order button. New order and Export Orders stay in Quick access; clicking an order opens Order Entry (unchanged, protected)</td><td><span class="tag t-l">Layout</span></td><td>Quick access already offers them; the header stays clean.</td></tr>
+        <tr><td>Hearth theme tokens, Inter, compact rows, money and dates formatted as the guidelines say; no serif, no raw colors</td><td><span class="tag t-c">Cosmetic</span></td><td>Design guidelines.</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+</div>
+
+<script>
+const C=['Harbor Street Café','Maple & Rye Market','Northgate Deli','Bluebird Diner','Cedar Hill Grocers','Third Ward Bistro','Lakeside Country Club','Union Coffee Co.','Riverbend Catering','Ferry Road Market','Old Mill Tavern','Pinecrest School Dist.','Summit Hotel','Greenway Co-op'];
+const D=['Main kitchen','Banquets','Café counter','—','Cafeteria','Room service','Bakery case','Catering Sat'];
+const S=[['Open','var(--text3)'],['In production','var(--warn)'],['Shipped','var(--info)'],['Invoiced','var(--pos)']];
+const SH=['Morning','Lunch','Dinner','Special'];
+const money=n=>'$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+// 74 sample orders, 50 per page (the real screen pages on the server)
+const ALL=[];for(let i=0;i<74;i++){ALL.push({no:1176300-i*3,c:C[(i*7)%C.length],d:D[(i*3)%D.length],sh:SH[i<32?0:i<56?1:i<70?2:3],l:2+(i*5)%9,a:42+((i*7919)%52000)/100,s:S[[1,1,2,1,3,0,1,2,1,1,0,2,1,3,1,2,1,1,0,2,1,1][i%22]]});}
+const PAGE=50;let page=0;let by='sh';
+function rows(){
+  const key=o=>by==='sh'?o.sh:by==='c'?o.c:by==='st'?o.s[0]:'';
+  const order=by==='sh'?SH:by==='st'?S.map(x=>x[0]):[...new Set(ALL.map(o=>o.c))].sort();
+  const sorted=by?[...ALL].sort((x,y)=>order.indexOf(key(x))-order.indexOf(key(y))||y.no-x.no):ALL;
+  const pages=Math.ceil(sorted.length/PAGE);page=Math.min(page,pages-1);
+  const list=sorted.slice(page*PAGE,page*PAGE+PAGE);
+  // subtotals cover the whole group (all pages), as the real screen will
+  const sub=k=>{const g=sorted.filter(o=>key(o)===k);return `<tr class="group"><td colspan="4">${k} · ${g.length} order${g.length===1?'':'s'}</td><td class="r">${g.reduce((a,o)=>a+o.l,0)}</td><td class="r">${money(g.reduce((a,o)=>a+o.a,0))}</td><td></td></tr>`};
+  let html='',cur=null;
+  for(const o of list){
+    if(by&&key(o)!==cur){cur=key(o);html+=sub(cur);}
+    html+=`<tr><td class="id">${o.no}</td><td>${o.c}</td><td class="muted">${o.d}</td><td>${o.sh}</td><td class="r">${o.l}</td><td class="r">${money(o.a)}</td><td><span class="pill" style="--c:${o.s[1]}">${o.s[0]}</span></td></tr>`;
+  }
+  document.getElementById('rows').innerHTML=html;
+  document.getElementById('showing').textContent=`Showing ${page*PAGE+1}–${page*PAGE+list.length} of ${sorted.length}`;
+  document.getElementById('prev').disabled=page===0;
+  document.getElementById('next').disabled=page>=pages-1;
+}
+document.getElementById('prev').addEventListener('click',()=>{page--;rows();});
+document.getElementById('next').addEventListener('click',()=>{page++;rows();});
+const g=document.getElementById('group');g.addEventListener('change',()=>{by=g.value;page=0;rows();});rows();
+document.getElementById('day').addEventListener('change',e=>{document.getElementById('range').hidden=e.target.value!=='custom';});
+document.querySelectorAll('.strip .fig:not(.static)').forEach(b=>b.addEventListener('click',()=>document.querySelectorAll('.strip .fig:not(.static)').forEach(x=>x.setAttribute('aria-pressed',String(x===b)))));
+</script>
