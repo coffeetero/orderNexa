@@ -46,7 +46,10 @@ AS $function$
                    AND ca.applied_at::date <= p_as_of AND (ca.reversed_at IS NULL OR (ca.reversed_at AT TIME ZONE (SELECT tz FROM zone))::date > p_as_of)), 0)
            - COALESCE((SELECT SUM(ca.applied_amount) FROM bps.ar_credit_applications ca
                  WHERE ca.tenant_id = p_tenant_id AND ca.credit_ar_transaction_id = t.ar_transaction_id
-                   AND ca.applied_at::date <= p_as_of AND (ca.reversed_at IS NULL OR (ca.reversed_at AT TIME ZONE (SELECT tz FROM zone))::date > p_as_of)), 0) AS paid,
+                   AND ca.applied_at::date <= p_as_of AND (ca.reversed_at IS NULL OR (ca.reversed_at AT TIME ZONE (SELECT tz FROM zone))::date > p_as_of)), 0)
+           -- an allowance counts as paid from the day it was given
+           + CASE WHEN t.allowance_amount <> 0 AND (t.allowance_at IS NULL OR (t.allowance_at AT TIME ZONE (SELECT tz FROM zone))::date <= p_as_of)
+                  THEN t.allowance_amount ELSE 0 END AS paid,
            NULL::bigint AS ar_payment_id
       FROM bps.ar_transactions t JOIN tree ON tree.customer_id = t.customer_id
      WHERE t.tenant_id = p_tenant_id AND t.status NOT IN ('DRAFT','CANCELLED') AND t.transaction_type IN ('INV','CM') AND t.transaction_date <= p_as_of

@@ -28,7 +28,7 @@ const STATUS: Record<Status, { label: string; tone: string; dot: string }> = {
   SHIPPED: { label: 'Shipped', tone: 'bg-info-soft text-info', dot: 'bg-info' },
   INVOICED: { label: 'Invoiced', tone: 'bg-success-soft text-success', dot: 'bg-success' },
 };
-const PERIODS = [['yesterday', 'Yesterday'], ['today', 'Today'], ['tomorrow', 'Tomorrow'], ['this_week', 'This week'], ['next_week', 'Next week'], ['custom', 'Custom range…']] as const;
+const PERIODS = [['yesterday', 'Yesterday'], ['today', 'Today'], ['tomorrow', 'Tomorrow'], ['this_week', 'This week']] as const;
 const GROUPS = [['shift', 'Group by Shift'], ['customer', 'Group by Customer'], ['status', 'Group by Status'], ['none', 'No grouping']] as const;
 
 /** Money with the sign in front of the $ ("-$5,768.69"). */
@@ -129,20 +129,22 @@ function ManageOrders() {
       </div>
 
       <section aria-label="Filters" className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card px-3 py-2.5 shadow-sm">
-        <select aria-label="Production date" className={SEL} value={period} onChange={(e) => set({ period: e.target.value === 'today' ? null : e.target.value, ...(e.target.value === 'custom' ? { from: data?.from ?? null, to: data?.to ?? null } : { from: null, to: null }) })}>
+        {/* a day fills the dates; typing dates makes it a custom range (shown, not pickable) */}
+        <select aria-label="Production date" className={SEL} value={period} onChange={(e) => set({ period: e.target.value === 'today' ? null : e.target.value, from: null, to: null })}>
           {PERIODS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          <option value="custom" hidden disabled>Custom dates</option>
         </select>
         <select aria-label="Shift" className={SEL} value={get('shift')} onChange={(e) => set({ shift: e.target.value || null })}>
           <option value="">All shifts</option>
           {data?.shifts.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
-        {period === 'custom' && (
-          <span className="inline-flex items-center gap-1.5">
-            <input type="date" aria-label="From" className={SEL} value={get('from', data?.from ?? '')} onChange={(e) => set({ from: e.target.value || null })} />
-            <span className="text-sm text-muted-foreground">to</span>
-            <input type="date" aria-label="To" className={SEL} value={get('to', data?.to ?? '')} onChange={(e) => set({ to: e.target.value || null })} />
-          </span>
-        )}
+        <span className="inline-flex items-center gap-1.5">
+          <input type="date" aria-label="From" className={SEL} value={data?.from ?? get('from')}
+            onChange={(e) => e.target.value && set({ period: 'custom', from: e.target.value, to: data?.to && data.to >= e.target.value ? data.to : e.target.value })} />
+          <span className="text-sm text-muted-foreground">to</span>
+          <input type="date" aria-label="To" className={SEL} value={data?.to ?? get('to')} min={data?.from}
+            onChange={(e) => e.target.value && set({ period: 'custom', from: data?.from ?? e.target.value, to: e.target.value })} />
+        </span>
         <select aria-label="Group the list" className={SEL} value={group} onChange={(e) => set({ group: e.target.value === 'shift' ? null : e.target.value })}>
           {GROUPS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>

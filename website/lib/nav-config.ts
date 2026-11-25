@@ -50,10 +50,7 @@ export const tenantNav: NavMenu[] = [
           { label: 'Call Up List', href: '/orders/callup', soon: true },
         ],
       },
-      {
-        heading: 'Adjustments',
-        items: [{ label: 'Returns & Credits', href: '/orders/returns', soon: true }],
-      },
+      // Returns and credits live under Financials (decided 2026-11-25: the office that handles checks, credits and debits enters them)
     ],
   },
   {
@@ -148,7 +145,8 @@ export const tenantNav: NavMenu[] = [
       {
         heading: 'Cash',
         items: [
-          { label: 'Manage Payments', href: '/financials/payments' },
+          { label: 'Enter Payments', href: '/financials/enter-payments' },
+          { label: 'Payment History', href: '/financials/payments' },
           { label: 'Cash Reconciliation', href: '/financials/cash', soon: true },
         ],
       },

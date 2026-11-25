@@ -15,7 +15,7 @@ BEGIN
   RETURN QUERY
   WITH actual AS (
     SELECT t.ar_transaction_id AS t_id, NULL::bigint AS p_id, t.customer_id, t.document_number AS doc,
-           t.amount - COALESCE(pa.s, 0) - COALESCE(ci.s, 0) + COALESCE(cc.s, 0) AS open_amount
+           t.amount - COALESCE(pa.s, 0) - COALESCE(ci.s, 0) + COALESCE(cc.s, 0) - t.allowance_amount AS open_amount
       FROM bps.ar_transactions t
       LEFT JOIN (SELECT a.ar_transaction_id, sum(a.applied_amount) s FROM bps.ar_payment_applications a
                   WHERE a.tenant_id = p_tenant_id AND a.reversed_at IS NULL GROUP BY 1) pa ON pa.ar_transaction_id = t.ar_transaction_id

@@ -1,0 +1,220 @@
+<title>Enter Payments Redesign</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: Financials › Enter Payments in the Hearth theme, modeled on the old BPS AR - Payments screen. Cancel / Save top right;
+   the check line (customer, received, check no., amount, live check balance); the entry line (invoice #, payment, allowance,
+   reason) where all typing happens; the customer's open transactions below, read only, picked with ↑ ↓ or a click.
+   Sizes match the live Dashboard: 14px rows, 11px headings. */
+:root{--bg:#f5f3f0;--surface:#fffefc;--side:#ede9e3;--line:#e1dbd3;--line2:#cfc7bc;--text:#1e1915;--text2:#544a41;--text3:#7a6e63;--accent:#a3451c;--accent-fg:#fff;--pos:#2d6e3e;--warn:#8f5a00;--info:#2a5fa8;--neg:#b3312a;--focus:#a3451c}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#161310;--surface:#1f1b17;--side:#1a1613;--line:#322c26;--line2:#433b33;--text:#efe9e2;--text2:#c4b9ad;--text3:#978b7e;--accent:#e58d60;--accent-fg:#1a120c;--pos:#7cc48c;--warn:#e0aa4a;--info:#7fb0ee;--neg:#ee8177;--focus:#e58d60;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#161310;--surface:#1f1b17;--side:#1a1613;--line:#322c26;--line2:#433b33;--text:#efe9e2;--text2:#c4b9ad;--text3:#978b7e;--accent:#e58d60;--accent-fg:#1a120c;--pos:#7cc48c;--warn:#e0aa4a;--info:#7fb0ee;--neg:#ee8177;--focus:#e58d60;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font:14px/20px Inter,system-ui,sans-serif;font-variant-numeric:tabular-nums;padding-block:16px 32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+.wrap{max-width:1400px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+.head{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
+.head h1{font-size:18px;font-weight:600;margin:0}
+.sp{flex:1}
+.muted{color:var(--text3)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:0 1px 2px rgb(0 0 0 / .04);min-width:0}
+.lab{display:block;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);margin-bottom:3px}
+.in{height:36px;border:1px solid var(--line2);border-radius:6px;background:var(--surface);padding:0 10px;width:100%;min-width:0}
+.in.r{text-align:right}
+.in.hot{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.btn{height:36px;padding:0 14px;border-radius:6px;border:1px solid var(--line2);background:var(--surface);font-weight:500;cursor:pointer;white-space:nowrap}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.btn:disabled{opacity:.45;cursor:default}
+/* check line */
+.row{display:grid;gap:10px;padding:12px;align-items:end}
+.check{grid-template-columns:minmax(260px,2.2fr) 150px 150px 150px 170px}
+.entry{grid-template-columns:170px 150px 150px minmax(0,1fr);border-top:1px solid var(--line)}
+.bal{height:36px;border-radius:6px;display:flex;align-items:center;justify-content:flex-end;padding:0 12px;font-weight:600;font-size:16px;border:1px solid var(--c);color:var(--c);background:color-mix(in srgb,var(--c) 12%,var(--surface))}
+.tip{font-size:13px;color:var(--text2);align-self:center;padding-top:16px}
+.tip b{color:var(--text)}
+.credit{color:var(--info);font-weight:500}
+/* customer combobox (as in Enter Orders) */
+.combo{position:relative}
+.combo .in{padding-left:32px;padding-right:30px}
+.combo .ico{position:absolute;left:10px;top:28px;color:var(--text3);pointer-events:none}
+.combo .chev{position:absolute;right:10px;top:28px;color:var(--text3);pointer-events:none}
+.list{position:absolute;z-index:5;left:0;right:0;top:64px;background:var(--surface);border:1px solid var(--line2);border-radius:6px;box-shadow:0 8px 24px rgb(0 0 0 / .14);max-height:240px;overflow:auto;padding:4px}
+.list div{padding:6px 8px;border-radius:4px;cursor:pointer;display:flex;justify-content:space-between;gap:12px}
+.list div:hover,.list div.on{background:color-mix(in srgb,var(--accent) 12%,var(--surface))}
+.list b{font-weight:600}.list small{color:var(--text3)}
+.hint{font-size:12px;color:var(--text3);padding:0 12px 10px}
+.kbd{border:1px solid var(--line2);border-radius:4px;padding:1px 5px;font-size:11px;background:var(--surface)}
+/* transactions (read only) */
+.ph{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line)}
+.ph h2{font-size:14px;font-weight:600;margin:0}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px;line-height:20px}
+th{height:32px;padding:0 10px;text-align:left;white-space:nowrap;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);background:color-mix(in srgb,var(--side) 60%,var(--surface));border-bottom:1px solid var(--line)}
+td{padding:6px 10px;border-bottom:1px solid var(--line);white-space:nowrap;cursor:pointer}
+.r{text-align:right}
+tbody tr:hover td{background:color-mix(in srgb,var(--accent) 5%,var(--surface))}
+tr.sel td{background:color-mix(in srgb,var(--accent) 14%,var(--surface))!important;font-weight:500}
+tr.sel td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+tr.done td.nb{color:var(--pos);font-weight:600}
+tr.done td{color:var(--text3)}
+tr.done td.nb{color:var(--pos)}
+td.pay{color:var(--accent);font-weight:500}
+.type{display:inline-block;font-size:11px;font-weight:600;padding:1px 6px;border-radius:4px;background:var(--side);color:var(--text2)}
+.type.cm{background:color-mix(in srgb,var(--info) 14%,var(--surface));color:var(--info)}
+tfoot td{font-weight:600;background:color-mix(in srgb,var(--side) 55%,var(--surface));border-bottom:0;cursor:default}
+.status{padding:8px 12px;border-top:1px solid var(--line);color:var(--text3);font-size:13px}
+/* notes */
+.notes{padding:14px 16px}
+.notes h2{font-size:14px;margin:0 0 8px}
+.notes td,.notes th{white-space:normal;vertical-align:top;cursor:default}
+.notes tbody tr:hover td{background:none}
+.tag{display:inline-block;font-size:11px;font-weight:600;padding:2px 7px;border-radius:9px;color:var(--c);background:color-mix(in srgb,var(--c) 14%,var(--surface))}
+.t-c{--c:var(--info)}.t-l{--c:var(--warn)}.t-w{--c:var(--accent)}.t-d{--c:var(--pos)}
+@media (max-width:980px){.check,.entry{grid-template-columns:1fr 1fr}.check .combo{grid-column:1/-1}}
+</style>
+
+<div class="wrap">
+  <div class="head">
+    <h1>Enter Payments</h1>
+    <span class="muted">Financials › Cash</span>
+    <span class="sp"></span>
+    <button class="btn" id="cancel">Cancel</button>
+    <button class="btn pri" id="save">Save payment</button>
+  </div>
+
+  <div class="panel">
+    <div class="row check">
+      <div class="combo">
+        <label class="lab" for="cust">Customer</label>
+        <svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="cust" class="in" value="15700 · HARBOR STREET CAFÉ" placeholder="Search number or name…" autocomplete="off">
+        <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+        <div class="list" id="custList" hidden></div>
+      </div>
+      <div><label class="lab" for="rcvd">Received</label><input id="rcvd" class="in" type="date" value="2026-11-25"></div>
+      <div><label class="lab" for="chk">Check no.</label><input id="chk" class="in" value="10482" placeholder="or CASH"></div>
+      <div><label class="lab" for="amt">Amount</label><input id="amt" class="in r" value="2,200.00"></div>
+      <div><span class="lab">Check balance</span><div class="bal" id="bal">$0.00</div></div>
+    </div>
+    <div class="row entry">
+      <div><label class="lab" for="qinv">Invoice #</label><input id="qinv" class="in hot" autocomplete="off"></div>
+      <div><label class="lab" for="qpay">Payment</label><input id="qpay" class="in r" placeholder="0.00"></div>
+      <div><label class="lab" for="qall">Allowance</label><input id="qall" class="in r" placeholder="0.00"></div>
+      <div><label class="lab" for="qrsn">Allowance reason</label><input id="qrsn" class="in" placeholder="Why, and which items (e.g. 2 cases rye, moldy)"></div>
+    </div>
+    <div class="hint">After the amount, the cursor waits in <b>Invoice #</b>: <span class="kbd">↑</span> <span class="kbd">↓</span> pick a transaction (or type its number, or click it), <span class="kbd">Enter</span> or <span class="kbd">Tab</span> goes to Payment, <span class="kbd">Enter</span> applies and comes back for the next one. Allowance and reason are one <span class="kbd">Tab</span> further.</div>
+  </div>
+
+  <div class="panel">
+    <div class="ph"><h2>Open transactions · Harbor Street Café</h2><span class="muted" id="cnt"></span></div>
+    <div class="tw">
+      <table>
+        <thead><tr>
+          <th>Date</th><th>Type</th><th>Number</th><th class="r">Amount</th><th class="r">Returns</th>
+          <th class="r">Payment</th><th class="r">Allowance</th><th>Reason</th><th class="r">Balance</th>
+        </tr></thead>
+        <tbody id="rows"></tbody>
+        <tfoot><tr id="tot"></tr></tfoot>
+      </table>
+    </div>
+    <div class="status" id="status"></div>
+  </div>
+
+  <div class="panel notes">
+    <h2>What changes from the old screen, and what kind of change</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Change</th><th>Kind</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>Same keyboard flow as the old AR - Payments: after Amount the cursor goes to Invoice #; ↑ ↓ (or typing the number, or a click) picks a transaction; Enter / Tab goes to Payment, which defaults to the transaction's open amount; Enter applies and returns for the next. All typing happens in the entry line; the list is read only.</td><td><span class="tag t-w">Workflow</span></td><td>The office's daily heads-down work; kept as it is (treated as a protected screen like Order Entry).</td></tr>
+        <tr><td>Credit memos and negative invoices are in the list. "Paying" one takes the whole credit: the check balance goes up by it and the transaction closes at $0.00.</td><td><span class="tag t-w">Workflow</span></td><td>As the office works today; in BPS it records a credit application (the credit pays invoices on this check), never negative cash.</td></tr>
+        <tr><td>Allowance is stored on the invoice itself (amount, a free-text reason saying why and which items, who and when), as the old BPS did; several allowances on one invoice add up</td><td><span class="tag t-d">Data</span></td><td>Shown on the same line; the reason keeps why money was written off (mostly spoiled product).</td></tr>
+        <tr><td>Balance column shows what is left on each transaction and drops to $0.00 (green) as it is paid or its credit taken; the check balance counts down (or up, for a credit) at the same time</td><td><span class="tag t-w">Workflow</span></td><td>One live balance per line is easier to follow than Open and New balance side by side.</td></tr>
+        <tr><td>Returns column shows returns entered in Enter Returns, already off the balance</td><td><span class="tag t-d">Data</span></td><td>As in the old screen.</td></tr>
+        <tr><td>Credits for missing items stay on the invoice: Alpine adds a Credit line to the order, so the customer sees it on the invoice itself (decision for the Issue Credits design)</td><td><span class="tag t-d">Data</span></td><td>Bakery customers want credits shown on the invoice they are checking.</td></tr>
+        <tr><td>Customer picker is the one from Enter Orders (search by number or name)</td><td><span class="tag t-l">Layout</span></td><td>One way to find a customer everywhere.</td></tr>
+        <tr><td>Cancel and Save payment at the top right; Save works at $0.00 check balance, or keeps what is left on account as unapplied cash (asks first)</td><td><span class="tag t-l">Layout</span></td><td>Always in reach; old BPS needed exactly $0.</td></tr>
+        <tr><td>Terms discount column dropped</td><td><span class="tag t-l">Layout</span></td><td>Used 7 times since 2000.</td></tr>
+        <tr><td>Hearth theme, Inter, 14px rows, money formatted as the guidelines say</td><td><span class="tag t-c">Cosmetic</span></td><td>Design guidelines.</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+</div>
+
+<script>
+// open transactions: an earlier payment with unapplied cash (PMT), invoices, a credit memo and a negative invoice (a credit)
+const T=[['10.21.26','PMT','PMT-46590 · 36410',-150.00,0],['11.08.26','INV','545716',468.52,0],['11.09.26','INV','545717',568.34,0],['11.10.26','INV','545803',718.22,24.10],['11.11.26','INV','545806',727.88,0],['11.12.26','INV','545870',741.04,0],['11.13.26','INV','545871',848.07,0],['11.14.26','INV','545904',854.52,12.80],['11.15.26','CM','CM-3021',-85.40,0],['11.15.26','INV','545993',784.11,0],['11.16.26','INV','545995',521.57,0],['11.17.26','INV','546030',-24.00,0],['11.17.26','INV','546031',645.73,0],['11.18.26','INV','546064',1101.44,0],['11.19.26','INV','546100',543.59,0]]
+  .map(([d,t,n,a,r])=>({d,t,n,a,r,open:+(a-r).toFixed(2),pay:0,all:0,rsn:''}));
+// nothing applied yet: the check balance starts at the check amount and counts down as transactions are paid
+const money=n=>(n<0?'-':'')+'$'+Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+const num=s=>{const v=parseFloat(String(s).replace(/[$,\s]/g,''));return isNaN(v)?0:v};
+const $=id=>document.getElementById(id);
+const isCredit=x=>x.open<0;
+let sel=4;
+const check=()=>num($('amt').value);
+const applied=()=>T.reduce((s,x)=>s+x.pay,0);
+const left=()=>+(check()-applied()).toFixed(2);
+function render(){
+  let tA=0,tR=0,tO=0,tP=0,tL=0,tN=0;
+  $('rows').innerHTML=T.map((x,i)=>{
+    const nb=+(x.open-x.pay-x.all).toFixed(2);
+    tA+=x.a;tR+=x.r;tO+=x.open;tP+=x.pay;tL+=x.all;tN+=nb;
+    return `<tr class="${i===sel?'sel':''} ${nb===0&&(x.pay||x.all)?'done':''}" data-i="${i}">
+      <td class="muted">${x.d}</td><td><span class="type ${x.t==='CM'||x.t==='PMT'?'cm':''}">${x.t}</span></td><td>${x.n}</td>
+      <td class="r ${x.a<0?'credit':''}">${money(x.a)}</td><td class="r ${x.r?'credit':'muted'}">${x.r?money(-x.r):'—'}</td>
+      <td class="r ${x.pay?'pay':'muted'}">${x.pay?money(x.pay):'—'}</td>
+      <td class="r ${x.all?'pay':'muted'}">${x.all?money(x.all):'—'}</td>
+      <td class="${x.all?'':'muted'}">${x.all?x.rsn:'—'}</td>
+      <td class="r nb ${nb<0?'credit':''}">${money(nb)}</td></tr>`;
+  }).join('');
+  $('tot').innerHTML=`<td colspan="3">${T.length} open transactions</td><td class="r">${money(tA)}</td><td class="r">${money(-tR)}</td><td class="r">${money(tP)}</td><td class="r">${money(tL)}</td><td></td><td class="r">${money(tN)}</td>`;
+  const l=left();
+  $('bal').textContent=money(l);
+  $('bal').style.setProperty('--c',l===0?'var(--pos)':l<0?'var(--neg)':'var(--warn)');
+  $('status').textContent=l===0?'Check fully applied.':l>0?`${money(l)} left: apply it, or Save keeps it on account as unapplied cash.`:`Applied ${money(-l)} more than the check. Reduce a payment.`;
+  $('save').disabled=l<0;
+  $('cnt').textContent=`${T.filter(x=>Math.abs(x.open-x.pay-x.all)>0.004).length} still open after this payment`;
+}
+function pick(i){sel=Math.max(0,Math.min(T.length-1,i));$('qinv').value=T[sel].n;render();document.querySelector('tr.sel')?.scrollIntoView({block:'nearest'});}
+function toPayment(){
+  const x=T[sel];if(!x)return;
+  // the payment defaults from the transaction: what is still open on it (a credit is taken whole)
+  const suggest=isCredit(x)?x.open:Math.max(0,+(x.open-x.all).toFixed(2));
+  $('qpay').value=(isCredit(x)?x.open:suggest).toFixed(2);$('qall').value=x.all?x.all.toFixed(2):'';$('qrsn').value=x.rsn||'';
+  $('qpay').focus();$('qpay').select();
+}
+function apply(){
+  const x=T[sel];if(!x)return;
+  if(isCredit(x)){x.pay=x.open;x.all=0;}            // a credit is taken whole and closes at $0.00
+  else{x.pay=num($('qpay').value);x.all=num($('qall').value);x.rsn=x.all?$('qrsn').value.trim():'';}
+  $('qrsn').value='';
+  $('qpay').value='';$('qall').value='';
+  const next=T.findIndex((y,j)=>j>sel&&Math.abs(y.open-y.pay-y.all)>0.004);
+  pick(next>=0?next:sel);$('qinv').focus();$('qinv').select();
+}
+// Invoice #: ↑ ↓ pick, typing a number picks it, Enter / Tab go to Payment
+$('qinv').addEventListener('keydown',e=>{
+  if(e.key==='ArrowDown'){e.preventDefault();pick(sel+1);}
+  else if(e.key==='ArrowUp'){e.preventDefault();pick(sel-1);}
+  else if(e.key==='Enter'||(e.key==='Tab'&&!e.shiftKey)){e.preventDefault();toPayment();}
+});
+$('qinv').addEventListener('input',()=>{const i=T.findIndex(x=>x.n.toLowerCase().startsWith($('qinv').value.trim().toLowerCase())&&$('qinv').value.trim());if(i>=0){sel=i;render();document.querySelector('tr.sel')?.scrollIntoView({block:'nearest'});}});
+$('qpay').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();apply();}else if(e.key==='Escape'){$('qinv').focus();}});
+$('qall').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();apply();}});
+$('qrsn').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();apply();}});
+// a click on the list picks the transaction and goes to Payment
+$('rows').addEventListener('click',e=>{const tr=e.target.closest('tr');if(tr){pick(+tr.dataset.i);toPayment();}});
+// Amount: Enter / Tab go to Invoice #
+$('amt').addEventListener('keydown',e=>{if(e.key==='Enter'||(e.key==='Tab'&&!e.shiftKey)){e.preventDefault();render();$('qinv').focus();$('qinv').select();}});
+$('amt').addEventListener('input',()=>{clearTimeout(window._a);window._a=setTimeout(render,300)});
+// customer picker: search by number or name, accounts as in Enter Orders
+const CUS=[['15700','HARBOR STREET CAFÉ'],['15702','MAPLE & RYE MARKET'],['15710','NORTHGATE DELI'],['15718','BLUEBIRD DINER'],['15733','CEDAR HILL GROCERS'],['15741','THIRD WARD BISTRO'],['15760','LAKESIDE COUNTRY CLUB'],['15772','UNION COFFEE CO.']];
+const cust=$('cust'),list=$('custList');
+function showList(){const q=cust.value.toLowerCase().replace(/^\d+ · /,'');const m=CUS.filter(([n,c])=>!q||n.includes(q)||c.toLowerCase().includes(q));
+  list.innerHTML=m.map(([n,c],k)=>`<div class="${k===0?'on':''}" data-v="${n} · ${c}"><b>${c}</b><small>${n}</small></div>`).join('')||'<div class="muted">No customer matches</div>';list.hidden=false;}
+cust.addEventListener('focus',()=>{cust.select();showList();});
+cust.addEventListener('input',showList);
+list.addEventListener('mousedown',e=>{const d=e.target.closest('[data-v]');if(d){cust.value=d.dataset.v;list.hidden=true;}});
+cust.addEventListener('blur',()=>setTimeout(()=>list.hidden=true,120));
+pick(4);$('qinv').focus();
+</script>

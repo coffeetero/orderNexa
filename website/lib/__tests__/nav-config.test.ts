@@ -33,11 +33,11 @@ describe('tenantNav matches the real routes', () => {
     for (const href of [
       '/dashboard', '/orders', '/orders/standing', '/orders/standing-mgmt', '/manage-orders',
       '/customers', '/inventory/item-profile', '/production/analysis', '/financials/ar',
-      '/inventory/nutrition', '/orders/callup', '/orders/import', '/orders/returns', '/admin/production', '/production/process', '/production/report', '/production/labels', '/production/packaging', '/production/routes', '/production/deliveries', '/financials/credits',
+      '/inventory/nutrition', '/orders/callup', '/orders/import', '/financials/returns', '/admin/production', '/production/process', '/production/report', '/production/labels', '/production/packaging', '/production/routes', '/production/deliveries', '/financials/credits',
     ]) {
       expect(hrefs.has(href), href).toBe(true);
     }
-    expect(items.length).toBe(1 + 8 + 7 + 3 + 9 + 10 + 11 + 5 + 1); // Dashboard + old sidebar sections + Admin > Appearance, Application Settings, Production > Process Run, Process Run + Orders > Export Orders + Production > Print Invoices + Organizer (Sheets and 4 planned) + Customers Import/Export split in two
+    expect(items.length).toBe(1 + 8 + 7 + 3 + 9 + 10 + 11 + 5 + 1 - 1 + 1); // + Financials > Enter Payments (Manage Payments became Payment History, 2026-11-25); - Orders > Returns & Credits (moved to Financials > Enter Returns, 2026-11-25); Dashboard + old sidebar sections + Admin > Appearance, Application Settings, Production > Process Run, Process Run + Orders > Export Orders + Production > Print Invoices + Organizer (Sheets and 4 planned) + Customers Import/Export split in two
   });
 });
 

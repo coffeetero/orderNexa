@@ -3,7 +3,7 @@ import { getCurrentTenantId } from '@/lib/supabase/tenant';
 import { ManagePayments } from '@/components/features/financials/ManagePayments';
 
 export const metadata = {
-  title: 'Manage Payments — Financials',
+  title: 'Payment History — Financials',
 };
 
 export default async function ManagePaymentsPage({ searchParams }: { searchParams: { id?: string } }) {

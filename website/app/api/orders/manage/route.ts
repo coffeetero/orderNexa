@@ -21,7 +21,7 @@ export async function GET(request: Request) {
   const page = Math.max(Number.parseInt(q.get('page') ?? '1', 10) || 1, 1);
   const { data, error } = await createClient().rpc('om_orders_manage_get', {
     p_tenant_id: tenantId,
-    p_period: oneOf(q.get('period'), ['yesterday', 'today', 'tomorrow', 'this_week', 'next_week', 'custom'] as const, 'today'),
+    p_period: oneOf(q.get('period'), ['yesterday', 'today', 'tomorrow', 'this_week', 'custom'] as const, 'today'),
     p_from: isDate(q.get('from')) ? q.get('from') : null,
     p_to: isDate(q.get('to')) ? q.get('to') : null,
     p_shift: q.get('shift') || null,

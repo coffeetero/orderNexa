@@ -73,12 +73,12 @@ tr.group td{background:color-mix(in srgb,var(--side) 45%,var(--surface));font-we
 
   <div class="panel filters" role="search">
     <select class="sel" id="day" aria-label="Production date">
-      <option>Yesterday</option><option selected>Today</option><option>Tomorrow</option><option>This week</option><option>Next week</option><option value="custom">Custom range…</option>
+      <option>Yesterday</option><option selected>Today</option><option>Tomorrow</option><option>This week</option><option value="custom" hidden disabled>Custom dates</option>
     </select>
     <select class="sel" aria-label="Shift">
       <option selected>All shifts</option><option>Morning</option><option>Lunch</option><option>Dinner</option><option>Special</option>
     </select>
-    <span id="range" class="range" hidden>
+    <span id="range" class="range">
       <input class="date" type="date" value="2026-11-25" aria-label="From">
       <span class="muted">to</span>
       <input class="date" type="date" value="2026-11-25" aria-label="To">
@@ -121,7 +121,7 @@ tr.group td{background:color-mix(in srgb,var(--side) 45%,var(--surface));font-we
         <tr><td>Real orders from the database (production date, shift, department/event, lines, amount), loaded page by page from the server</td><td><span class="tag t-d">Data</span></td><td>The page shows sample orders today. About 60–90 orders a day, 595,000 in total, so it filters and pages on the server.</td></tr>
         <tr><td>Status from what really happened to the order: Open → In production → Shipped → Invoiced (same rule as the Dashboard)</td><td><span class="tag t-d">Data</span></td><td>"Pending, Packed, Dispatched" do not exist in BPS data.</td></tr>
         <tr><td>Remove Route column; add Shift and Department / event</td><td><span class="tag t-l">Layout</span></td><td>Orders have no route; shift and department are how the bakery works.</td></tr>
-        <tr><td>Filter bar: a Day dropdown (Today by default; Yesterday, Tomorrow, This week, Next week, or Custom range… which shows From / To dates), then a Shift dropdown (All shifts by default); the search box sits right above the list</td><td><span class="tag t-w">Workflow</span></td><td>Replaces the dead Filter button; compact, and the day that matters is the default.</td></tr>
+        <tr><td>Filter bar: a Day dropdown (Today by default; Yesterday, Tomorrow, This week) with From / To dates always shown (a day fills them; typing dates makes a custom range), then a Shift dropdown (All shifts by default); the search box sits right above the list</td><td><span class="tag t-w">Workflow</span></td><td>Replaces the dead Filter button; compact, and the day that matters is the default.</td></tr>
         <tr><td>Compact summary strip in one panel, one line (orders by status, amount; no units); clicking a status filters the list</td><td><span class="tag t-l">Layout</span></td><td>Same pattern as the approved Dashboard; replaces four separate cards with made-up numbers.</td></tr>
         <tr><td>Group dropdown: Group by Shift (default), Customer or Status, or No grouping; a subtotal row (orders, lines, amount) per group</td><td><span class="tag t-w">Workflow</span></td><td>Production thinks in shifts; the office also looks by customer or by status.</td></tr>
         <tr><td>Sortable columns, 50 per page, keyboard: ↑↓ Enter, / search</td><td><span class="tag t-w">Workflow</span></td><td>Office staff work this list all day.</td></tr>
@@ -162,6 +162,5 @@ function rows(){
 document.getElementById('prev').addEventListener('click',()=>{page--;rows();});
 document.getElementById('next').addEventListener('click',()=>{page++;rows();});
 const g=document.getElementById('group');g.addEventListener('change',()=>{by=g.value;page=0;rows();});rows();
-document.getElementById('day').addEventListener('change',e=>{document.getElementById('range').hidden=e.target.value!=='custom';});
 document.querySelectorAll('.strip .fig:not(.static)').forEach(b=>b.addEventListener('click',()=>document.querySelectorAll('.strip .fig:not(.static)').forEach(x=>x.setAttribute('aria-pressed',String(x===b)))));
 </script>

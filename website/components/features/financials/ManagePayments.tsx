@@ -498,7 +498,7 @@ export function ManagePayments({ tenantId, initialPaymentId }: { tenantId: numbe
     <div className="mx-auto max-w-[110rem] space-y-4 p-2 sm:p-3">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Manage Payments</h1>
+          <h1 className="text-2xl font-semibold">Payment History</h1>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
             Enter customer payments and apply them to open invoices. What is not applied stays on account. Payments are never deleted: unapply or void them.
           </p>

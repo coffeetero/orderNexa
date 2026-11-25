@@ -5,7 +5,7 @@
 -- ar_payment_applications and ar_credit_applications, and once by the migration to fill the table.
 -- Same rules as ar_transaction_open_amount and ar_report_open_items:
 --   invoice / credit memo (not DRAFT or CANCELLED): amount - live payment applications - live credit applications that paid it
---                                                   + live credit applications that used it
+--                                                   + live credit applications that used it - allowance
 --   payment (not voided):                           -(amount) + live applications   (negative = credit still available)
 -- One recalculation per company at a time (transaction-level advisory lock), so two payments applied to the same invoice at the
 -- same moment cannot leave a stale balance: the second waits, then reads the first one's committed applications.
@@ -28,7 +28,7 @@ BEGIN
     INSERT INTO bps.ar_open_items (tenant_id, ar_transaction_id, customer_id, open_amount)
     SELECT x.tenant_id, x.ar_transaction_id, x.customer_id, x.open_amount
       FROM (SELECT t.tenant_id, t.ar_transaction_id, t.customer_id,
-                   t.amount - COALESCE(pa.s, 0) - COALESCE(ci.s, 0) + COALESCE(cc.s, 0) AS open_amount
+                   t.amount - COALESCE(pa.s, 0) - COALESCE(ci.s, 0) + COALESCE(cc.s, 0) - t.allowance_amount AS open_amount
               FROM bps.ar_transactions t
               LEFT JOIN (SELECT a.ar_transaction_id, sum(a.applied_amount) s FROM bps.ar_payment_applications a
                           WHERE a.tenant_id = p_tenant_id AND a.ar_transaction_id = ANY(p_transaction_ids) AND a.reversed_at IS NULL

@@ -100,6 +100,11 @@ Status: first release built (see docs/Architecture/health-checks.md): two tables
 - To check next: speed of the app's AR reports on 530,000 invoices (`ar_sales_report_get`, `ar_report_open_items`, `ar_customer_balance_get` call `ar_invoice_recognized_amount` per invoice).
   - Done 2026-11-25 for open items: `bps.ar_open_items` (migration/add_ar_open_items.sql) holds only documents with money open, kept by triggers. Dashboard AR call 0.45 s → 0.01 s; aging and statements for today use it too. Health check `ar_open_items_drift`. Still slow: `ar_sales_report_get`, `ar_customer_balance_get` (not yet checked).
 
+### Returns and credits: where they live (decided 2026-11-25)
+- Returns and credits are entered under **Financials** (Adjustments): Enter Credits (built; credit memo referencing the invoice line), Enter Returns (to design). The office that handles checks, credits and debits does this work, as in the old BPS. Orders › Returns & Credits placeholder removed.
+- Every route ends in a credit memo in AR; applying a credit to an invoice is a credit application (Financials › Manage Payments), never negative cash.
+- To design Enter Returns (mockup first): stales policy (credit up to a % of delivered?), entry by delivery date / customer / item quantities with BPS pricing them, whether returned goods are tracked for waste or production, and debit memos (charges) if Alpine needs them.
+
 ### AR troubleshooting and write-off screen (idea 2026-11-25, not designed)
 - Built on `bps.ar_open_items`: list old documents that are still open (e.g. a 2022 invoice or a 2000 payment), show their history (invoice, applications, reversals, credits) so a user can see why the balance remains.
 - Actions: write off an invoice remainder to an allowance, zero out an unapplied payment, or apply it to an invoice. Needs: approval rules, an allowance/write-off document type, audit, and how write-offs show on statements and in the sales report.

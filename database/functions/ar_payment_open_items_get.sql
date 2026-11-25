@@ -3,7 +3,7 @@
 -- What a payment from this customer can be applied to: open invoices and available credits (credit memos and negative
 -- invoices) of the customer and everything beneath it that is not itself an ACCOUNT (the same tree as the AR reports),
 -- plus its earlier payments that still have unapplied cash. Oldest first.
--- Returns { invoices: [{ ar_transaction_id, document_number, customer_name, transaction_date, due_date, amount, open }],
+-- Returns { invoices: [{ ar_transaction_id, document_number, customer_name, transaction_date, due_date, amount, open, allowance, allowance_reason }],
 --           credits:  [{ ar_transaction_id, document_number, transaction_type, customer_name, transaction_date, amount, available }],
 --           unapplied_payments: [{ ar_payment_id, payment_number, payment_date, payment_method, reference_number, amount, unapplied }] }
 -- ============================================================
@@ -26,17 +26,14 @@ BEGIN
     SELECT c.customer_id FROM fnd_customers c JOIN tree ON c.customer_parent_id = tree.customer_id
      WHERE c.tenant_id = p_tenant_id AND upper(btrim(c.customer_type)) <> 'ACCOUNT'
   ), docs AS (
-    -- same sums as ar_transaction_open_amount, inline: a big account has 25,000 invoices
+    -- open documents from ar_open_items (kept current by triggers; open = amount less payments, credits and allowance), so a
+    -- big account with 25,000 invoices answers from its few open ones
     SELECT t.ar_transaction_id, t.document_number, t.transaction_type, t.transaction_date, t.due_date, t.amount, c.customer_name,
-           t.amount
-           - COALESCE((SELECT SUM(pa.applied_amount) FROM ar_payment_applications pa
-                        WHERE pa.tenant_id = p_tenant_id AND pa.ar_transaction_id = t.ar_transaction_id AND pa.reversed_at IS NULL), 0)
-           - COALESCE((SELECT SUM(ca.applied_amount) FROM ar_credit_applications ca
-                        WHERE ca.tenant_id = p_tenant_id AND ca.ar_transaction_id = t.ar_transaction_id AND ca.reversed_at IS NULL), 0)
-           + COALESCE((SELECT SUM(ca.applied_amount) FROM ar_credit_applications ca
-                        WHERE ca.tenant_id = p_tenant_id AND ca.credit_ar_transaction_id = t.ar_transaction_id AND ca.reversed_at IS NULL), 0) AS open
-      FROM ar_transactions t JOIN tree ON tree.customer_id = t.customer_id JOIN fnd_customers c ON c.customer_id = t.customer_id
-     WHERE t.tenant_id = p_tenant_id AND t.status NOT IN ('DRAFT', 'CANCELLED') AND t.transaction_type IN ('INV', 'CM')
+           o.open_amount AS open, t.allowance_amount, t.allowance_reason
+      FROM ar_open_items o JOIN tree ON tree.customer_id = o.customer_id
+      JOIN ar_transactions t ON t.ar_transaction_id = o.ar_transaction_id
+      JOIN fnd_customers c ON c.customer_id = t.customer_id
+     WHERE o.tenant_id = p_tenant_id
   ), pays AS (
     SELECT p.ar_payment_id, p.payment_number, p.payment_date, p.payment_method, p.reference_number, p.amount,
            p.amount - COALESCE((SELECT SUM(pa.applied_amount) FROM ar_payment_applications pa
@@ -46,7 +43,8 @@ BEGIN
   )
   SELECT jsonb_build_object(
     'invoices', COALESCE((SELECT jsonb_agg(jsonb_build_object('ar_transaction_id', d.ar_transaction_id, 'document_number', d.document_number,
-                    'customer_name', d.customer_name, 'transaction_date', d.transaction_date, 'due_date', d.due_date, 'amount', d.amount, 'open', d.open)
+                    'customer_name', d.customer_name, 'transaction_date', d.transaction_date, 'due_date', d.due_date, 'amount', d.amount, 'open', d.open,
+                    'allowance', d.allowance_amount, 'allowance_reason', d.allowance_reason)
                     ORDER BY COALESCE(d.due_date, d.transaction_date), d.transaction_date, d.document_number)
                   FROM docs d WHERE d.transaction_type = 'INV' AND d.amount > 0 AND d.open > 0), '[]'::jsonb),
     'credits', COALESCE((SELECT jsonb_agg(jsonb_build_object('ar_transaction_id', d.ar_transaction_id, 'document_number', d.document_number,
