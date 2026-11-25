@@ -148,7 +148,7 @@ export const tenantNav: NavMenu[] = [
       {
         heading: 'Cash',
         items: [
-          { label: 'Manage Payments', href: '/financials/payments', soon: true },
+          { label: 'Manage Payments', href: '/financials/payments' },
           { label: 'Cash Reconciliation', href: '/financials/cash', soon: true },
         ],
       },

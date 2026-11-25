@@ -2,6 +2,7 @@
 -- ar_customer_balance_get
 -- What a paying customer (an account, or a department that pays for itself) owes: recognised invoices (shipped lines)
 -- of the customer and of everything beneath it that is not itself an ACCOUNT, minus credit memos, minus payments applied.
+-- Unapplied (reversed) payment applications do not count. Credit applications net to zero within the customer.
 -- Staff only. Returns { recognized_invoices, credits, payments_applied, balance }.
 -- ============================================================
 CREATE OR REPLACE FUNCTION bps.ar_customer_balance_get(p_tenant_id bigint, p_customer_id bigint)
@@ -32,7 +33,7 @@ BEGIN
     SELECT COALESCE(SUM(d.amount) FILTER (WHERE d.transaction_type = 'INV'), 0),
            COALESCE(SUM(d.amount) FILTER (WHERE d.transaction_type = 'CM'), 0),
            COALESCE((SELECT SUM(pa.applied_amount) FROM ar_payment_applications pa WHERE pa.tenant_id = p_tenant_id
-                        AND pa.ar_transaction_id IN (SELECT ar_transaction_id FROM docs)), 0)
+                        AND pa.reversed_at IS NULL AND pa.ar_transaction_id IN (SELECT ar_transaction_id FROM docs)), 0)
       INTO v_inv, v_cred, v_pay
       FROM docs d;
 
