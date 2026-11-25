@@ -104,6 +104,9 @@ Status: first release built (see docs/Architecture/health-checks.md): two tables
 - Built on `bps.ar_open_items`: list old documents that are still open (e.g. a 2022 invoice or a 2000 payment), show their history (invoice, applications, reversals, credits) so a user can see why the balance remains.
 - Actions: write off an invoice remainder to an allowance, zero out an unapplied payment, or apply it to an invoice. Needs: approval rules, an allowance/write-off document type, audit, and how write-offs show on statements and in the sales report.
 - Would clear most of the about -$191,000 of old negative items behind the negative Outstanding AR (see the reconciliation above).
+- Likely cause of many of them (owner, 2026-11-25): Alpine sometimes accepted a settlement (the customer paid less, or a payment was taken as payment in full) and nobody went back to clear the remaining invoices or payment balances, because the old BPS simply left negative transactions out of its reports. BPS counts them, so they now show as open.
+- So the screen needs a **settlement** action: pick an account's open items, record the settlement (date, reason, who approved) and close the remainders in one step, as a write-off/allowance document so statements and the sales report show it.
+- Open question for the Alpine manager: clear the old remainders once at go-live (a migration cleanup with a cut-off date and their sign-off), or leave them and settle account by account with the screen.
 
 ## 5. Import Orders follow-ups (built 2026-11-24)
 - Aggregator customers: the same import from the customer portal (an aggregator uploads hundreds of orders for its own customers). The import tables already hold the account; needs a portal page, a customer-side area and row security for portal users.
@@ -183,3 +186,11 @@ Built and merged: Dashboard real data, Customers Import/Export, Inventory › Nu
 - Before sending: preview as a chosen customer; test send to yourself. After: a send log per customer (sent, failed, bounced) in the customer's history.
 - Needs the email connector (provider such as Resend, Postmark or Amazon SES, plus the bakery's domain set up so mail is not marked as spam).
 - Open questions: which contact receives notices (billing, ordering, or contacts flagged for notices); operational notices only or promotions too (unsubscribe rules); which fields; customers' country (CAN-SPAM or CASL); later the same template by text message (Phone & Messaging).
+
+## 11. Security risks
+
+### Account recovery codes stored in the project folder (found 2026-11-25)
+- `docs/vercel/` holds the Vercel account's recovery codes in a plain text file. Anyone with the file can take over the Vercel account (and so the hosted site and its environment variables).
+- Done: `docs/vercel/` is in `.gitignore`, so it cannot be committed.
+- To do (owner): move the file into a password manager and delete it from the project folder; check it was never copied elsewhere (cloud sync, backups, other machines).
+- Same rule for `supabase setup/` (cloud database passwords, `uat.env` with the Resend API key): gitignored, but still plain files on disk. Move them to a password manager or an encrypted vault before go-live, and rotate any key that was ever shared.
