@@ -9,9 +9,10 @@ import { Label } from '@/components/ui/label';
 import { AccountPicker } from '@/components/features/orders/AccountPicker';
 import type { CustomerOption } from '@/components/features/account/order-entry/OrderHeaderRow';
 import { adminCall, adminPost, PageHead, useBanner } from './adminShared';
+import { EmailSenderPanel } from './EmailSenderPanel';
 
 type InviteStatus = 'ACTIVE' | 'INVITED' | 'NOT_INVITED';
-interface UserRow { user_id: number; user_name: string | null; email: string | null; user_type: string; is_active: boolean; status: InviteStatus; invited_at: string | null; role_ids: number[]; group_ids: number[]; customers: string[] }
+interface UserRow { user_id: number; user_name: string | null; email: string | null; user_type: string; is_active: boolean; status: InviteStatus; invited_at: string | null; is_user_admin: boolean; role_ids: number[]; group_ids: number[]; customer_id: number | null; customers: string[] }
 interface Role { role_id: number; role_name: string; role_audience: string; is_active: boolean }
 interface Group { group_id: number; group_name: string; is_all_customers: boolean; is_active: boolean }
 interface NewUser { email: string; user_name: string; account: CustomerOption | null; role_ids: number[]; group_ids: number[] }
@@ -45,12 +46,13 @@ export function UsersAdmin({ tenantId, audience: pageAudience }: { tenantId: num
   }, [tenantId, pageAudience, notify]);
   useEffect(() => { void load(); }, [load]);
 
-  // the customer accounts list is only needed to add a customer user
+  // the customer accounts list is only needed to add or edit a customer user
+  const editing = adding !== null || sel !== null;
   useEffect(() => {
-    if (pageAudience !== 'CUSTOMER' || !adding || customers !== null) return;
+    if (pageAudience !== 'CUSTOMER' || !editing || customers !== null) return;
     adminCall<CustomerOption[]>(`/api/customers?tenant_id=${tenantId}&hierarchy=true&active=true`)
       .then(setCustomers).catch((e: Error) => { setCustomers([]); notify(e.message, 'error'); });
-  }, [pageAudience, adding, customers, tenantId, notify]);
+  }, [pageAudience, editing, customers, tenantId, notify]);
 
   const audience = pageAudience;
   const flip = (list: number[], id: number, on: boolean) => (on ? [...list, id] : list.filter((x) => x !== id));
@@ -60,7 +62,15 @@ export function UsersAdmin({ tenantId, audience: pageAudience }: { tenantId: num
     if (!sel) return;
     setBusy(true);
     try {
-      await adminPost('/api/admin/users', { tenant_id: tenantId, user_id: sel.user_id, role_ids: sel.role_ids, group_ids: sel.group_ids, is_active: sel.is_active });
+      const was = users.find((u) => u.user_id === sel.user_id);
+      const same = (a: number[], b: number[]) => a.length === b.length && a.every((x) => b.includes(x));
+      // two saves, each only when its part changed: who the person is, and what they may do (which nobody may change for themselves)
+      if (!was || was.user_name !== sel.user_name || was.email !== sel.email || was.customer_id !== sel.customer_id) {
+        await adminPost('/api/admin/users/update', { tenant_id: tenantId, user_id: sel.user_id, user_name: sel.user_name ?? '', email: sel.email ?? '', customer_id: sel.customer_id });
+      }
+      if (!was || was.is_active !== sel.is_active || !same(was.role_ids, sel.role_ids) || !same(was.group_ids, sel.group_ids)) {
+        await adminPost('/api/admin/users', { tenant_id: tenantId, user_id: sel.user_id, role_ids: sel.role_ids, group_ids: sel.group_ids, is_active: sel.is_active });
+      }
       notify(`${sel.user_name ?? sel.email} saved.`, 'success');
       await load(); setSel(null);
     } catch (e) { notify((e as Error).message, 'error'); } finally { setBusy(false); }
@@ -126,6 +136,12 @@ export function UsersAdmin({ tenantId, audience: pageAudience }: { tenantId: num
         a staff user with no group sees no customers. Add a user, then send them an invite to choose their password.
       </PageHead>
       {banner}
+      {pageAudience === 'TENANT' && users.filter((u) => u.is_user_admin).length === 1 && (
+        <p className="rounded-md border border-amber-500/40 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
+          Only {users.find((u) => u.is_user_admin)?.user_name} can manage users. Give a second person that access, so nobody gets locked out.
+        </p>
+      )}
+      {pageAudience === 'CUSTOMER' && <EmailSenderPanel tenantId={tenantId} notify={notify} />}
       <div className="flex justify-end">
         <Button size="sm" onClick={() => { setSel(null); setInvite(null); setAdding({ email: '', user_name: '', account: null, role_ids: [], group_ids: [] }); }}>
           <UserPlus className="mr-1.5 h-4 w-4" /> Add user
@@ -165,10 +181,20 @@ export function UsersAdmin({ tenantId, audience: pageAudience }: { tenantId: num
           </div>
         ) : sel ? (
           <div className="space-y-4 rounded-md border p-4">
-            <div><div className="font-medium">{sel.user_name ?? sel.email}</div><div className="text-xs text-muted-foreground">{audience === 'TENANT' ? 'Staff' : 'Customer'} user · {sel.email}</div></div>
+            <div className="font-medium">{audience === 'TENANT' ? 'Staff' : 'Customer'} user</div>
+            <div className="space-y-1.5"><Label htmlFor="eu-name">Name</Label><Input id="eu-name" value={sel.user_name ?? ''} onChange={(e) => setSel({ ...sel, user_name: e.target.value })} /></div>
+            <div className="space-y-1.5"><Label htmlFor="eu-email">Email</Label>
+              <Input id="eu-email" type="email" value={sel.email ?? ''} disabled={sel.status === 'ACTIVE'} onChange={(e) => setSel({ ...sel, email: e.target.value })} />
+              <p className="text-xs text-muted-foreground">{sel.status === 'ACTIVE' ? 'The email is fixed once the person has signed in.' : sel.status === 'INVITED' ? 'Changing the email cancels the invite already sent; send a new one after saving.' : ''}</p>
+            </div>
+            {audience === 'CUSTOMER' && (
+              <div className="space-y-1.5"><Label htmlFor="eu-acct">Customer account</Label>
+                <AccountPicker customers={customers} value={customers?.find((c) => c.customer_id === sel.customer_id) ?? null} onChange={(a) => setSel({ ...sel, customer_id: a?.customer_id ?? null })} id="eu-acct" />
+              </div>
+            )}
             <div className="space-y-2 rounded-md bg-muted/40 p-3 text-sm">
               <div>{STATUS_LABEL[sel.status]}{sel.status === 'INVITED' && ` on ${shortDate(sel.invited_at)}`}</div>
-              <Button size="sm" variant="outline" onClick={sendInvite} disabled={busy || !sel.is_active}>
+              <Button size="sm" variant="outline" onClick={sendInvite} disabled={busy || !sel.is_active || sel.email !== users.find((u) => u.user_id === sel.user_id)?.email}>
                 <Mail className="mr-1.5 h-4 w-4" /> {sel.status === 'NOT_INVITED' ? 'Send invite' : sel.status === 'INVITED' ? 'Resend invite' : 'Send sign-in email'}
               </Button>
               {invite?.link && (
@@ -186,7 +212,7 @@ export function UsersAdmin({ tenantId, audience: pageAudience }: { tenantId: num
             {groupList(sel.group_ids, (ids) => setSel({ ...sel, group_ids: ids }))}
             <div className="flex gap-2"><Button onClick={save} disabled={busy}>Save</Button><Button variant="outline" onClick={() => setSel(null)}>Cancel</Button></div>
           </div>
-        ) : <p className="text-sm text-muted-foreground">Choose a user to edit their access, or add a new one.</p>}
+        ) : <p className="text-sm text-muted-foreground">Choose a user to edit them, or add a new one.</p>}
       </div>
     </div>
   );

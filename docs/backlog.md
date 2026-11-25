@@ -127,7 +127,35 @@ Status: first release built (see docs/Architecture/health-checks.md): two tables
 - Built: `org_sheets` (sheet_id, tenant_id, owner_user_id, sheet_name, visibility, workbook, version, created/updated at/by), area `organizer.sheets`, functions `org_sheets_get`, `org_sheet_get`, `org_sheet_save`, `org_sheet_delete`, `org_sheet_bps_eval`; Organizer menu with Sheets (Documents, Calendar, Contacts, Tasks greyed out).
 - Follow-ups: Send (needs the email connector; the button is disabled); the grid stays light in dark mode; check the editor signed in on an iPad; consider "freeze values" and more BPS functions once the client uses it.
 
-## 8. Post Production (after go-live)
+## 8. Users, invites and UAT site (built locally 2026-11-24)
+Built: Add user, invite / resend, accept page, forgot password, edit user (name, email until first sign-in, customer account), customer email sender panel, links built from `SITE_BASE_URL`. Emails go through Resend (ordernexa.com and alpinebakerynj.com verified). Customer emails never name OrderNexa.
+
+### Before the first real invite
+- Commit the work (nothing from 2026-11-24 evening is committed).
+- Cloud database: apply `add_user_invites.sql`, `fnd_user_invites.sql`, `fnd_users_get.sql` (needs the owner's OK per write).
+- Host the UAT site with `SITE_BASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `ORDERNEXA_EMAIL_FROM`; decide the address (`alpine-bakery.ordernexa.com` or Alpine's `bps.alpinebakerynj.com`; a custom domain needs link support).
+- Supabase dashboard (cloud): Email OTP Expiration = 86400 (emails promise 24 hours; local is 1 hour); confirm Auth › Hooks points at `bps.bps_access_token_hook`.
+- Alpine's From and Reply-to addresses: type them in Admin › Customer Users › Change (owner to supply).
+- maria@bps.com has no customer account: pick one on Customer Users.
+- Read one real invite email end to end from the hosted site (link address, wording, lands in the right place).
+
+### Circle back
+- Last-administrator guard (built 2026-11-24): a user or role change that would leave nobody able to manage users is refused (`fnd_assert_user_admin`); the Users screen warns when only one person has that access. Still open: an OrderNexa recovery path other than SQL, and add `add_access_admin_functions.sql` to the cloud apply list.
+- No delete user: only "Active in this tenancy" off. Decide whether a delete (soft) is wanted, e.g. for a mistyped user who never signed in.
+- From address: any tenancy admin can type any address, including another tenancy's verified domain. Lock it to OrderNexa before a second tenancy goes live (needs a platform-admin notion, also needed for trial signup).
+- Forgot password: limited to one email per person per 2 minutes; no per-visitor limit (new table, or the hosting platform's rate limiting).
+- Shared email across tenancies is refused; only a direct database session can attach a person to a second tenancy. Needs a proper OrderNexa screen when a second tenancy exists.
+- Trial signup (prospect creates their own tenancy): deferred.
+- "Designed by orderNexa.com" on the site, and the inquiries website (owner).
+- Resend: each new bakery's domain is added in OrderNexa's Resend account (DNS records in the bakery's DNS). Free plan: 3,000 emails a month, 100 a day.
+
+### From the 2026-11-24 review (not fixed)
+- High: cloud 8-second limit vs AR Open Balances for all accounts (12.6 s) and Print Invoices for all accounts, one day (13-14 s); Next.js 13.5.1 is out of support; direct database logins (`bps_dev`, `bps_app`) are fully trusted.
+- Rotate the cloud `postgres`, `bps_dev` and `bps_app` passwords (shown once in tool output).
+- Medium: 23 staff pages have no per-area guard; a session token is committed in `.claude/worktrees/dazzling-heyrovsky-7d6ad1/.claude/settings.local.json` (untrack it); no security headers; lint is skipped in builds.
+- Low: `fn_audit_log` and `handle_new_user` have no search_path; dead `handle_*` functions; 5 junk `v_*` tables in bps (also in cloud); the access-token hook ignores `deleted_at`; raw database errors reach the browser; about 6 redundant indexes (~100 MB).
+
+## 9. Post Production (after go-live)
 
 ### Customer email templates and mass emails (idea 2026-11-24, not designed)
 - Purpose: notices to many customers at once, e.g. "Dear {{customer_name}}, as always we truly appreciate your business. This Thanksgiving the cutoff time is 2 hours earlier."

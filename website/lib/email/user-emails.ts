@@ -25,7 +25,8 @@ ${paragraphs.map((p) => `<p style="margin:0 0 12px">${esc(p)}</p>`).join('\n')}
 <p style="margin:24px 0 0;font-size:12px;color:#888">${esc(footer)}</p></div>`;
 }
 
-interface Who { to: string; userName: string | null; tenantName: string; sender: Sender; fallbackAddress: string }
+/** `customer`: the reader is a bakery's customer, who knows the bakery, not OrderNexa — their emails never name OrderNexa. */
+interface Who { to: string; userName: string | null; tenantName: string; sender: Sender; fallbackAddress: string; customer?: boolean }
 
 function build(w: Who, subject: string, heading: string, paragraphs: string[], button: { label: string; href: string }, footer: string): Email {
   const greeting = `Hello${w.userName && !w.userName.includes('@') ? ` ${w.userName}` : ''},`;
@@ -42,22 +43,22 @@ function build(w: Who, subject: string, heading: string, paragraphs: string[], b
 
 /** First invite (or a resend before the person ever signed in): the link lets them choose a password. */
 export function inviteEmail(w: Who, link: string): Email {
-  return build(w, `You're invited to ${w.tenantName} on OrderNexa`, `Welcome to ${w.tenantName}`,
-    [`${w.tenantName} has set up an OrderNexa account for you. Choose a password to get started.`],
+  return build(w, w.customer ? `Your ${w.tenantName} online ordering account` : `You're invited to ${w.tenantName} on OrderNexa`, `Welcome to ${w.tenantName}`,
+    [`${w.tenantName} has set up an ${w.customer ? 'online ordering' : 'OrderNexa'} account for you. Choose a password to get started.`],
     { label: 'Choose your password', href: link },
     'This link works once and expires in 24 hours. If it has expired, ask for a new invite.');
 }
 
 /** The person already has a login (e.g. at another company): no password change, just where to sign in. */
 export function accessEmail(w: Who, signInUrl: string): Email {
-  return build(w, `You now have access to ${w.tenantName} on OrderNexa`, `Access to ${w.tenantName}`,
-    [`You can now sign in to ${w.tenantName} with your existing OrderNexa email and password.`],
+  return build(w, `You now have access to ${w.tenantName}${w.customer ? '' : ' on OrderNexa'}`, `Access to ${w.tenantName}`,
+    [`You can now sign in to ${w.tenantName} with your existing ${w.customer ? '' : 'OrderNexa '}email and password.`],
     { label: 'Sign in', href: signInUrl },
     'Forgot your password? Use "Forgot password" on the sign-in page.');
 }
 
 export function resetEmail(w: Who, link: string): Email {
-  return build(w, 'Reset your OrderNexa password', 'Reset your password',
+  return build(w, `Reset your ${w.customer ? w.tenantName : 'OrderNexa'} password`, 'Reset your password',
     ['We received a request to reset your password. If it was not you, you can ignore this email.'],
     { label: 'Choose a new password', href: link },
     'This link works once and expires in 24 hours.');
@@ -69,6 +70,24 @@ export function requestOrigin(request: Request): string {
   const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || url.host;
   const proto = (request.headers.get('x-forwarded-proto') || url.protocol.replace(':', '')).split(',')[0].trim();
   return `${proto}://${host}`;
+}
+
+/** A tenancy's address under the site's own base address: ("https://ordernexa.com", "alpine-bakery") → "https://alpine-bakery.ordernexa.com". */
+export function tenantOrigin(baseUrl: string, tenantSlug: string | null): string {
+  const u = new URL(baseUrl);
+  return `${u.protocol}//${tenantSlug ? `${tenantSlug}.` : ''}${u.host}`;
+}
+
+/**
+ * The address emailed links point at. It comes from SITE_BASE_URL plus the tenancy's slug, never from the request,
+ * so a forged Host header cannot send someone's password link to another site. Without SITE_BASE_URL (a developer's
+ * machine) it falls back to the address the request came in on; a production site refuses instead.
+ */
+export function linkOrigin(request: Request, tenantSlug: string | null): string {
+  const base = process.env.SITE_BASE_URL;
+  if (base) return tenantOrigin(base, tenantSlug);
+  if (process.env.NODE_ENV === 'production') throw new Error('SITE_BASE_URL is not set');
+  return requestOrigin(request);
 }
 
 /** Our own landing page for a token from auth.admin.generateLink: the token is used only when the person submits. */

@@ -35,6 +35,29 @@ BEGIN
     WHERE a.audience = v_aud);
 END $$;
 
+-- Users administrators: active staff with a login whose active role may change users (admin.users write).
+CREATE OR REPLACE FUNCTION bps.fnd_user_admin_ids(p_tenant_id bigint) RETURNS SETOF bigint
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'bps', 'public' AS $$
+  SELECT DISTINCT u.user_id
+    FROM bps.fnd_user_tenants ut
+    JOIN bps.fnd_users u ON u.user_id = ut.user_id AND u.is_active AND u.deleted_at IS NULL AND u.user_type = 'TENANCY_USER' AND u.auth_user_id IS NOT NULL
+    JOIN bps.fnd_user_roles ur ON ur.user_id = u.user_id AND ur.tenant_id = ut.tenant_id
+    JOIN bps.fnd_roles r ON r.role_id = ur.role_id AND r.tenant_id = ut.tenant_id AND r.is_active AND r.role_audience = 'TENANT'
+    JOIN bps.fnd_role_area_access a ON a.role_id = r.role_id AND a.area_key = 'admin.users' AND a.can_write
+   WHERE ut.tenant_id = p_tenant_id AND ut.is_active
+$$;
+REVOKE EXECUTE ON FUNCTION bps.fnd_user_admin_ids(bigint) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION bps.fnd_user_admin_ids(bigint) TO authenticated, service_role, bps_dev;
+
+-- Last-administrator guard: a change to users or roles may not leave the tenancy with nobody able to manage users.
+CREATE OR REPLACE FUNCTION bps.fnd_assert_user_admin(p_tenant_id bigint) RETURNS void
+LANGUAGE plpgsql STABLE SET search_path TO 'bps', 'public' AS $$
+BEGIN
+  IF NOT bps.fnd_is_trusted() AND NOT EXISTS (SELECT 1 FROM bps.fnd_user_admin_ids(p_tenant_id)) THEN
+    RAISE EXCEPTION 'This would leave nobody able to manage users. Give another user that access first.';
+  END IF;
+END $$;
+
 -- payload: {role_id?, role_name, role_audience, owner_customer_id?, is_active, access: [{area_key, can_read, can_write, can_approve, can_void, can_delete}]}
 -- Any action flag implies read. System roles keep their name and access.
 CREATE OR REPLACE FUNCTION bps.fnd_role_save(p_tenant_id bigint, p_payload jsonb) RETURNS bigint
@@ -67,6 +90,7 @@ BEGIN
     END IF;
   END LOOP;
   DELETE FROM bps.fnd_role_area_access WHERE role_id = v_id AND tenant_id = p_tenant_id AND NOT (area_key = ANY (v_keys));
+  PERFORM bps.fnd_assert_user_admin(p_tenant_id);
   RETURN v_id;
 END $$;
 
@@ -78,6 +102,7 @@ BEGIN
   DELETE FROM bps.fnd_roles WHERE role_id = p_role_id AND tenant_id = p_tenant_id;
   GET DIAGNOSTICS n = ROW_COUNT;
   IF n = 0 THEN RAISE EXCEPTION 'Role not found or you may not delete it'; END IF;
+  PERFORM bps.fnd_assert_user_admin(p_tenant_id);
 END $$;
 
 -- ---------- users ----------
@@ -117,6 +142,7 @@ BEGIN
       INSERT INTO bps.fnd_user_customer_groups (tenant_id, user_id, group_id) VALUES (p_tenant_id, p_user_id, g);
     END LOOP;
   END IF;
+  PERFORM bps.fnd_assert_user_admin(p_tenant_id);
 END $$;
 
 -- ---------- customer groups ----------

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { acceptLink, accessEmail, fromHeader, inviteEmail, requestOrigin, resetEmail, type Sender } from '@/lib/email/user-emails';
+import { acceptLink, accessEmail, fromHeader, inviteEmail, requestOrigin, resetEmail, tenantOrigin, type Sender } from '@/lib/email/user-emails';
 import { isTenantFreePath } from '@/lib/tenant-session';
 
 const alpine: Sender = { sender_name: 'Alpine Bakery', sender_address: 'orders@alpinebakerynj.com', reply_to: 'office@alpinebakerynj.com' };
@@ -36,6 +36,16 @@ describe('emails', () => {
     expect(e.replyTo).toBeUndefined();
     expect(e.text.startsWith('Hello,')).toBe(true);
   });
+  it("never names OrderNexa in a customer's email, but does for staff", () => {
+    const customer = { ...who(), customer: true };
+    const own = 'https://bps.alpinebakerynj.com/auth/accept?type=invite&token_hash=abc';   // wording only; the link is whatever address the site is on
+    for (const e of [inviteEmail(customer, own), accessEmail(customer, 'https://x/login'), resetEmail(customer, own)]) {
+      expect(`${e.subject} ${e.text} ${e.html}`).not.toMatch(/ordernexa/i);
+      expect(e.subject).toContain('Alpine Bakery');
+    }
+    const staff = { ...who({ sender_name: 'OrderNexa', sender_address: null, reply_to: null }), userName: 'Pat' };
+    expect(inviteEmail(staff, 'https://x/a').subject).toContain('OrderNexa');
+  });
   it('access email points at sign in, with no token', () => {
     const e = accessEmail(who(), 'https://x/login');
     expect(e.text).toContain('https://x/login');
@@ -51,6 +61,14 @@ describe('requestOrigin', () => {
   it('prefers the proxy headers', () => {
     const r = new Request('http://10.0.0.1/api/x', { headers: { host: '10.0.0.1', 'x-forwarded-host': 'alpine-bakery.ordernexa.com', 'x-forwarded-proto': 'https' } });
     expect(requestOrigin(r)).toBe('https://alpine-bakery.ordernexa.com');
+  });
+});
+
+describe('tenantOrigin', () => {
+  it('puts the tenancy in front of the configured site address', () => {
+    expect(tenantOrigin('https://ordernexa.com', 'alpine-bakery')).toBe('https://alpine-bakery.ordernexa.com');
+    expect(tenantOrigin('http://localhost:3000/', 'alpine-bakery')).toBe('http://alpine-bakery.localhost:3000');
+    expect(tenantOrigin('https://ordernexa.com', null)).toBe('https://ordernexa.com');
   });
 });
 

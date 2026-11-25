@@ -4,12 +4,12 @@ import { createServiceClient } from '@/lib/supabase/service';
 import { readBody } from '@/lib/api/admin-rpc';
 import { requireStaff, toInt } from '@/lib/api/nav';
 import { sendEmail } from '@/lib/email/send';
-import { acceptLink, accessEmail, defaultFromAddress, inviteEmail, requestOrigin, type Sender } from '@/lib/email/user-emails';
+import { acceptLink, accessEmail, defaultFromAddress, inviteEmail, linkOrigin, type Sender } from '@/lib/email/user-emails';
 
 export const dynamic = 'force-dynamic';
 
 interface Prepared extends Sender {
-  email: string; user_name: string | null; user_type: string; auth_user_id: string | null; signed_in: boolean; tenant_name: string;
+  email: string; user_name: string | null; user_type: string; auth_user_id: string | null; signed_in: boolean; tenant_name: string; tenant_slug: string | null;
 }
 
 /**
@@ -30,8 +30,8 @@ export async function POST(request: Request) {
   const { data, error } = await db.rpc('fnd_user_invite_prepare', { p_tenant_id: tenantId, p_user_id: userId });
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   const u = data as Prepared;
-  const origin = requestOrigin(request);
-  const who = { to: u.email, userName: u.user_name, tenantName: u.tenant_name, sender: u, fallbackAddress: defaultFromAddress() };
+  const origin = linkOrigin(request, u.tenant_slug);
+  const who = { to: u.email, userName: u.user_name, tenantName: u.tenant_name, sender: u, fallbackAddress: defaultFromAddress(), customer: u.user_type === 'CUSTOMER_USER' };
 
   let authUserId = u.auth_user_id;
   let link: string;
