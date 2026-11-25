@@ -14,3 +14,4 @@ database/migration/.env
 # Cloud credentials and production customer reports (keep local only)
 supabase setup/
 docs/reportsFromOldBPS/
+docs/vercel/
