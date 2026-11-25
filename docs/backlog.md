@@ -193,4 +193,5 @@ Built and merged: Dashboard real data, Customers Import/Export, Inventory › Nu
 - `docs/vercel/` holds the Vercel account's recovery codes in a plain text file. Anyone with the file can take over the Vercel account (and so the hosted site and its environment variables).
 - Done: `docs/vercel/` is in `.gitignore`, so it cannot be committed.
 - To do (owner): move the file into a password manager and delete it from the project folder; check it was never copied elsewhere (cloud sync, backups, other machines).
+- 2026-11-25: both cloud database passwords in `supabase setup/supabase initial setup.txt` (the `postgres` user and the pooler user `bps_dev`) were printed into a Claude Code session transcript by mistake. Change both in the Supabase dashboard (Project Settings > Database), then update the file.
 - Same rule for `supabase setup/` (cloud database passwords, `uat.env` with the Resend API key): gitignored, but still plain files on disk. Move them to a password manager or an encrypted vault before go-live, and rotate any key that was ever shared.
