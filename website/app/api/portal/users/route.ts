@@ -8,12 +8,14 @@ export const dynamic = 'force-dynamic';
 
 const ids = (v: unknown) => (Array.isArray(v) ? v.map(toInt).filter((n): n is number => n !== null) : []);
 
-async function context() {
+type Context = { ok: false; response: NextResponse } | { ok: true; tenantId: number; db: ReturnType<typeof createClient> };
+
+async function context(): Promise<Context> {
   const user = await getSessionUser();
-  if (!user) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
+  if (!user) return { ok: false, response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
   const tenantId = await getCurrentTenantId();
-  if (tenantId === null) return { error: NextResponse.json({ error: 'No company found' }, { status: 400 }) };
-  return { tenantId, db: createClient() };
+  if (tenantId === null) return { ok: false, response: NextResponse.json({ error: 'No company found' }, { status: 400 }) };
+  return { ok: true, tenantId, db: createClient() };
 }
 
 /**
@@ -23,7 +25,7 @@ async function context() {
  */
 export async function GET() {
   const c = await context();
-  if ('error' in c) return c.error;
+  if (!c.ok) return c.response;
   const [users, roles] = await Promise.all([
     c.db.rpc('fnd_portal_users_get', { p_tenant_id: c.tenantId }),
     c.db.rpc('fnd_portal_roles_get', { p_tenant_id: c.tenantId }),
@@ -42,7 +44,7 @@ export async function GET() {
  */
 export async function POST(request: Request) {
   const c = await context();
-  if ('error' in c) return c.error;
+  if (!c.ok) return c.response;
   const body = await readBody(request);
   if (body?.action === 'create') {
     const email = typeof body.email === 'string' ? body.email : '';
