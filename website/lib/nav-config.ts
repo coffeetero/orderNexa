@@ -94,7 +94,8 @@ export const tenantNav: NavMenu[] = [
         heading: 'Reporting',
         items: [
           { label: 'Reports', href: '/customers/reports', soon: true },
-          { label: 'Import/Export', href: '/customers/exports', soon: true },
+          { label: 'Import Customers', href: '/customers/import', area: 'customers.import' },
+          { label: 'Export Customers', href: '/customers/export', area: 'customers.exports' },
         ],
       },
     ],
