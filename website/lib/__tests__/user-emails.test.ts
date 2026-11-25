@@ -69,6 +69,7 @@ describe('tenantOrigin', () => {
     expect(tenantOrigin('https://ordernexa.com', 'alpine-bakery')).toBe('https://alpine-bakery.ordernexa.com');
     expect(tenantOrigin('http://localhost:3000/', 'alpine-bakery')).toBe('http://alpine-bakery.localhost:3000');
     expect(tenantOrigin('https://ordernexa.com', null)).toBe('https://ordernexa.com');
+    expect(tenantOrigin('https://bps-uat.vercel.app', 'alpinebakerynj')).toBe('https://bps-uat.vercel.app');
   });
 });
 

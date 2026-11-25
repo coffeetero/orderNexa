@@ -75,6 +75,8 @@ export function requestOrigin(request: Request): string {
 /** A tenancy's address under the site's own base address: ("https://ordernexa.com", "alpine-bakery") → "https://alpine-bakery.ordernexa.com". */
 export function tenantOrigin(baseUrl: string, tenantSlug: string | null): string {
   const u = new URL(baseUrl);
+  // a Vercel free address has no per-tenancy sub-addresses: links point at it as is
+  if (u.hostname.endsWith('.vercel.app')) return `${u.protocol}//${u.host}`;
   return `${u.protocol}//${tenantSlug ? `${tenantSlug}.` : ''}${u.host}`;
 }
 

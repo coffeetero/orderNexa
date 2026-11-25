@@ -15,4 +15,7 @@ describe('parseTenantSubdomain', () => {
     expect(parseTenantSubdomain('127.0.0.1:3000')).toBeNull();
     expect(parseTenantSubdomain('192.168.1.20')).toBeNull();
   });
+  it('treats Vercel free addresses as having no tenant', () => {
+    expect(parseTenantSubdomain('bps-uat.vercel.app')).toBeNull();
+  });
 });
