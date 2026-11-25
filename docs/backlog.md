@@ -141,6 +141,7 @@ Built: Add user, invite / resend, accept page, forgot password, edit user (name,
 
 ### Circle back
 - Last-administrator guard (built 2026-11-24): a user or role change that would leave nobody able to manage users is refused (`fnd_assert_user_admin`); the Users screen warns when only one person has that access. Still open: an OrderNexa recovery path other than SQL, and add `add_access_admin_functions.sql` to the cloud apply list.
+- Change type (staff ↔ customer): a user's type is fixed and one email is one person, so today it is SQL only (change `user_type`, remove the customer link, swap roles for the other audience, add customer groups for staff). Add a "Change type" action; decide whether only before first sign-in or any time. Same email cannot be both staff and customer (needs a second address).
 - No delete user: only "Active in this tenancy" off. Decide whether a delete (soft) is wanted, e.g. for a mistyped user who never signed in.
 - From address: any tenancy admin can type any address, including another tenancy's verified domain. Lock it to OrderNexa before a second tenancy goes live (needs a platform-admin notion, also needed for trial signup).
 - Forgot password: limited to one email per person per 2 minutes; no per-visitor limit (new table, or the hosting platform's rate limiting).
