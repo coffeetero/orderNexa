@@ -176,7 +176,7 @@ export const tenantNav: NavMenu[] = [
           { label: 'Sheets', href: '/organizer/sheets', area: 'organizer.sheets' },
           { label: 'Documents', href: '/organizer/documents', soon: true },
           { label: 'Calendar', href: '/organizer/calendar', soon: true },
-          { label: 'Contacts', href: '/organizer/contacts', soon: true },
+          { label: 'Contacts', href: '/organizer/contacts', area: 'organizer.contacts' },
           { label: 'Tasks', href: '/organizer/tasks', soon: true },
         ],
       },
