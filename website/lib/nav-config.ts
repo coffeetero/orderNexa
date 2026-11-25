@@ -170,7 +170,7 @@ export const tenantNav: NavMenu[] = [
   },
   {
     label: 'Organizer',
-    requiresAnyArea: ['organizer.sheets'],
+    requiresAnyArea: ['organizer.sheets', 'organizer.contacts'],
     groups: [
       {
         items: [
