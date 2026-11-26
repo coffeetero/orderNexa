@@ -408,7 +408,7 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
     try {
       // A saved compound item must keep at least one component (a brand-new one gets its components after its first save).
       if (draft.is_compound && selectedItemId !== null && (componentsRef.current?.count() ?? 0) === 0) {
-        toast.error('A compound item needs at least one component. Add components on the Components tab, or turn Compound item off.');
+        toast.error('A compound item needs at least one component. Add components on the Compound Items tab, or turn Compound item off.');
         setTab('components');
         return;
       }
@@ -614,7 +614,7 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
           <TabsList className="relative z-0 h-auto w-fit justify-start gap-0.5 rounded-none bg-transparent p-0">
             <TabsTrigger value="profile" className={TAB_TRIGGER}>Profile</TabsTrigger>
             <TabsTrigger value="details" className={TAB_TRIGGER}>Details</TabsTrigger>
-            <TabsTrigger value="components" disabled={!draft.is_compound} className={TAB_TRIGGER}>Components</TabsTrigger>
+            <TabsTrigger value="components" disabled={!draft.is_compound} className={TAB_TRIGGER}>Compound Items</TabsTrigger>
             <TabsTrigger value="pricebooks" className={TAB_TRIGGER}>Pricebooks</TabsTrigger>
             <TabsTrigger value="notes" className={TAB_TRIGGER}>Notes</TabsTrigger>
           </TabsList>
