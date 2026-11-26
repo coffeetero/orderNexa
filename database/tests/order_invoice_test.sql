@@ -85,7 +85,40 @@ BEGIN
   EXCEPTION WHEN raise_exception THEN INSERT INTO _t VALUES ('credits: production time is required', true);
   END;
 END $$;
+-- quantity_credited on the invoice line, kept by trigger
+DO $$
+DECLARE inv bigint; ln bigint; cm jsonb; q numeric;
+BEGIN
+  SELECT t.ar_transaction_id, l.ar_transaction_line_id INTO inv, ln
+    FROM ar_transactions t JOIN ar_transaction_lines l ON l.ar_transaction_id = t.ar_transaction_id
+   WHERE t.tenant_id = 200000000002 AND t.document_number = 'ZZINV-1';
+  SELECT quantity_credited INTO q FROM ar_transaction_lines WHERE ar_transaction_line_id = ln;
+  INSERT INTO _t VALUES ('credited qty: earlier credit memo counted on the invoice line', q = 4);
+  cm := ar_credit_memo_create(200000000002, inv, jsonb_build_object('reason', 'test', 'lines', jsonb_build_array(jsonb_build_object('ar_transaction_line_id', ln, 'quantity', 6))));
+  SELECT quantity_credited INTO q FROM ar_transaction_lines WHERE ar_transaction_line_id = ln;
+  INSERT INTO _t VALUES ('credited qty: a new credit memo adds to it', q = 10);
+  BEGIN
+    PERFORM ar_credit_memo_create(200000000002, inv, jsonb_build_object('lines', jsonb_build_array(jsonb_build_object('ar_transaction_line_id', ln, 'quantity', 11))));
+    INSERT INTO _t VALUES ('credited qty: more than is left is refused', false);
+  EXCEPTION WHEN raise_exception THEN INSERT INTO _t VALUES ('credited qty: more than is left is refused', true);
+  END;
+  PERFORM ar_credit_memo_create(200000000002, inv, jsonb_build_object('lines', jsonb_build_array(jsonb_build_object('ar_transaction_line_id', ln, 'quantity', 10))));
+  SELECT quantity_credited INTO q FROM ar_transaction_lines WHERE ar_transaction_line_id = ln;
+  INSERT INTO _t VALUES ('credited qty: exactly what is left is allowed', q = 20);
+  PERFORM set_config('t.cm', cm->>'ar_transaction_id', false);
+  PERFORM set_config('t.ln', ln::text, false);
+END $$;
 RESET ROLE;
+DO $$
+DECLARE q numeric;
+BEGIN
+  UPDATE ar_transactions SET status = 'CANCELLED' WHERE ar_transaction_id = current_setting('t.cm')::bigint;
+  SELECT quantity_credited INTO q FROM ar_transaction_lines WHERE ar_transaction_line_id = current_setting('t.ln')::bigint;
+  INSERT INTO _t VALUES ('credited qty: cancelling a credit memo gives its quantity back', q = 14);
+  DELETE FROM ar_transaction_lines WHERE ar_transaction_id = (SELECT ar_transaction_id FROM ar_transactions WHERE document_number = 'ZZCM-1' AND tenant_id = 200000000002);
+  SELECT quantity_credited INTO q FROM ar_transaction_lines WHERE ar_transaction_line_id = current_setting('t.ln')::bigint;
+  INSERT INTO _t VALUES ('credited qty: deleting a credit memo line takes it off', q = 10);
+END $$;
 
 SELECT name, CASE WHEN ok THEN 'PASS' ELSE 'FAIL' END FROM _t ORDER BY name;
 DO $$ BEGIN IF EXISTS (SELECT 1 FROM _t WHERE ok IS NOT TRUE) THEN RAISE EXCEPTION 'order_invoice_test failed'; END IF; END $$;

@@ -3,10 +3,10 @@
 -- Enter Credits: the orders of one account customer (and of its departments and sites invoiced to it) for a production
 -- date and code, each with its invoice and the invoice lines that can be credited. Staff only.
 --   status: NONE (not on an invoice), DRAFT (run processed, not yet numbered), or the invoice status (OPEN, PARTIAL, CLOSED).
---   Only orders on an issued invoice (not DRAFT or NONE) carry lines; a line's credited_quantity counts earlier credit
---   memos (not cancelled) and remaining_quantity = quantity - credited_quantity. item_description falls back to the item's
+--   Only orders on an issued invoice (not DRAFT or NONE) carry lines; a line's credited_quantity is the invoice line's
+--   quantity_credited (earlier credit memos, not cancelled) and remaining_quantity = quantity - credited_quantity. item_description falls back to the item's
 --   name for imported lines that only say 'INVOICE'.
--- Returns { orders: [{ order_id, order_number, department_event, po_number, customer_name, amount, invoice_id, invoice_number, status,
+-- Returns { orders: [{ order_id, order_date, order_number, department_event, po_number, customer_name, amount, invoice_id, invoice_number, status,
 --   credited_amount, lines: [{ ar_transaction_line_id, source_type, item_description, quantity, unit_price, amount,
 --   credited_quantity, remaining_quantity }] }] }
 -- ============================================================
@@ -29,7 +29,7 @@ BEGIN
 
     RETURN jsonb_build_object('orders', COALESCE((
         SELECT jsonb_agg(jsonb_build_object(
-                   'order_id', o.order_id, 'order_number', o.order_number, 'department_event', o.department_event, 'po_number', o.po_number,
+                   'order_id', o.order_id, 'order_date', o.order_date, 'order_number', o.order_number, 'department_event', o.department_event, 'po_number', o.po_number,
                    'customer_name', CASE WHEN o.customer_id = p_customer_id THEN NULL ELSE o.customer_name END,
                    'amount', o.amount,
                    'invoice_id', inv.ar_transaction_id,
@@ -53,11 +53,7 @@ BEGIN
                                       CASE WHEN COALESCE(UPPER(TRIM(l.item_description)), 'INVOICE') IN ('INVOICE', '')
                                            THEN COALESCE((SELECT i.item_name FROM fnd_items i WHERE i.item_id = l.item_id), l.item_description)
                                            ELSE l.item_description END AS item_name,
-                                      COALESCE((SELECT SUM(cl.quantity) FROM ar_transaction_lines cl
-                                                       JOIN ar_transactions ct ON ct.ar_transaction_id = cl.ar_transaction_id
-                                                      WHERE ct.tenant_id = p_tenant_id AND ct.transaction_type = 'CM' AND ct.status <> 'CANCELLED'
-                                                        AND ct.applies_to_ar_transaction_id = inv.ar_transaction_id
-                                                        AND (cl.snapshot_data ->> 'credits_line_id')::bigint = l.ar_transaction_line_id), 0) AS credited
+                                      l.quantity_credited AS credited
                                  FROM ar_transaction_lines l
                                 WHERE l.tenant_id = p_tenant_id AND l.ar_transaction_id = inv.ar_transaction_id AND l.order_id = o.order_id) x
                    ), '[]'::jsonb) END

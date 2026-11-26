@@ -3,7 +3,8 @@
 -- Credits quantities of an issued invoice (e.g. "missing 14 rolls"): creates a CM document for the same customer with a
 -- number from the tenant sequence 'credit_memo_number', negative ADJUSTMENT lines (quantity x the invoice line's unit
 -- price) and applies_to_ar_transaction_id pointing at the invoice. A line cannot be credited beyond the quantity that
--- shipped (earlier credits count). Staff only. Invoices are never edited after printing.
+-- shipped (earlier credits count, from the invoice line's quantity_credited). Staff only. Invoices are never edited after printing;
+-- only quantity_credited on its lines moves (by trigger).
 -- p_payload: { reason, lines: [{ ar_transaction_line_id, quantity }] }
 -- Returns { ar_transaction_id, document_number, amount }
 -- ============================================================
@@ -65,9 +66,8 @@ BEGIN
         IF v_qty IS NULL OR v_qty <= 0 THEN
             RAISE EXCEPTION 'Credit quantity must be above zero';
         END IF;
-        SELECT COALESCE(SUM(cl.quantity), 0) INTO v_credited
-          FROM ar_transaction_lines cl JOIN ar_transactions ct ON ct.ar_transaction_id = cl.ar_transaction_id AND ct.status <> 'CANCELLED'
-         WHERE ct.applies_to_ar_transaction_id = v_inv.ar_transaction_id AND (cl.snapshot_data ->> 'credits_line_id')::bigint = v_il.ar_transaction_line_id;
+        -- kept by trigger from the credit memo lines; the invoice row is locked above, so two users cannot both take the rest
+        v_credited := v_il.quantity_credited;
         -- an item line can only be credited up to what actually shipped (a short delivery is already not receivable)
         v_cap := COALESCE((SELECT sl.shipped_quantity FROM om_shipment_lines sl WHERE sl.shipment_line_id = v_il.shipment_line_id), v_il.quantity, 0);
         IF v_qty > v_cap - v_credited THEN

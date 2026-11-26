@@ -17,6 +17,7 @@ interface CreditLine {
 }
 interface CreditOrder {
   order_id: number;
+  order_date: string | null;
   order_number: string;
   department_event: string | null;
   po_number: string | null;
@@ -32,6 +33,7 @@ interface CreditOrder {
 const money = (v: number) => `${v < 0 ? '-' : ''}$${Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const qtyText = (v: number) => Number(v).toLocaleString('en-US', { maximumFractionDigits: 3 });
 const localToday = () => new Date().toLocaleDateString('en-CA');
+const shortDate = (d: string | null) => (d ? new Date(`${d.slice(0, 10)}T12:00:00`).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) : '');
 const IN = 'h-9 w-full min-w-0 rounded-md border border-input bg-background px-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
 const LAB = 'bps-label mb-1 block text-xs font-semibold text-muted-foreground';
 const TH = 'h-8 whitespace-nowrap bg-muted/50 px-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground';
@@ -193,6 +195,21 @@ export function CreditEntry({ tenantId }: { tenantId: number }) {
 
   const cancel = () => { setQty({}); setReason(''); setReasonEdited(false); setError(null); };
 
+  /** Starts over: clears the number, customer and lists, puts the date back to today and the cursor in Number. */
+  const clearAll = () => {
+    cancel();
+    setFindQ('');
+    setMatches(null);
+    setFoundAccount(null);
+    setCustomerId(null);
+    setDate(localToday());
+    setOrders(null);
+    setSelId(null);
+    setMessage(null);
+    pendingSelRef.current = null;
+    setTimeout(() => document.getElementById('cr-find')?.focus(), 0);
+  };
+
   const save = async () => {
     if (!selected?.invoice_id || typed.length === 0 || anyOver) return;
     setBusy(true);
@@ -327,6 +344,7 @@ export function CreditEntry({ tenantId }: { tenantId: number }) {
             <h2 className="text-sm font-semibold">Orders for {customer?.customer_name} · {dateLabel} {codeLabel}</h2>
             {orders.length > 0 && <span className="text-sm text-muted-foreground">↑ ↓ or click to pick</span>}
             <span className="flex-1" />
+            <Button variant="outline" size="sm" onClick={clearAll} disabled={busy}>Clear</Button>
             <Button variant="outline" size="sm" onClick={cancel} disabled={busy}>Cancel</Button>
             <Button size="sm" onClick={() => void save()} disabled={busy || typed.length === 0 || anyOver}>{busy ? 'Saving…' : 'Save'}</Button>
           </div>
@@ -336,7 +354,7 @@ export function CreditEntry({ tenantId }: { tenantId: number }) {
             <div className="max-h-[17rem] overflow-auto" tabIndex={0} onKeyDown={onListKey} role="listbox" aria-label="Orders">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 z-[1] bg-card"><tr>
-                  <th className={`${TH} text-center`}>Order No.</th><th className={TH}>Dept/Event</th><th className={TH}>PO Number</th>
+                  <th className={`${TH} text-center`}>Date</th><th className={`${TH} text-center`}>Order No.</th><th className={TH}>Dept/Event</th><th className={TH}>PO Number</th>
                   <th className={`${TH} text-right`}>Amount</th><th className={`${TH} text-center`}>Invoice No.</th><th className={TH}>Status</th>
                 </tr></thead>
                 <tbody>
@@ -350,6 +368,7 @@ export function CreditEntry({ tenantId }: { tenantId: number }) {
                         title={ok ? undefined : 'Not invoiced yet: change the order in Enter Orders instead'}
                         onClick={() => pick(o)}
                         className={`border-t border-border ${sel ? 'bps-sel bg-accent font-medium text-accent-foreground shadow-[inset_3px_0_0_hsl(var(--primary))]' : ok ? 'cursor-pointer hover:bg-muted/40' : 'text-muted-foreground'}`}>
+                        <td className={`${TD} text-center tabular-nums`}>{shortDate(o.order_date)}</td>
                         <td className={`${TD} text-center`}>{o.order_number}</td>
                         <td className={TD}>{o.department_event}{o.customer_name ? <span className="text-muted-foreground"> ({o.customer_name})</span> : null}</td>
                         <td className={TD}>{o.po_number ?? ''}</td>
@@ -383,20 +402,20 @@ export function CreditEntry({ tenantId }: { tenantId: number }) {
             <table className="w-full text-sm">
               <thead><tr>
                 <th className={TH}>Item name</th><th className={`${TH} text-center`}>Qty</th><th className={`${TH} text-right`}>Price</th>
-                <th className={`${TH} text-right`}>Extended</th><th className={`${TH} text-right`}>Credit Qty</th><th className={`${TH} text-right`}>Credit Amt</th>
+                <th className={`${TH} text-right`}>Extended</th><th className={`${TH} text-center`}>Credited Qty</th><th className={`${TH} text-right`}>Credit Qty</th><th className={`${TH} text-right`}>Credit Amt</th>
               </tr></thead>
               <tbody>
                 {selected.lines.map((l) => {
                   const c = lineCredit(l);
                   return (
                     <tr key={l.ar_transaction_line_id} className="border-t border-border">
-                      <td className={TD}>
-                        {l.item_description}
-                        {l.credited_quantity > 0 && <span className="text-xs text-muted-foreground"> · {qtyText(l.credited_quantity)} credited earlier</span>}
-                      </td>
+                      <td className={TD}>{l.item_description}</td>
                       <td className={`${TD} text-center tabular-nums`}>{qtyText(l.quantity)}</td>
                       <td className={`${TD} text-right tabular-nums`}>{money(l.unit_price)}</td>
                       <td className={`${TD} text-right tabular-nums`}>{money(l.amount)}</td>
+                      <td className={`${TD} text-center tabular-nums ${l.credited_quantity > 0 ? 'font-semibold text-destructive' : 'text-muted-foreground'}`}>
+                        {l.credited_quantity > 0 ? qtyText(l.credited_quantity) : '—'}
+                      </td>
                       <td className={`${TD} text-right`}>
                         <input
                           type="number" min={0} max={l.remaining_quantity} step="any" inputMode="decimal"
@@ -419,7 +438,7 @@ export function CreditEntry({ tenantId }: { tenantId: number }) {
                 <tr className="border-t border-border bg-muted/40 font-semibold">
                   <td className={TD}>Order total</td><td className={TD} /><td className={TD} />
                   <td className={`${TD} text-right tabular-nums`}>{money(selected.lines.reduce((s, l) => s + l.amount, 0))}</td>
-                  <td className={TD} />
+                  <td className={TD} /><td className={TD} />
                   <td className={`${TD} text-right tabular-nums text-destructive`}>{creditTotal ? money(-creditTotal) : ''}</td>
                 </tr>
               </tbody>

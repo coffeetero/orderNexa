@@ -192,3 +192,6 @@ Before calling UI work done:
 | 2026-11-25 | Enter Credits (owner request): while a number is in the Find box, Customer, Production Date and Production Time are disabled (clear the number to change them); the Orders bar reads "Orders for <customer> · <date> <time>". |
 | 2026-11-25 | Enter Credits: a Credit Qty above what is left (ordered less earlier credits) turns the box red, shows "Only N left" in Credit Amt, is left out of the total and keeps Save off; the database refuses it too. |
 | 2026-11-25 | Enter Credits: an order found by number whose account is inactive still shows the account in the Customer box and the Orders heading (the picker lists active accounts only). |
+| 2026-11-25 | Enter Credits: Order Detail shows Credited Qty (earlier credits on the line, from the stored ar_transaction_lines.quantity_credited) before Credit Qty; quantity only, no credited amount column, by owner decision. |
+| 2026-11-25 | Enter Credits: Clear button left of Cancel on the Orders bar (Clear, Cancel, Save). Clear starts over (number, customer, lists cleared, date back to today, cursor in Number); Cancel only drops the typed credit quantities and reason. |
+| 2026-11-25 | Enter Credits: Orders grid starts with Date (the order date, MM/DD/YYYY, centered) before Order No. |

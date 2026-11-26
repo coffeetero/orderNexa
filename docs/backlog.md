@@ -118,8 +118,20 @@ Status: first release built (see docs/Architecture/health-checks.md): two tables
 ### Credits flow (decided 2026-11-25, Enter Credits screen in progress)
 - A credit is a CM in AR linked to the invoice (and line) it is for. It is not applied to that invoice automatically: open credits are applied to the customer's **next issued invoice** and printed on it ("Less credit CM 1042 for INV-1000 (11/27), 20 rolls short"). If there is no next invoice it stays open on the account.
 - Paid invoice: the credit stays open and is used on later invoices.
+- Built 2026-11-25: `ar_transaction_lines.quantity_credited` (invoice lines; quantity only, no amount) kept by triggers from the credit memo lines and a credit memo's status (migration/add_quantity_credited.sql); Enter Credits shows it and `ar_credit_memo_create` limits new credits with it. To do: a health check comparing it with the credit memo lines (like `ar_open_items_drift`).
 - Needs: `ar_credit_applications.ar_payment_id` optional (apply without a payment), apply-on-issue in the posting function, credits on the invoice print and reprint, customer portal shows the CM and balance.
 - Statement: each invoice followed by its credit lines (number, date, reason), the invoice balance on its last line; leftover open credits as their own lines.
+
+### Credit line vs credit memo: decide with Alpine (meeting Monday 2026-11-30)
+- Alpine today: go back to the order and add a **CREDIT** line (an amount), then reprint the invoice. Simple for them; works while the invoice is unpaid, but changes a past invoice and has no answer once the invoice is paid.
+- Built so far: Enter Credits creates a numbered **credit memo in AR** linked to the invoice lines (item quantities), dated the day it is given, so closed periods and paid invoices are untouched.
+- Owner's proposal (2026-11-25, to confirm with Alpine): application setting **"Accounting Rules: Strict | Relaxed"**.
+  - **Strict:** any change after posting creates an adjustment in AR (credit memo, or a debit for added items); the posted invoice never changes.
+  - **Relaxed:** while the invoice is unpaid, staff may change the order, including adding items and a **CREDIT** line; the invoice is re-synced by invoice number (same number) and AR follows, as in the Post Orders design. Once paid, changes produce adjustments, as in Strict.
+  - In both, a paid invoice is never edited. Replaces the separate "Lock invoices with Post" setting idea above (Strict = locked, Relaxed = editable until paid).
+  - Open: under Strict, anything that raises the amount after posting (an added item, or a higher quantity on an existing item) needs a **debit memo** (charge) document type, which does not exist yet; lowering a quantity is a credit memo.
+- Related parked item: a **Credit** amount line at the bottom of Enter Credits' Order Detail (no quantity; goes on the same credit memo with the reason). Open: cap at order total less earlier credits or at the invoice's open balance; reason required; keep CM- numbers or continue the old CR- numbers.
+- Either way the invoice reprint and statement show the credit, so the customer sees it on the document they know.
 
 ### AR troubleshooting and write-off screen (idea 2026-11-25, not designed)
 - Built on `bps.ar_open_items`: list old documents that are still open (e.g. a 2022 invoice or a 2000 payment), show their history (invoice, applications, reversals, credits) so a user can see why the balance remains.
