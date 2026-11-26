@@ -25,7 +25,7 @@ export function Breadcrumbs({ showSidebarToggle, sidebarOpen, onToggleSidebar }:
   const crumbs = buildBreadcrumbs(pathname, tenantNav, record);
 
   return (
-    <div className="flex h-[42px] shrink-0 items-center gap-2 border-b border-border bg-muted/30 px-3 text-xs sm:px-4">
+    <div className="flex h-[42px] shrink-0 items-center gap-2 border-b border-border bg-muted/30 px-3 text-sm sm:px-4">
       {showSidebarToggle && (
         <Button
           type="button"
@@ -49,7 +49,7 @@ export function Breadcrumbs({ showSidebarToggle, sidebarOpen, onToggleSidebar }:
               <Fragment key={`${i}-${crumb.label}`}>
                 {i > 0 && (
                   <li aria-hidden="true" className={cn('shrink-0', crumbs.length > 2 && i === 1 && 'max-sm:hidden')}>
-                    <ChevronRight className="h-3 w-3" />
+                    <ChevronRight className="h-3.5 w-3.5" />
                   </li>
                 )}
                 <li
