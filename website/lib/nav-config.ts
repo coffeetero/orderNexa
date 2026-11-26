@@ -110,7 +110,7 @@ export const tenantNav: NavMenu[] = [
       {
         heading: 'Costing',
         items: [
-          { label: 'Recipes', href: '/inventory/recipes', soon: true },
+          { label: 'Recipes', href: '/inventory/recipes', area: 'inventory.recipes' },
           { label: 'Costing & COGS', href: '/inventory/costing', soon: true },
           { label: 'Waste Tracking', href: '/inventory/waste', soon: true },
         ],

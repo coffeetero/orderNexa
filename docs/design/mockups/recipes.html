@@ -1,0 +1,208 @@
+<title>Inventory Recipes</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Inventory › Recipes in the Hearth theme. Two panes like Organizer › Contacts: recipe list left, the selected recipe right.
+   Right pane: header + actions, scale bar, formula table (baker's %, base, scaled, cost), summary panel, pre-ferments to
+   make first, method steps, used by items. Every figure comes from the database (inv_recipe_calc); this page fakes it in JS. */
+:root{--bg:#f5f3f0;--surface:#fffefc;--side:#ede9e3;--line:#e1dbd3;--line2:#cfc7bc;--text:#1e1915;--text2:#544a41;--text3:#7a6e63;--accent:#a3451c;--accent-fg:#fff;--pos:#2d6e3e;--warn:#8f5a00;--info:#2a5fa8;--neg:#b3312a;--focus:#a3451c}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#161310;--surface:#1f1b17;--side:#1a1613;--line:#322c26;--line2:#433b33;--text:#efe9e2;--text2:#c4b9ad;--text3:#978b7e;--accent:#e58d60;--accent-fg:#1a120c;--pos:#7cc48c;--warn:#e0aa4a;--info:#7fb0ee;--neg:#ee8177;--focus:#e58d60;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#161310;--surface:#1f1b17;--side:#1a1613;--line:#322c26;--line2:#433b33;--text:#efe9e2;--text2:#c4b9ad;--text3:#978b7e;--accent:#e58d60;--accent-fg:#1a120c;--pos:#7cc48c;--warn:#e0aa4a;--info:#7fb0ee;--neg:#ee8177;--focus:#e58d60;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font:14px/20px Inter,system-ui,sans-serif;font-variant-numeric:tabular-nums;margin:0;padding-block:16px 32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+.app{display:grid;grid-template-columns:300px minmax(0,1fr);gap:12px;max-width:1500px;margin:0 auto}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:0 1px 2px rgb(0 0 0 / .04);min-width:0}
+.muted{color:var(--text3)}
+.lab{display:block;font-size:12px;font-weight:600;color:var(--text3);margin-bottom:4px}
+.in{height:36px;border:1px solid var(--line2);border-radius:6px;background:var(--surface);padding:0 10px;width:100%;min-width:0}
+.btn{height:32px;padding:0 12px;border-radius:6px;border:1px solid var(--line2);background:var(--surface);font-weight:500;cursor:pointer;white-space:nowrap}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:500;padding:0 8px;border-radius:10px;border:1px solid var(--line2);white-space:nowrap;color:var(--text2)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--c)}
+.ph{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:8px 12px;border-bottom:1px solid var(--line);min-height:40px}
+.ph h2{font-size:14px;font-weight:600;margin:0}
+/* list */
+.list .top{padding:12px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid var(--line)}
+.list .top h1{font-size:18px;font-weight:600;margin:0;flex:1}
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.chip{border:0;border-radius:999px;padding:1px 10px;font-size:12px;font-weight:500;background:var(--side);color:var(--text3);cursor:pointer}
+.chip.on{background:var(--accent);color:var(--accent-fg)}
+.list ul{list-style:none;margin:0;padding:0}
+.list li{display:flex;gap:8px;align-items:center;padding:7px 12px;border-bottom:1px solid var(--line);cursor:pointer}
+.list li:hover{background:color-mix(in srgb,var(--accent) 6%,var(--surface))}
+.list li.sel{background:color-mix(in srgb,var(--accent) 14%,var(--surface));box-shadow:inset 3px 0 0 var(--accent)}
+.list .nm{flex:1;min-width:0}.list .nm b{display:block;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.list .nm span{font-size:12px;color:var(--text3)}
+.foot{padding:6px 12px;font-size:12px;color:var(--text3)}
+/* detail */
+.detail{display:flex;flex-direction:column;gap:12px;min-width:0}
+.hd{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;padding:10px 12px}
+.hd h1{font-size:18px;font-weight:600;margin:0}
+.hd .sub{font-size:12px;color:var(--text3);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.scale{display:grid;grid-template-columns:auto 140px 110px 1fr;gap:10px;padding:10px 12px;align-items:end}
+.seg{display:inline-flex;border:1px solid var(--line2);border-radius:6px;overflow:hidden;height:36px}
+.seg button{border:0;background:var(--surface);padding:0 12px;cursor:pointer;font-size:13px;font-weight:500;color:var(--text2)}
+.seg button+button{border-left:1px solid var(--line2)}
+.seg button.on{background:color-mix(in srgb,var(--accent) 14%,var(--surface));color:var(--text)}
+.scale .res{font-size:13px;color:var(--text2);align-self:center}.scale .res b{color:var(--text)}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:12px;align-items:start}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{height:32px;padding:0 10px;text-align:left;white-space:nowrap;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);background:color-mix(in srgb,var(--side) 60%,var(--surface));border-bottom:1px solid var(--line)}
+td{padding:5px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.r{text-align:right}
+tr.sub td:first-child{padding-left:26px;color:var(--text2)}
+tr.tot td{font-weight:600;background:color-mix(in srgb,var(--side) 40%,var(--surface))}
+tr.ov td{color:var(--text2);font-size:13px}
+.big{font-weight:600}
+.role{font-size:11px;font-weight:600;color:var(--text3);margin-left:6px}
+.link{color:var(--accent);font-weight:500;text-decoration:none}
+.kv{display:grid;grid-template-columns:1fr auto;gap:4px 12px;padding:10px 12px;font-size:13px}
+.kv dt{color:var(--text2)}.kv dd{margin:0;text-align:right;font-weight:600}
+.kv hr{grid-column:1/-1;border:0;border-top:1px solid var(--line);margin:4px 0}
+.alg{display:flex;flex-wrap:wrap;gap:4px;padding:0 12px 12px}
+.steps li{display:grid;grid-template-columns:28px 80px minmax(0,1fr) 70px 70px;gap:10px;padding:6px 12px;border-bottom:1px solid var(--line);align-items:baseline}
+.steps ol{list-style:none;margin:0;padding:0}
+.steps .n{color:var(--text3);font-weight:600}
+.steps .t{font-size:12px;font-weight:600;color:var(--text2)}
+.steps .wrap{white-space:normal}
+.notes{font-size:13px;color:var(--text2);padding:12px;max-width:1500px;margin:12px auto 0}
+.notes ul{margin:4px 0 8px;padding-left:18px}
+.tag{display:inline-block;font-size:11px;font-weight:600;padding:0 6px;border-radius:9px;border:1px solid var(--line2);color:var(--text2);margin-right:4px}
+.wt{padding:10px 12px;font-size:13px;color:var(--text2);border-top:1px solid var(--line)}
+.wt b{color:var(--text);font-size:16px}
+@media (max-width:1100px){.grid2{grid-template-columns:1fr}}
+@media (max-width:820px){.app{grid-template-columns:1fr}.scale{grid-template-columns:1fr 1fr}.scale .seg{grid-column:1/-1;overflow-x:auto}.steps li{grid-template-columns:24px 1fr 60px;}.steps li .t{grid-column:2/-1}.steps li .wrap{grid-column:2/-1}}
+</style>
+
+<div class="app">
+  <aside class="panel list">
+    <div class="top">
+      <div style="display:flex;gap:6px;align-items:center"><h1>Recipes</h1><button class="btn">Ingredients</button><button class="btn pri">+ New</button></div>
+      <input class="in" id="q" placeholder="Search recipe or dough code" aria-label="Search recipes">
+      <div class="chips"><button class="chip on">All</button><button class="chip">Doughs</button><button class="chip">Pre-ferments</button><button class="chip">Other</button><button class="chip">Archived</button></div>
+    </div>
+    <ul>
+      <li class="sel"><span class="nm"><b>Ciabatta</b><span>CIAPATA · 18.4 kg · 78% hydration</span></span><span class="pill"><span class="dot" style="--c:var(--accent)"></span>Dough</span></li>
+      <li><span class="nm"><b>Euro White</b><span>EUROWHITE · 24.6 kg · 62%</span></span><span class="pill"><span class="dot" style="--c:var(--accent)"></span>Dough</span></li>
+      <li><span class="nm"><b>Light Rye</b><span>LIGHTRYE · 16.2 kg · 68%</span></span><span class="pill"><span class="dot" style="--c:var(--accent)"></span>Dough</span></li>
+      <li><span class="nm"><b>Poolish</b><span>6.0 kg · 100%</span></span><span class="pill"><span class="dot" style="--c:var(--info)"></span>Pre-ferment</span></li>
+      <li><span class="nm"><b>Rye Sour (Levain)</b><span>4.5 kg · 80%</span></span><span class="pill"><span class="dot" style="--c:var(--info)"></span>Pre-ferment</span></li>
+      <li><span class="nm"><b>Rosemary Oil Topping</b><span>1.2 kg</span></span><span class="pill"><span class="dot" style="--c:var(--text3)"></span>Other</span></li>
+    </ul>
+    <div class="foot">6 recipes · example data</div>
+  </aside>
+
+  <main class="detail">
+    <div class="panel hd">
+      <div style="flex:1;min-width:220px">
+        <h1>Ciabatta</h1>
+        <div class="sub"><span class="pill"><span class="dot" style="--c:var(--accent)"></span>Dough</span>Dough code CIAPATA · Version 3 · saved 11/24/2026 by Maria L. · "Salt 2.0% → 2.2%"</div>
+      </div>
+      <button class="btn">History</button><button class="btn" aria-label="More actions (Duplicate, Delete)">•••</button><button class="btn">Batch sheet</button><button class="btn pri">Edit</button>
+    </div>
+
+    <div class="panel scale">
+      <div><span class="lab">Scale by</span><div class="seg" id="mode">
+        <button data-m="F" class="on">Batches</button><button data-m="D">Dough weight</button><button data-m="L">Flour weight</button><button data-m="P">Pieces</button></div></div>
+      <div><label class="lab" for="val" id="vlab">Batches</label><input class="in r" id="val" value="1"></div>
+      <div><label class="lab" for="unit">Show in</label><select class="in" id="unit"><option value="g">g</option><option value="kg">kg</option><option value="lb">lb</option><option value="oz">oz</option></select></div>
+      <div class="res" id="res"></div>
+    </div>
+
+    <div class="grid2">
+      <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+        <div class="panel">
+          <div class="ph"><h2>Formula</h2><span class="muted" style="font-size:12px">Final dough · baker's % of total flour (incl. the poolish's flour)</span></div>
+          <div class="tw"><table>
+            <thead><tr><th>Ingredient</th><th class="r">Baker's %</th><th class="r">Base batch</th><th class="r">Scaled</th><th class="r">Cost</th></tr></thead>
+            <tbody id="fx"></tbody>
+          </table></div>
+        </div>
+
+        <div class="panel">
+          <div class="ph"><h2>Make first: Poolish</h2><span class="muted" style="font-size:12px" id="pq"></span><span style="flex:1"></span><a class="link" href="#">Open recipe</a></div>
+          <div class="tw"><table><thead><tr><th>Ingredient</th><th class="r">%</th><th class="r">Scaled</th></tr></thead><tbody id="px"></tbody></table></div>
+        </div>
+
+        <div class="panel steps">
+          <div class="ph"><h2>Method</h2><span class="muted" style="font-size:12px">DDT 76 °F · friction 26 °F</span></div>
+          <ol>
+            <li><span class="n">1</span><span class="t">PRE-FERMENT</span><span class="wrap">Mix poolish the day before; cover and leave at room temperature.</span><span class="r">12–16 h</span><span class="r">70 °F</span></li>
+            <li><span class="n">2</span><span class="t">MIX</span><span class="wrap">Flour, water and poolish on low until combined; autolyse 20 min. Add salt and yeast, mix 3 min low, then 4 min second speed; drizzle in oil.</span><span class="r">30 min</span><span class="r"></span></li>
+            <li><span class="n">3</span><span class="t">BULK</span><span class="wrap">Bulk ferment with folds at 30 and 60 min.</span><span class="r">2 h</span><span class="r">76 °F</span></li>
+            <li><span class="n">4</span><span class="t">DIVIDE</span><span class="wrap">Turn out on floured bench, cut 170 g pieces, no pre-shape.</span><span class="r">20 min</span><span class="r"></span></li>
+            <li><span class="n">5</span><span class="t">PROOF</span><span class="wrap">On floured couche, seam up.</span><span class="r">45 min</span><span class="r">80 °F</span></li>
+            <li><span class="n">6</span><span class="t">BAKE</span><span class="wrap">Deck oven with steam, vent after 10 min.</span><span class="r">22 min</span><span class="r">460 °F</span></li>
+          </ol>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+        <div class="panel">
+          <div class="ph"><h2>Summary</h2><span class="muted" style="font-size:12px" id="sumh">1 batch</span></div>
+          <dl class="kv" id="kv"></dl>
+          <div class="wt">Water temperature for DDT 76 °F<br><span class="muted">room 72 · flour 70 · poolish 70 · friction 26 →</span> <b>66 °F</b></div>
+        </div>
+        <div class="panel">
+          <div class="ph"><h2>Allergens</h2><span class="muted" style="font-size:12px">from ingredients</span></div>
+          <div class="alg" style="padding-top:10px"><span class="pill"><span class="dot" style="--c:var(--warn)"></span>Wheat</span></div>
+        </div>
+        <div class="panel">
+          <div class="ph"><h2>Used by items</h2><span class="muted" style="font-size:12px">dough code CIAPATA</span></div>
+          <div class="tw"><table><tbody>
+            <tr><td>10601 Ciabatta 5 x 5</td><td class="r muted">DOZ</td></tr>
+            <tr><td>10600 Ciabatta Roll Rosemary</td><td class="r muted">DOZ</td></tr>
+            <tr><td>10828 Ciabatta 3" Cylinder</td><td class="r muted">PCS</td></tr>
+          </tbody></table></div>
+        </div>
+        <div class="panel">
+          <div class="ph"><h2>Ingredient statement</h2><button class="btn" style="height:28px;margin-left:auto">Copy</button></div>
+          <p style="margin:0;padding:10px 12px;font-size:13px;color:var(--text2)">Bread Flour (Wheat), Water, Olive Oil, Salt, Yeast.</p>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="panel notes">
+  <span class="tag">layout</span> New screen. Recipe list on the left (search, Doughs / Pre-ferments / Other / Archived), the recipe on the right. On a phone the list and the recipe stack, like Contacts.
+  <ul>
+    <li><b>Formula</b>: one row per line as the baker mixes it, the pre-ferment as one line. Baker's % is of <b>total flour</b>, counting the pre-ferment's flour (BBGA overall formula). The grey rows under the total give the overall formula: total flour, total water, hydration, pre-fermented flour.</li>
+    <li><b>Scale by</b> batches, dough weight, flour weight or pieces (pieces × scaling weight, plus dough loss). Units g, kg, lb or oz. The database does every figure; the screen only shows them.</li>
+    <li><b>Cost</b> from the price on each ingredient (per kg or per lb). A line with no price shows "–" and the summary says how many are missing.</li>
+    <li><b>Make first</b>: each pre-ferment or sub-recipe, scaled to what this batch needs.</li>
+    <li><b>Used by items</b>: items whose dough code (Item Profile) matches the recipe's dough code.</li>
+    <li><b>As built</b>: the right-hand column (Summary, Water temperature, Allergens, Used by items, Ingredient statement) sits beside the formula only on wide windows (1700px and up); at 1536 and 1280 it moves below the method in two columns, and the scale bar line keeps factor, dough weight and pieces in view. Duplicate and Delete are under •••.</li>
+  </ul>
+  <span class="tag">workflow</span> Edit turns the formula and method into editable rows (ingredient or recipe picker, quantity, unit; step type, text, minutes, °F) with the % updating as you type; Save asks for an optional change note and adds a version. Batch sheet opens a print page scaled as set here, with check boxes for the mixer, the poolish first and the method.
+</div>
+
+<script>
+const UNIT={g:1,kg:1000,lb:453.59237,oz:28.349523};
+const lines=[['Bread flour','FLOUR',7000,0.926],['Water','LIQUID',4800,0],['Poolish','SUB',6003,null],['Olive oil','OTHER',300,9.26],['Salt','OTHER',220,0.66],['Instant yeast','OTHER',50,7.72]];
+const pool=[['Bread flour','FLOUR',3000,0.926],['Water','LIQUID',3000,0],['Instant yeast','OTHER',3,7.72]];
+const FLOUR=10000,WATER=7800,TOTAL=18373,LOSS=.02,PIECE=170,POOLCOST=3000/1000*0.926+3/1000*7.72;
+let mode='F';
+const fq=(g,u)=>{const v=g/UNIT[u];return v.toLocaleString(undefined,{maximumFractionDigits:u==='g'?0:u==='oz'?1:2,minimumFractionDigits:u==='g'?0:u==='oz'?1:2})+' '+u};
+const $=v=>'$'+v.toFixed(2);
+function factor(){const v=parseFloat(document.getElementById('val').value)||0,u=document.getElementById('unit').value;
+ if(mode==='F')return v;if(mode==='D')return v*UNIT[u]/TOTAL;if(mode==='L')return v*UNIT[u]/FLOUR;return v*PIECE/(TOTAL*(1-LOSS));}
+function draw(){const f=factor(),u=document.getElementById('unit').value;let cost=0;
+ document.getElementById('fx').innerHTML=lines.map(([n,r,g,c])=>{const lc=r==='SUB'?POOLCOST:(c?g/1000*c:0);cost+=lc;
+  return `<tr><td>${r==='SUB'?`<a class="link" href="#">${n}</a><span class="role">RECIPE</span>`:n+(r!=='OTHER'?`<span class="role">${r}</span>`:'')}</td><td class="r">${(g/FLOUR*100).toFixed(1)}%</td><td class="r">${fq(g,'g')}</td><td class="r big">${fq(g*f,u)}</td><td class="r">${lc?$(lc*f):'–'}</td></tr>`}).join('')+
+  `<tr class="tot"><td>Total dough</td><td class="r">${(TOTAL/FLOUR*100).toFixed(1)}%</td><td class="r">${fq(TOTAL,'g')}</td><td class="r">${fq(TOTAL*f,u)}</td><td class="r">${$(cost*f)}</td></tr>`+
+  `<tr class="ov"><td>Overall: total flour 100% · total water ${(WATER/FLOUR*100).toFixed(0)}% · pre-fermented flour 30%</td><td></td><td class="r">${fq(FLOUR,'g')}</td><td class="r">${fq(FLOUR*f,u)}</td><td></td></tr>`;
+ document.getElementById('px').innerHTML=pool.map(([n,r,g])=>`<tr><td>${n}</td><td class="r">${(g/3000*100).toFixed(1)}%</td><td class="r big">${fq(g*f,u)}</td></tr>`).join('');
+ document.getElementById('pq').textContent=fq(6003*f,u)+' for this batch · ready 12–16 h ahead';
+ const pcs=Math.floor(TOTAL*f*(1-LOSS)/PIECE);
+ document.getElementById('res').innerHTML=`Factor <b>${f.toFixed(3)}</b> · dough <b>${fq(TOTAL*f,u)}</b> · <b>${pcs.toLocaleString()}</b> pieces of 170 g`;
+ document.getElementById('sumh').textContent='factor '+f.toFixed(3);
+ document.getElementById('kv').innerHTML=`<dt>Total dough</dt><dd>${fq(TOTAL*f,u)}</dd><dt>Total flour</dt><dd>${fq(FLOUR*f,u)}</dd><dt>Hydration</dt><dd>78.0%</dd><dt>Pre-fermented flour</dt><dd>30.0%</dd><dt>Dough loss</dt><dd>2.0%</dd><dt>Pieces (170 g)</dt><dd>${pcs.toLocaleString()}</dd><hr><dt>Cost per batch</dt><dd>${$(cost*f)}</dd><dt>Cost per kg dough</dt><dd>${$(cost/TOTAL*1000)}</dd><dt>Cost per piece</dt><dd>${$(cost*f/Math.max(pcs,1))}</dd><dt class="muted">Missing prices</dt><dd class="muted">0 of 6</dd>`;}
+document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>{mode=b.dataset.m;document.querySelectorAll('#mode button').forEach(x=>x.classList.toggle('on',x===b));
+ const v=document.getElementById('val');document.getElementById('vlab').textContent=b.textContent;v.value={F:1,D:25,L:15,P:120}[mode];document.getElementById('unit').value=mode==='D'||mode==='L'?'kg':document.getElementById('unit').value;draw()});
+['val','unit'].forEach(id=>document.getElementById(id).addEventListener('input',draw));
+draw();
+</script>
