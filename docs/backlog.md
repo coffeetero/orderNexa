@@ -245,3 +245,29 @@ Built and merged: Dashboard real data, Customers Import/Export, Inventory › Nu
 - To do (owner): move the file into a password manager and delete it from the project folder; check it was never copied elsewhere (cloud sync, backups, other machines).
 - 2026-11-25: both cloud database passwords in `supabase setup/supabase initial setup.txt` (the `postgres` user and the pooler user `bps_dev`) were printed into a Claude Code session transcript by mistake. Change both in the Supabase dashboard (Project Settings > Database), then update the file.
 - Same rule for `supabase setup/` (cloud database passwords, `uat.env` with the Resend API key): gitignored, but still plain files on disk. Move them to a password manager or an encrypted vault before go-live, and rotate any key that was ever shared.
+
+## 12. Overnight build 2026-11-25 follow-ups (merged 2026-11-26, local only, not in the cloud)
+Built and merged: Organizer › Calendar, Organizer › Tasks, Inventory › Recipes. Migrations add_organizer_calendar, add_organizer_tasks, add_recipes plus function files; apply to the cloud only with the owner's OK. Hand-over notes (column lists) are in the session notes folder.
+- Owner to confirm: Calendar privacy per calendar (not per event), colours from status tokens, company time zone only, any Calendar writer may edit any shared event; another user's private task list hidden even from Company Administrators; recipe ingredients as their own catalog; °F only.
+- Not tested: Ledger and Graphite themes; Calendar "this and following" and one-occurrence delete in the browser; Tasks drag and drop in the browser; Recipes print preview, iPad, delete buttons.
+- `npm run build` fails when `website/.env.local` is a symlink (worktrees need a copy).
+- Recipes demo data in the local database (8 ingredients; Poolish, Ciabatta, Light Rye); removal SQL in recipes-handover.md.
+
+### Calendar
+- Reminders/notifications and invitations/attendees; Google / Apple sync, .ics export/import.
+- Drag to move or resize events; multi-day all-day events as one bar; Year view.
+- Hidden calendars stored per user in the database (per browser today); week start day as a company setting (Sunday now).
+- Link events to customers/orders and Contacts; show Closed & holidays days on Order Entry / production planning.
+- Categorical colour tokens for calendars; Day/Week opens at 5 AM, consider scrolling to the first event or now.
+
+### Tasks
+- Reminders / notifications, notify the assignee; dated tasks in Calendar.
+- Show health-check findings and `fnd_security_events` To-Dos as a read-only "System" view, or let a finding create a task.
+- Purge soft-deleted tasks after 30 days; "every X from completion" repeats; search; reorder lists; link a task to a customer or order.
+
+### Recipes
+- Replace native selects (ingredients, 1,000+ items) with EntityComboBox-style search.
+- Friendly units per line from the database (g under 1 kg, oz under 1 lb); °C option; volume units and "each".
+- Restore and compare versions; water content of milk, eggs, butter for hydration.
+- Nutrition from recipes into Nutrition Labels; production batch sheets from order quantities via dough_code.
+- Costing & COGS screen, ingredient price history, bake loss; items as ingredients (optional item_id on inv_ingredients).
