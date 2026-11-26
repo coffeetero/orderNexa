@@ -107,7 +107,7 @@ Use the shared components in `website/components/ui/` and `website/components/bp
 
 - **Navigation.** Top menubar for modules, context sidebar for quick access and recent records. Structure is layer 4.
 - **Panels and cards.** One border, `bg-card`, small radius, at most `shadow-sm`. A title row with an optional sub-line and one link. Do not put a card around every number; group related figures in one panel with hairline dividers.
-- **Tables.** Left-align text, right-align numbers and money. Header in `text-xs`, muted, on `bg-muted/50`. Row hover `bg-muted/40`. Totals in a distinct final row. Wide tables scroll inside their own container.
+- **Tables.** Left-align text, right-align numbers and money. Header in `text-xs`, muted, on `bg-muted/50`. Headers are always centered over their column, whatever the column's alignment. When a header is too wide for its column, break it onto two lines rather than widening the column or abbreviating it; headers are bottom-aligned (`align-bottom`), so single-line headers sit on the same baseline as the second line of two-line ones. Row hover `bg-muted/40`. Totals in a distinct final row. Wide tables scroll inside their own container.
 - **Forms.** Label above the field, required fields marked with `*`. Field order and tab order are layer 4.
 - **Dialogs.** Title says the action; primary button on the right names the action ("Save payment", not "OK"). Destructive actions use the destructive style and say what will be lost.
 - **Button order.** In every form, panel and dialog: Cancel (outline) on the left, the main action (primary) on its right. An action the person came to do, such as Send invite, uses the primary style too.
@@ -202,3 +202,4 @@ Before calling UI work done:
 | 2026-11-25 | Inventory › Recipes (new screen): two panes like Contacts; recipe = base-batch weights, baker's % of total flour incl. pre-ferment flour (BBGA overall formula), all figures from inv_recipe_calc; summary column beside the formula only at 1700px+, below it otherwise. |
 | 2026-11-25 | Recipe ingredients are a per-tenant catalog (inv_ingredients) with role, price and allergens, not fnd_items; recipes link to items through dough_code = fnd_items.dough_type and an optional finished item. |
 | 2026-11-25 | Batch sheets print in fixed black on white, like nutrition labels. |
+| 2026-11-26 | Grid headers always centered; a header too wide for its column goes onto two lines, and all headers are bottom-aligned so single-line ones line up with the second line. Applies to every grid through one rule in globals.css (thead th), which overrides per-column alignment classes; cells keep their own alignment. |

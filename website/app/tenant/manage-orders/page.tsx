@@ -36,7 +36,7 @@ const money = (v: number | null | undefined) => { const n = Number(v ?? 0); retu
 const longDate = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
 const shortDate = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 const SEL = 'h-9 rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
-const TH = 'h-8 whitespace-nowrap bg-muted/50 px-3 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground';
+const TH = 'h-8 whitespace-nowrap bg-muted/50 px-3 py-1.5 text-center align-bottom text-[11px] font-semibold uppercase tracking-wider text-muted-foreground';
 const TD = 'whitespace-nowrap px-3 py-1.5';
 
 function ManageOrders() {
@@ -183,8 +183,8 @@ function ManageOrders() {
                   <th className={`${TH} cursor-pointer`} onClick={() => sortBy('customer')}>Customer{arrow('customer')}</th>
                   <th className={TH}>Department / event</th>
                   <th className={TH}>Shift</th>
-                  <th className={`${TH} cursor-pointer text-right`} onClick={() => sortBy('lines')}>Lines{arrow('lines')}</th>
-                  <th className={`${TH} cursor-pointer text-right`} onClick={() => sortBy('amount')}>Amount{arrow('amount')}</th>
+                  <th className={`${TH} cursor-pointer`} onClick={() => sortBy('lines')}>Lines{arrow('lines')}</th>
+                  <th className={`${TH} cursor-pointer`} onClick={() => sortBy('amount')}>Amount{arrow('amount')}</th>
                   <th className={TH}>Status</th>
                 </tr>
               </thead>

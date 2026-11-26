@@ -167,6 +167,8 @@
   }
   /* Figures line up in columns. */
   th, td { font-variant-numeric: tabular-nums; }
+  /* Grid headers: always centered, bottom-aligned so one-line headers sit on the second line of two-line ones (guidelines, Tables). Beats per-column text-left/right. */
+  thead th { text-align: center !important; vertical-align: bottom !important; }
 }
 
 @layer utilities {
