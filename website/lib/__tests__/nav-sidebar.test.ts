@@ -77,20 +77,19 @@ describe('normalizePins', () => {
 describe('recent records', () => {
   it('maps modules to the lists they show', () => {
     expect(recentTypesFor('Customers')).toEqual(['customer']);
-    expect(recentTypesFor('Orders')).toEqual(['customer', 'order']);
+    expect(recentTypesFor('Operations')).toEqual(['customer', 'order', 'production_run']);
     expect(recentTypesFor('Inventory')).toEqual(['item']);
-    expect(recentTypesFor('Production')).toEqual(['production_run']);
     expect(recentTypesFor('Financials')).toEqual([]);
     expect(recentTypesFor(null)).toEqual([]);
     expect(Object.keys(MODULE_RECENTS).every((m) => tenantNav.some((n) => n.label === m))).toBe(true);
   });
   it('builds deep links per module', () => {
-    expect(recordHref('customer', '10700', 'Orders')).toBe('/orders?customer=10700');
+    expect(recordHref('customer', '10700', 'Operations')).toBe('/orders?customer=10700');
     expect(recordHref('customer', '10700', 'Customers')).toBe('/customers?customer=10700');
-    expect(recordHref('order', '55', 'Orders')).toBe('/orders/55/edit');
-    expect(recordHref('order', 'abc', 'Orders')).toBeNull();
+    expect(recordHref('order', '55', 'Operations')).toBe('/orders/55/edit');
+    expect(recordHref('order', 'abc', 'Operations')).toBeNull();
     expect(recordHref('item', '9', 'Inventory')).toBe('/inventory/item-profile?item=9');
-    expect(recordHref('production_run', '2026-11-23|AM', 'Production')).toBeNull();
+    expect(recordHref('production_run', '2026-11-23|AM', 'Operations')).toBeNull();
   });
   it('validates and normalizes untrusted records', () => {
     expect(normalizeRecord({ type: 'customer', key: 10700, label: '  10700 · HOBOKEN  ', sublabel: '' }))
@@ -132,14 +131,14 @@ describe('buildBreadcrumbs', () => {
   });
   it("sends a module crumb to the module's first built page", () => {
     expect(buildBreadcrumbs('/inventory/item-profile', tenantNav)[0]).toEqual({ label: 'Inventory', href: '/inventory/item-profile' });
-    expect(buildBreadcrumbs('/orders/standing', tenantNav)[0]).toEqual({ label: 'Orders', href: '/orders' });
+    expect(buildBreadcrumbs('/orders/standing', tenantNav)[0]).toEqual({ label: 'Operations', href: '/orders' });
   });
   it('handles dashboard, extra pages, edit-order and the internal /tenant prefix', () => {
     expect(buildBreadcrumbs('/dashboard', tenantNav)).toEqual([{ label: 'Dashboard' }]);
     expect(buildBreadcrumbs('/tenant/profile', tenantNav)).toEqual([{ label: 'User Profile' }]);
     expect(buildBreadcrumbs('/orders/55/edit', tenantNav, { type: 'order', key: '55', label: '0115-1087' }).map((c) => c.label))
-      .toEqual(['Orders', 'Enter Orders', '0115-1087']);
-    expect(buildBreadcrumbs('/tenant/manage-orders', tenantNav).map((c) => c.label)).toEqual(['Orders', 'Manage Orders']);
+      .toEqual(['Operations', 'Enter Orders', '0115-1087']);
+    expect(buildBreadcrumbs('/tenant/manage-orders', tenantNav).map((c) => c.label)).toEqual(['Operations', 'Manage Orders']);
   });
   it('returns nothing for unknown pages', () => {
     expect(buildBreadcrumbs('/nowhere', tenantNav)).toEqual([]);

@@ -7,7 +7,7 @@ import { selectQuickAccess, type ActionRow } from '@/lib/quick-access';
 export const dynamic = 'force-dynamic';
 
 /**
- * GET /api/nav/sidebar?tenant_id=<n>&module=<Orders|Customers|Inventory|Production>
+ * GET /api/nav/sidebar?tenant_id=<n>&module=<Operations|Customers|Inventory>
  * → { data: { quickAccess: string[], pinned: string[], recents: RecentRow[] } }
  * Quick Access hrefs are ranked/filtered here (built + authorized only); recents are per user and tenant.
  */

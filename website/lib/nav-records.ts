@@ -25,12 +25,12 @@ export type RecentRow = {
 /** Which recent lists each module shows, in order. Keys are top-level menu labels in nav-config. */
 export const MODULE_RECENTS: Record<string, { type: RecordType; title: string }[]> = {
   Customers: [{ type: 'customer', title: 'Recent customers' }],
-  Orders: [
+  Operations: [
     { type: 'customer', title: 'Recent customers' },
     { type: 'order', title: 'Recent orders' },
+    { type: 'production_run', title: 'Recent production runs' },
   ],
   Inventory: [{ type: 'item', title: 'Recent items' }],
-  Production: [{ type: 'production_run', title: 'Recent production runs' }],
 };
 
 export function recentTypesFor(module: string | null | undefined): RecordType[] {
@@ -67,7 +67,7 @@ export function recordHref(type: RecordType, key: string, module: string | null 
   const k = encodeURIComponent(key);
   switch (type) {
     case 'customer':
-      return module === 'Orders' ? `/orders?customer=${k}` : `/customers?customer=${k}`;
+      return module === 'Operations' ? `/orders?customer=${k}` : `/customers?customer=${k}`;
     case 'order':
       return /^\d+$/.test(key) ? `/orders/${key}/edit` : null;
     case 'item':

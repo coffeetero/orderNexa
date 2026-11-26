@@ -25,47 +25,36 @@ export type NavMenu = {
   /** Hide the whole menu unless the user may read at least one of these areas (fnd_areas keys). Omit = always shown. */
   requiresAnyArea?: string[];
   groups?: NavGroup[];
+  /** Mega menu columns (default: 2 when there are 3+ groups, else 1). */
+  columns?: 2 | 3;
 };
 
 /** Staff navigation. Hrefs are canonical tenant-host URLs (middleware rewrites them to /tenant/…). */
 export const tenantNav: NavMenu[] = [
   { label: 'Dashboard', href: '/dashboard' },
   {
-    label: 'Orders',
+    // Orders, Production and Delivery in one mega menu (decided 2026-11-26).
+    label: 'Operations',
+    columns: 3,
     groups: [
       {
-        heading: 'Entry',
+        heading: 'Orders',
         items: [
           { label: 'Enter Orders', href: '/orders' },
           { label: 'Manage Orders', href: '/manage-orders' },
           { label: 'Import Orders', href: '/orders/import' },
           { label: 'Export Orders', href: '/orders/export' },
-        ],
-      },
-      {
-        heading: 'Standing',
-        items: [
           { label: 'Standing Order Mgt', href: '/orders/standing-mgmt' },
           { label: 'Post Standing Orders', href: '/orders/standing' },
           { label: 'Call Up List', href: '/orders/callup', soon: true },
         ],
       },
       // Returns and credits live under Financials (decided 2026-11-25: the office that handles checks, credits and debits enters them)
-    ],
-  },
-  {
-    label: 'Production',
-    groups: [
       {
-        heading: 'Planning',
+        heading: 'Production',
         items: [
           { label: 'Order Analysis', href: '/production/analysis', soon: true },
           { label: 'Estimate Production', href: '/production/estimate', soon: true },
-        ],
-      },
-      {
-        heading: 'Floor',
-        items: [
           { label: 'Process Run', href: '/production/process' },
           { label: 'Confirm Deliveries', href: '/production/deliveries' },
           { label: "Baker's Report", href: '/production/report' },
@@ -74,6 +63,17 @@ export const tenantNav: NavMenu[] = [
           { label: 'Print Invoices', href: '/production/invoices' },
           { label: 'Packaging List', href: '/production/packaging' },
           { label: 'Route Delivery Report', href: '/production/routes' },
+        ],
+      },
+      {
+        // Fleet management, to be designed.
+        heading: 'Delivery',
+        items: [
+          { label: 'Vehicles', href: '/delivery/vehicles', soon: true },
+          { label: 'Maintenance', href: '/delivery/maintenance', soon: true },
+          { label: 'Driver Checks', href: '/delivery/checks', soon: true },
+          { label: 'Fuel & Costs', href: '/delivery/fuel', soon: true },
+          { label: 'Renewals', href: '/delivery/renewals', soon: true },
         ],
       },
     ],

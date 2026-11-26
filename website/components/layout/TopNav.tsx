@@ -10,7 +10,6 @@ import {
   LogOut,
   Menu,
   Palette,
-  Search,
   User,
   Wheat,
 } from 'lucide-react';
@@ -176,7 +175,7 @@ export function TopNav({
           }
 
           const groups = menu.groups ?? [];
-          const twoColumns = groups.length >= 3;
+          const columns = menu.columns ?? (groups.length >= 3 ? 2 : 1);
 
           return (
             <MenubarMenu key={menu.label}>
@@ -187,7 +186,9 @@ export function TopNav({
               <MenubarContent
                 className={cn(
                   'max-h-[calc(100vh-5rem)] overflow-y-auto p-2',
-                  twoColumns ? 'grid w-[32rem] grid-cols-2 gap-x-4 gap-y-3' : 'min-w-[16rem] space-y-2',
+                  columns === 3 && 'grid w-[44rem] grid-cols-3 gap-x-4 gap-y-3',
+                  columns === 2 && 'grid w-[32rem] grid-cols-2 gap-x-4 gap-y-3',
+                  columns === 1 && 'min-w-[16rem] space-y-2',
                 )}
               >
                 {groups.map((group, gi) => (
@@ -211,9 +212,6 @@ export function TopNav({
       {/* Right-hand controls */}
       <div className="flex items-center gap-1">
         {healthHref && <HealthHeart href={healthHref} />}
-        <Button variant="ghost" size="icon" className="hidden h-9 w-9 text-muted-foreground sm:inline-flex" aria-label="Search">
-          <Search className="h-4 w-4" />
-        </Button>
         <Button variant="ghost" size="icon" className="relative hidden h-9 w-9 text-muted-foreground sm:inline-flex" aria-label="Notifications">
           <Bell className="h-4 w-4" />
           <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-primary" />

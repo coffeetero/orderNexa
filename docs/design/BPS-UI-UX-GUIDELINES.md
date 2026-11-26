@@ -105,7 +105,7 @@ A user-selectable compact / comfortable density setting has been proposed but is
 
 Use the shared components in `website/components/ui/` and `website/components/bps/`. Change a look in the shared component, not per screen.
 
-- **Navigation.** Top menubar for modules, context sidebar for quick access and recent records. Structure is layer 4.
+- **Navigation.** Top menubar for modules, context sidebar for quick access and recent records. The breadcrumb bar ends with a screen search (Ctrl+K) and 4 icon quick buttons the user assigns (default Enter Orders, Enter Payments, Customers, Items). Structure is layer 4.
 - **Panels and cards.** One border, `bg-card`, small radius, at most `shadow-sm`. A title row with an optional sub-line and one link. Do not put a card around every number; group related figures in one panel with hairline dividers.
 - **Tables.** Left-align text, right-align numbers and money. Header in `text-xs`, muted, on `bg-muted/50`. Headers are always centered over their column, whatever the column's alignment. When a header is too wide for its column, break it onto two lines rather than widening the column or abbreviating it; headers are bottom-aligned (`align-bottom`), so single-line headers sit on the same baseline as the second line of two-line ones. Row hover `bg-muted/40`. Totals in a distinct final row. Wide tables scroll inside their own container.
 - **Forms.** Label above the field, required fields marked with `*`. Field order and tab order are layer 4.
@@ -203,3 +203,5 @@ Before calling UI work done:
 | 2026-11-25 | Recipe ingredients are a per-tenant catalog (inv_ingredients) with role, price and allergens, not fnd_items; recipes link to items through dough_code = fnd_items.dough_type and an optional finished item. |
 | 2026-11-25 | Batch sheets print in fixed black on white, like nutrition labels. |
 | 2026-11-26 | Grid headers always centered; a header too wide for its column goes onto two lines, and all headers are bottom-aligned so single-line ones line up with the second line. Applies to every grid through one rule in globals.css (thead th), which overrides per-column alignment classes; cells keep their own alignment. |
+| 2026-11-26 | Menu: Orders and Production merged into one Operations mega menu with three columns, Orders, Production and Delivery (fleet screens planned: Vehicles, Maintenance, Driver Checks, Fuel & Costs, Renewals). Branch ui-redesign. |
+| 2026-11-26 | Breadcrumb bar: screen search (Ctrl+K, jumps to a screen) then 4 icon quick buttons at the right end; the user assigns them from the pencil button, saved as their Quick access pins; defaults Enter Orders, Enter Payments, Customers, Items. The dead search icon in the top bar was removed. |
