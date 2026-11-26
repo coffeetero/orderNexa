@@ -276,3 +276,14 @@ Built and merged: Organizer › Calendar, Organizer › Tasks, Inventory › Rec
 - Quick Buttons list by role: today it hides menus and screens the user's areas don't allow, but screens without an access area (most Operations screens) show to every staff user. Give each screen an area, or check roles, so the list shows only what the user's roles allow.
 - Global search for records (customers, orders, invoices, items) beside screen search: one database search function behind one API route, respecting access.
 - Per-screen sidebars (each screen chooses its own panel or none).
+
+### Routes Maintenance (built 2026-11-26, local only)
+- Map and route optimisation (no coordinates yet: 0 of 2,196 addresses are geocoded; see the separate research note). Geocoding first.
+- Drag-and-drop reordering of stops (buttons and keyboard work now; drag was optional).
+- Per-site stops, if sites really get separate drops. That needs shipments per site, which is an order/shipment model change.
+- Driver assignment per day (today there is only a default driver per route), and a driver/route field on the printed Route Delivery Report header.
+- Show route + stop on Confirm Deliveries and the packing labels.
+- Bulk move: select several stops and move them to another route.
+- Check the delivery-day vs production-day meaning of legacy route_dow with the owner (decision 1).
+- Before the cloud: run add_routes.sql, the function files in the order listed in the migration header (om_production_run_process.sql and om_report_delivery_get.sql with `-U supabase_admin`), then seed_om_routes.sql. The seed needs the legacy tables, so run it before they are dropped (or at cutover after the legacy reload).
+- Maps research (phased plan, costs, approvals): routes-maps-research.md in the session notes folder.

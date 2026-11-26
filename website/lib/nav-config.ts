@@ -69,6 +69,7 @@ export const tenantNav: NavMenu[] = [
         // Fleet management, to be designed.
         heading: 'Delivery',
         items: [
+          { label: 'Routes Maintenance', href: '/delivery/routes', area: 'delivery.routes' },
           { label: 'Vehicles', href: '/delivery/vehicles', soon: true },
           { label: 'Maintenance', href: '/delivery/maintenance', soon: true },
           { label: 'Driver Checks', href: '/delivery/checks', soon: true },

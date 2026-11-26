@@ -4,6 +4,9 @@ export interface DeliveryData {
   stops: {
     delivery_date: string;
     route: string | null;
+    route_code?: string | null;
+    route_name?: string | null;
+    stop_no?: number | null;
     shipment_number: string;
     customer_name: string;
     customer_number: string | null;
@@ -14,7 +17,7 @@ export interface DeliveryData {
   }[];
 }
 
-/** Route delivery report for the driver: stops by delivery date and route, with invoices, items and a signature line. */
+/** Route delivery report for the driver: stops by delivery date and route (in route order and stop number), with invoices, items and a signature line. */
 export async function deliveryPdf(data: DeliveryData, generatedLabel: string): Promise<Uint8Array> {
   const w = await createWriter(LETTER);
   let current = '';
@@ -25,10 +28,11 @@ export async function deliveryPdf(data: DeliveryData, generatedLabel: string): P
     if (groupKey !== current) {
       current = groupKey;
       if (i > 0) w.y -= 6;
-      text(w, `Delivery ${stop.delivery_date}${stop.route ? `  -  Route ${stop.route}` : ''}`, { size: 12, bold: true }, 16);
+      const routeTitle = stop.route_code ? `${stop.route_code} · ${stop.route_name ?? ''}` : stop.route ? `Route ${stop.route}` : 'No route';
+      text(w, `Delivery ${stop.delivery_date}  -  ${routeTitle}`, { size: 12, bold: true }, 16);
       rule(w, 4);
     }
-    text(w, `${i + 1}.  ${stop.customer_name}${stop.customer_number ? `  (${stop.customer_number})` : ''}`, { size: 11, bold: true }, 14);
+    text(w, `${stop.stop_no ?? i + 1}.  ${stop.customer_name}${stop.customer_number ? `  (${stop.customer_number})` : ''}`, { size: 11, bold: true }, 14);
     if (stop.address) wrap(stop.address, w.font, 9, 500).forEach((line) => text(w, line, { size: 9, muted: true, x: 56 }, 11));
     text(
       w,
