@@ -518,7 +518,7 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
                   )}
                   <li>
                     <button type="button" onClick={() => selectItem(it)}
-                      className={cn('w-full px-3 py-1.5 text-left text-sm hover:bg-muted', !it.is_active && 'bg-muted/60 text-muted-foreground', selectedItemId === it.item_id && 'bg-accent')}>
+                      className={cn('w-full px-3 py-1.5 text-left text-[13px] hover:bg-muted', !it.is_active && 'bg-muted/60 text-muted-foreground', selectedItemId === it.item_id && 'bg-accent')}>
                       <div className="truncate font-medium">{it.item_number} {it.item_name}</div>
                       {(it.is_compound || !it.is_active) && (
                         <div className="truncate text-xs text-muted-foreground">{[it.is_compound && 'Compound', !it.is_active && 'Inactive'].filter(Boolean).join(' · ')}</div>
@@ -564,7 +564,7 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
                   )}
                   <li>
                     <button type="button" onClick={() => selectItem(it)}
-                      className={cn('w-full px-3 py-1.5 text-left text-sm hover:bg-muted', !it.is_active && 'bg-muted/60 text-muted-foreground', selectedItemId === it.item_id && 'bg-accent')}>
+                      className={cn('w-full px-3 py-1.5 text-left text-[13px] hover:bg-muted', !it.is_active && 'bg-muted/60 text-muted-foreground', selectedItemId === it.item_id && 'bg-accent')}>
                       <div className="truncate font-medium">{it.item_number} {it.item_name}</div>
                       {(it.is_compound || !it.is_active) && (
                         <div className="truncate text-xs text-muted-foreground">{[it.is_compound && 'Compound', !it.is_active && 'Inactive'].filter(Boolean).join(' · ')}</div>
