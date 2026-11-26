@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   Bell,
   ChevronDown,
+  LayoutGrid,
   CircleHelp as HelpCircle,
   LogOut,
   Menu,
@@ -14,6 +15,7 @@ import {
   Wheat,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useNav } from '@/components/layout/nav-context';
 import { createClient } from '@/lib/supabase/client';
 import { findActiveHref, findActiveMenu, type NavItem, type NavMenu } from '@/lib/nav-config';
 import { Button } from '@/components/ui/button';
@@ -96,6 +98,7 @@ export function TopNav({
   const router = useRouter();
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const { tenantId, setQuickButtonsOpen } = useNav();
 
   const activeHref = findActiveHref(pathname, menus);
   const activeMenu = findActiveMenu(pathname, menus);
@@ -241,6 +244,12 @@ export function TopNav({
               <DropdownMenuItem onClick={() => router.push(appearanceHref)}>
                 <Palette className="mr-2 h-4 w-4" />
                 Appearance
+              </DropdownMenuItem>
+            )}
+            {tenantId && (
+              <DropdownMenuItem onClick={() => setQuickButtonsOpen(true)}>
+                <LayoutGrid className="mr-2 h-4 w-4" />
+                Quick Buttons
               </DropdownMenuItem>
             )}
             <DropdownMenuItem disabled>

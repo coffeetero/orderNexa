@@ -4,10 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Banknote, Building2, CalendarDays, ClipboardList, Factory, FileText, LayoutDashboard, type LucideIcon,
-  Package, Pencil, Search, Settings, Truck, Users, Wallet,
+  Package, Search, Settings, Truck, Users, Wallet,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { GuardedLink } from '@/components/layout/GuardedLink';
 import { useNav } from '@/components/layout/nav-context';
 import { tenantNav, visibleMenus, type BuiltAction } from '@/lib/nav-config';
@@ -97,56 +97,61 @@ export function QuickBar() {
               </Button>
             );
           })}
-        {pinned !== null && <ButtonsEditor buttons={buttons} actions={actions} onSave={save} />}
       </div>
+      {pinned !== null && <ButtonsEditor buttons={buttons} actions={actions} onSave={save} />}
     </div>
   );
 }
 
-/** Assign a screen to each of the 4 buttons. Saved as the user's pins (shared with sidebar Quick access). */
+/** Assign a screen to each of the 4 buttons (opened from the avatar menu). Saved as the user's pins (shared with sidebar Quick access). */
 function ButtonsEditor({ buttons, actions, onSave }: { buttons: string[]; actions: BuiltAction[]; onSave: (keys: string[]) => void }) {
-  const [open, setOpen] = useState(false);
+  const { quickButtonsOpen: open, setQuickButtonsOpen: setOpen } = useNav();
   const [draft, setDraft] = useState<string[]>(buttons);
   const modules = useMemo(() => Array.from(new Set(actions.map((a) => a.module))), [actions]);
 
+  // Start from the current buttons each time the dialog opens.
+  useEffect(() => {
+    if (open) setDraft(buttons);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
   return (
-    <Popover
-      open={open}
-      onOpenChange={(o) => {
-        setOpen(o);
-        if (o) setDraft(buttons);
-      }}
-    >
-      <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" aria-label="Choose quick buttons" title="Choose quick buttons">
-          <Pencil className="h-4 w-4" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-72 space-y-2 p-3 text-sm">
-        <p className="text-xs font-medium text-muted-foreground">Quick buttons</p>
-        {Array.from({ length: QUICK_ACCESS_SLOTS }, (_, i) => (
-          <label key={i} className="flex items-center gap-2">
-            <span className="w-4 text-xs text-muted-foreground">{i + 1}</span>
-            <select
-              className="h-8 flex-1 rounded-md border border-input bg-background px-2 text-sm"
-              value={draft[i] ?? ''}
-              onChange={(e) => setDraft((d) => {
-                const next = [...d];
-                next[i] = e.target.value;
-                return next;
-              })}
-            >
-              {modules.map((m) => (
-                <optgroup key={m} label={m}>
-                  {actions.filter((a) => a.module === m).map((a) => (
-                    <option key={a.href} value={a.href}>{a.label}</option>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Quick Buttons</DialogTitle>
+          <DialogDescription>Choose the screens for the 4 buttons at the right of the breadcrumb bar.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2 text-sm">
+          {Array.from({ length: QUICK_ACCESS_SLOTS }, (_, i) => {
+            const a = actions.find((x) => x.href === draft[i]);
+            const Icon = a ? iconFor(a) : FileText;
+            return (
+              <label key={i} className="flex items-center gap-2">
+                <Icon className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <span className="sr-only">Button {i + 1}</span>
+                <select
+                  className="h-9 flex-1 rounded-md border border-input bg-background px-2 text-sm"
+                  value={draft[i] ?? ''}
+                  onChange={(e) => setDraft((d) => {
+                    const next = [...d];
+                    next[i] = e.target.value;
+                    return next;
+                  })}
+                >
+                  {modules.map((m) => (
+                    <optgroup key={m} label={m}>
+                      {actions.filter((x) => x.module === m).map((x) => (
+                        <option key={x.href} value={x.href}>{x.label}</option>
+                      ))}
+                    </optgroup>
                   ))}
-                </optgroup>
-              ))}
-            </select>
-          </label>
-        ))}
-        <div className="flex items-center justify-between pt-1">
+                </select>
+              </label>
+            );
+          })}
+        </div>
+        <DialogFooter className="flex-row items-center justify-between sm:justify-between">
           <Button type="button" variant="ghost" size="sm" onClick={() => setDraft(DEFAULT_QUICK_BUTTONS)}>Defaults</Button>
           <div className="flex gap-2">
             <Button type="button" variant="outline" size="sm" onClick={() => setOpen(false)}>Cancel</Button>
@@ -161,9 +166,9 @@ function ButtonsEditor({ buttons, actions, onSave }: { buttons: string[]; action
               Save
             </Button>
           </div>
-        </div>
-      </PopoverContent>
-    </Popover>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

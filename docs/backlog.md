@@ -271,3 +271,8 @@ Built and merged: Organizer › Calendar, Organizer › Tasks, Inventory › Rec
 - Restore and compare versions; water content of milk, eggs, butter for hydration.
 - Nutrition from recipes into Nutrition Labels; production batch sheets from order quantities via dough_code.
 - Costing & COGS screen, ingredient price history, bake loss; items as ingredients (optional item_id on inv_ingredients).
+
+## 13. UI redesign follow-ups (branch ui-redesign, 2026-11-26)
+- Quick Buttons list by role: today it hides menus and screens the user's areas don't allow, but screens without an access area (most Operations screens) show to every staff user. Give each screen an area, or check roles, so the list shows only what the user's roles allow.
+- Global search for records (customers, orders, invoices, items) beside screen search: one database search function behind one API route, respecting access.
+- Per-screen sidebars (each screen chooses its own panel or none).
