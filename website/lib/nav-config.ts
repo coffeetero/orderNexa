@@ -117,6 +117,15 @@ export const tenantNav: NavMenu[] = [
         ],
       },
       {
+        heading: 'Purchasing',
+        items: [
+          { label: 'Vendors', href: '/purchasing/vendors', area: 'purchasing.vendors' },
+          { label: 'Vendor Items', href: '/purchasing/items', area: 'purchasing.vendors' },
+          { label: 'Purchase Orders', href: '/purchasing/orders', soon: true },
+          { label: 'Receiving', href: '/purchasing/receiving', soon: true },
+        ],
+      },
+      {
         heading: 'Nutrition',
         items: [
           { label: 'Nutritional Analysis', href: '/inventory/nutrition', soon: true },
