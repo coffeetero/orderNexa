@@ -26,6 +26,9 @@ type NavContextValue = {
   /** The Quick Buttons dialog (opened from the avatar menu, shown by the breadcrumb bar). */
   quickButtonsOpen: boolean;
   setQuickButtonsOpen: (open: boolean) => void;
+  /** Where a page may render its own sidebar content (null when the sidebar is not docked and open). */
+  sidebarSlot: HTMLElement | null;
+  setSidebarSlot: (el: HTMLElement | null) => void;
 };
 
 const noop = () => {};
@@ -40,6 +43,8 @@ const defaultValue: NavContextValue = {
   confirmLeave: () => true,
   quickButtonsOpen: false,
   setQuickButtonsOpen: noop,
+  sidebarSlot: null,
+  setSidebarSlot: noop,
 };
 
 const NavContext = createContext<NavContextValue>(defaultValue);
@@ -50,6 +55,7 @@ export function NavProvider({ tenantId, areas = null, children }: { tenantId: nu
   const [record, setRecord] = useState<CurrentRecord | null>(null);
   const [version, setVersion] = useState(0);
   const [quickButtonsOpen, setQuickButtonsOpen] = useState(false);
+  const [sidebarSlot, setSidebarSlot] = useState<HTMLElement | null>(null);
   const guards = useRef(new Set<() => boolean>());
   const tenantRef = useRef(tenantId);
   tenantRef.current = tenantId;
@@ -110,8 +116,8 @@ export function NavProvider({ tenantId, areas = null, children }: { tenantId: nu
   }, [anyDirty]);
 
   const value = useMemo<NavContextValue>(
-    () => ({ tenantId, areas, record, setRecord, version, touch, registerGuard, confirmLeave, quickButtonsOpen, setQuickButtonsOpen }),
-    [tenantId, areas, record, version, touch, registerGuard, confirmLeave, quickButtonsOpen],
+    () => ({ tenantId, areas, record, setRecord, version, touch, registerGuard, confirmLeave, quickButtonsOpen, setQuickButtonsOpen, sidebarSlot, setSidebarSlot }),
+    [tenantId, areas, record, version, touch, registerGuard, confirmLeave, quickButtonsOpen, sidebarSlot],
   );
 
   return (

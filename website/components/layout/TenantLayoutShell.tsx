@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TopNav } from '@/components/layout/TopNav';
 import { Breadcrumbs } from '@/components/layout/Breadcrumbs';
-import { ContextSidebar } from '@/components/layout/ContextSidebar';
+import { ContextSidebar, HiddenSidebarSlot } from '@/components/layout/ContextSidebar';
 import { NavProvider } from '@/components/layout/nav-context';
 import { AccountAppearanceLoader } from '@/components/theme/AppearanceProvider';
 import { ActivityPing } from '@/components/layout/ActivityPing';
@@ -134,13 +134,14 @@ export function TenantLayoutShell({
             <div className={cn('mx-auto h-full w-full max-w-[1440px]', contentClassName)}>{children}</div>
           </main>
 
+          {hasSidebar && collapsed && docked && <HiddenSidebarSlot />}
           {hasSidebar && !collapsed && (
             <aside
               id="context-sidebar"
               aria-label="Page sidebar"
               className="order-1 hidden w-[260px] shrink-0 overflow-y-auto border-r border-border bg-muted/20 scrollbar-thin xl:block"
             >
-              <ContextSidebar />
+              <ContextSidebar withSlot={docked} />
             </aside>
           )}
         </div>

@@ -39,6 +39,7 @@ export const PAGE_RECENTS: Record<string, { type: RecordType; title: string }[]>
     { type: 'customer', title: 'Recent customers' },
     { type: 'order', title: 'Recent orders' },
   ],
+  '/inventory/recipes': [], // the recipe list sits in the sidebar instead
 };
 
 export function recentListsFor(page: string | null | undefined, module: string | null | undefined) {

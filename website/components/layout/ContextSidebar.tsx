@@ -27,9 +27,9 @@ function SectionTitle({ children, action }: { children: React.ReactNode; action?
  * The page's own sidebar: recent records chosen per page (see PAGE_RECENTS), and the Admin sections.
  * Content comes from /api/nav/sidebar; it never blocks the page it sits beside.
  */
-export function ContextSidebar({ onNavigate }: { onNavigate?: () => void }) {
+export function ContextSidebar({ onNavigate, withSlot = false }: { onNavigate?: () => void; withSlot?: boolean }) {
   const pathname = usePathname();
-  const { tenantId, version, areas } = useNav();
+  const { tenantId, version, areas, setSidebarSlot } = useNav();
   const searchParams = useSearchParams();
   const adminMenu = tenantNav.find((m) => m.label === 'Admin');
   const [data, setData] = useState<SidebarData | null>(null);
@@ -163,6 +163,14 @@ export function ContextSidebar({ onNavigate }: { onNavigate?: () => void }) {
         );
       })}
       {failed && <p className="px-2 text-xs text-muted-foreground">Couldn&apos;t refresh. Showing the last list.</p>}
+      {/* The page's own sidebar content (e.g. the Recipes list), only in the docked sidebar. */}
+      {withSlot && <div ref={setSidebarSlot} className="flex min-h-0 flex-1 flex-col empty:hidden" />}
     </div>
   );
+}
+
+/** While the docked sidebar is closed, page sidebar content goes here and stays hidden (it is not shown in the page instead). */
+export function HiddenSidebarSlot() {
+  const { setSidebarSlot } = useNav();
+  return <div ref={setSidebarSlot} hidden />;
 }

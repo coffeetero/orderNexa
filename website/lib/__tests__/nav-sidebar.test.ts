@@ -48,6 +48,7 @@ describe('recent records', () => {
     expect(recentTypesFor('Financials')).toEqual([]);
     expect(recentTypesFor(null)).toEqual([]);
     expect(recentTypesFor('Operations', '/orders')).toEqual(['customer', 'order']); // Enter Orders chooses its own
+    expect(recentTypesFor('Inventory', '/inventory/recipes')).toEqual([]);
     expect(recentTypesFor('Operations', '/manage-orders')).toEqual(['customer', 'order', 'production_run']);
     expect(Object.keys(MODULE_RECENTS).every((m) => tenantNav.some((n) => n.label === m))).toBe(true);
   });

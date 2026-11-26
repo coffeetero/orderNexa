@@ -19,13 +19,34 @@ const formOf = (i: Ingredient): Form => ({
 });
 const allergenLabel = (c: string) => ALLERGENS.find(([k]) => k === c)?.[1] ?? c;
 
-/**
- * The ingredient catalog: list, add, edit, delete (unused only). With `startNew` it opens straight on a new ingredient
- * (from the recipe editor) and reports the saved one through onSaved.
- */
+/** From the recipe editor: opens straight on a new ingredient and reports the saved one through onSaved. */
 export function IngredientsDialog({ tenantId, open, onOpenChange, canEdit, canDelete, startNew, onSaved }: {
   tenantId: number; open: boolean; onOpenChange: (o: boolean) => void; canEdit: boolean; canDelete: boolean;
   startNew?: string | null; onSaved?: (i: Ingredient) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90dvh] max-w-3xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{startNew !== undefined && startNew !== null ? 'New ingredient' : 'Ingredients'}</DialogTitle>
+          <DialogDescription>{HELP}</DialogDescription>
+        </DialogHeader>
+        <IngredientsCatalog tenantId={tenantId} canEdit={canEdit} canDelete={canDelete} startNew={startNew}
+          onSaved={onSaved} onDone={() => onOpenChange(false)} tableClassName="max-h-[55dvh]" />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+const HELP = 'Mark flours and liquids for baker\'s percentages and hydration. Prices give recipe costs; allergens roll up into recipes.';
+
+/**
+ * The ingredient catalog: list, add, edit, delete (unused only). Loads when it mounts. Shown in the Ingredients tab and,
+ * for a new ingredient, in IngredientsDialog. onChanged fires after a save or delete.
+ */
+export function IngredientsCatalog({ tenantId, canEdit, canDelete, startNew, onSaved, onDone, onChanged, tableClassName, showHelp }: {
+  tenantId: number; canEdit: boolean; canDelete: boolean; startNew?: string | null; onSaved?: (i: Ingredient) => void;
+  onDone?: () => void; onChanged?: () => void; tableClassName?: string; showHelp?: boolean;
 }) {
   const [rows, setRows] = useState<Ingredient[] | null>(null);
   const [form, setForm] = useState<Form | null>(null);
@@ -37,11 +58,10 @@ export function IngredientsDialog({ tenantId, open, onOpenChange, canEdit, canDe
     adminCall<Ingredient[]>(`/api/inventory/recipes/ingredients?tenant_id=${tenantId}`).then(setRows).catch((e: Error) => setError(e.message));
   }, [tenantId]);
   useEffect(() => {
-    if (!open) return;
     setError(null);
     setForm(startNew !== undefined && startNew !== null ? blank(startNew) : null);
     load();
-  }, [open, startNew, load]);
+  }, [startNew, load]);
 
   const shown = useMemo(() => {
     const t = q.trim().toLowerCase();
@@ -53,26 +73,22 @@ export function IngredientsDialog({ tenantId, open, onOpenChange, canEdit, canDe
     setBusy(true); setError(null);
     try {
       const saved = await adminPost<Ingredient>('/api/inventory/recipes/ingredients', { tenant_id: tenantId, ingredient: form });
-      load();
-      if (onSaved && startNew !== undefined && startNew !== null) { onSaved(saved); onOpenChange(false); return; }
+      load(); onChanged?.();
+      if (onSaved && startNew !== undefined && startNew !== null) { onSaved(saved); onDone?.(); return; }
       setForm(null);
     } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   };
   const remove = async () => {
     if (!form?.ingredient_id || !window.confirm(`Delete ${form.ingredient_name}? This cannot be undone.`)) return;
     setBusy(true); setError(null);
-    try { await adminDelete(`/api/inventory/recipes/ingredients?tenant_id=${tenantId}&id=${form.ingredient_id}`); setForm(null); load(); }
+    try { await adminDelete(`/api/inventory/recipes/ingredients?tenant_id=${tenantId}&id=${form.ingredient_id}`); setForm(null); load(); onChanged?.(); }
     catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   };
   const used = form?.ingredient_id ? rows?.find((r) => r.ingredient_id === form.ingredient_id)?.recipe_count ?? 0 : 0;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90dvh] max-w-3xl overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{startNew !== undefined && startNew !== null ? 'New ingredient' : 'Ingredients'}</DialogTitle>
-          <DialogDescription>Mark flours and liquids for baker&apos;s percentages and hydration. Prices give recipe costs; allergens roll up into recipes.</DialogDescription>
-        </DialogHeader>
+      <div className="space-y-3">
+        {showHelp && <p className="text-sm text-muted-foreground">{HELP}</p>}
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
 
         {form ? (
@@ -115,7 +131,7 @@ export function IngredientsDialog({ tenantId, open, onOpenChange, canEdit, canDe
                 </Button>
               )}
               <span className="flex-1" />
-              <Button variant="outline" onClick={() => (startNew !== undefined && startNew !== null ? onOpenChange(false) : setForm(null))}>Cancel</Button>
+              <Button variant="outline" onClick={() => (startNew !== undefined && startNew !== null ? onDone?.() : setForm(null))}>Cancel</Button>
               {canEdit && <Button disabled={busy || !form.ingredient_name.trim()} onClick={() => void save()}>Save ingredient</Button>}
             </div>
           </div>
@@ -125,7 +141,7 @@ export function IngredientsDialog({ tenantId, open, onOpenChange, canEdit, canDe
               <Input type="search" placeholder="Search ingredients" aria-label="Search ingredients" value={q} onChange={(e) => setQ(e.target.value)} />
               {canEdit && <Button className="shrink-0 gap-1" onClick={() => setForm(blank(q.trim()))}><Plus className="h-4 w-4" />New</Button>}
             </div>
-            <div className="max-h-[55dvh] overflow-auto rounded-md border">
+            <div className={cn('overflow-auto rounded-md border', tableClassName)}>
               <table className="w-full text-sm">
                 <thead className="sticky top-0"><tr>
                   <th className={thCls}>Ingredient</th><th className={thCls}>Counts as</th><th className={cn(thCls, 'text-right')}>Price</th>
@@ -148,7 +164,6 @@ export function IngredientsDialog({ tenantId, open, onOpenChange, canEdit, canDe
             </div>
           </div>
         )}
-      </DialogContent>
-    </Dialog>
+      </div>
   );
 }
