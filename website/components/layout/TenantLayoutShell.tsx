@@ -137,7 +137,7 @@ export function TenantLayoutShell({
           {hasSidebar && !collapsed && (
             <aside
               id="context-sidebar"
-              aria-label="Quick access and recent records"
+              aria-label="Page sidebar"
               className="order-1 hidden w-[260px] shrink-0 overflow-y-auto border-r border-border bg-muted/20 scrollbar-thin xl:block"
             >
               <ContextSidebar />
@@ -148,8 +148,8 @@ export function TenantLayoutShell({
         {hasSidebar && (
           <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
             <SheetContent side="left" className="w-[88vw] max-w-[300px] p-0">
-              <SheetTitle className="sr-only">Quick access and recent records</SheetTitle>
-              <SheetDescription className="sr-only">Your most-used actions and recently opened records</SheetDescription>
+              <SheetTitle className="sr-only">Page sidebar</SheetTitle>
+              <SheetDescription className="sr-only">Recently opened records for this page</SheetDescription>
               <div className="h-full overflow-y-auto pt-8">
                 <ContextSidebar onNavigate={() => setDrawerOpen(false)} />
               </div>

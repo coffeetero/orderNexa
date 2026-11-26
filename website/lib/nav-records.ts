@@ -33,8 +33,20 @@ export const MODULE_RECENTS: Record<string, { type: RecordType; title: string }[
   Inventory: [{ type: 'item', title: 'Recent items' }],
 };
 
-export function recentTypesFor(module: string | null | undefined): RecordType[] {
-  return (module ? MODULE_RECENTS[module] ?? [] : []).map((r) => r.type);
+/** Pages that choose their own recent lists (keyed by menu href). They win over the module's lists. */
+export const PAGE_RECENTS: Record<string, { type: RecordType; title: string }[]> = {
+  '/orders': [
+    { type: 'customer', title: 'Recent customers' },
+    { type: 'order', title: 'Recent orders' },
+  ],
+};
+
+export function recentListsFor(page: string | null | undefined, module: string | null | undefined) {
+  return (page && PAGE_RECENTS[page]) || (module ? MODULE_RECENTS[module] ?? [] : []);
+}
+
+export function recentTypesFor(module: string | null | undefined, page?: string | null): RecordType[] {
+  return recentListsFor(page, module).map((r) => r.type);
 }
 
 const KEY_RE = /^[A-Za-z0-9|:_.-]{1,64}$/;

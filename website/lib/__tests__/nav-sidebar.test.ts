@@ -4,15 +4,9 @@ import { buildBreadcrumbs } from '@/lib/breadcrumbs';
 import {
   isValidActionKey, MODULE_RECENTS, normalizeRecord, parseIdParam, recentTypesFor, recordHref,
 } from '@/lib/nav-records';
-import { normalizePins, selectQuickAccess, type ActionRow } from '@/lib/quick-access';
+import { normalizePins } from '@/lib/quick-access';
 
 const allowed = builtActions(tenantNav);
-const NOW = new Date('2026-11-22T12:00:00Z');
-const row = (key: string, uses: number, daysAgo: number, pin: number | null = null): ActionRow => ({
-  action_key: key, use_count: uses, last_used_at: new Date(NOW.getTime() - daysAgo * 86_400_000).toISOString(),
-  is_pinned: pin !== null, pin_order: pin,
-});
-
 describe('builtActions / authorization', () => {
   it('lists only built entries with their module', () => {
     const hrefs = allowed.map((a) => a.href);
@@ -29,34 +23,6 @@ describe('builtActions / authorization', () => {
   it('firstBuiltHref skips "Soon" entries', () => {
     const inventory = tenantNav.find((m) => m.label === 'Inventory')!;
     expect(firstBuiltHref(inventory)).toBe('/inventory/item-profile');
-  });
-});
-
-describe('selectQuickAccess', () => {
-  it('starts with the defaults (Item Management stands in for the missing Inventory landing page)', () => {
-    expect(selectQuickAccess([], allowed, NOW)).toEqual(['/orders', '/customers', '/inventory/item-profile', '/orders/standing-mgmt']);
-  });
-  it('puts pins first, in pin order', () => {
-    const rows = [row('/manage-orders', 1, 1, 2), row('/customers', 5, 1, 1)];
-    expect(selectQuickAccess(rows, allowed, NOW).slice(0, 2)).toEqual(['/customers', '/manage-orders']);
-  });
-  it('ranks unpinned actions by use count, then recency, and fills with defaults', () => {
-    const rows = [row('/manage-orders', 10, 2), row('/orders/standing', 10, 1), row('/customers', 3, 1)];
-    expect(selectQuickAccess(rows, allowed, NOW)).toEqual(['/orders/standing', '/manage-orders', '/customers', '/orders']);
-  });
-  it('ignores usage older than 90 days', () => {
-    const rows = [row('/manage-orders', 99, 200)];
-    expect(selectQuickAccess(rows, allowed, NOW)).toEqual(['/orders', '/customers', '/inventory/item-profile', '/orders/standing-mgmt']);
-  });
-  it('never returns unbuilt or unknown actions, even if pinned', () => {
-    const rows = [row('/production/mixing', 50, 1, 1), row('/nope', 50, 1)];
-    expect(selectQuickAccess(rows, allowed, NOW)).toEqual(['/orders', '/customers', '/inventory/item-profile', '/orders/standing-mgmt']);
-  });
-  it('returns at most 4 with no duplicates', () => {
-    const rows = [row('/orders', 5, 1, 1), row('/orders', 9, 1), row('/customers', 9, 1)];
-    const out = selectQuickAccess(rows, allowed, NOW);
-    expect(out).toHaveLength(4);
-    expect(new Set(out).size).toBe(4);
   });
 });
 
@@ -81,6 +47,8 @@ describe('recent records', () => {
     expect(recentTypesFor('Inventory')).toEqual(['item']);
     expect(recentTypesFor('Financials')).toEqual([]);
     expect(recentTypesFor(null)).toEqual([]);
+    expect(recentTypesFor('Operations', '/orders')).toEqual(['customer', 'order']); // Enter Orders chooses its own
+    expect(recentTypesFor('Operations', '/manage-orders')).toEqual(['customer', 'order', 'production_run']);
     expect(Object.keys(MODULE_RECENTS).every((m) => tenantNav.some((n) => n.label === m))).toBe(true);
   });
   it('builds deep links per module', () => {
