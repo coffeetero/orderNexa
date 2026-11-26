@@ -170,7 +170,7 @@ export const tenantNav: NavMenu[] = [
   },
   {
     label: 'Organizer',
-    requiresAnyArea: ['organizer.sheets', 'organizer.contacts'],
+    requiresAnyArea: ['organizer.sheets', 'organizer.contacts', 'organizer.tasks'],
     groups: [
       {
         items: [
@@ -178,7 +178,7 @@ export const tenantNav: NavMenu[] = [
           { label: 'Documents', href: '/organizer/documents', soon: true },
           { label: 'Calendar', href: '/organizer/calendar', soon: true },
           { label: 'Contacts', href: '/organizer/contacts', area: 'organizer.contacts' },
-          { label: 'Tasks', href: '/organizer/tasks', soon: true },
+          { label: 'Tasks', href: '/organizer/tasks', area: 'organizer.tasks' },
         ],
       },
     ],

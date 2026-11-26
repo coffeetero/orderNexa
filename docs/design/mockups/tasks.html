@@ -1,0 +1,193 @@
+<title>Organizer Tasks</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Organizer › Tasks in the Hearth theme. Layout: views + lists rail | task list with quick add | task details pane.
+   Google Tasks model (lists, star, date/time, one level of subtasks, Completed section, My order / Date / Starred)
+   plus shared company lists, assign to staff, Upcoming and Assigned to me views. */
+:root{--bg:#f5f3f0;--surface:#fffefc;--side:#ede9e3;--line:#e1dbd3;--line2:#cfc7bc;--text:#1e1915;--text2:#544a41;--text3:#7a6e63;--accent:#a3451c;--accent-fg:#fff;--pos:#2d6e3e;--warn:#8f5a00;--info:#2a5fa8;--neg:#b3312a;--focus:#a3451c;--star:#8f5a00}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#161310;--surface:#1f1b17;--side:#1a1613;--line:#322c26;--line2:#433b33;--text:#efe9e2;--text2:#c4b9ad;--text3:#978b7e;--accent:#e58d60;--accent-fg:#1a120c;--pos:#7cc48c;--warn:#e0aa4a;--info:#7fb0ee;--neg:#ee8177;--focus:#e58d60;--star:#e0aa4a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#161310;--surface:#1f1b17;--side:#1a1613;--line:#322c26;--line2:#433b33;--text:#efe9e2;--text2:#c4b9ad;--text3:#978b7e;--accent:#e58d60;--accent-fg:#1a120c;--pos:#7cc48c;--warn:#e0aa4a;--info:#7fb0ee;--neg:#ee8177;--focus:#e58d60;--star:#e0aa4a;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font:14px/20px Inter,system-ui,sans-serif;font-variant-numeric:tabular-nums;margin:0;padding-block:16px 32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+button,input,textarea,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+.wrap{max-width:1500px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+.head{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
+.head h1{font-size:18px;font-weight:600;margin:0}
+.muted{color:var(--text3)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:0 1px 2px rgb(0 0 0 / .04);min-width:0}
+.app{display:grid;grid-template-columns:220px minmax(0,1fr) 340px;gap:12px;height:620px}
+.rail{padding:8px;overflow:auto;display:flex;flex-direction:column;gap:2px}
+.rail .sec{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);padding:10px 8px 4px;display:flex;justify-content:space-between;align-items:center}
+.nav{display:flex;align-items:center;gap:8px;height:32px;padding:0 8px;border-radius:6px;cursor:pointer;border:0;background:none;width:100%;text-align:left}
+.nav:hover{background:color-mix(in srgb,var(--accent) 6%,var(--surface))}
+.nav.sel{background:color-mix(in srgb,var(--accent) 14%,var(--surface));font-weight:500}
+.nav .n{margin-left:auto;font-size:12px;color:var(--text3)}
+.nav .n.bad{color:var(--neg);font-weight:600}
+.ico{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.share{font-size:11px;color:var(--text3)}
+.main{display:flex;flex-direction:column;min-height:0}
+.ph{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:8px 12px;border-bottom:1px solid var(--line);min-height:40px}
+.ph h2{font-size:14px;font-weight:600;margin:0}
+.btn{height:32px;padding:0 12px;border-radius:6px;border:1px solid var(--line2);background:var(--surface);font-weight:500;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.btn.ghost{border-color:transparent}
+.qa{display:flex;gap:8px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line)}
+.qa .plus{color:var(--accent)}
+.qa input{flex:1;height:36px;border:1px solid var(--line2);border-radius:6px;background:var(--surface);padding:0 10px}
+.list{overflow:auto;flex:1}
+.grp{font-size:12px;font-weight:600;color:var(--text3);padding:8px 12px 4px;background:color-mix(in srgb,var(--side) 50%,var(--surface));border-bottom:1px solid var(--line)}
+.grp.bad{color:var(--neg)}
+.row{display:flex;align-items:flex-start;gap:10px;padding:6px 12px;border-bottom:1px solid var(--line);cursor:pointer}
+.row:hover{background:color-mix(in srgb,var(--accent) 5%,var(--surface))}
+.row.sel{background:color-mix(in srgb,var(--accent) 12%,var(--surface));box-shadow:inset 3px 0 0 var(--accent)}
+.row.sub{padding-left:42px}
+.grip{color:var(--text3);opacity:0;cursor:grab;width:10px;margin-top:2px}
+.row:hover .grip{opacity:1}
+.chk{width:18px;height:18px;border-radius:50%;border:2px solid var(--line2);flex:none;margin-top:1px;background:none;padding:0;cursor:pointer;display:grid;place-items:center}
+.chk:hover{border-color:var(--accent)}
+.chk.on{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.body{flex:1;min-width:0}
+.t{display:block}
+.done .t{text-decoration:line-through;color:var(--text3)}
+.meta{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12px;color:var(--text3);margin-top:1px}
+.due{display:inline-flex;align-items:center;gap:4px}
+.due.over{color:var(--neg);font-weight:500}.due.today{color:var(--warn);font-weight:500}
+.av{width:20px;height:20px;border-radius:50%;background:var(--side);color:var(--text2);font-size:10px;font-weight:600;display:inline-grid;place-items:center;flex:none;margin-top:0}
+.star{background:none;border:0;padding:0;cursor:pointer;color:var(--text3);margin-top:1px}
+.star.on{color:var(--star)}.star.on .ico{fill:currentColor}
+.completed{display:flex;align-items:center;gap:6px;padding:8px 12px;font-weight:500;color:var(--text2);border:0;background:none;width:100%;cursor:pointer;border-bottom:1px solid var(--line)}
+.detail{display:flex;flex-direction:column;min-height:0}
+.dbody{padding:12px;overflow:auto;display:flex;flex-direction:column;gap:12px}
+.lab{display:block;font-size:12px;font-weight:600;color:var(--text3);margin-bottom:4px}
+.in{height:36px;border:1px solid var(--line2);border-radius:6px;background:var(--surface);padding:0 10px;width:100%}
+textarea.in{height:72px;padding:8px 10px;resize:vertical}
+.title-in{font-size:16px;font-weight:600;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:0 0 6px;height:auto;background:none}
+.two{display:grid;grid-template-columns:1fr 110px;gap:8px}
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.chip{height:28px;min-width:32px;padding:0 8px;border-radius:14px;border:1px solid var(--line2);background:var(--surface);font-size:12px;font-weight:500;cursor:pointer}
+.chip.on{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.subs{border:1px solid var(--line);border-radius:6px}
+.subs .row{padding:5px 8px}
+.foot{display:flex;gap:8px;padding:8px 12px;border-top:1px solid var(--line);align-items:center;font-size:12px;color:var(--text3)}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:500;padding:1px 8px;border-radius:10px;border:1px solid var(--line2);white-space:nowrap}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--c)}
+.notes{font-size:13px;color:var(--text2);padding:12px}
+.notes ul{margin:4px 0 8px;padding-left:18px}
+.tag{display:inline-block;font-size:11px;font-weight:600;padding:0 6px;border-radius:9px;border:1px solid var(--line2);color:var(--text2);margin-right:4px}
+.menu{position:relative}
+@media (max-width:1100px){.app{grid-template-columns:200px minmax(0,1fr)}.detail{grid-column:1/-1;height:auto}.app{height:auto}.list{max-height:420px}}
+@media (max-width:700px){.app{grid-template-columns:1fr}.rail{flex-direction:row;flex-wrap:wrap}.rail .sec{width:100%}.nav{width:auto}}
+</style>
+
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-sun" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2M16 3.13a4 4 0 0 1 0 7.75M21 21v-2a4 4 0 0 0-3-3.85"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-repeat" viewBox="0 0 24 24"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-sub" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M5 6v12h4"/></symbol>
+</svg>
+
+<div class="wrap">
+  <div class="head"><h1>Tasks</h1><span class="muted">Organizer</span></div>
+
+  <div class="app">
+    <nav class="panel rail" aria-label="Task views and lists">
+      <button class="nav" data-v="upcoming"><svg class="ico"><use href="#i-sun"/></svg>Upcoming<span class="n"><span class="dot" style="--c:var(--neg);display:inline-block"></span> 2</span></button>
+      <button class="nav" data-v="starred"><svg class="ico"><use href="#i-star"/></svg>Starred<span class="n">3</span></button>
+      <button class="nav" data-v="assigned"><svg class="ico"><use href="#i-user"/></svg>Assigned to me<span class="n">2</span></button>
+      <div class="sec">Lists <button class="btn ghost" style="height:24px;padding:0 4px" aria-label="New list"><svg class="ico"><use href="#i-plus"/></svg></button></div>
+      <button class="nav sel" data-v="my"><svg class="ico"><use href="#i-list"/></svg>My Tasks<span class="n">5</span></button>
+      <button class="nav" data-v="my"><svg class="ico"><use href="#i-list"/></svg>Follow-ups<span class="n">2</span></button>
+      <div class="sec">Company lists</div>
+      <button class="nav" data-v="my"><svg class="ico"><use href="#i-users"/></svg>Office<span class="n"><span class="dot" style="--c:var(--neg);display:inline-block"></span> 3</span></button>
+      <button class="nav" data-v="my"><svg class="ico"><use href="#i-users"/></svg>Bakery floor<span class="n">4</span></button>
+    </nav>
+
+    <section class="panel main">
+      <div class="ph">
+        <h2 id="vt">My Tasks</h2><span class="muted" id="vs" style="font-size:12px">Only you</span>
+        <span style="flex:1"></span>
+        <button class="btn" id="sortbtn">Sort: My order <svg class="ico"><use href="#i-chev"/></svg></button>
+        <button class="btn" aria-label="List options">•••</button>
+      </div>
+      <div class="qa"><svg class="ico plus"><use href="#i-plus"/></svg><input id="qa" placeholder="Add a task, press Enter"></div>
+      <div class="list" id="list"></div>
+    </section>
+
+    <aside class="panel detail" aria-label="Task details">
+      <div class="ph"><h2>Details</h2><span style="flex:1"></span><button class="btn ghost" aria-label="Star"><svg class="ico" style="color:var(--star);fill:var(--star)"><use href="#i-star"/></svg></button></div>
+      <div class="dbody">
+        <input class="in title-in" value="Order flour for next week" aria-label="Title">
+        <div><label class="lab">Details</label><textarea class="in">Check stock first. Bay State: 40 bags high-gluten, 10 bags rye.</textarea></div>
+        <div class="two"><div><label class="lab">Date</label><input class="in" value="11/26/2026"></div><div><label class="lab">Time</label><input class="in" value="10:00 AM"></div></div>
+        <div><label class="lab">Repeat</label>
+          <div class="two" style="grid-template-columns:90px 1fr"><select class="in"><option>Every 1</option></select><select class="in"><option>week</option></select></div>
+          <div class="chips" style="margin-top:6px"><button class="chip">S</button><button class="chip">M</button><button class="chip">T</button><button class="chip">W</button><button class="chip on">T</button><button class="chip">F</button><button class="chip">S</button></div>
+          <div class="muted" style="font-size:12px;margin-top:4px">Every week on Thu · next: Thu, Dec 3</div></div>
+        <div class="two" style="grid-template-columns:1fr 1fr"><div><label class="lab">List</label><select class="in"><option>My Tasks</option></select></div><div><label class="lab">Assigned to</label><select class="in"><option>Maria Lopez</option></select></div></div>
+        <div><label class="lab">Subtasks</label>
+          <div class="subs">
+            <div class="row"><button class="chk on" aria-label="Done"><svg class="ico" style="width:12px;height:12px"><use href="#i-check"/></svg></button><span class="body done"><span class="t">Count bags in the store room</span></span></div>
+            <div class="row"><button class="chk" aria-label="Not done"></button><span class="body"><span class="t">Email Bay State the order</span></span></div>
+            <div class="row" style="color:var(--accent)"><svg class="ico"><use href="#i-plus"/></svg>Add subtask</div>
+          </div></div>
+      </div>
+      <div class="foot">Created by Glen · Nov 24, 2026<span style="flex:1"></span><button class="btn">Delete</button></div>
+    </aside>
+  </div>
+
+  <div class="panel notes">
+    <span class="tag">layout</span> Three panes like Contacts: views and lists on the left, the task list in the middle, the selected task's details on the right (a sheet on iPad portrait and phones).
+    <ul>
+      <li><b>Views:</b> Upcoming (open tasks with a date, grouped Overdue / Today / Tomorrow / This week / Later), Starred, Assigned to me. Each shows its open count; a red dot marks overdue tasks.</li>
+      <li><b>Lists:</b> everyone gets a private <b>My Tasks</b> that cannot be deleted; more private lists, and lists <b>shared with the company</b> (every staff member with Tasks access sees and edits them).</li>
+      <li><b>Rows:</b> circle to complete, title, then date (red when overdue, amber today), repeat icon, subtasks done/total, assignee initials, list name in the cross-list views; star on the right. Subtasks indented one level.</li>
+      <li><b>Completed</b> folds under the open tasks with the completion date; "Delete completed tasks" is in the list menu.</li>
+    </ul>
+    <span class="tag">workflow</span> Type in the quick-add box and press Enter: the task goes to the top and the box stays ready for the next one. Details save as you leave each field (as in Google Tasks); no Save button. Drag the handle to reorder, or ↑ ↓ to select and Alt+↑ ↓ to move; Alt+→ / Alt+← indents and outdents; Space completes; S stars; Delete removes with an Undo. Quick add in Starred stars the task; in Assigned to me it assigns it to you. Sort per list: My order, Date, Starred. Completing a repeating task creates the next one in the database (a task done late skips to today or later; its subtasks come back unticked).
+  </div>
+</div>
+
+<script>
+const T={
+ my:{t:'My Tasks',s:'Only you',groups:[[null,[
+  {id:1,t:'Order flour for next week',due:'Tomorrow, 10:00 AM',cls:'',rep:1,sub:'1/2',av:'ML',star:1,sel:1},
+  {id:2,t:'Call Featherstone about the holiday order',due:'Yesterday',cls:'over',star:1},
+  {id:3,t:'Check oven 2 thermostat',due:'Today',cls:'today'},
+  {id:4,t:'Renew health permit',due:'Fri, Dec 18'},
+  {id:5,t:'Price list for 2027',sub:'0/3'},
+  {id:6,t:'Draft the January price change letter',subOf:5},
+ ]]],done:[{t:'Send Thanksgiving delivery schedule',due:'Completed Nov 24'},{t:'Clean proofer',due:'Completed Nov 23'}]},
+ upcoming:{t:'Upcoming',s:'All lists',groups:[
+  ['Overdue',[{t:'Call Featherstone about the holiday order',due:'Yesterday',cls:'over',list:'My Tasks',star:1}]],
+  ['Today',[{t:'Check oven 2 thermostat',due:'Today',cls:'today',list:'My Tasks'},{t:'Wipe down slicer',due:'Today, 3:00 PM',cls:'today',list:'Bakery floor',rep:1,av:'JR'}]],
+  ['Tomorrow',[{t:'Order flour for next week',due:'Tomorrow, 10:00 AM',list:'My Tasks',rep:1,av:'ML',star:1}]],
+  ['Later',[{t:'Renew health permit',due:'Fri, Dec 18',list:'My Tasks'}]]],done:[]},
+ starred:{t:'Starred',s:'All lists',groups:[[null,[{t:'Order flour for next week',due:'Tomorrow, 10:00 AM',list:'My Tasks',star:1},{t:'Call Featherstone about the holiday order',due:'Yesterday',cls:'over',list:'My Tasks',star:1},{t:'Quarterly sales tax filing',due:'Jan 20, 2027',list:'Office',star:1}]]],done:[]},
+ assigned:{t:'Assigned to me',s:'All lists',groups:[[null,[{t:'Wipe down slicer',due:'Today, 3:00 PM',cls:'today',list:'Bakery floor',rep:1},{t:'Count Christmas stollen boxes',list:'Office'}]]],done:[]}
+};
+const ic=(n,s='')=>`<svg class="ico" ${s}><use href="#i-${n}"/></svg>`;
+function row(x,done){return `<div class="row${x.subOf?' sub':''}${x.sel?' sel':''}${done?' done':''}" draggable="true"><span class="grip">⋮⋮</span>
+ <button class="chk${done?' on':''}" aria-label="${done?'Mark not done':'Mark done'}">${done?ic('check','style="width:12px;height:12px"'):''}</button>
+ <span class="body${done?' done':''}"><span class="t">${x.t}</span><span class="meta">${x.due?`<span class="due ${x.cls||''}">${x.due}</span>`:''}${x.rep?`<span class="due">${ic('repeat','style="width:12px;height:12px"')}</span>`:''}${x.sub?`<span class="due">${ic('sub','style="width:12px;height:12px"')}${x.sub}</span>`:''}${x.list?`<span>${x.list}</span>`:''}</span></span>
+ ${x.av?`<span class="av" title="Assigned">${x.av}</span>`:''}${done?'':`<button class="star${x.star?' on':''}" aria-label="Star">${ic('star')}</button>`}</div>`}
+function show(v){const d=T[v];document.getElementById('vt').textContent=d.t;document.getElementById('vs').textContent=d.s;
+ document.getElementById('sortbtn').hidden=v!=='my';
+ let h=d.groups.map(([g,rs])=>(g?`<div class="grp${g==='Overdue'?' bad':''}">${g}</div>`:'')+rs.map(r=>row(r)).join('')).join('');
+ if(d.done.length)h+=`<button class="completed" id="ct">${ic('chev')}Completed (${d.done.length})</button><div id="cl">${d.done.map(r=>row(r,1)).join('')}</div>`;
+ document.getElementById('list').innerHTML=h;
+ const ct=document.getElementById('ct');if(ct)ct.onclick=()=>{const c=document.getElementById('cl');c.hidden=!c.hidden};
+ document.querySelectorAll('#list .chk').forEach(b=>b.onclick=e=>{e.stopPropagation();const r=b.closest('.row');r.classList.toggle('done');b.classList.toggle('on');r.querySelector('.body').classList.toggle('done')});
+ document.querySelectorAll('#list .star').forEach(b=>b.onclick=e=>{e.stopPropagation();b.classList.toggle('on')});
+ document.querySelectorAll('#list .row').forEach(r=>r.onclick=()=>{document.querySelectorAll('#list .row').forEach(x=>x.classList.toggle('sel',x===r))});}
+document.querySelectorAll('.nav[data-v]').forEach(b=>b.onclick=()=>{document.querySelectorAll('.nav').forEach(x=>x.classList.toggle('sel',x===b));show(b.dataset.v)});
+document.getElementById('qa').addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.value.trim()){T.my.groups[0][1].unshift({t:e.target.value.trim()});e.target.value='';document.querySelectorAll('.nav').forEach(x=>x.classList.toggle('sel',x.textContent.startsWith('My Tasks')));show('my')}});
+show('my');
+</script>
