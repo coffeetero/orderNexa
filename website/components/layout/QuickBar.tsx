@@ -34,9 +34,18 @@ function iconFor(a: BuiltAction): LucideIcon {
   return HREF_ICONS[a.href] ?? MODULE_ICONS[a.module] ?? FileText;
 }
 
+/** true on Mac/iPad keyboards (⌘ and ⌥ instead of Ctrl and Alt). Set after mount to avoid a hydration mismatch. */
+function useIsMac() {
+  const [mac, setMac] = useState(false);
+  useEffect(() => setMac(/Mac|iPhone|iPad/.test(navigator.userAgent)), []);
+  return mac;
+}
+
 /** Screen search and the user's 4 quick buttons, at the right end of the breadcrumb bar. */
 export function QuickBar() {
-  const { tenantId, areas, version } = useNav();
+  const { tenantId, areas, version, confirmLeave } = useNav();
+  const router = useRouter();
+  const isMac = useIsMac();
   const [pinned, setPinned] = useState<string[] | null>(null);
 
   // Screens this user may open (built, menu visible, area readable).
@@ -79,19 +88,38 @@ export function QuickBar() {
     }).catch(() => undefined);
   }, []);
 
+  // Alt+Shift+1..4 (Option+Shift on a Mac) open the quick buttons. Plain Alt+digit switches tabs in Brave and Linux browsers.
+  // e.code, so the characters a Mac or Shift would type still match.
+  const buttonsRef = useRef<string[]>([]);
+  buttonsRef.current = pinned === null ? [] : buttons;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.altKey || !e.shiftKey || e.ctrlKey || e.metaKey) return;
+      const m = /^Digit([1-4])$/.exec(e.code);
+      const href = m ? buttonsRef.current[Number(m[1]) - 1] : undefined;
+      if (!href) return;
+      e.preventDefault();
+      if (confirmLeave()) router.push(href);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [confirmLeave, router]);
+
   if (!tenantId) return null;
+
+  const alt = isMac ? '⌥⇧' : 'Alt+Shift+';
 
   return (
     <div className="ml-auto flex shrink-0 items-center gap-1">
-      <ScreenSearch actions={actions} />
+      <ScreenSearch actions={actions} shortcut={isMac ? '⌘K' : 'Ctrl+K'} />
       <div className="flex items-center" role="group" aria-label="Quick buttons">
         {pinned !== null &&
-          buttons.map((href) => {
+          buttons.map((href, i) => {
             const a = byHref.get(href)!;
             const Icon = iconFor(a);
             return (
               <Button key={href} asChild variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
-                <GuardedLink href={href} aria-label={a.label} title={a.label}>
+                <GuardedLink href={href} aria-label={a.label} aria-keyshortcuts={`Alt+Shift+${i + 1}`} title={`${a.label} (${alt}${i + 1})`}>
                   <Icon className="h-5 w-5" />
                 </GuardedLink>
               </Button>
@@ -120,7 +148,7 @@ function ButtonsEditor({ buttons, actions, onSave }: { buttons: string[]; action
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Quick Buttons</DialogTitle>
-          <DialogDescription>Choose the screens for the 4 buttons at the right of the breadcrumb bar.</DialogDescription>
+          <DialogDescription>Choose the screens for the 4 buttons at the right of the breadcrumb bar. Open them with Alt+Shift+1 to 4 (Option+Shift on a Mac).</DialogDescription>
         </DialogHeader>
         <div className="space-y-2 text-sm">
           {Array.from({ length: QUICK_ACCESS_SLOTS }, (_, i) => {
@@ -172,8 +200,8 @@ function ButtonsEditor({ buttons, actions, onSave }: { buttons: string[]; action
   );
 }
 
-/** Find a screen by name; Ctrl+K / ⌘K focuses it. */
-function ScreenSearch({ actions }: { actions: BuiltAction[] }) {
+/** Find a screen by name; Ctrl+K (⌘K on a Mac) focuses it. */
+function ScreenSearch({ actions, shortcut }: { actions: BuiltAction[]; shortcut: string }) {
   const router = useRouter();
   const { confirmLeave } = useNav();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -215,7 +243,8 @@ function ScreenSearch({ actions }: { actions: BuiltAction[] }) {
         aria-expanded={open && matches.length > 0}
         aria-controls="screen-search-list"
         aria-label="Search screens"
-        placeholder="Search screens  (Ctrl+K)"
+        aria-keyshortcuts="Control+K Meta+K"
+        placeholder={`Search screens  (${shortcut})`}
         value={q}
         onChange={(e) => {
           setQ(e.target.value);
