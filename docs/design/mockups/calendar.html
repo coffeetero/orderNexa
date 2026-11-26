@@ -1,0 +1,260 @@
+<title>Organizer Calendar</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Organizer › Calendar in the Hearth theme. Left rail: Create, mini month, calendar list with show/hide, production overlay.
+   Main: toolbar (Today ‹ › title · search · Day/Week/Month/Agenda) and the view. Calendar colours use the theme's status
+   tokens (accent, info, success, warning, destructive, muted) so they follow themes and dark mode. Production runs are a
+   read-only overlay drawn with a dashed outline. Click an event or an empty slot for the dialog shown at the bottom. */
+:root{--bg:#f5f3f0;--surface:#fffefc;--side:#ede9e3;--line:#e1dbd3;--line2:#cfc7bc;--text:#1e1915;--text2:#544a41;--text3:#7a6e63;--accent:#a3451c;--accent-fg:#fff;--pos:#2d6e3e;--warn:#8f5a00;--info:#2a5fa8;--neg:#b3312a;--gray:#7a6e63;--focus:#a3451c}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#161310;--surface:#1f1b17;--side:#1a1613;--line:#322c26;--line2:#433b33;--text:#efe9e2;--text2:#c4b9ad;--text3:#978b7e;--accent:#e58d60;--accent-fg:#1a120c;--pos:#7cc48c;--warn:#e0aa4a;--info:#7fb0ee;--neg:#ee8177;--gray:#978b7e;--focus:#e58d60;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#161310;--surface:#1f1b17;--side:#1a1613;--line:#322c26;--line2:#433b33;--text:#efe9e2;--text2:#c4b9ad;--text3:#978b7e;--accent:#e58d60;--accent-fg:#1a120c;--pos:#7cc48c;--warn:#e0aa4a;--info:#7fb0ee;--neg:#ee8177;--gray:#978b7e;--focus:#e58d60;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font:14px/20px Inter,system-ui,sans-serif;font-variant-numeric:tabular-nums;margin:0;padding-block:16px 32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+.wrap{max-width:1500px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+.head{display:flex;align-items:baseline;gap:12px}.head h1{font-size:18px;font-weight:600;margin:0}.muted{color:var(--text3)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:0 1px 2px rgb(0 0 0 / .04);min-width:0}
+.app{display:grid;grid-template-columns:232px minmax(0,1fr);gap:12px;height:640px}
+.rail{display:flex;flex-direction:column;gap:12px;padding:12px;overflow:auto}
+.btn{height:36px;padding:0 14px;border-radius:6px;border:1px solid var(--line2);background:var(--surface);font-weight:500;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.btn.sm{height:32px;padding:0 10px}.btn.ico{width:32px;padding:0;justify-content:center}
+.mini{font-size:12px}.mini .mh{display:flex;align-items:center;justify-content:space-between;font-weight:600;font-size:13px;margin-bottom:4px}
+.mini .mh button{border:0;background:none;cursor:pointer;color:var(--text2);width:24px;height:24px;border-radius:4px}
+.mini table{width:100%;border-collapse:collapse;text-align:center}.mini th{font-weight:500;color:var(--text3);height:22px;font-size:11px}
+.mini td{height:26px;padding:0}.mini td span{display:inline-flex;width:24px;height:24px;align-items:center;justify-content:center;border-radius:50%;cursor:pointer}
+.mini td.out span{color:var(--text3)}.mini td.wk span{background:color-mix(in srgb,var(--accent) 10%,transparent)}
+.mini td.today span{background:var(--accent);color:var(--accent-fg);font-weight:600}
+.sec{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);display:flex;justify-content:space-between;align-items:center}
+.cal{display:flex;align-items:center;gap:8px;padding:3px 4px;border-radius:5px;font-size:13px;cursor:pointer}
+.cal:hover{background:color-mix(in srgb,var(--accent) 6%,transparent)}
+.box{width:16px;height:16px;border-radius:4px;border:2px solid var(--c);background:var(--c);display:inline-flex;align-items:center;justify-content:center;color:var(--surface);font-size:11px;font-weight:700;flex:none}
+.box.off{background:transparent}.lock{margin-left:auto;font-size:11px;color:var(--text3)}
+.main{display:flex;flex-direction:column;min-height:0}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line)}
+.bar h2{font-size:18px;font-weight:600;margin:0 8px}
+.search{height:32px;border:1px solid var(--line2);border-radius:6px;background:var(--surface);padding:0 10px;width:200px;color:var(--text3);display:flex;align-items:center}
+.seg{display:inline-flex;border:1px solid var(--line2);border-radius:6px;overflow:hidden}.seg button{height:30px;padding:0 12px;border:0;background:var(--surface);cursor:pointer;font-weight:500}
+.seg button+button{border-left:1px solid var(--line2)}.seg button.on{background:color-mix(in srgb,var(--accent) 14%,var(--surface));color:var(--accent)}
+.grow{flex:1}
+/* Month */
+.month{flex:1;display:grid;grid-template-rows:28px repeat(5,minmax(0,1fr));min-height:0}
+.dows,.week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}
+.dows div{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);padding:6px 8px;border-bottom:1px solid var(--line)}
+.day{border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:2px 4px;min-width:0;overflow:hidden;cursor:pointer}
+.day:nth-child(7n){border-right:0}.day.out{background:color-mix(in srgb,var(--side) 45%,var(--surface))}.day.out .dn{color:var(--text3)}
+.dn{font-size:12px;font-weight:500;display:inline-flex;min-width:22px;height:22px;align-items:center;justify-content:center;border-radius:11px;padding:0 4px}
+.day.today .dn{background:var(--accent);color:var(--accent-fg);font-weight:600}
+.ev{display:flex;align-items:center;gap:5px;font-size:12px;line-height:18px;padding:0 5px;border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.ev.all{background:color-mix(in srgb,var(--c) 18%,var(--surface));color:var(--text)}
+.ev.all{box-shadow:inset 3px 0 0 var(--c)}
+.ev .d{width:7px;height:7px;border-radius:50%;background:var(--c);flex:none}.ev .t{color:var(--text3)}
+.ev.prod{border:1px dashed var(--line2);background:transparent;color:var(--text2)}
+.more{font-size:12px;color:var(--text3);padding-left:5px;font-weight:500}
+/* Week */
+.weekv{flex:1;display:flex;flex-direction:column;min-height:0}
+.wgrid{display:grid;grid-template-columns:56px repeat(7,minmax(0,1fr))}
+.wh div{padding:4px 6px;border-bottom:1px solid var(--line);text-align:center;font-size:11px;color:var(--text3);font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.wh b{display:block;font-size:18px;line-height:26px;color:var(--text);letter-spacing:0;font-weight:500}.wh .today b{color:var(--accent);font-weight:700}
+.alld{border-bottom:1px solid var(--line)}.alld>div{padding:2px 3px;border-right:1px solid var(--line);min-height:26px}
+.alld .lbl{font-size:11px;color:var(--text3);text-align:right;padding-right:6px;border-right:1px solid var(--line)}
+.scroll{flex:1;overflow:auto;position:relative}
+.hours{display:grid;grid-template-columns:56px repeat(7,minmax(0,1fr));position:relative}
+.hr{height:44px;border-bottom:1px solid var(--line);font-size:11px;color:var(--text3);text-align:right;padding-right:6px;transform:translateY(-7px)}
+.col{position:relative;border-right:1px solid var(--line);background:repeating-linear-gradient(to bottom,transparent 0 43px,var(--line) 43px 44px)}
+.blk{position:absolute;left:2px;right:4px;border-radius:5px;padding:2px 6px;font-size:12px;line-height:16px;overflow:hidden;background:color-mix(in srgb,var(--c) 20%,var(--surface));box-shadow:inset 3px 0 0 var(--c);cursor:pointer}
+.blk b{font-weight:600;display:block}.blk span{color:var(--text2)}
+.now{position:absolute;left:0;right:0;height:2px;background:var(--neg)}.now::before{content:"";position:absolute;left:-4px;top:-4px;width:10px;height:10px;border-radius:50%;background:var(--neg)}
+/* Agenda */
+.agenda{flex:1;overflow:auto;padding:4px 12px}
+.ag{display:grid;grid-template-columns:120px 150px minmax(0,1fr);gap:8px;padding:6px 0;border-bottom:1px solid var(--line);align-items:baseline}
+.ag .dt{font-weight:600}.ag .dt small{display:block;font-weight:400;color:var(--text3);font-size:12px}
+/* Dialog */
+.dlg{max-width:560px;padding:0}.dlg h3{font-size:16px;font-weight:600;margin:0;padding:14px 16px 6px}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px;padding:8px 16px 14px}.form .full{grid-column:1/-1}
+.lab{display:block;font-size:12px;font-weight:600;color:var(--text3);margin-bottom:4px}
+.in{height:36px;border:1px solid var(--line2);border-radius:6px;background:var(--surface);padding:0 10px;width:100%;display:flex;align-items:center;gap:6px}
+.in.hot{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}.ta{height:64px;align-items:flex-start;padding-top:8px;color:var(--text2)}
+.chk{display:flex;align-items:center;gap:8px;font-size:13px}.chk i{width:16px;height:16px;border-radius:4px;border:1px solid var(--line2);display:inline-block}
+.chk i.on{background:var(--accent);border-color:var(--accent)}
+.days{display:flex;gap:4px}.days span{width:30px;height:30px;border-radius:50%;border:1px solid var(--line2);display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:500}
+.days span.on{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.foot{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--line)}
+.btn.del{color:var(--neg)}
+.notes{font-size:13px;color:var(--text2);padding:12px 16px}.notes ul{margin:4px 0 0;padding-left:18px}.notes li{margin:2px 0}
+kbd{font:600 11px Inter,sans-serif;border:1px solid var(--line2);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--surface)}
+.below{display:grid;grid-template-columns:minmax(0,560px) minmax(0,1fr);gap:12px;align-items:start}
+@media (max-width:900px){.app{grid-template-columns:1fr;height:auto}.rail{display:none}.month{min-height:520px}.below{grid-template-columns:1fr}.search{display:none}}
+@media (max-width:600px){.weekv,.month{display:none!important}.agenda{display:block!important}.ag{grid-template-columns:1fr}}
+</style>
+
+<div class="wrap">
+  <div class="head"><h1>Calendar</h1><span class="muted">Organizer › Calendar · times in America/New_York</span></div>
+
+  <div class="app">
+    <aside class="panel rail">
+      <button class="btn pri" type="button">+ Create event</button>
+      <div class="mini">
+        <div class="mh"><button type="button" aria-label="Previous month">‹</button>November 2026<button type="button" aria-label="Next month">›</button></div>
+        <table>
+          <tr><th>S</th><th>M</th><th>T</th><th>W</th><th>T</th><th>F</th><th>S</th></tr>
+          <tr><td><span>1</span></td><td><span>2</span></td><td><span>3</span></td><td><span>4</span></td><td><span>5</span></td><td><span>6</span></td><td><span>7</span></td></tr>
+          <tr><td><span>8</span></td><td><span>9</span></td><td><span>10</span></td><td><span>11</span></td><td><span>12</span></td><td><span>13</span></td><td><span>14</span></td></tr>
+          <tr><td><span>15</span></td><td><span>16</span></td><td><span>17</span></td><td><span>18</span></td><td><span>19</span></td><td><span>20</span></td><td><span>21</span></td></tr>
+          <tr><td class="wk"><span>22</span></td><td class="wk"><span>23</span></td><td class="wk"><span>24</span></td><td class="today"><span>25</span></td><td class="wk"><span>26</span></td><td class="wk"><span>27</span></td><td class="wk"><span>28</span></td></tr>
+          <tr><td><span>29</span></td><td><span>30</span></td><td class="out"><span>1</span></td><td class="out"><span>2</span></td><td class="out"><span>3</span></td><td class="out"><span>4</span></td><td class="out"><span>5</span></td></tr>
+        </table>
+      </div>
+      <div>
+        <div class="sec">Company calendars <button class="btn sm ico" type="button" aria-label="New calendar" style="height:24px;width:24px">+</button></div>
+        <div class="cal"><span class="box" style="--c:var(--accent)">✓</span>Company</div>
+        <div class="cal"><span class="box" style="--c:var(--info)">✓</span>Deliveries &amp; catering</div>
+        <div class="cal"><span class="box" style="--c:var(--pos)">✓</span>Staff</div>
+        <div class="cal"><span class="box" style="--c:var(--neg)">✓</span>Closed &amp; holidays</div>
+      </div>
+      <div>
+        <div class="sec">My calendars</div>
+        <div class="cal"><span class="box off" style="--c:var(--warn)"></span>Glen (private)<span class="lock">only me</span></div>
+      </div>
+      <div>
+        <div class="sec">From BPS</div>
+        <div class="cal"><span class="box" style="--c:var(--gray)">✓</span>Production runs<span class="lock">read-only</span></div>
+      </div>
+      <div class="muted" style="font-size:12px;margin-top:auto">Keys: <kbd>t</kbd> today <kbd>d</kbd> <kbd>w</kbd> <kbd>m</kbd> <kbd>a</kbd> views <kbd>c</kbd> create <kbd>←</kbd><kbd>→</kbd> move <kbd>/</kbd> search <kbd>?</kbd> help</div>
+    </aside>
+
+    <section class="panel main">
+      <div class="bar">
+        <button class="btn sm" type="button">Today</button>
+        <button class="btn sm ico" type="button" aria-label="Previous">‹</button><button class="btn sm ico" type="button" aria-label="Next">›</button>
+        <h2 id="ttl">November 2026</h2>
+        <span class="grow"></span>
+        <div class="search">Search events</div>
+        <div class="seg" role="tablist">
+          <button type="button" data-v="day">Day</button><button type="button" data-v="week">Week</button><button type="button" data-v="month" class="on">Month</button><button type="button" data-v="agenda">Agenda</button>
+        </div>
+      </div>
+
+      <div class="month" id="v-month">
+        <div class="dows"><div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div></div>
+        <div class="week">
+          <div class="day"><span class="dn">1</span></div>
+          <div class="day"><span class="dn">2</span><div class="ev" style="--c:var(--pos)"><span class="d"></span><span class="t">7am</span>Staff meeting</div></div>
+          <div class="day"><span class="dn">3</span></div>
+          <div class="day"><span class="dn">4</span><div class="ev" style="--c:var(--info)"><span class="d"></span><span class="t">10am</span>Flour delivery</div></div>
+          <div class="day"><span class="dn">5</span></div>
+          <div class="day"><span class="dn">6</span><div class="ev all" style="--c:var(--accent)">Health inspection window</div></div>
+          <div class="day"><span class="dn">7</span></div>
+        </div>
+        <div class="week">
+          <div class="day"><span class="dn">8</span></div>
+          <div class="day"><span class="dn">9</span><div class="ev" style="--c:var(--pos)"><span class="d"></span><span class="t">7am</span>Staff meeting</div></div>
+          <div class="day"><span class="dn">10</span></div>
+          <div class="day"><span class="dn">11</span><div class="ev" style="--c:var(--info)"><span class="d"></span><span class="t">10am</span>Flour delivery</div><div class="ev all" style="--c:var(--neg)">Veterans Day: office closed</div></div>
+          <div class="day"><span class="dn">12</span></div>
+          <div class="day"><span class="dn">13</span></div>
+          <div class="day"><span class="dn">14</span><div class="ev" style="--c:var(--info)"><span class="d"></span><span class="t">2pm</span>Wedding cake: Rossi</div></div>
+        </div>
+        <div class="week">
+          <div class="day"><span class="dn">15</span></div>
+          <div class="day"><span class="dn">16</span><div class="ev" style="--c:var(--pos)"><span class="d"></span><span class="t">7am</span>Staff meeting</div></div>
+          <div class="day"><span class="dn">17</span><div class="ev" style="--c:var(--pos)"><span class="d"></span><span class="t">1pm</span>Food safety training</div></div>
+          <div class="day"><span class="dn">18</span><div class="ev" style="--c:var(--info)"><span class="d"></span><span class="t">10am</span>Flour delivery</div></div>
+          <div class="day"><span class="dn">19</span></div>
+          <div class="day"><span class="dn">20</span><div class="ev" style="--c:var(--accent)"><span class="d"></span><span class="t">9am</span>Holiday menu tasting</div></div>
+          <div class="day"><span class="dn">21</span></div>
+        </div>
+        <div class="week">
+          <div class="day out"><span class="dn">22</span></div>
+          <div class="day"><span class="dn">23</span><div class="ev prod">Production · MORNING</div><div class="ev" style="--c:var(--pos)"><span class="d"></span><span class="t">7am</span>Staff meeting</div></div>
+          <div class="day"><span class="dn">24</span><div class="ev prod">Delivery · MORNING</div><div class="ev" style="--c:var(--info)"><span class="d"></span><span class="t">6am</span>Catering: Lakeview Club</div></div>
+          <div class="day today"><span class="dn">25</span><span class="more" style="float:right">+1 more</span><div class="ev prod">Production · MORNING</div><div class="ev" style="--c:var(--info)"><span class="d"></span><span class="t">10am</span>Flour delivery</div></div>
+          <div class="day"><span class="dn">26</span><div class="ev all" style="--c:var(--neg)">Thanksgiving: bakery closed</div><div class="ev prod">Delivery · MORNING</div></div>
+          <div class="day"><span class="dn">27</span><div class="ev all" style="--c:var(--pos)">Maria off</div></div>
+          <div class="day"><span class="dn">28</span></div>
+        </div>
+        <div class="week">
+          <div class="day"><span class="dn">29</span></div>
+          <div class="day"><span class="dn">30</span><div class="ev" style="--c:var(--pos)"><span class="d"></span><span class="t">7am</span>Staff meeting</div></div>
+          <div class="day out"><span class="dn">1</span><div class="ev prod">Production · MORNING</div></div>
+          <div class="day out"><span class="dn">2</span><div class="ev prod">Delivery · MORNING</div><div class="ev" style="--c:var(--info)"><span class="d"></span><span class="t">10am</span>Flour delivery</div></div>
+          <div class="day out"><span class="dn">3</span><div class="ev prod">Production · MORNING</div></div>
+          <div class="day out"><span class="dn">4</span><div class="ev prod">Delivery · MORNING</div></div>
+          <div class="day out"><span class="dn">5</span></div>
+        </div>
+      </div>
+
+      <div class="weekv" id="v-week" hidden>
+        <div class="wgrid wh"><div></div><div>Sun<b>22</b></div><div>Mon<b>23</b></div><div>Tue<b>24</b></div><div class="today">Wed<b>25</b></div><div>Thu<b>26</b></div><div>Fri<b>27</b></div><div>Sat<b>28</b></div></div>
+        <div class="wgrid alld"><div class="lbl">all-day</div><div></div><div><div class="ev prod">Production · MORNING</div></div><div><div class="ev prod">Delivery · MORNING</div></div><div><div class="ev prod">Production · MORNING</div></div><div><div class="ev all" style="--c:var(--neg)">Thanksgiving: closed</div></div><div><div class="ev all" style="--c:var(--pos)">Maria off</div></div><div></div></div>
+        <div class="scroll" id="sc">
+          <div class="hours">
+            <div><div class="hr"></div><div class="hr">1 AM</div><div class="hr">2 AM</div><div class="hr">3 AM</div><div class="hr">4 AM</div><div class="hr">5 AM</div><div class="hr">6 AM</div><div class="hr">7 AM</div><div class="hr">8 AM</div><div class="hr">9 AM</div><div class="hr">10 AM</div><div class="hr">11 AM</div><div class="hr">12 PM</div><div class="hr">1 PM</div><div class="hr">2 PM</div><div class="hr">3 PM</div><div class="hr">4 PM</div><div class="hr">5 PM</div><div class="hr">6 PM</div><div class="hr">7 PM</div><div class="hr">8 PM</div><div class="hr">9 PM</div><div class="hr">10 PM</div><div class="hr">11 PM</div></div>
+            <div class="col" style="height:1056px"></div>
+            <div class="col"><div class="blk" style="--c:var(--pos);top:308px;height:44px"><b>Staff meeting</b><span>7:00 – 8:00 AM</span></div></div>
+            <div class="col"><div class="blk" style="--c:var(--info);top:264px;height:88px"><b>Catering: Lakeview Club</b><span>6:00 – 8:00 AM · Lakeview CC</span></div></div>
+            <div class="col"><div class="blk" style="--c:var(--info);top:440px;height:44px"><b>Flour delivery</b><span>10:00 – 11:00 AM</span></div><div class="blk" style="--c:var(--accent);top:616px;height:66px"><b>Call with packaging rep</b><span>2:00 – 3:30 PM</span></div><div class="now" style="top:1034px"></div></div>
+            <div class="col"></div>
+            <div class="col"></div>
+            <div class="col"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="agenda" id="v-agenda" hidden>
+        <div class="ag"><div class="dt">Wed 11/25<small>Today</small></div><div class="muted">All day</div><div><span class="ev prod" style="display:inline-flex">Production · MORNING</span></div></div>
+        <div class="ag"><div class="dt"></div><div>10:00 – 11:00 AM</div><div><span class="ev" style="--c:var(--info);display:inline-flex;padding:0"><span class="d"></span>Flour delivery</span> <span class="muted">· King Arthur</span></div></div>
+        <div class="ag"><div class="dt"></div><div>2:00 – 3:30 PM</div><div><span class="ev" style="--c:var(--accent);display:inline-flex;padding:0"><span class="d"></span>Call with packaging rep</span></div></div>
+        <div class="ag"><div class="dt">Thu 11/26</div><div class="muted">All day</div><div><span class="ev" style="--c:var(--neg);display:inline-flex;padding:0"><span class="d"></span>Thanksgiving: bakery closed</span></div></div>
+        <div class="ag"><div class="dt"></div><div class="muted">All day</div><div><span class="ev prod" style="display:inline-flex">Delivery · MORNING</span></div></div>
+        <div class="ag"><div class="dt">Fri 11/27</div><div class="muted">All day</div><div><span class="ev" style="--c:var(--pos);display:inline-flex;padding:0"><span class="d"></span>Maria off</span></div></div>
+        <div class="ag"><div class="dt">Mon 11/30</div><div>7:00 – 8:00 AM</div><div><span class="ev" style="--c:var(--pos);display:inline-flex;padding:0"><span class="d"></span>Staff meeting</span> <span class="muted">· repeats weekly</span></div></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="below">
+    <div class="panel dlg" role="dialog" aria-label="Edit event example">
+      <h3>Edit event</h3>
+      <div class="form">
+        <div class="full"><span class="lab">Title *</span><div class="in hot">Staff meeting</div></div>
+        <div class="full chk"><i></i>All day</div>
+        <div><span class="lab">Starts</span><div class="in">11/30/2026 · 7:00 AM</div></div>
+        <div><span class="lab">Ends</span><div class="in">11/30/2026 · 8:00 AM</div></div>
+        <div><span class="lab">Repeat</span><div class="in">Weekly ▾</div></div>
+        <div><span class="lab">Ends</span><div class="in">Never ▾</div></div>
+        <div class="full"><span class="lab">On</span><div class="days"><span>S</span><span class="on">M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div></div>
+        <div><span class="lab">Calendar</span><div class="in"><span class="box" style="--c:var(--pos);width:12px;height:12px"></span>Staff ▾</div></div>
+        <div><span class="lab">Location</span><div class="in">Back office</div></div>
+        <div class="full"><span class="lab">Notes</span><div class="in ta">Weekly run-through: holiday orders, staffing, equipment.</div></div>
+      </div>
+      <div class="foot"><button class="btn del" type="button">Delete</button><span class="grow"></span><button class="btn" type="button">Cancel</button><button class="btn pri" type="button">Save event</button></div>
+    </div>
+    <div class="panel notes">
+      <b>What this screen does</b>
+      <ul>
+        <li><b>Views:</b> Day, Week, Month and Agenda, with Today and ‹ › and the mini month to jump to any date. Week starts Sunday. Day and Week open scrolled to 5 AM for the early shift.</li>
+        <li><b>Calendars:</b> several per company, one colour each, ticked on or off (remembered per browser). A calendar is either shared with everyone who has Calendar access, or private to its owner. That is how an event is made private: put it on a private calendar.</li>
+        <li><b>Production runs</b> from Process Run appear read-only (dashed): the production date and the delivery date of each run. Clicking one opens Process Run.</li>
+        <li><b>Repeat:</b> daily, weekly on chosen days, monthly (same day), yearly, every N, ending never / on a date / after N times. Changing or deleting a repeating event asks: this event, this and following, or all.</li>
+        <li><b>Search</b> finds events by title, location or notes a year back and a year ahead, shown as an agenda list.</li>
+        <li><b>Database does the dates:</b> the visible days, today in the company time zone, repeat expansion and time labels all come from database functions.</li>
+        <li><b>Not in this version:</b> reminders, drag to move, invites/attendees, Google/Apple sync.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+const views={month:'v-month',week:'v-week',agenda:'v-agenda',day:'v-week'};
+const titles={month:'November 2026',week:'Nov 22 – 28, 2026',day:'Wed, Nov 25, 2026',agenda:'Nov 25 – Dec 24, 2026'};
+document.querySelectorAll('.seg button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.seg button').forEach(x=>x.classList.toggle('on',x===b));
+  Object.values(views).forEach(id=>document.getElementById(id).hidden=true);
+  document.getElementById(views[b.dataset.v]).hidden=false;
+  document.getElementById('ttl').textContent=titles[b.dataset.v];
+  if(b.dataset.v!=='month'){document.getElementById('sc').scrollTop=210}
+}));
+</script>
