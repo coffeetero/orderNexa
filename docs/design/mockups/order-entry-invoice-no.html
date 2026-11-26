@@ -1,0 +1,127 @@
+<title>Order Entry Invoice No</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Order Entry (protected screen): one read-only Invoice No. box is added to the item row, just left of the existing read-only
+   Order Number box; header, tab order and every other field unchanged. The Search existing orders panel finds orders of the chosen date by
+   invoice no., order no., PO, customer number or name, or department/event, and each row shows the invoice no. and PO. */
+:root{--bg:#f5f3f0;--surface:#fffefc;--side:#ede9e3;--line:#e1dbd3;--line2:#cfc7bc;--text:#1e1915;--text2:#544a41;--text3:#7a6e63;--accent:#a3451c;--accent-fg:#fff;--pos:#2d6e3e;--warn:#8f5a00;--focus:#a3451c;--new:#ffe9a8}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#161310;--surface:#1f1b17;--side:#1a1613;--line:#322c26;--line2:#433b33;--text:#efe9e2;--text2:#c4b9ad;--text3:#978b7e;--accent:#e58d60;--accent-fg:#1a120c;--pos:#7cc48c;--warn:#e0aa4a;--focus:#e58d60;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#161310;--surface:#1f1b17;--side:#1a1613;--line:#322c26;--line2:#433b33;--text:#efe9e2;--text2:#c4b9ad;--text3:#978b7e;--accent:#e58d60;--accent-fg:#1a120c;--pos:#7cc48c;--warn:#e0aa4a;--focus:#e58d60;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font:14px/20px Inter,system-ui,sans-serif;font-variant-numeric:tabular-nums;margin:0;padding-block:16px 32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+.wrap{max-width:1500px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+h1{font-size:18px;font-weight:600;margin:0}
+.note{font-size:13px;color:var(--text2);margin:0}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tabs button{height:30px;padding:0 12px;border-radius:6px;border:1px solid var(--line2);background:var(--surface);cursor:pointer;font-size:13px}
+.tabs button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;min-width:0}
+.hdr{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px;padding:8px 12px}
+.f{display:flex;flex-direction:column;gap:4px;min-width:0}
+.lab{font-size:12px;font-weight:600;color:var(--text3);letter-spacing:.02em}
+.in{height:36px;border:1px solid var(--line2);border-radius:6px;background:var(--surface);padding:0 8px;display:flex;align-items:center;white-space:nowrap;overflow:hidden}
+.date{background:color-mix(in srgb,var(--pos) 14%,var(--surface))}
+.ro{background:var(--side);border-color:var(--line);color:var(--text);font-weight:600}
+.ro.dim{color:var(--text3);font-weight:400;font-style:italic}
+.added{position:relative}
+.added::after{content:"new";position:absolute;top:-2px;right:0;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--warn)}
+.icon{width:36px;height:36px;border:1px solid var(--line2);border-radius:6px;background:var(--surface);display:grid;place-items:center;cursor:pointer}
+.items{border-top:1px solid var(--line);padding:8px 12px;color:var(--text3);font-size:13px}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:12px;align-items:start}
+@media (max-width:1100px){.grid2{grid-template-columns:1fr}}
+.sheet{padding:12px}
+.sheet h2{font-size:14px;font-weight:600;margin:0 0 2px}
+.search{height:32px;width:100%;border:1px solid var(--accent);box-shadow:0 0 0 1px var(--accent);border-radius:6px;padding:0 8px;background:var(--surface);margin:8px 0}
+.list{border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.cust{background:var(--bg);padding:4px 12px;font-weight:600;text-transform:uppercase;font-size:13px}
+.ord{display:grid;grid-template-columns:minmax(0,1fr) 84px;gap:8px;padding:3px 12px 3px 24px;border-top:1px solid var(--line);cursor:pointer}
+.ord:hover{background:color-mix(in srgb,var(--accent) 8%,var(--surface))}
+.ord.on{background:var(--accent);color:var(--accent-fg)}
+.ord .t{font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ord .t span{opacity:.75}
+.ord .a{text-align:right;font-weight:600}
+mark{background:var(--new);color:#1e1915;border-radius:2px;padding:0 1px}
+.legend{font-size:12px;color:var(--text3)}
+ul{margin:4px 0 0;padding-left:18px;font-size:13px;color:var(--text2)}
+.tag{display:inline-block;font-size:11px;font-weight:600;padding:0 6px;border-radius:9px;border:1px solid var(--line2);color:var(--text2);margin-right:4px}
+</style>
+
+<div class="wrap">
+  <div>
+    <h1>Order Entry: Invoice No.</h1>
+    <p class="note">Protected screen. One read-only Invoice No. box is added to the item row, left of the existing Order Number. PO Number is 20% narrower and Invoice No. and Order Number match its width; Tab skips them. The cutoff line under the header is removed (cutoffs are for customers). (Built 2026-11-25.)</p>
+  </div>
+
+  <div class="tabs" role="tablist" aria-label="Order state">
+    <button class="on" data-s="inv">Invoiced order</button>
+    <button data-s="draft">Order processed, not yet numbered</button>
+    <button data-s="open">Order not processed yet</button>
+    <button data-s="new">New order</button>
+  </div>
+
+  <div class="grid2">
+    <div class="panel">
+      <div class="hdr">
+        <div class="f" style="flex:1.2 1 300px"><span class="lab">Customer</span><div class="in">1040 · Harvard Club of NY</div></div>
+        <div class="f" style="flex:1 1 200px"><span class="lab">Department/Event</span><div class="in">Kitchen</div></div>
+        <div class="f" style="width:144px"><span class="lab">Production Date</span><div class="in date">11/26/2026</div></div>
+        <div class="f" style="width:112px"><span class="lab">Production Time</span><div class="in">AM</div></div>
+        <button class="icon" aria-label="Search existing orders" title="Search existing orders">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        </button>
+      </div>
+      <div class="hdr" style="border-top:1px solid var(--line)">
+        <div class="f" style="flex:1 1 220px"><span class="lab">Item</span><div class="in" style="color:var(--text3)">Search items…</div></div>
+        <div class="f" style="width:80px"><span class="lab">Quantity</span><div class="in"></div></div>
+        <div class="f" style="width:115px"><span class="lab">PO Number</span><div class="in"></div></div>
+        <div class="f" style="width:96px"><span class="lab">Delivery</span><div class="in">0.00</div></div>
+        <div class="f" style="width:96px"><span class="lab">Total Order</span><div class="in" style="justify-content:flex-end;font-weight:700">$212.50</div></div>
+        <div class="f added" style="width:115px"><span class="lab">Invoice No.</span><div class="in ro" id="inv" style="justify-content:center">INV-001000</div></div>
+        <div class="f" style="width:115px"><span class="lab">Order Number</span><div class="in" id="ord" style="justify-content:center">0115-1087</div></div>
+      </div>
+      <div class="items">Line grid unchanged.</div>
+    </div>
+
+    <div class="panel sheet" aria-label="Search existing orders panel">
+      <h2>Existing orders · 11/26/2026 AM</h2>
+      <div class="legend">Search panel (opened with the magnifier)</div>
+      <input class="search" value="4471" aria-label="Search" readonly>
+      <div class="legend" style="margin-bottom:6px">Placeholder: <i>Invoice, order, PO, customer or department…</i></div>
+      <div class="list" role="listbox">
+        <div class="cust">Harvard Club of NY</div>
+        <div class="ord on"><div class="t">0115-1087 · Kitchen <span>· INV-001000 · PO <mark>4471</mark></span></div><div class="a">$212.50</div></div>
+        <div class="cust">Bel Pane</div>
+        <div class="ord"><div class="t">0115-1090 · Main <span>· INV-001003 · PO 9<mark>4471</mark>2</span></div><div class="a">$98.00</div></div>
+      </div>
+      <ul>
+        <li>Matches on <b>invoice no., order no., PO, customer number or name, department/event</b>.</li>
+        <li>Searches all orders for the chosen <b>production date</b>, every time code, as today.</li>
+        <li>Rows still group by customer; invoice no. and PO are added in lighter text.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="panel" style="padding:12px">
+    <span class="tag">layout</span><b>Invoice No.</b> (read only) in the item row, left of the existing <b>Order Number</b>. Not focusable, so data entry is unchanged.
+    <ul>
+      <li><b>Invoiced:</b> the invoice number from AR.</li>
+      <li><b>Processed, not yet numbered:</b> "Draft". The number comes when tonight's Packaging List is printed.</li>
+      <li><b>Not processed:</b> "Not invoiced".</li>
+      <li><b>New order:</b> "New" (Order Number shows "New Order", as before).</li>
+    </ul>
+    <span class="tag">workflow</span><b>Search existing orders</b> also matches invoice no., PO and customer number. No other change to the panel or keyboard.
+  </div>
+</div>
+
+<script>
+const S={inv:['INV-001000','0115-1087',0],draft:['Draft','0115-1087',1],open:['Not invoiced','0115-1087',1],new:['New','New Order',1]};
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));
+  const [i,o,dim]=S[b.dataset.s];
+  const inv=document.getElementById('inv'),ord=document.getElementById('ord');
+  inv.textContent=i;ord.textContent=o;inv.classList.toggle('dim',!!dim);
+});
+</script>

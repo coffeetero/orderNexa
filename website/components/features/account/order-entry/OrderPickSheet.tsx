@@ -46,8 +46,11 @@ export function OrderPickSheet({
       ? candidates.filter((row) =>
           [
             row.customer_name,
+            row.customer_number,
             row.department_event,
             row.order_number,
+            row.invoice_number,
+            row.po_number,
           ]
             .filter(Boolean)
             .join(' ')
@@ -140,7 +143,7 @@ export function OrderPickSheet({
             setCustomerSearch(event.target.value);
             setActiveIndex(-1);
           }}
-          placeholder="Search Customer, Department/Event or Order.."
+          placeholder="Search invoice, order, PO, customer or department…"
           className="h-8 text-sm"
           onKeyDown={(event) => {
             if (['ArrowDown', 'ArrowUp', 'Home', 'End', 'Enter'].includes(event.key)) {
@@ -197,6 +200,12 @@ export function OrderPickSheet({
                       <span className="truncate text-xs font-medium">
                         {row.order_number || `Order #${row.order_id}`}
                         {row.department_event ? ` · ${row.department_event}` : ''}
+                        {(row.invoice_number || row.po_number) && (
+                          <span className="opacity-75">
+                            {row.invoice_number ? ` · ${row.invoice_number}` : ''}
+                            {row.po_number ? ` · PO ${row.po_number}` : ''}
+                          </span>
+                        )}
                       </span>
                       <span className="text-right text-sm font-semibold tabular-nums">
                         $

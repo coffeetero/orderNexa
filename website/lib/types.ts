@@ -151,6 +151,8 @@ export interface OrderHeaderListRow {
   top_customer_name?: string;
   /** Set for imported orders: IMPORTED / ISSUES (waiting for approval) or APPROVED. */
   import_status?: string | null;
+  /** The invoice number once issued (om_order_invoice_get). */
+  invoice_number?: string | null;
 }
 
 /** An item row returned by om_items_get, used in the Item combobox. */
@@ -215,6 +217,9 @@ export interface OrderEntryDraft {
   total_amount: number;
   /** Customer's internal order reference / PO number (stored in snapshot_data.order_ref). */
   order_ref?: string;
+  /** Read only, from om_order_invoice_get: the invoice number once issued, and ISSUED / DRAFT / NONE. */
+  invoice_number?: string | null;
+  invoice_status?: string;
   lines: OrderEntryLine[];
 }
 

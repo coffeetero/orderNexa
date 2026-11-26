@@ -74,7 +74,12 @@ export function useOrderEntryState(initial?: OrderEntryDraft) {
 
   const setField = useCallback(
     <K extends keyof OrderEntryDraft>(field: K, value: OrderEntryDraft[K]) => {
-      setDraft((prev) => ({ ...prev, [field]: value }));
+      setDraft((prev) =>
+        // another order: its invoice is loaded with it, so never show the previous order's
+        field === 'order_id' && prev.order_id !== value
+          ? { ...prev, [field]: value, invoice_number: null, invoice_status: undefined }
+          : { ...prev, [field]: value },
+      );
     },
     [],
   );

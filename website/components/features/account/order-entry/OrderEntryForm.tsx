@@ -61,6 +61,7 @@ function normalizeOrderHeaderRow(raw: Record<string, unknown>): OrderHeaderListR
     total_quantity: Number(raw.total_quantity ?? 0),
     customer_id: Number(raw.customer_id ?? 0),
     import_status: raw.import_status !== undefined && raw.import_status !== null ? String(raw.import_status) : null,
+    invoice_number: raw.invoice_number !== undefined && raw.invoice_number !== null ? String(raw.invoice_number) : null,
     customer_number:
       raw.customer_number !== undefined && raw.customer_number !== null
         ? String(raw.customer_number)
@@ -312,6 +313,8 @@ export function OrderEntryForm({
       production_code: (data.production_code as string) ?? '',
       delivery_amount: Number(data.delivery_amount ?? 0),
       total_amount: totalAmount,
+      invoice_number: (data.invoice_number as string | null) ?? null,
+      invoice_status: (data.invoice_status as string | undefined) ?? undefined,
       lines,
     };
   }, []);
@@ -452,38 +455,6 @@ export function OrderEntryForm({
     },
     [tenantId, draft.customer_id, draft.customer_name, loadOrderClean, mapOrderToDraft, showStatusMessage],
   );
-
-  // ── Cutoff for the selected production date + code (display only; the save function enforces it for customers) ──
-  const [cutoff, setCutoff] = useState<{
-    cutoff_at: string | null;
-    effective_cutoff_at: string | null;
-    time_zone: string | null;
-    is_open: boolean;
-  } | null>(null);
-  useEffect(() => {
-    if (!tenantId || !draft.production_date || !draft.production_code) {
-      setCutoff(null);
-      return;
-    }
-    let cancelled = false;
-    const qs = new URLSearchParams({
-      tenant_id: String(tenantId),
-      production_date: draft.production_date,
-      production_code: draft.production_code,
-    });
-    if (draft.customer_id) qs.set('customer_id', String(draft.customer_id));
-    fetch(`/api/orders/cutoff?${qs.toString()}`)
-      .then((r) => r.json())
-      .then((json: { data?: typeof cutoff }) => {
-        if (!cancelled) setCutoff(json.data ?? null);
-      })
-      .catch(() => {
-        if (!cancelled) setCutoff(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [tenantId, draft.production_date, draft.production_code, draft.customer_id]);
 
   // ── Load PRODUCTIONCODE valueset, default draft.production_code ───────────
   useEffect(() => {
@@ -1266,23 +1237,6 @@ export function OrderEntryForm({
           />
         </div>
 
-        {cutoff?.effective_cutoff_at && (
-          <p
-            className={cn(
-              'mt-1 px-1 text-xs',
-              cutoff.is_open ? 'text-muted-foreground' : 'font-medium text-warning',
-            )}
-            role="status"
-          >
-            Cutoff{' '}
-            {new Intl.DateTimeFormat('en-US', {
-              weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
-              timeZone: cutoff.time_zone ?? undefined,
-            }).format(new Date(cutoff.effective_cutoff_at))}
-            {cutoff.is_open ? '' : ' — closed to customers (staff can still save)'}
-          </p>
-        )}
-
         {draft.order_id && (importStatus === 'IMPORTED' || importStatus === 'ISSUES') && (
           <p role="status" className="mt-1 rounded bg-amber-100 px-2 py-1 text-xs font-medium text-amber-900 dark:bg-amber-950/60 dark:text-amber-200">
             Imported order — waiting for approval in Orders › Import Orders. Uploading that file again replaces this order and any changes made here.
@@ -1299,6 +1253,12 @@ export function OrderEntryForm({
             qtyRef={qtyRef}
             onCommit={handleItemCommit}
             orderNumber={draft.order_number}
+            invoiceIssued={Boolean(draft.order_id && draft.invoice_status === 'ISSUED' && draft.invoice_number)}
+            invoiceLabel={
+              !draft.order_id ? 'New'
+                : draft.invoice_status === 'ISSUED' && draft.invoice_number ? draft.invoice_number
+                  : draft.invoice_status === 'DRAFT' ? 'Draft' : 'Not invoiced'
+            }
             poNumber={draft.po_number}
             onPoNumberChange={(value) => setField('po_number', value)}
             deliveryAmount={draft.delivery_amount}

@@ -1,0 +1,119 @@
+<title>Enter Credits Redesign</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Financials › Enter Credits in the Hearth theme. Filters as in Enter Orders (Customer, Production Date, Production Time);
+   the customer's orders for that slot (Order No., Dept/Event, Amount, Status); picking one shows its items with Credit Qty and
+   Credit Amt; Cancel / Save on the Orders bar; Reason filled in from the credit lines. Sizes match Enter Payments. */
+:root{--bg:#f5f3f0;--surface:#fffefc;--side:#ede9e3;--line:#e1dbd3;--line2:#cfc7bc;--text:#1e1915;--text2:#544a41;--text3:#7a6e63;--accent:#a3451c;--accent-fg:#fff;--pos:#2d6e3e;--warn:#8f5a00;--info:#2a5fa8;--neg:#b3312a;--focus:#a3451c}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#161310;--surface:#1f1b17;--side:#1a1613;--line:#322c26;--line2:#433b33;--text:#efe9e2;--text2:#c4b9ad;--text3:#978b7e;--accent:#e58d60;--accent-fg:#1a120c;--pos:#7cc48c;--warn:#e0aa4a;--info:#7fb0ee;--neg:#ee8177;--focus:#e58d60;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#161310;--surface:#1f1b17;--side:#1a1613;--line:#322c26;--line2:#433b33;--text:#efe9e2;--text2:#c4b9ad;--text3:#978b7e;--accent:#e58d60;--accent-fg:#1a120c;--pos:#7cc48c;--warn:#e0aa4a;--info:#7fb0ee;--neg:#ee8177;--focus:#e58d60;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font:14px/20px Inter,system-ui,sans-serif;font-variant-numeric:tabular-nums;margin:0;padding-block:16px 32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+.wrap{max-width:1400px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+.head{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
+.head h1{font-size:18px;font-weight:600;margin:0}
+.muted{color:var(--text3)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:0 1px 2px rgb(0 0 0 / .04);min-width:0}
+.lab{display:block;font-size:12px;font-weight:600;color:var(--text3);margin-bottom:4px}
+.in{height:36px;border:1px solid var(--line2);border-radius:6px;background:var(--surface);padding:0 10px;width:100%;min-width:0;display:flex;align-items:center}
+.in.hot{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.date{background:color-mix(in srgb,var(--pos) 14%,var(--surface))}
+.btn{height:36px;padding:0 14px;border-radius:6px;border:1px solid var(--line2);background:var(--surface);font-weight:500;cursor:pointer;white-space:nowrap}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.btn:disabled{opacity:.45;cursor:default}
+.filters{display:grid;grid-template-columns:130px 170px minmax(240px,1fr) 150px 120px;gap:10px;padding:12px;align-items:end}
+.ph{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;padding:8px 12px;border-bottom:1px solid var(--line)}
+.ph h2{font-size:14px;font-weight:600;margin:0}
+.fig{font-size:13px;color:var(--text2)}.fig b{color:var(--text);font-weight:600}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:500;padding:1px 8px;border-radius:10px;border:1px solid var(--line2);white-space:nowrap}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--c)}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px;line-height:20px}
+th{height:32px;padding:0 10px;text-align:left;white-space:nowrap;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);background:color-mix(in srgb,var(--side) 60%,var(--surface));border-bottom:1px solid var(--line)}
+td{padding:5px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.r{text-align:right}
+.orders td{cursor:pointer}
+.orders tbody tr:hover td{background:color-mix(in srgb,var(--accent) 6%,var(--surface))}
+.orders tr.sel td{background:color-mix(in srgb,var(--accent) 14%,var(--surface));font-weight:500}
+.orders tr.sel td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+.orders tr.off td{color:var(--text3);cursor:default}
+.cq{width:84px;height:30px;text-align:right;border:1px solid var(--line2);border-radius:5px;background:color-mix(in srgb,var(--info) 6%,var(--surface));padding:0 8px}
+.cq:focus{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);outline:none}
+.cr{color:var(--neg);font-weight:600}
+tr.tot td{font-weight:600;border-bottom:0;background:color-mix(in srgb,var(--side) 40%,var(--surface))}
+.foot{display:flex;flex-wrap:wrap;gap:10px;padding:12px;border-top:1px solid var(--line);align-items:end}
+.foot .reason{flex:1 1 320px}
+.notes{font-size:13px;color:var(--text2);padding:12px}
+.notes ul{margin:4px 0 0;padding-left:18px}
+.tag{display:inline-block;font-size:11px;font-weight:600;padding:0 6px;border-radius:9px;border:1px solid var(--line2);color:var(--text2);margin-right:4px}
+@media (max-width:700px){.filters{grid-template-columns:1fr 1fr}.filters .cust{grid-column:1/-1}}
+</style>
+
+<div class="wrap">
+  <div class="head">
+    <h1>Enter Credits</h1>
+    <span class="muted">Financials › Adjustments</span>
+  </div>
+
+  <div class="panel">
+    <div class="filters">
+      <div><span class="lab">Find by</span><div class="in">Order No. ▾</div></div>
+      <div><span class="lab">Number</span><div class="in" style="color:var(--text3)">Enter to find, blank to skip</div></div>
+      <div class="cust"><span class="lab">Customer</span><div class="in hot">15700 · Featherstone Baking</div></div>
+      <div><span class="lab">Production Date</span><div class="in date">11/27/2026</div></div>
+      <div><span class="lab">Production Time</span><div class="in">AM</div></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="ph"><h2>Orders for Featherstone Baking · 11/27/2026 AM</h2><span style="flex:1"></span><button class="btn" style="height:32px">Cancel</button><button class="btn pri" id="save" style="height:32px">Save</button></div>
+    <div class="tw"><table class="orders">
+      <thead><tr><th style="text-align:center">Order No.</th><th>Dept/Event</th><th>PO Number</th><th class="r">Amount</th><th style="text-align:center">Invoice No.</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr class="sel" data-o="a"><td style="text-align:center">1175244</td><td>Kitchen</td><td>PO-4471</td><td class="r">$108.00</td><td style="text-align:center">546224</td><td><span class="pill"><span class="dot" style="--c:var(--warn)"></span>Invoiced · open</span></td></tr>
+        <tr data-o="b"><td style="text-align:center">1175245</td><td>Banquet</td><td>PO-4471</td><td class="r">$104.50</td><td style="text-align:center">546224</td><td><span class="pill"><span class="dot" style="--c:var(--info)"></span>Credited $6.50</span></td></tr>
+        <tr class="off" title="Not invoiced yet: change the order in Enter Orders instead"><td style="text-align:center">1175260</td><td>Bar (site: Featherstone Hoboken)</td><td></td><td class="r">$42.00</td><td></td><td><span class="pill"><span class="dot" style="--c:var(--text3)"></span>Not invoiced</span></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="panel">
+    <div class="ph"><h2>Order Detail</h2><span class="fig" id="oh">Order 1175244 · Kitchen · Invoice No. <b>546224</b></span></div>
+    <div class="tw"><table>
+      <thead><tr><th>Item name</th><th style="text-align:center">Qty</th><th class="r">Price</th><th class="r">Extended</th><th class="r">Credit Qty</th><th class="r">Credit Amt</th></tr></thead>
+      <tbody id="items"></tbody>
+    </table></div>
+    <div class="foot">
+      <div class="reason"><label class="lab" for="reason">Reason</label><input id="reason" class="in" placeholder="Filled in from the credit lines; type to change it"></div>
+    </div>
+  </div>
+
+  <div class="panel notes">
+    <span class="tag">layout</span> Filters as in Enter Orders, the orders list, then the selected order's items. Cancel and Save sit under the grid.
+    <ul>
+      <li><b>Find by</b> Order No. (default), Invoice No. or PO No., and a <b>Number</b> box (letters and digits; the cursor starts here). Enter finds it and opens its customer, date and time with the order selected; several matches (a PO used on more than one day) show a list to click. Blank + Enter moves to the customer search. Production Date and Time stay disabled until a customer is chosen, and Customer, Date and Time are all disabled while a number is in the box (clear it to change them).</li>
+      <li><b>Filters:</b> Customer uses the Enter Orders customer search, showing <b>account customers only</b> (as in Enter Payments); the list then includes the orders of its departments and sites too, since they share the account's invoice. Production Date and Production Time as in Enter Orders. The list fills as soon as all three are set.</li>
+      <li><b>Orders:</b> Order No., Dept/Event, Amount, Invoice, Status; about 8 rows show, the rest scroll inside the list. Status is the invoice's: Not invoiced, Draft, Invoiced · open, Paid, Credited $x. Orders not invoiced yet can't be credited; change them in Enter Orders.</li>
+      <li><b>Items:</b> Item name, Qty, Price, Extended, Credit Qty (typed), Credit Amt. The delivery charge is a line too. Qty can't go over what's left after earlier credits; the database checks it.</li>
+    </ul>
+    <span class="tag">workflow</span> Save creates one numbered credit memo in AR for the selected order's lines, linked to its invoice. ↑ ↓ picks an order, Tab moves down the Credit Qty boxes, Cancel clears the typed quantities.
+  </div>
+</div>
+
+<script>
+const O={a:{h:'Order 1175244 · Kitchen · Invoice No. 546224',l:[['French Baguette',40,1.25,0],['Kaiser Roll',120,0.45,20],['Delivery charge',1,4,0]]},
+         b:{h:'Order 1175245 · Banquet · Invoice No. 546224',l:[['Grissini Rosemary',60,1.10,0],['Sourdough Loaf',10,3.85,0]]}};
+const fmt=v=>'$'+v.toFixed(2);
+function show(k){const o=O[k];document.getElementById('oh').textContent=o.h;
+ document.getElementById('items').innerHTML=o.l.map(([n,q,p,c])=>`<tr><td>${n}</td><td style="text-align:center">${q}</td><td class="r">${fmt(p)}</td><td class="r">${fmt(q*p)}</td><td class="r"><input class="cq" data-p="${p}" value="${c||''}" aria-label="Credit qty ${n}"></td><td class="r cr"></td></tr>`).join('')+
+ `<tr class="tot"><td>Order total</td><td></td><td></td><td class="r">${fmt(o.l.reduce((s,[,q,p])=>s+q*p,0))}</td><td></td><td class="r cr" id="tot"></td></tr>`;
+ document.querySelectorAll('.cq').forEach(i=>i.addEventListener('input',calc));calc()}
+function calc(){let t=0;document.querySelectorAll('.cq').forEach(i=>{const a=(parseFloat(i.value)||0)*parseFloat(i.dataset.p);t+=a;i.closest('tr').querySelector('.cr').textContent=a?'-'+fmt(a):''});
+ document.getElementById('tot').textContent=t?'-'+fmt(t):'';document.getElementById('save').disabled=!t;
+ document.getElementById('reason').value=[...document.querySelectorAll('.cq')].filter(i=>parseFloat(i.value)>0).map(i=>'Credit '+i.value+' '+i.closest('tr').cells[0].textContent).join(', ')}
+document.querySelectorAll('.orders tbody tr:not(.off)').forEach(r=>r.onclick=()=>{document.querySelectorAll('.orders tbody tr').forEach(x=>x.classList.toggle('sel',x===r));show(r.dataset.o)});
+show('a');
+</script>

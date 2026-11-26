@@ -23,6 +23,9 @@ interface ItemEntryRowProps {
   onCommit: (item: OrderEntryItem, quantity: number) => void;
   /** Display-only current order number/reference. */
   orderNumber: string;
+  /** Invoice number once issued, or Draft / Not invoiced / New (read only). */
+  invoiceLabel: string;
+  invoiceIssued: boolean;
   /** Customer purchase order number for this order. */
   poNumber: string;
   onPoNumberChange: (value: string) => void;
@@ -43,6 +46,8 @@ export function ItemEntryRow({
   qtyRef,
   onCommit,
   orderNumber,
+  invoiceLabel,
+  invoiceIssued,
   poNumber,
   onPoNumberChange,
   deliveryAmount,
@@ -132,8 +137,8 @@ export function ItemEntryRow({
         />
       </div>
 
-      {/* Qty — same width as Delivery (w-20) */}
-      <div className="flex w-20 shrink-0 flex-col gap-1">
+      {/* Qty */}
+      <div className="flex w-[60px] shrink-0 flex-col gap-1">
         <Label
           htmlFor="item-qty"
           className={cn(
@@ -141,7 +146,7 @@ export function ItemEntryRow({
             'w-full justify-center text-center !items-center',
           )}
         >
-          Quantity
+          QTY
         </Label>
         <input
           id="item-qty"
@@ -168,7 +173,7 @@ export function ItemEntryRow({
       </div>
 
       {/* PO Number */}
-      <div className="flex w-36 shrink-0 flex-col gap-1">
+      <div className="flex w-24 shrink-0 flex-col gap-1">
         <Label
           htmlFor="po-number"
           className={cn(CONTROL_LABEL, 'w-full justify-center text-center !items-center')}
@@ -242,8 +247,24 @@ export function ItemEntryRow({
         </span>
       </div>
 
+      {/* Invoice No. (read only) */}
+      <div className="flex w-24 min-w-0 shrink-0 flex-col gap-1">
+        <span className={cn(CONTROL_LABEL, 'w-full justify-center text-center !items-center')}>
+          Invoice No.
+        </span>
+        <div
+          className={cn(
+            'flex h-9 w-full items-center justify-center rounded-md border border-input bg-background px-3 text-center text-sm text-foreground',
+            !invoiceIssued && 'text-muted-foreground',
+          )}
+          aria-label="Invoice number"
+        >
+          <span className="truncate">{invoiceLabel}</span>
+        </div>
+      </div>
+
       {/* Order Number */}
-      <div className="flex w-[173px] min-w-0 shrink-0 flex-col gap-1">
+      <div className="flex w-24 min-w-0 shrink-0 flex-col gap-1">
         <Label
           htmlFor="order-number-display"
           className={cn(CONTROL_LABEL, 'w-full justify-center text-center !items-center')}

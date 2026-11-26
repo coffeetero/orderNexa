@@ -105,6 +105,22 @@ Status: first release built (see docs/Architecture/health-checks.md): two tables
 - Every route ends in a credit memo in AR; applying a credit to an invoice is a credit application (Financials › Manage Payments), never negative cash.
 - To design Enter Returns (mockup first): stales policy (credit up to a % of delivered?), entry by delivery date / customer / item quantities with BPS pricing them, whether returned goods are tracked for waste or production, and debit memos (charges) if Alpine needs them.
 
+### Post Orders: rename Process Run, number invoices, post to AR (decided 2026-11-25, not built)
+- Rename Production › Process Run to **Post Orders**. Posting locks the run for customers (firm cutoff), creates one invoice per bill-to customer per run, **gives it its number** (moved from the Packaging print) and posts it to AR. Packaging List and Print Invoices only print what is posted.
+- No production table is needed: the Baker's Report already expands compound items on the fly (`om_run_item_quantities`).
+- Application setting **"Lock invoices with Post"** (per company, Admin › Application Settings):
+  - ON: posted orders cannot be edited; corrections go through Enter Credits (or a reopen by a privileged user, to decide).
+  - OFF: staff may edit a posted order; the save re-syncs that customer's invoice for the run by invoice number (same number, lines and amount rebuilt from its orders) in the same transaction, so AR follows; the invoice is flagged "changed since printed". One database function builds invoices for both Post Orders and order save.
+- **Once an invoice is paid (any payment applied), changes go only through Enter Credits**, whatever the setting. Probably the same for a confirmed delivery or a closed period (to confirm).
+- Orders keep their own numbers per Department/Event (as in old BPS: easier to call about an order number); all of a customer's orders for a run share one invoice.
+- Open: who may reopen a posted run; whether an order entered after posting joins the invoice automatically (setting OFF); gapless numbering vs "cancelled, number kept".
+
+### Credits flow (decided 2026-11-25, Enter Credits screen in progress)
+- A credit is a CM in AR linked to the invoice (and line) it is for. It is not applied to that invoice automatically: open credits are applied to the customer's **next issued invoice** and printed on it ("Less credit CM 1042 for INV-1000 (11/27), 20 rolls short"). If there is no next invoice it stays open on the account.
+- Paid invoice: the credit stays open and is used on later invoices.
+- Needs: `ar_credit_applications.ar_payment_id` optional (apply without a payment), apply-on-issue in the posting function, credits on the invoice print and reprint, customer portal shows the CM and balance.
+- Statement: each invoice followed by its credit lines (number, date, reason), the invoice balance on its last line; leftover open credits as their own lines.
+
 ### AR troubleshooting and write-off screen (idea 2026-11-25, not designed)
 - Built on `bps.ar_open_items`: list old documents that are still open (e.g. a 2022 invoice or a 2000 payment), show their history (invoice, applications, reversals, credits) so a user can see why the balance remains.
 - Actions: write off an invoice remainder to an allowance, zero out an unapplied payment, or apply it to an invoice. Needs: approval rules, an allowance/write-off document type, audit, and how write-offs show on statements and in the sales report.

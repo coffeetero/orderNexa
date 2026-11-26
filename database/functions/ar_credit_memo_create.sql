@@ -26,6 +26,7 @@ DECLARE
     v_total    numeric := 0;
     v_n        integer := 0;
     v_reason   text := NULLIF(TRIM(p_payload ->> 'reason'), '');
+    v_desc     text;
 BEGIN
     IF NOT bps.fnd_is_tenant_staff(p_tenant_id) THEN
         RAISE EXCEPTION 'Only tenant staff can create credit memos';
@@ -57,6 +58,10 @@ BEGIN
         IF NOT FOUND THEN
             RAISE EXCEPTION 'Line % is not on invoice %', v_line ->> 'ar_transaction_line_id', v_inv.document_number;
         END IF;
+        -- imported invoice lines say just 'INVOICE': use the item's name
+        v_desc := CASE WHEN COALESCE(UPPER(TRIM(v_il.item_description)), 'INVOICE') IN ('INVOICE', '')
+                       THEN COALESCE((SELECT i.item_name FROM fnd_items i WHERE i.item_id = v_il.item_id), v_il.item_description)
+                       ELSE v_il.item_description END;
         IF v_qty IS NULL OR v_qty <= 0 THEN
             RAISE EXCEPTION 'Credit quantity must be above zero';
         END IF;
@@ -66,12 +71,12 @@ BEGIN
         -- an item line can only be credited up to what actually shipped (a short delivery is already not receivable)
         v_cap := COALESCE((SELECT sl.shipped_quantity FROM om_shipment_lines sl WHERE sl.shipment_line_id = v_il.shipment_line_id), v_il.quantity, 0);
         IF v_qty > v_cap - v_credited THEN
-            RAISE EXCEPTION 'Cannot credit % of "%": % delivered, % already credited', v_qty, v_il.item_description, v_cap, v_credited;
+            RAISE EXCEPTION 'Cannot credit % of "%": % delivered, % already credited', trim_scale(v_qty), v_desc, trim_scale(v_cap), trim_scale(v_credited);
         END IF;
         v_n := v_n + 1;
         INSERT INTO ar_transaction_lines (tenant_id, ar_transaction_id, line_number, source_type, item_id, item_description,
                                           quantity, unit_price, amount, snapshot_data)
-        VALUES (p_tenant_id, v_cm_id, v_n, 'ADJUSTMENT', v_il.item_id, v_il.item_description, v_qty, v_il.unit_price,
+        VALUES (p_tenant_id, v_cm_id, v_n, 'ADJUSTMENT', v_il.item_id, v_desc, v_qty, v_il.unit_price,
                 -(v_qty * COALESCE(v_il.unit_price, 0)),
                 jsonb_build_object('credits_line_id', v_il.ar_transaction_line_id, 'invoice_number', v_inv.document_number,
                                    'order_number', v_il.snapshot_data ->> 'order_number', 'reason', v_reason));

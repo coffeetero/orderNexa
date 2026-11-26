@@ -16,6 +16,9 @@
 --   List (neither of the above):
 --     Returns up to 500 order headers matching the filters.
 --
+-- Every mode except suggestions adds invoice_number / invoice_status (om_order_invoice_get); the list also adds
+-- customer_number, so Order Entry can search orders by invoice no., PO or customer number.
+--
 -- Customer type: DEPARTMENT customers are looked up via their parent.
 -- (LOCATION is no longer used — superseded by DEPARTMENT.)
 -- ============================================================
@@ -67,7 +70,7 @@ BEGIN
                 'customer_name',    COALESCE(o.customer_name, c.customer_name, o.snapshot_data->>'cus_name', ''),
                 'snapshot_data',    o.snapshot_data,
                 'lines',            '[]'::JSONB
-            ) INTO v_result
+            ) || bps.om_order_invoice_get(p_tenant_id, o.order_id) INTO v_result
             FROM om_orders o
             LEFT JOIN fnd_customers c
                    ON c.customer_id = o.customer_id AND c.tenant_id = o.tenant_id
@@ -95,7 +98,7 @@ BEGIN
                 'customer_name',    COALESCE(o.customer_name, c.customer_name, o.snapshot_data->>'cus_name', ''),
                 'snapshot_data',    o.snapshot_data,
                 'lines',            COALESCE(lines_agg.lines, '[]'::JSONB)
-            ) INTO v_result
+            ) || bps.om_order_invoice_get(p_tenant_id, o.order_id) INTO v_result
             FROM om_orders o
             LEFT JOIN fnd_customers c
                    ON c.customer_id = o.customer_id AND c.tenant_id = o.tenant_id
@@ -195,12 +198,14 @@ BEGIN
             'import_status',    o.import_status,
             'amount',           o.amount,
             'customer_id',      o.customer_id,
-            'customer_name',    o.customer_name
-        ) AS row_data,
+            'customer_name',    o.customer_name,
+            'customer_number',  c.customer_number
+        ) || bps.om_order_invoice_get(p_tenant_id, o.order_id) AS row_data,
         o.order_id AS order_id_sort,
         COALESCE(o.customer_name, '') AS customer_name_sort,
         COALESCE(o.department_event, '') AS department_event_sort
         FROM om_orders o
+        LEFT JOIN fnd_customers c ON c.customer_id = o.customer_id AND c.tenant_id = o.tenant_id
        WHERE o.tenant_id = p_tenant_id
          AND (v_lookup_customer_id IS NULL OR o.customer_id = v_lookup_customer_id)
          AND (p_production_date_from IS NULL OR o.production_date >= p_production_date_from)

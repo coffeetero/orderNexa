@@ -99,10 +99,10 @@ BEGIN
                                     AND transaction_type = 'INV' AND status <> 'CANCELLED');
 
     INSERT INTO ar_transaction_lines (tenant_id, ar_transaction_id, line_number, source_type, item_id, item_description,
-                                      quantity, unit_price, amount, shipment_line_id, snapshot_data)
+                                      quantity, unit_price, amount, shipment_line_id, order_id, snapshot_data)
     SELECT p_tenant_id, src.ar_transaction_id,
            ROW_NUMBER() OVER (PARTITION BY src.ar_transaction_id ORDER BY src.department_event, src.order_number, src.kind_rank, src.order_line_id),
-           src.source_type, src.item_id, src.item_description, src.quantity, src.unit_price, src.amount, src.shipment_line_id,
+           src.source_type, src.item_id, src.item_description, src.quantity, src.unit_price, src.amount, src.shipment_line_id, src.order_id,
            jsonb_build_object('order_id', src.order_id, 'order_number', src.order_number, 'order_line_id', src.order_line_id,
                               'department_event', src.department_event, 'customer_id', src.customer_id,
                               'customer_name', src.customer_name, 'po_number', src.po_number)
