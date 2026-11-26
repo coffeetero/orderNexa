@@ -90,9 +90,9 @@ export function QuickBar() {
             const a = byHref.get(href)!;
             const Icon = iconFor(a);
             return (
-              <Button key={href} asChild variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground">
+              <Button key={href} asChild variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
                 <GuardedLink href={href} aria-label={a.label} title={a.label}>
-                  <Icon className="h-4 w-4" />
+                  <Icon className="h-5 w-5" />
                 </GuardedLink>
               </Button>
             );
@@ -118,8 +118,8 @@ function ButtonsEditor({ buttons, actions, onSave }: { buttons: string[]; action
       }}
     >
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground" aria-label="Choose quick buttons" title="Choose quick buttons">
-          <Pencil className="h-3 w-3" />
+        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" aria-label="Choose quick buttons" title="Choose quick buttons">
+          <Pencil className="h-4 w-4" />
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-72 space-y-2 p-3 text-sm">
@@ -202,7 +202,7 @@ function ScreenSearch({ actions }: { actions: BuiltAction[] }) {
 
   return (
     <div className="relative hidden sm:block">
-      <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+      <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
       <input
         ref={inputRef}
         type="search"
@@ -225,7 +225,7 @@ function ScreenSearch({ actions }: { actions: BuiltAction[] }) {
           else if (e.key === 'Enter' && matches[active]) { e.preventDefault(); go(matches[active]); }
           else if (e.key === 'Escape') { setQ(''); inputRef.current?.blur(); }
         }}
-        className="h-6 w-56 rounded-md border border-input bg-background pl-7 pr-2 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+        className="h-8 w-60 text-sm rounded-md border border-input bg-background pl-7 pr-2 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
       />
       {open && matches.length > 0 && (
         <ul id="screen-search-list" role="listbox" className="absolute right-0 z-50 mt-1 w-72 overflow-hidden rounded-md border border-border bg-popover py-1 text-sm text-popover-foreground shadow-md">

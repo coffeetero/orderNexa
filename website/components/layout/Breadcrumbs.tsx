@@ -25,19 +25,19 @@ export function Breadcrumbs({ showSidebarToggle, sidebarOpen, onToggleSidebar }:
   const crumbs = buildBreadcrumbs(pathname, tenantNav, record);
 
   return (
-    <div className="flex h-8 shrink-0 items-center gap-2 border-b border-border bg-muted/30 px-3 text-xs sm:px-4">
+    <div className="flex h-[42px] shrink-0 items-center gap-2 border-b border-border bg-muted/30 px-3 text-xs sm:px-4">
       {showSidebarToggle && (
         <Button
           type="button"
           variant="ghost"
           size="icon"
-          className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground"
+          className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
           onClick={onToggleSidebar}
           aria-label={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
           aria-expanded={!!sidebarOpen}
           aria-controls="context-sidebar"
         >
-          <PanelLeft className="h-4 w-4" />
+          <PanelLeft className="h-5 w-5" />
         </Button>
       )}
 
