@@ -32,9 +32,11 @@ export const CUSTOM_LIMIT = 20;
  * - Clay: inspired by Anthropic's Claude look (warm ivory paper, clay/terracotta accent).
  * - High contrast: accessibility (black on white / white on black, saturated roles; well past WCAG AAA for body text).
  * - Sepia: warm paper, inspired by e-reader sepia modes.
+ * - BPS Classic: the old BPS desktop app's window colours (Windows gray and blue, yellow headers, cyan entry fields).
  */
 export const BAKERY_ID = 'bakery';
 export const LEDGER_ID = 'ledger';
+export const BPS_CLASSIC_ID = 'bps-classic';
 export const HEARTH_ID = 'hearth';
 export const BUILTIN_THEMES: ThemeDef[] = [
   { v: 1, id: LEDGER_ID, label: 'Ledger', inputs: {
@@ -52,6 +54,12 @@ export const BUILTIN_THEMES: ThemeDef[] = [
   { v: 1, id: BAKERY_ID, label: 'Bakery', inputs: {
     light: { accent: '#7e4925', danger: '#dc2828', success: '#059467', warning: '#db7706', pro: '#0284c5', 'surface-0': '#faf8f5', 'surface-1': '#efebe7', 'surface-2': '#f6f3ee', 'text-primary': '#251d18', 'text-secondary': '#3d3129', 'text-muted': '#8d7768' },
     dark: { accent: '#cca35c', danger: '#d54444', success: '#36d399', warning: '#fbbd23', pro: '#38bdfa', 'surface-0': '#1e1915', 'surface-1': '#342d27', 'surface-2': '#29231e', 'text-primary': '#f0ece6', 'text-secondary': '#e2dbcf', 'text-muted': '#a49784' },
+  } },
+  // BPS Classic: the old BPS (PowerBuilder) window colours, softened to pass contrast; light only (old BPS had no dark mode). Approved
+  // 2026-11-25 (docs/design/mockups/bps-classic-theme.html). Its yellow column headers, cyan entry fields, yellow balances, blue top bar,
+  // blue selected row and grid lines are in globals.css under :root[data-bps-theme='bps-classic'].
+  { v: 1, id: BPS_CLASSIC_ID, label: 'BPS Classic', inputs: {
+    light: { accent: '#0a5fc2', danger: '#c42b1c', success: '#107c10', warning: '#8a5a00', pro: '#005a9e', 'surface-0': '#ececec', 'surface-1': '#e1e1e1', 'surface-2': '#ffffff', 'text-primary': '#000000', 'text-secondary': '#262626', 'text-muted': '#5c5c5c' },
   } },
   { v: 1, id: 'clay', label: 'Clay', inputs: {
     light: { accent: '#ac4f2d', danger: '#b3392f', success: '#2c764a', warning: '#8b5f0e', pro: '#6d4f94', 'surface-0': '#f5f4ee', 'surface-1': '#eeebe1', 'surface-2': '#fffdf8', 'text-primary': '#29261b', 'text-secondary': '#4f4b3f', 'text-muted': '#655f52' },

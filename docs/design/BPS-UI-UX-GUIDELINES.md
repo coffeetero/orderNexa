@@ -58,6 +58,7 @@ Architecture (`website/lib/theme/`): a theme is data only, 11 hex seed colors pe
 | **Ledger** | Cool slate, white work surfaces | Ink blue |
 | **Hearth** (default) | Warm grey, white panels | Copper |
 | **Graphite** | Green-grey, dark top bar in both modes | Teal |
+| **BPS Classic** | The old BPS window: Windows gray, blue top bar, yellow headers, cyan entry fields; light only | Windows blue |
 
 Bakery (the original look), Clay, Sepia, High contrast and the curated catalog remain available. **Printing** still uses Bakery's fixed light colours. The **customer portal** shows the default theme (Hearth) whatever a device last chose; customers cannot pick a theme.
 
@@ -180,3 +181,4 @@ Before calling UI work done:
 | 2026-11-25 | AR Open Balances: list only customers with an open balance (with the balance), click a name for its open items below (each with the payments and credits applied and what else they covered), collapsible first section that folds when a customer is opened. |
 | 2026-11-25 | Financials › Cash › Enter Payments (docs/design/mockups/enter-payments.html), modeled on old BPS AR - Payments: Customer picker as in Enter Orders (accounts only), Received, Check no. (CASH for cash), Amount, live Check balance; cursor waits in Invoice #, ↑ ↓ / typing / click picks, Enter or Tab to Payment (defaults to what is open), Enter applies and moves to the next open one; Tab to Allowance and Allowance reason (why and which items, stored on the invoice); credits taken whole; read-only list with one live Balance column (Returns column kept); Cancel and Save payment top right; over-applying blocks Save, money left over is kept as unapplied cash only after asking. Manage Payments renamed Payment History. |
 | 2026-11-25 | Enter Payments: earlier payments with unapplied cash show in the list as PMT rows and are taken whole like credits (oldest money is applied first); a new payment needs its check no. or CASH (reapplying earlier cash alone does not); money left over gets a gentle confirm. |
+| 2026-11-25 | New built-in theme BPS Classic (docs/design/mockups/bps-classic-theme.html): old BPS window colours, softened to pass contrast, light only. Windows gray and blue, blue top bar, yellow table headers and grid lines everywhere; screens opt in to yellow field labels (bps-label), cyan fields you type in (bps-entry), yellow highlighted amounts (bps-hi) and a blue selected row (bps-sel). These styles exist only under data-bps-theme='bps-classic', so other themes are unchanged. Enter Payments uses all four. |

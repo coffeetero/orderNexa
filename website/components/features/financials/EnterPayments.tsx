@@ -27,7 +27,7 @@ const cents = (v: number) => Math.round(v * 100);
 const shortDate = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
 const localToday = () => new Date().toLocaleDateString('en-CA');
 const IN = 'h-9 w-full min-w-0 rounded-md border border-input bg-background px-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
-const LAB = 'mb-1 block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground';
+const LAB = 'bps-label mb-1 block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground';
 const TH = 'h-8 whitespace-nowrap bg-muted/50 px-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground';
 const TD = 'whitespace-nowrap px-2.5 py-1.5';
 
@@ -228,7 +228,7 @@ export function EnterPayments({ tenantId }: { tenantId: number }) {
           </div>
           <div>
             <span className={LAB}>Check balance</span>
-            <div className={`flex h-9 items-center justify-end rounded-md border px-3 text-base font-semibold tabular-nums ${balTone}`} aria-live="polite">{money(left)}</div>
+            <div className={`bps-hi flex h-9 items-center justify-end rounded-md border px-3 text-base font-semibold tabular-nums ${balTone}`} aria-live="polite">{money(left)}</div>
           </div>
         </div>
 
@@ -245,18 +245,18 @@ export function EnterPayments({ tenantId }: { tenantId: number }) {
           </div>
           <div>
             <label className={LAB} htmlFor="pay-pay">Payment</label>
-            <input id="pay-pay" ref={payRef} className={`${IN} text-right tabular-nums`} inputMode="decimal" placeholder="0.00" value={pay} disabled={sel < 0}
+            <input id="pay-pay" ref={payRef} className={`${IN} bps-entry text-right tabular-nums`} inputMode="decimal" placeholder="0.00" value={pay} disabled={sel < 0}
               readOnly={!!rows?.[sel]?.credit} onChange={(e) => setPay(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); apply(); } else if (e.key === 'Escape') invRef.current?.focus(); }} />
           </div>
           <div>
             <label className={LAB} htmlFor="pay-allow">Allowance</label>
-            <input id="pay-allow" className={`${IN} text-right tabular-nums`} inputMode="decimal" placeholder="0.00" value={allow} disabled={sel < 0 || !!rows?.[sel]?.credit}
+            <input id="pay-allow" className={`${IN} bps-entry text-right tabular-nums`} inputMode="decimal" placeholder="0.00" value={allow} disabled={sel < 0 || !!rows?.[sel]?.credit}
               onChange={(e) => setAllow(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); apply(); } }} />
           </div>
           <div className="col-span-2 lg:col-span-1">
             <label className={LAB} htmlFor="pay-reason">Allowance reason</label>
-            <input id="pay-reason" className={IN} placeholder="Why, and which items (e.g. 2 cases rye, moldy)" value={reason} disabled={sel < 0 || !!rows?.[sel]?.credit}
+            <input id="pay-reason" className={`${IN} bps-entry`} placeholder="Why, and which items (e.g. 2 cases rye, moldy)" value={reason} disabled={sel < 0 || !!rows?.[sel]?.credit}
               onChange={(e) => setReason(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); apply(); } }} />
           </div>
         </div>
@@ -286,18 +286,18 @@ export function EnterPayments({ tenantId }: { tenantId: number }) {
                   const l = lineOf(r.key); const b = balanceOf(r); const done = Math.abs(b) < 0.005 && (l.payment !== 0 || l.allowance !== 0);
                   return (
                     <tr key={r.key} data-i={i} onClick={() => { pick(i); setTimeout(toPayment, 0); }}
-                      className={`cursor-pointer border-t border-border ${i === sel ? 'bg-accent font-medium text-accent-foreground shadow-[inset_3px_0_0_hsl(var(--primary))]' : 'hover:bg-muted/40'} ${done && i !== sel ? 'text-muted-foreground' : ''}`}>
+                      className={`cursor-pointer border-t border-border ${i === sel ? 'bps-sel ' : ''}${i === sel ? 'bg-accent font-medium text-accent-foreground shadow-[inset_3px_0_0_hsl(var(--primary))]' : 'hover:bg-muted/40'} ${done && i !== sel ? 'text-muted-foreground' : ''}`}>
                       <td className={`${TD} text-muted-foreground`}>{shortDate(r.date)}</td>
                       <td className={TD}><span className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${r.type === 'CM' || r.type === 'PMT' ? 'bg-info-soft text-info' : 'bg-muted text-muted-foreground'}`}>{r.type}</span></td>
                       <td className={TD}>{r.number}</td>
                       <td className={`${TD} text-right tabular-nums ${r.amount < 0 ? 'text-info' : ''}`}>{money(r.amount)}</td>
                       <td className={`${TD} text-right tabular-nums text-muted-foreground`}>{r.returns ? money(-r.returns) : '—'}</td>
-                      <td className={`${TD} text-right tabular-nums ${l.payment ? 'font-medium text-primary' : 'text-muted-foreground'}`}>{l.payment ? money(l.payment) : '—'}</td>
-                      <td className={`${TD} text-right tabular-nums ${l.allowance ? 'font-medium text-primary' : 'text-muted-foreground'}`}>
+                      <td className={`${TD} bps-entry text-right tabular-nums ${l.payment ? 'font-medium text-primary' : 'text-muted-foreground'}`}>{l.payment ? money(l.payment) : '—'}</td>
+                      <td className={`${TD} bps-entry text-right tabular-nums ${l.allowance ? 'font-medium text-primary' : 'text-muted-foreground'}`}>
                         {l.allowance ? money(l.allowance) : r.priorAllowance ? <span title="Allowance already on this invoice">{money(r.priorAllowance)}*</span> : '—'}
                       </td>
-                      <td className={`${TD} max-w-[16rem] truncate ${l.reason ? '' : 'text-muted-foreground'}`} title={l.reason}>{l.reason || '—'}</td>
-                      <td className={`${TD} text-right tabular-nums ${done ? 'font-semibold text-success' : b < 0 ? 'text-info' : ''}`}>{money(b)}</td>
+                      <td className={`${TD} bps-entry max-w-[16rem] truncate ${l.reason ? '' : 'text-muted-foreground'}`} title={l.reason}>{l.reason || '—'}</td>
+                      <td className={`${TD} bps-hi text-right tabular-nums ${done ? 'font-semibold text-success' : b < 0 ? 'text-info' : ''}`}>{money(b)}</td>
                     </tr>
                   );
                 })}

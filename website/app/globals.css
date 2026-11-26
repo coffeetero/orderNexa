@@ -127,6 +127,44 @@
       color: hsl(var(--foreground));
     }
   }
+  /* BPS Classic: the old BPS window look. Only this theme sets these, so every other theme is unchanged. Table headers and grid lines
+     apply everywhere; a screen opts in to the rest with bps-label (yellow field label), bps-entry (cyan field you type in), bps-hi
+     (yellow highlighted amount) and bps-sel (blue selected row). */
+  @media screen {
+    :root[data-bps-theme='bps-classic'] {
+      --bps-head: 54 100% 88%;
+      --bps-entry: 188 75% 92%;
+      --bps-hi: 54 100% 83%;
+      --bps-grid: 0 0% 66%;
+      --bps-sel: 214 91% 44%;
+    }
+    :root[data-bps-theme='bps-classic'] .bps-topnav {
+      --background: 211 73% 45%;
+      --foreground: 0 0% 100%;
+      --muted: 211 60% 38%;
+      --muted-foreground: 211 60% 92%;
+      --accent: 211 70% 38%;
+      --accent-foreground: 0 0% 100%;
+      --primary: 0 0% 100%;
+      --border: 211 60% 38%;
+      --ring: 0 0% 100%;
+      color: hsl(var(--foreground));
+    }
+    :root[data-bps-theme='bps-classic'] thead th { background: hsl(var(--bps-head)); color: hsl(0 0% 0%); }
+    :root[data-bps-theme='bps-classic'] table th,
+    :root[data-bps-theme='bps-classic'] table td { border: 1px solid hsl(var(--bps-grid)); }
+    :root[data-bps-theme='bps-classic'] .bps-label {
+      background: hsl(var(--bps-head)); color: hsl(0 0% 0%); padding: 1px 6px; margin-bottom: 0;
+      border: 1px solid hsl(var(--bps-grid)); border-bottom: 0; border-radius: 3px 3px 0 0;
+    }
+    :root[data-bps-theme='bps-classic'] :where(input, textarea, select):not(:disabled) { background-color: hsl(0 0% 100%); }
+    :root[data-bps-theme='bps-classic'] .bps-entry { background: hsl(var(--bps-entry)); }
+    :root[data-bps-theme='bps-classic'] input.bps-entry:focus { background: hsl(0 0% 100%); font-weight: 600; }
+    :root[data-bps-theme='bps-classic'] .bps-hi { background: hsl(var(--bps-hi)); }
+    :root[data-bps-theme='bps-classic'] .bps-sel > td,
+    :root[data-bps-theme='bps-classic'] tr[data-state='selected'] > td { background: hsl(var(--bps-sel)); color: hsl(0 0% 100%); }
+    :root[data-bps-theme='bps-classic'] .bps-sel > td * { color: inherit; }
+  }
   /* Figures line up in columns. */
   th, td { font-variant-numeric: tabular-nums; }
 }

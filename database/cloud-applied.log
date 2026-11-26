@@ -1,1 +1,9 @@
 2026-11-25 20:29:00Z  b19b6dc  OK      database/functions/fnd_user_last_activity.sql
+2026-11-25 23:27:39Z  2c679f5  OK      database/functions/om_orders_manage_get.sql
+2026-11-25 23:27:41Z  2c679f5  OK      database/migration/add_payment_allowances.sql
+2026-11-25 23:27:42Z  2c679f5  OK      database/functions/ar_transaction_open_amount.sql
+2026-11-25 23:27:43Z  2c679f5  OK      database/functions/ar_open_items_refresh.sql
+2026-11-25 23:27:45Z  2c679f5  OK      database/functions/ar_report_open_items.sql
+2026-11-25 23:27:46Z  2c679f5  OK      database/functions/fnd_hc_ar_open_items_drift.sql
+2026-11-25 23:27:46Z  2c679f5  OK      database/functions/ar_payment_open_items_get.sql
+2026-11-25 23:27:47Z  2c679f5  OK      database/functions/ar_payment_enter.sql

@@ -169,8 +169,8 @@ describe('preferences', () => {
 });
 
 describe('built-in themes', () => {
-  it('are Ledger, Hearth (the default), Graphite, Bakery, Clay, High contrast, Sepia', () => {
+  it('are Ledger, Hearth (the default), Graphite, Bakery, BPS Classic, Clay, High contrast, Sepia', () => {
     expect(DEFAULT_THEME.id).toBe(HEARTH_ID);
-    expect(BUILTIN_THEMES.map((t) => t.id)).toEqual(['ledger', 'hearth', 'graphite', 'bakery', 'clay', 'high-contrast', 'sepia']);
+    expect(BUILTIN_THEMES.map((t) => t.id)).toEqual(['ledger', 'hearth', 'graphite', 'bakery', 'bps-classic', 'clay', 'high-contrast', 'sepia']);
   });
 });
