@@ -60,3 +60,6 @@
 2026-11-26 12:38:53Z  e6720b5  OK      database/functions/inv_ingredients_get.sql
 2026-11-26 12:38:53Z  e6720b5  OK      database/functions/inv_ingredient_save.sql
 2026-11-26 12:38:54Z  e6720b5  OK      database/functions/inv_ingredient_delete.sql
+2026-11-27 06:43:32Z  36e3e3f  OK      database/functions/om_customer_invoice_owner.sql
+2026-11-27 06:43:33Z  36e3e3f  OK      database/functions/om_orders_save.sql
+2026-11-27 06:43:34Z  36e3e3f  OK      database/functions/om_orders_get_v2.sql
