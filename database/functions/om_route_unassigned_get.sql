@@ -1,7 +1,7 @@
 -- ============================================================
 -- om_route_unassigned_get
--- Routes Maintenance › Unassigned: active own-fleet ship-to locations (accounts and departments) that have no stop on
--- any route for a day of week + production code, so nobody falls off a route. A department with no stop of its own is
+-- Routes Maintenance › Unassigned: active own-fleet ship-to locations (accounts and sites) that have no stop on
+-- any route for a day of week + production code, so nobody falls off a route. A site with no stop of its own is
 -- covered by its nearest ancestor's stop (Process run stamps it with that stop). The delivery method follows
 -- om_customer_delivery_method (own, else inherited, else the company's own-fleet default).
 -- p_ordering_only (default true): only those with an order for this production code delivered on this day of week in the
@@ -58,7 +58,7 @@ BEGIN
              WHERE o.tenant_id = p_tenant_id AND o.customer_id = t.customer_id AND o.production_code = v_code) AS last_order_date
       FROM tree t
       LEFT JOIN om_delivery_methods m ON m.tenant_id = p_tenant_id AND m.delivery_method_code = COALESCE(t.method, v_default)
-     WHERE t.is_active AND NOT t.has_stop AND upper(btrim(t.customer_type)) IN ('ACCOUNT', 'DEPARTMENT')
+     WHERE t.is_active AND NOT t.has_stop AND upper(btrim(t.customer_type)) IN ('ACCOUNT', 'SITE')
        AND COALESCE(m.is_own_fleet, COALESCE(t.method, v_default) IS NULL)
        AND (NOT COALESCE(p_ordering_only, true)
             OR EXISTS (SELECT 1 FROM om_orders o

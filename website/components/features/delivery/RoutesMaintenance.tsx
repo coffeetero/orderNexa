@@ -277,7 +277,7 @@ export function RoutesMaintenance({ tenantId, canEdit, canDelete }: { tenantId: 
                 </tbody>
               </table>
             </div>
-            <p className="border-t border-border px-3 py-1 text-xs text-muted-foreground">Own-truck accounts and departments with no stop this day and time; a department follows its account&apos;s stop.</p>
+            <p className="border-t border-border px-3 py-1 text-xs text-muted-foreground">Own-truck accounts and sites with no stop this day and time; a department follows its account&apos;s stop.</p>
           </section>
         </div>
 
@@ -319,7 +319,7 @@ export function RoutesMaintenance({ tenantId, canEdit, canDelete }: { tenantId: 
                     getItemWeight={(c) => ((c.customer_type ?? '').trim().toUpperCase() === 'ACCOUNT' ? 'bold' : 'regular')}
                     placeholder="Search number or name, Enter adds at the end…"
                     loading={customers === null} disabled={busy}
-                    emptyText="No accounts or departments found."
+                    emptyText="No accounts or sites found."
                     alwaysOpen collapseOnSelect clearSearchOnFocus
                     inputRef={addRef} triggerId="rt-add"
                   />

@@ -6,7 +6,8 @@ import { useBreadcrumbRecord, useNav, useNavGuard, useTrackRecent } from '@/comp
 import { useDeepLinkId } from '@/lib/use-deep-link';
 import type { CurrentRecord } from '@/lib/nav-records';
 import { useRouter } from 'next/navigation';
-import { Save, Trash2, RotateCcw } from 'lucide-react';
+import { Eraser, Gift, Save, Trash2 } from 'lucide-react';
+import { HoverTip } from '@/components/bps/HoverTip';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -907,11 +908,15 @@ export function OrderEntryForm({
       const response = await fetch(`/api/orders?${qs}`);
       const json = (await response.json()) as { data: unknown; error?: string };
       if (!response.ok || json.error) throw new Error(getErrorMessage(json.error, 'Could not load past orders.'));
+      // A department's orders are stored under its parent with the department as Department/Event: keep only those.
+      const selected = customers.find((c) => c.customer_id === draft.customer_id);
+      const department = selected && isDepartmentEventCustomer(selected) ? normalizeDepartmentEventText(selected.customer_name) : null;
       return (Array.isArray(json.data) ? json.data : [])
         .map((r) => (r && typeof r === 'object' ? normalizeOrderHeaderRow(r as Record<string, unknown>) : null))
-        .filter((r): r is OrderHeaderListRow => r !== null && r.order_id !== draft.order_id);
+        .filter((r): r is OrderHeaderListRow => r !== null && r.order_id !== draft.order_id
+          && (!department || normalizeDepartmentEventText(r.department_event ?? '').startsWith(department)));
     },
-    [tenantId, draft.customer_id, draft.order_id],
+    [tenantId, draft.customer_id, draft.order_id, customers],
   );
 
   const loadCopyLines = useCallback(
@@ -1256,26 +1261,29 @@ export function OrderEntryForm({
             orderTotal={draft.total_amount + draft.delivery_amount}
             entryToolbar={
               <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-9 px-3 text-xs"
-                  onClick={handleSample}
-                  disabled={isSaving || draft.lines.length === 0}
-                  title="Zero line prices for a sample order"
-                >
-                  Sample
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-9 w-9 p-0"
-                  onClick={handleRefreshOrder}
-                  title="Refresh"
-                  aria-label="Refresh"
-                >
-                  <RotateCcw className="h-4 w-4" />
-                </Button>
+                <HoverTip label="Sample: zero line prices for a sample order">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 w-9 p-0"
+                    onClick={handleSample}
+                    disabled={isSaving || draft.lines.length === 0}
+                    aria-label="Sample: zero line prices"
+                  >
+                    <Gift className="h-4 w-4" />
+                  </Button>
+                </HoverTip>
+                <HoverTip label="Clear Order">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 w-9 p-0"
+                    onClick={handleRefreshOrder}
+                    aria-label="Clear Order"
+                  >
+                    <Eraser className="h-4 w-4" />
+                  </Button>
+                </HoverTip>
               </>
             }
           />

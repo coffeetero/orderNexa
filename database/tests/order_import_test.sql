@@ -142,7 +142,8 @@ BEGIN
   INSERT INTO _t VALUES ('export rows carry cus no, item, item name, quantity and event',
      EXISTS (SELECT 1 FROM jsonb_array_elements(ex) x WHERE x ->> 'cus_no' = '15700' AND x ->> 'department_event' = 'LUNCH, 2ND FLOOR' AND x ->> 'qty' = '1.5'
                AND x ->> 'item_desc' = (SELECT item_name FROM fnd_items WHERE item_id = it1))
-     AND EXISTS (SELECT 1 FROM jsonb_array_elements(ex) x WHERE x ->> 'cus_no' = '15702' AND x ->> 'qty' = '4'));
+     -- a department's order is stored under its account (15700) with the department as event
+     AND EXISTS (SELECT 1 FROM jsonb_array_elements(ex) x WHERE x ->> 'cus_no' = '15700' AND x ->> 'department_event' = 'ORDER' AND x ->> 'qty' = '4'));
   INSERT INTO _t VALUES ('export of an empty slot is an empty list', jsonb_array_length(bps.om_order_export_get(t, acc, DATE '2033-03-28', 'MORNING')) = 0);
 
   r := bps.om_order_import_upload(t, jsonb_build_object('customer_id', acc, 'production_date', '2033-03-21', 'production_code', 'MORNING', 'rows', ex));

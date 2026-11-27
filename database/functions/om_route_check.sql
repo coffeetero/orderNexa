@@ -4,7 +4,7 @@
 --   om_route_check(tenant, action)        : the caller may act on routes (delivery.routes R / W / D); returns the user id.
 --   om_route_slot_check(tenant, dow, code): checks a day of week (MON..SUN) and an existing production code; returns the code.
 --   om_route_row_check(tenant, route_id)  : the route of this tenant, or 'Route not found'.
---   om_route_ship_to_check(tenant, customer_id): an account or department of this tenant (sites go with their parent).
+--   om_route_ship_to_check(tenant, customer_id): an account or site of this tenant (departments go with their parent).
 -- ============================================================
 CREATE OR REPLACE FUNCTION bps.om_route_check(p_tenant_id bigint, p_action text)
 RETURNS bigint
@@ -70,10 +70,10 @@ DECLARE
 BEGIN
   SELECT * INTO v FROM fnd_customers WHERE tenant_id = p_tenant_id AND customer_id = p_customer_id;
   IF NOT FOUND THEN RAISE EXCEPTION 'Customer not found'; END IF;
-  IF upper(btrim(v.customer_type)) = 'SITE' THEN
-    RAISE EXCEPTION '% is a site: its orders are delivered with its department or account, so add that instead', v.customer_name;
+  IF upper(btrim(v.customer_type)) = 'DEPARTMENT' THEN
+    RAISE EXCEPTION '% is a department: its orders are delivered with its site or account, so add that instead', v.customer_name;
   END IF;
-  IF upper(btrim(v.customer_type)) NOT IN ('ACCOUNT', 'DEPARTMENT') THEN
+  IF upper(btrim(v.customer_type)) NOT IN ('ACCOUNT', 'SITE') THEN
     RAISE EXCEPTION '% cannot be a route stop', v.customer_name;
   END IF;
   RETURN v;

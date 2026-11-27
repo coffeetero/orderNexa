@@ -5,6 +5,7 @@ import { EntityComboBox } from '@/components/bps/EntityComboBox';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Copy, Search } from 'lucide-react';
+import { HoverTip } from '@/components/bps/HoverTip';
 import {
   Select,
   SelectContent,
@@ -91,11 +92,6 @@ function localTomorrow(): string {
   return `${year}-${month}-${day}`;
 }
 
-function isDepartmentCustomer(customer: CustomerOption): boolean {
-  const customerType = customer.customer_type?.trim().toUpperCase();
-  return customerType === 'DEPARTMENT' || customerType === 'LOCATION';
-}
-
 export function OrderHeaderRow({
   draft,
   customers,
@@ -154,16 +150,6 @@ export function OrderHeaderRow({
       ? `${customer.customer_number} - ${customer.customer_name}`
       : customer.customer_name;
 
-  const getCustomerInputLabel = (customer: CustomerOption) => {
-    if (isDepartmentCustomer(customer)) {
-      const parent = customer.customer_parent_id
-        ? customerById.get(customer.customer_parent_id)
-        : undefined;
-      return parent ? getCustomerLabel(parent) : getCustomerLabel(customer);
-    }
-    return getCustomerLabel(customer);
-  };
-
   const formatMoney = (amount: number) =>
     new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -198,7 +184,6 @@ export function OrderHeaderRow({
               if (t === 'DEPARTMENT') return 'muted';
               return undefined;
             }}
-            getInputLabel={getCustomerInputLabel}
             getSearchText={(c) =>
               `${c.customer_number ?? ''} ${c.customer_name}`
             }
@@ -318,29 +303,31 @@ export function OrderHeaderRow({
           </Select>
         </div>
 
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          className="mb-0 h-9 w-9 shrink-0"
-          onClick={onSearchExistingOrders}
-          aria-label="Search existing orders"
-          title="Search existing orders"
-        >
-          <Search className="h-4 w-4" />
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          className="mb-0 h-9 w-9 shrink-0"
-          onClick={onCopyOrder}
-          disabled={copyDisabled}
-          aria-label="Copy a previous order"
-          title={copyDisabled ? 'Copy a previous order (enter the customer first)' : 'Copy a previous order'}
-        >
-          <Copy className="h-4 w-4" />
-        </Button>
+        <HoverTip label="Search existing orders">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="mb-0 h-9 w-9 shrink-0"
+            onClick={onSearchExistingOrders}
+            aria-label="Search existing orders"
+          >
+            <Search className="h-4 w-4" />
+          </Button>
+        </HoverTip>
+        <HoverTip label={copyDisabled ? 'Copy a previous order (enter the customer first)' : 'Copy a previous order'}>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="mb-0 h-9 w-9 shrink-0"
+            onClick={onCopyOrder}
+            disabled={copyDisabled}
+            aria-label="Copy a previous order"
+          >
+            <Copy className="h-4 w-4" />
+          </Button>
+        </HoverTip>
 
       </div>
     </div>

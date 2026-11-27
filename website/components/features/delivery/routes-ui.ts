@@ -68,8 +68,8 @@ export interface DateChange {
   usual_stop_no: number | null;
 }
 
-/** Ship-to locations: accounts and departments (sites are delivered with their parent). */
-export const isShipTo = (c: CustomerOption) => ['ACCOUNT', 'DEPARTMENT'].includes((c.customer_type ?? '').trim().toUpperCase());
+/** Ship-to locations: accounts and sites (departments are delivered with their site or account). */
+export const isShipTo = (c: CustomerOption) => ['ACCOUNT', 'SITE'].includes((c.customer_type ?? '').trim().toUpperCase());
 export const customerLabel = (c: { customer_number: string | null; customer_name: string }) =>
   c.customer_number ? `${c.customer_number} · ${c.customer_name}` : c.customer_name;
 

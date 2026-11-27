@@ -12,18 +12,18 @@ CREATE TEMP TABLE _t (name text, ok boolean);
 CREATE TEMP TABLE _id (k text PRIMARY KEY, v bigint);
 GRANT ALL ON _t, _id TO PUBLIC;
 
--- ── Setup (trusted): accounts A, B, C (carrier), E (inactive), F, G; department D under A; site S under A ──
+-- ── Setup (trusted): accounts A, B, C (carrier), E (inactive), F, G; site D under A; department S under A ──
 DO $$
 DECLARE a bigint; b bigint; c bigint; d bigint; e bigint; f bigint; g bigint; s bigint; u bigint;
 BEGIN
   INSERT INTO fnd_customers (tenant_id, customer_name, customer_type, customer_number) VALUES (200000000002, 'ZR ACCOUNT A', 'ACCOUNT', 'ZR01') RETURNING customer_id INTO a;
   INSERT INTO fnd_customers (tenant_id, customer_name, customer_type, customer_number) VALUES (200000000002, 'ZR ACCOUNT B', 'ACCOUNT', 'ZR02') RETURNING customer_id INTO b;
   INSERT INTO fnd_customers (tenant_id, customer_name, customer_type, customer_number, delivery_method_code) VALUES (200000000002, 'ZR ACCOUNT C', 'ACCOUNT', 'ZR03', 'CARRIER') RETURNING customer_id INTO c;
-  INSERT INTO fnd_customers (tenant_id, customer_name, customer_type, customer_number, customer_parent_id) VALUES (200000000002, 'ZR DEPT D', 'DEPARTMENT', 'ZR04', a) RETURNING customer_id INTO d;
+  INSERT INTO fnd_customers (tenant_id, customer_name, customer_type, customer_number, customer_parent_id) VALUES (200000000002, 'ZR SITE D', 'SITE', 'ZR04', a) RETURNING customer_id INTO d;
   INSERT INTO fnd_customers (tenant_id, customer_name, customer_type, customer_number, is_active) VALUES (200000000002, 'ZR ACCOUNT E', 'ACCOUNT', 'ZR05', false) RETURNING customer_id INTO e;
   INSERT INTO fnd_customers (tenant_id, customer_name, customer_type, customer_number) VALUES (200000000002, 'ZR ACCOUNT F', 'ACCOUNT', 'ZR06') RETURNING customer_id INTO f;
   INSERT INTO fnd_customers (tenant_id, customer_name, customer_type, customer_number) VALUES (200000000002, 'ZR ACCOUNT G', 'ACCOUNT', 'ZR07') RETURNING customer_id INTO g;
-  INSERT INTO fnd_customers (tenant_id, customer_name, customer_type, customer_number, customer_parent_id) VALUES (200000000002, 'ZR SITE S', 'SITE', 'ZR08', a) RETURNING customer_id INTO s;
+  INSERT INTO fnd_customers (tenant_id, customer_name, customer_type, customer_number, customer_parent_id) VALUES (200000000002, 'ZR DEPT S', 'DEPARTMENT', 'ZR08', a) RETURNING customer_id INTO s;
   INSERT INTO _id VALUES ('a', a), ('b', b), ('c', c), ('d', d), ('e', e), ('f', f), ('g', g), ('s', s);
   -- a customer-side user, for the access check
   INSERT INTO fnd_users (tenant_id, auth_user_id, user_name, user_type) VALUES (200000000002, gen_random_uuid(), 'zr customer user', 'CUSTOMER_USER') RETURNING user_id INTO u;
@@ -102,7 +102,7 @@ BEGIN
   INSERT INTO _t VALUES ('stop save: a window ending before it starts is refused', ok);
   BEGIN PERFORM om_route_stop_add(200000000002, r1, 'WED', 'MORNING', (SELECT v FROM _id WHERE k = 's')); ok := false;
   EXCEPTION WHEN raise_exception THEN ok := true; END;
-  INSERT INTO _t VALUES ('stops: a site cannot be a stop', ok);
+  INSERT INTO _t VALUES ('stops: a department cannot be a stop', ok);
   BEGIN PERFORM om_route_stop_add(200000000002, r1, 'WED', 'MORNING', (SELECT v FROM _id WHERE k = 'e')); ok := false;
   EXCEPTION WHEN raise_exception THEN ok := true; END;
   INSERT INTO _t VALUES ('stops: an inactive customer cannot be added', ok);
@@ -156,7 +156,7 @@ BEGIN
   r := om_route_unassigned_get(200000000002, 'WED', 'MORNING', false);
   SELECT array_agg((x->>'customer_id')::bigint) INTO ids FROM jsonb_array_elements(r->'customers') x;
   INSERT INTO _t VALUES ('unassigned: account with no stop is listed', (SELECT v FROM _id WHERE k = 'f') = ANY (ids));
-  INSERT INTO _t VALUES ('unassigned: stops, the department riding with its account, carrier, inactive and site are not',
+  INSERT INTO _t VALUES ('unassigned: stops, the site riding with its account, carrier, inactive and department are not',
     NOT ((SELECT v FROM _id WHERE k = 'a') = ANY (ids)) AND NOT ((SELECT v FROM _id WHERE k = 'd') = ANY (ids))
     AND NOT ((SELECT v FROM _id WHERE k = 'c') = ANY (ids)) AND NOT ((SELECT v FROM _id WHERE k = 'e') = ANY (ids))
     AND NOT ((SELECT v FROM _id WHERE k = 's') = ANY (ids)));
@@ -212,7 +212,7 @@ BEGIN
     EXISTS (SELECT 1 FROM jsonb_array_elements(r->'routes') x WHERE x->>'route_code' = 'ZT1' AND jsonb_array_length(x->'stops') = 3 AND x->>'start_time' = '05:30')
     AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(r->'routes') x WHERE x->>'route_code' = 'ZT3'));
   r := om_customer_routes_get(200000000002, (SELECT v FROM _id WHERE k = 'd'));
-  INSERT INTO _t VALUES ('customer profile: a department shows the stops it follows from its account',
+  INSERT INTO _t VALUES ('customer profile: a site shows the stops it follows from its account',
     EXISTS (SELECT 1 FROM jsonb_array_elements(r->'stops') x WHERE x->>'day_of_week' = 'WED' AND x->>'route_code' = 'ZT1' AND x->>'stop_no' = '2' AND x->>'inherited_from' = 'ZR ACCOUNT A'));
   r := om_customer_routes_get(200000000002, (SELECT v FROM _id WHERE k = 'b'));
   INSERT INTO _t VALUES ('customer profile: own stops and upcoming date changes',
@@ -255,10 +255,10 @@ BEGIN
    WHERE s.production_run_id = v_run AND c.customer_number LIKE 'ZR%';
   INSERT INTO _t VALUES ('reprocess: weekly stops are stamped again (date change removed)', lst = 'ZR01:ZT1/2,ZR02:ZT1/1,ZR03:-/-,ZR04:ZT1/2,ZR07:ZT1/3');
 
-  -- a department with its own stop wins over its account's
+  -- a site with its own stop wins over its account's
   PERFORM om_route_stop_add(200000000002, (SELECT v FROM _id WHERE k = 'r2'), 'WED', 'MORNING', (SELECT v FROM _id WHERE k = 'd'));
   PERFORM om_production_runs_process(200000000002, DATE '2033-05-10', DATE '2033-05-10', 'MORNING');
-  INSERT INTO _t VALUES ('stamp: a department''s own stop wins over its account''s',
+  INSERT INTO _t VALUES ('stamp: a site''s own stop wins over its account''s',
     (SELECT rt.route_code = 'ZT2' AND s.route_stop_no = 1 FROM om_shipments s JOIN om_routes rt ON rt.route_id = s.route_id
       WHERE s.production_run_id = v_run AND s.ship_to_customer_id = (SELECT v FROM _id WHERE k = 'd')));
 
