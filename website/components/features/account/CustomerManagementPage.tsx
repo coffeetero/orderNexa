@@ -50,6 +50,8 @@ type CustomerRow = {
   is_cost_on_invoice: boolean;
   is_cost_on_bill_of_lading: boolean;
   is_returns_allowed: boolean;
+  /** CUSTOMERSEGMENT value set on accounts; null = Unassigned */
+  segment_code: string | null;
 };
 
 type CustomerFormState = {
@@ -69,6 +71,7 @@ type CustomerFormState = {
   is_cost_on_invoice: boolean;
   is_cost_on_bill_of_lading: boolean;
   is_returns_allowed: boolean;
+  segment_code: string;
 };
 
 type SetCustomerResult = {
@@ -142,6 +145,7 @@ function emptyForm(tenantId: number): CustomerFormState {
     is_cost_on_invoice: false,
     is_cost_on_bill_of_lading: false,
     is_returns_allowed: true,
+    segment_code: '',
   };
 }
 
@@ -163,6 +167,7 @@ function toFormState(customer: CustomerRow): CustomerFormState {
     is_cost_on_invoice: customer.is_cost_on_invoice,
     is_cost_on_bill_of_lading: customer.is_cost_on_bill_of_lading,
     is_returns_allowed: customer.is_returns_allowed,
+    segment_code: customer.segment_code ?? '',
   };
 }
 
@@ -198,6 +203,7 @@ function mergeFullCustomerJson(hier: CustomerRow, full: unknown): CustomerRow {
     is_cost_on_invoice: toBoolean(o.is_cost_on_invoice, false),
     is_cost_on_bill_of_lading: toBoolean(o.is_cost_on_bill_of_lading, false),
     is_returns_allowed: toBoolean(o.is_returns_allowed, true),
+    segment_code: o.segment_code ? String(o.segment_code) : null,
   };
 }
 
@@ -230,6 +236,7 @@ function normalizeCustomerRows(rows: unknown[]): CustomerRow[] {
         is_cost_on_invoice: toBoolean(candidate.is_cost_on_invoice, false),
         is_cost_on_bill_of_lading: toBoolean(candidate.is_cost_on_bill_of_lading, false),
         is_returns_allowed: toBoolean(candidate.is_returns_allowed, true),
+        segment_code: candidate.segment_code ?? null,
       };
     })
     .filter((row): row is CustomerRow => row !== null)
@@ -260,6 +267,20 @@ export function CustomerManagementPage({
   const [contactsIsDirty, setContactsIsDirty] = useState(false);
   const [pricingIsDirty, setPricingIsDirty] = useState(false);
   const [notesIsDirty, setNotesIsDirty] = useState(false);
+  const [segments, setSegments] = useState<{ value: string; label: string }[]>([]);
+
+  // Segment list (CUSTOMERSEGMENT value set) for the account's Segment picker
+  useEffect(() => {
+    if (tenantId === null) return;
+    let live = true;
+    fetch(`/api/valuesets?tenant_id=${tenantId}&code=CUSTOMERSEGMENT`, { credentials: 'same-origin' })
+      .then((r) => r.json())
+      .then((j: { data?: { value: string; label: string; is_disabled?: boolean }[] }) => {
+        if (live) setSegments((j.data ?? []).filter((v) => !v.is_disabled).map((v) => ({ value: v.value, label: v.label })));
+      })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [tenantId]);
   const contactsTabRef = useRef<CustomerContactsTabHandle>(null);
   const notesTabRef = useRef<CustomerNotesTabHandle>(null);
   const pricingTabRef = useRef<CustomerPricebooksTabHandle>(null);
@@ -421,6 +442,7 @@ export function CustomerManagementPage({
       is_cost_on_invoice: formState.is_cost_on_invoice,
       is_cost_on_bill_of_lading: formState.is_cost_on_bill_of_lading,
       is_returns_allowed: formState.is_returns_allowed,
+      segment_code: formState.segment_code || null,
     };
 
     const updatePayload = isCreate
@@ -767,6 +789,18 @@ export function CustomerManagementPage({
                       {formState.customer_type || <span className="italic opacity-50">None</span>}
                     </div>
                   </div>
+                  {formState.customer_type === 'ACCOUNT' && (
+                    <div className="space-y-1.5">
+                      <Label htmlFor="segment_code">Segment</Label>
+                      <Select value={formState.segment_code || '__none'} onValueChange={(v) => updateField('segment_code', v === '__none' ? '' : v)}>
+                        <SelectTrigger id="segment_code" className="h-9"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none">Unassigned</SelectItem>
+                          {segments.map((sg) => <SelectItem key={sg.value} value={sg.value}>{sg.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   <div className="space-y-1.5">
                     <Label>Parent Customer</Label>
                     {(() => {

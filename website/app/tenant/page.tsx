@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { SalesCharts } from '@/components/features/dashboard/SalesCharts';
 import { Suspense, cache } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { SecurityTodo, type SecuritySignal } from '@/components/features/dashboard/SecurityTodo';
@@ -67,7 +68,7 @@ const loadAr = cache(async (tenantId: number): Promise<ArDashboard | null> => {
 /** One cell of the key-figures strip. */
 function FigureCell({ f }: { f: Figure }) {
   return (
-    <div className="min-w-0 border-b border-r border-border px-4 py-3">
+    <div className="min-w-0 border-b border-r border-border px-4 py-3 text-center">
       <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-muted-foreground" title={f.label}>{f.label}</p>
       <p className="mt-0.5 text-2xl font-semibold tabular-nums tracking-tight">{f.value}</p>
       <p className="mt-0.5 text-xs text-muted-foreground">
@@ -86,10 +87,10 @@ function FigureCell({ f }: { f: Figure }) {
 function Pending({ label, rows = 0 }: { label?: string; rows?: number }) {
   if (label) {
     return (
-      <div className="min-w-0 border-b border-r border-border px-4 py-3" aria-busy="true">
+      <div className="min-w-0 border-b border-r border-border px-4 py-3 text-center" aria-busy="true">
         <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
-        <p className="mt-1.5 h-6 w-28 animate-pulse rounded bg-muted" />
-        <p className="mt-1.5 h-3 w-36 animate-pulse rounded bg-muted" />
+        <p className="mx-auto mt-1.5 h-6 w-28 animate-pulse rounded bg-muted" />
+        <p className="mx-auto mt-1.5 h-3 w-36 animate-pulse rounded bg-muted" />
       </div>
     );
   }
@@ -215,6 +216,8 @@ export default async function TenantDashboardPage() {
           </div>
         </section>
       )}
+
+      {showAr && <SalesCharts tenantId={tenantId!} />}
 
       {(todos.length > 0 || signals.length > 0) && (
         <Panel title="To-Do's" sub={`${todos.length + signals.length} item${todos.length + signals.length === 1 ? '' : 's'} need attention`} className="border-warning/50">

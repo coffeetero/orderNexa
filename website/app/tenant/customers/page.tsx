@@ -26,6 +26,7 @@ type CustomerRow = {
   is_cost_on_invoice: boolean;
   is_cost_on_bill_of_lading: boolean;
   is_returns_allowed: boolean;
+  segment_code: string | null;
 };
 
 function toNumber(value: unknown): number | null {
@@ -100,6 +101,7 @@ function normalizeCustomers(data: unknown): CustomerRow[] {
         is_cost_on_invoice: toBoolean(row.is_cost_on_invoice),
         is_cost_on_bill_of_lading: toBoolean(row.is_cost_on_bill_of_lading),
         is_returns_allowed: toBoolean(row.is_returns_allowed, true),
+        segment_code: typeof row.segment_code === 'string' ? row.segment_code : null,
       };
     })
     .filter((customer): customer is CustomerRow => customer !== null)

@@ -66,6 +66,13 @@ BEGIN
     v_customer_type := 'DEPARTMENT';
   END IF;
 
+  -- segment: a value of the company's CUSTOMERSEGMENT list, or empty (Unassigned)
+  IF NULLIF(p_payload ->> 'segment_code', '') IS NOT NULL AND NOT EXISTS (
+       SELECT 1 FROM fnd_valueset_values vv JOIN fnd_valuesets vs ON vs.valueset_id = vv.valueset_id
+        WHERE vs.tenant_id = p_tenant_id AND vs.valueset_code = 'CUSTOMERSEGMENT' AND vv.value = p_payload ->> 'segment_code' AND NOT vv.is_disabled) THEN
+    RAISE EXCEPTION 'Unknown segment %', p_payload ->> 'segment_code';
+  END IF;
+
   IF v_action = 'create' THEN
     INSERT INTO fnd_customers (
       tenant_id,
@@ -86,6 +93,7 @@ BEGIN
       is_cost_on_invoice,
       is_cost_on_bill_of_lading,
       is_returns_allowed,
+      segment_code,
       created_by,
       updated_by
     )
@@ -108,6 +116,7 @@ BEGIN
       coalesce((p_payload ->> 'is_cost_on_invoice')::boolean, false),
       coalesce((p_payload ->> 'is_cost_on_bill_of_lading')::boolean, false),
       coalesce((p_payload ->> 'is_returns_allowed')::boolean, true),
+      nullif(p_payload ->> 'segment_code', ''),
       v_app_user_id,
       v_app_user_id
     )
@@ -179,6 +188,7 @@ BEGIN
       is_cost_on_invoice = CASE WHEN p_payload ? 'is_cost_on_invoice' THEN (p_payload ->> 'is_cost_on_invoice')::boolean ELSE cus.is_cost_on_invoice END,
       is_cost_on_bill_of_lading = CASE WHEN p_payload ? 'is_cost_on_bill_of_lading' THEN (p_payload ->> 'is_cost_on_bill_of_lading')::boolean ELSE cus.is_cost_on_bill_of_lading END,
       is_returns_allowed = CASE WHEN p_payload ? 'is_returns_allowed' THEN (p_payload ->> 'is_returns_allowed')::boolean ELSE cus.is_returns_allowed END,
+      segment_code = CASE WHEN p_payload ? 'segment_code' THEN nullif(p_payload ->> 'segment_code', '') ELSE cus.segment_code END,
       updated_by = v_app_user_id
     WHERE cus.tenant_id = p_tenant_id
       AND cus.customer_id = p_customer_id
