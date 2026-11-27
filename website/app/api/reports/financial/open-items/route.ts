@@ -7,9 +7,10 @@ export const dynamic = 'force-dynamic';
 const isDate = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
 
 /**
- * GET /api/reports/financial/open-items?tenant_id=n&account_id=n&as_of=YYYY-MM-DD
+ * GET /api/reports/financial/open-items?tenant_id=n&account_id=n&as_of=YYYY-MM-DD[&aging=1]
  * → one account's open items on that date, each with the payments and credits applied to it and the other documents those covered
- *   (ar_open_item_details_get). Row security limits it to the caller's company and customers.
+ *   (ar_open_item_details_get). With aging=1 also `aging`: the account's buckets from ar_aging_get (current_amt, d1_30, d31_60,
+ *   d61_90, d90_plus, total). Row security limits it to the caller's company and customers.
  */
 export async function GET(request: Request) {
   const q = new URL(request.url).searchParams;
@@ -21,7 +22,11 @@ export async function GET(request: Request) {
   }
   const auth = await requireStaff();
   if (!auth.ok) return auth.response;
-  const { data, error } = await (await createClient()).rpc('ar_open_item_details_get', { p_tenant_id: tenantId, p_account_id: accountId, p_as_of: asOf });
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc('ar_open_item_details_get', { p_tenant_id: tenantId, p_account_id: accountId, p_as_of: asOf });
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-  return NextResponse.json({ data });
+  if (q.get('aging') !== '1') return NextResponse.json({ data });
+  const ag = await supabase.rpc('ar_aging_get', { p_tenant_id: tenantId, p_account_ids: [accountId], p_as_of: asOf });
+  if (ag.error) return NextResponse.json({ error: ag.error.message }, { status: 400 });
+  return NextResponse.json({ data: { ...data, aging: ag.data?.accounts?.[0] ?? null } });
 }

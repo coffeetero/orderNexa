@@ -34,7 +34,7 @@ export function agingSpec(data: Json, company: string): PdfSpec {
   const t = data.totals;
   const accounts = (data.accounts as Json[]).filter((a) => Number(a.total) !== 0);
   return {
-    title: `AR Aging Report - as of ${day(data.as_of)}`, company, landscape: true,
+    title: `AR Aging Report - as of ${day(data.as_of)}`, company,
     subtitle: ['Days past due date (the document date when no due date is set). Accounts with nothing open are not listed.'],
     sections: [{
       columns: [

@@ -39,6 +39,7 @@ export const MODULE_RECENTS: Record<string, { type: RecordType; title: string }[
  */
 export const PAGE_SIDEBAR: Record<string, { width?: number; inDrawer?: boolean }> = {
   '/financials/ar': { width: 340, inDrawer: true }, // customer list with number and balance (owner request 2026-11-27)
+  '/financials/aging': { width: 340, inDrawer: true }, // same layout as AR Open Balances
 };
 
 /** Pages that choose their own recent lists (keyed by menu href). They win over the module's lists. */
