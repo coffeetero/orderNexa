@@ -16,6 +16,8 @@ export type NavItem = {
   area?: string;
   /** Sections of a long page, listed under it in the sidebar; the page shows the one in ?section=. */
   sections?: { key: string; label: string }[];
+  /** Draw a thin line above this entry (splits a group into parts). */
+  divider?: boolean;
 };
 export type NavGroup = { heading?: string; items: NavItem[] };
 export type NavMenu = {
@@ -38,41 +40,40 @@ export const tenantNav: NavMenu[] = [
     columns: 3,
     groups: [
       {
+        // Order of the day's work (decided 2026-11-27)
         heading: 'Orders',
         items: [
-          { label: 'Enter Orders', href: '/orders' },
-          { label: 'Manage Orders', href: '/manage-orders' },
-          { label: 'Import Orders', href: '/orders/import' },
-          { label: 'Export Orders', href: '/orders/export' },
-          { label: 'Standing Order Mgt', href: '/orders/standing-mgmt' },
           { label: 'Post Standing Orders', href: '/orders/standing' },
           { label: 'Call Up List', href: '/orders/callup', soon: true },
+          { label: 'Enter Orders', href: '/orders' },
+          { label: 'Import Orders', href: '/orders/import' },
+          { label: 'Export Orders', href: '/orders/export' },
+          { label: 'Manage Orders', href: '/manage-orders', divider: true },
+          { label: 'Manage Standing Orders', href: '/orders/standing-mgmt' },
         ],
       },
       // Returns and credits live under Financials (decided 2026-11-25: the office that handles checks, credits and debits enters them)
       {
         heading: 'Production',
         items: [
-          { label: 'Order Analysis', href: '/production/analysis', soon: true },
-          { label: 'Estimate Production', href: '/production/estimate', soon: true },
           { label: 'Post Orders to Production', href: '/production/process' },
-          { label: 'Post Orders to AR', href: '/production/post-to-ar' },
-          { label: 'Confirm Deliveries', href: '/production/deliveries' },
-          { label: "Baker's Report", href: '/production/report' },
-          { label: 'Mixing Sheets', href: '/production/mixing', soon: true },
+          { label: 'Order Analysis', href: '/production/analysis', soon: true },
+          { label: "Baker's Reports", href: '/production/report' },
+          { label: 'Print Invoices', href: '/production/invoices', divider: true },
           { label: 'Packing Labels', href: '/production/labels' },
-          { label: 'Print Invoices', href: '/production/invoices' },
-          { label: 'Packaging List', href: '/production/packaging' },
-          { label: 'Route Delivery Report', href: '/production/routes' },
+          { label: 'Packing Lists', href: '/production/packaging' },
+          { label: 'Post Orders to AR', href: '/production/post-to-ar', divider: true },
         ],
       },
       {
         // Fleet management, to be designed.
         heading: 'Delivery',
         items: [
+          { label: 'Route Delivery Reports', href: '/production/routes' },
+          { label: 'Confirm Deliveries', href: '/production/deliveries' },
           { label: 'Routes Maintenance', href: '/delivery/routes', area: 'delivery.routes' },
           { label: 'Vehicles', href: '/delivery/vehicles', soon: true },
-          { label: 'Maintenance', href: '/delivery/maintenance', soon: true },
+          { label: 'Vehicle Maintenance', href: '/delivery/maintenance', soon: true },
           { label: 'Driver Checks', href: '/delivery/checks', soon: true },
           { label: 'Fuel & Costs', href: '/delivery/fuel', soon: true },
           { label: 'Renewals', href: '/delivery/renewals', soon: true },

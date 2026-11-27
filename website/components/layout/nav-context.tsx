@@ -26,6 +26,9 @@ type NavContextValue = {
   /** The Quick Buttons dialog (opened from the avatar menu, shown by the breadcrumb bar). */
   quickButtonsOpen: boolean;
   setQuickButtonsOpen: (open: boolean) => void;
+  /** The screens on the user's quick buttons, in order (Alt+Shift+1..4); the menu shows their keys. */
+  quickHrefs: string[];
+  setQuickHrefs: (hrefs: string[]) => void;
   /** Where a page may render its own sidebar content (null when the sidebar is not docked and open). */
   sidebarSlot: HTMLElement | null;
   setSidebarSlot: (el: HTMLElement | null) => void;
@@ -43,6 +46,8 @@ const defaultValue: NavContextValue = {
   confirmLeave: () => true,
   quickButtonsOpen: false,
   setQuickButtonsOpen: noop,
+  quickHrefs: [],
+  setQuickHrefs: noop,
   sidebarSlot: null,
   setSidebarSlot: noop,
 };
@@ -55,6 +60,7 @@ export function NavProvider({ tenantId, areas = null, children }: { tenantId: nu
   const [record, setRecord] = useState<CurrentRecord | null>(null);
   const [version, setVersion] = useState(0);
   const [quickButtonsOpen, setQuickButtonsOpen] = useState(false);
+  const [quickHrefs, setQuickHrefs] = useState<string[]>([]);
   const [sidebarSlot, setSidebarSlot] = useState<HTMLElement | null>(null);
   const guards = useRef(new Set<() => boolean>());
   const tenantRef = useRef(tenantId);
@@ -116,8 +122,8 @@ export function NavProvider({ tenantId, areas = null, children }: { tenantId: nu
   }, [anyDirty]);
 
   const value = useMemo<NavContextValue>(
-    () => ({ tenantId, areas, record, setRecord, version, touch, registerGuard, confirmLeave, quickButtonsOpen, setQuickButtonsOpen, sidebarSlot, setSidebarSlot }),
-    [tenantId, areas, record, version, touch, registerGuard, confirmLeave, quickButtonsOpen, sidebarSlot],
+    () => ({ tenantId, areas, record, setRecord, version, touch, registerGuard, confirmLeave, quickButtonsOpen, setQuickButtonsOpen, quickHrefs, setQuickHrefs, sidebarSlot, setSidebarSlot }),
+    [tenantId, areas, record, version, touch, registerGuard, confirmLeave, quickButtonsOpen, quickHrefs, sidebarSlot],
   );
 
   return (

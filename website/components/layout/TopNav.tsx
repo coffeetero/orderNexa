@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { GuardedLink as Link } from '@/components/layout/GuardedLink';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNav } from '@/components/layout/nav-context';
+import { useIsMac } from '@/components/layout/QuickBar';
 import { createClient } from '@/lib/supabase/client';
 import { findActiveHref, findActiveMenu, type NavItem, type NavMenu } from '@/lib/nav-config';
 import { Button } from '@/components/ui/button';
@@ -41,6 +42,7 @@ import {
   MenubarGroup,
   MenubarItem,
   MenubarLabel,
+  MenubarSeparator,
   MenubarMenu,
   MenubarTrigger,
 } from '@/components/ui/menubar';
@@ -98,7 +100,8 @@ export function TopNav({
   const router = useRouter();
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const { tenantId, setQuickButtonsOpen } = useNav();
+  const { tenantId, setQuickButtonsOpen, quickHrefs } = useNav();
+  const isMac = useIsMac();
 
   const activeHref = findActiveHref(pathname, menus);
   const activeMenu = findActiveMenu(pathname, menus);
@@ -108,9 +111,16 @@ export function TopNav({
     router.replace('/login');
   };
 
+  // Quick-button keys (Alt+Shift+1..4) next to the screens the user put on them
+  const quickKey = (href: string) => {
+    const i = quickHrefs.indexOf(href);
+    return i < 0 ? null : `${isMac ? '⌥⇧' : 'Alt+Shift+'}${i + 1}`;
+  };
+
   const desktopItem = (item: NavItem) => (
+    <Fragment key={item.href}>
+    {item.divider && <MenubarSeparator className="mx-2 my-1" />}
     <MenubarItem
-      key={item.href}
       asChild
       disabled={item.soon}
       className="gap-2 py-1 pl-5 data-[disabled]:opacity-60"
@@ -127,9 +137,13 @@ export function TopNav({
           className={cn('cursor-pointer', item.href === activeHref && 'bg-accent font-medium text-accent-foreground')}
         >
           {item.label}
+          {quickKey(item.href) && (
+            <span className="ml-auto pl-4 text-[10px] tabular-nums text-muted-foreground">{quickKey(item.href)}</span>
+          )}
         </Link>
       )}
     </MenubarItem>
+    </Fragment>
   );
 
   return (

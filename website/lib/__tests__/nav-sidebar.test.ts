@@ -101,7 +101,7 @@ describe('buildBreadcrumbs', () => {
   });
   it("sends a module crumb to the module's first built page", () => {
     expect(buildBreadcrumbs('/inventory/item-profile', tenantNav)[0]).toEqual({ label: 'Inventory', href: '/inventory/item-profile' });
-    expect(buildBreadcrumbs('/orders/standing', tenantNav)[0]).toEqual({ label: 'Operations', href: '/orders' });
+    expect(buildBreadcrumbs('/orders/standing', tenantNav)[0]).toEqual({ label: 'Operations', href: '/orders/standing' });
   });
   it('handles dashboard, extra pages, edit-order and the internal /tenant prefix', () => {
     expect(buildBreadcrumbs('/dashboard', tenantNav)).toEqual([{ label: 'Dashboard' }]);
