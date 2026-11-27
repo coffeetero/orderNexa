@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { localDateIso } from '@/lib/date';
 import { useBreadcrumbRecord, useNav, useNavGuard, useTrackRecent } from '@/components/layout/nav-context';
 import { useDeepLinkId } from '@/lib/use-deep-link';
@@ -42,6 +43,7 @@ import type {
   ProductionCode,
 } from '@/lib/types';
 import { OrderPickSheet } from './OrderPickSheet';
+import { CallUpPanel, type CallUpOrder, type CallUpRow } from './CallUpPanel';
 import { CopyOrderSheet, type CopyPick } from './CopyOrderSheet';
 
 function normalizeOrderHeaderRow(raw: Record<string, unknown>): OrderHeaderListRow | null {
@@ -174,7 +176,7 @@ export function OrderEntryForm({
   serverCustomers,
 }: OrderEntryFormProps) {
   const router = useRouter();
-  const { touch: touchNav } = useNav();
+  const { touch: touchNav, sidebarSlot, confirmLeave } = useNav();
 
   // ── Session / tenant ───────────────────────────────────────────────────
   // Initialise directly from the server-passed value when available.
@@ -1063,6 +1065,24 @@ export function OrderEntryForm({
   }, [draft.order_id, draft.order_number, draft.lines.length, draft.customer_id, draft.production_date, draft.production_code,
       draft.department_event, standingOrderLines, items, customers, getDefaultDepartmentEvent, addCopiedLines, showStatusMessage]);
 
+  // Call Up List (side panel): clicking a customer opens their order for the day, or selects them when nothing is posted yet.
+  const handleCallUpOpen = useCallback(
+    (row: CallUpRow, order: CallUpOrder | null) => {
+      if (!confirmLeave()) return;
+      if (order) {
+        suppressNextSlotLookupRef.current = true;
+        setField('order_id', order.order_id);
+        setField('order_number', order.order_number);
+        setField('order_ref', order.order_number);
+        void loadOrderById(order.order_id, { preserveSelectedCustomer: false });
+        return;
+      }
+      const customer = customers.find((c) => c.customer_id === row.customer_id) ?? null;
+      if (customer) handleCustomerChange(customer);
+    },
+    [confirmLeave, customers, handleCustomerChange, loadOrderById, setField],
+  );
+
   const handleOrderPickNew = useCallback(() => {
     setOrderPickOpen(false);
     setField('order_id', undefined);
@@ -1256,6 +1276,17 @@ export function OrderEntryForm({
 
   return (
     <div className="flex h-full bg-background overflow-hidden">
+      {/* The day's Call Up List in the docked sidebar */}
+      {sidebarSlot && tenantId && createPortal(
+        <CallUpPanel
+          tenantId={tenantId}
+          date={draft.production_date}
+          refreshKey={`${draft.order_id ?? ''}|${isSaving}`}
+          codeLabel={(code) => productionCodes.find((c) => c.value === code)?.label ?? code}
+          onOpen={handleCallUpOpen}
+        />,
+        sidebarSlot,
+      )}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* ── Title bar ─────────────────────────────────────────────────── */}
         <div className="flex items-center justify-between px-3 py-2 border-b border-border/60 bg-card shrink-0">
