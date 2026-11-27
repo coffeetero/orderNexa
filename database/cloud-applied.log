@@ -116,3 +116,17 @@
 2026-11-27 22:20:02Z  3ae87ed  OK      database/functions/om_standing_order_call_save.sql
 2026-11-27 22:20:03Z  3ae87ed  OK      database/functions/om_call_up_list_get.sql
 2026-11-27 22:20:04Z  3ae87ed  OK      database/functions/om_call_up_called_set.sql
+2026-11-27 22:44:27Z  9e83b61  OK      database/migration/add_ar_settlements.sql
+2026-11-27 22:44:28Z  9e83b61  OK      database/functions/ar_transaction_open_amount.sql
+2026-11-27 22:44:30Z  9e83b61  OK      database/functions/ar_report_open_items.sql
+2026-11-27 22:44:31Z  9e83b61  OK      database/functions/ar_open_items_refresh.sql
+2026-11-27 22:44:32Z  9e83b61  OK      database/functions/ar_customer_balance_get.sql
+2026-11-27 22:44:32Z  9e83b61  OK      database/functions/ar_payment_allocate.sql
+2026-11-27 22:44:33Z  9e83b61  OK      database/functions/ar_payment_open_items_get.sql
+2026-11-27 22:44:34Z  9e83b61  OK      database/functions/ar_payment_enter.sql
+2026-11-27 22:44:35Z  9e83b61  OK      database/functions/ar_payment_apply.sql
+2026-11-27 22:44:36Z  9e83b61  OK      database/functions/ar_payment_get.sql
+2026-11-27 22:44:37Z  9e83b61  OK      database/functions/ar_payments_search.sql
+2026-11-27 22:44:38Z  9e83b61  OK      database/functions/fnd_hc_ar_open_items_drift.sql
+2026-11-27 22:44:39Z  9e83b61  OK      database/migration/seed_ar_legacy_settlements_cloud.sql
+2026-11-27 22:45:54Z  f76d184  OK      database/migration/seed_ar_legacy_settlements_cloud.sql
