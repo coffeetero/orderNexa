@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { TopNav } from '@/components/layout/TopNav';
 import { Breadcrumbs } from '@/components/layout/Breadcrumbs';
 import { ContextSidebar, HiddenSidebarSlot } from '@/components/layout/ContextSidebar';
@@ -10,7 +10,8 @@ import { AccountAppearanceLoader } from '@/components/theme/AppearanceProvider';
 import { ActivityPing } from '@/components/layout/ActivityPing';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import { createClient } from '@/lib/supabase/client';
-import { tenantNav, visibleMenus } from '@/lib/nav-config';
+import { findActiveHref, findActiveMenu, tenantNav, visibleMenus } from '@/lib/nav-config';
+import { PAGE_SIDEBAR, recentListsFor } from '@/lib/nav-records';
 import { SIDEBAR_COLLAPSED, SIDEBAR_COOKIE, SIDEBAR_OPEN } from '@/lib/sidebar-pref';
 import { cn } from '@/lib/utils';
 
@@ -42,6 +43,7 @@ export function TenantLayoutShell({
   areas = null,
 }: TenantLayoutShellProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const [authChecked, setAuthChecked] = useState(false);
   const [collapsed, setCollapsed] = useState(sidebarCollapsed);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -91,6 +93,14 @@ export function TenantLayoutShell({
   }
 
   const hasSidebar = tenantId !== null;
+  // The drawer (narrow screens) shows only the recent lists and Admin sections; a page's own sidebar list stays on
+  // the page there. With nothing to show, hide the toggle instead of opening a blank drawer.
+  // A page can ask for its own list to sit in the drawer too (PAGE_SIDEBAR inDrawer), and for a wider docked sidebar.
+  const moduleLabel = findActiveMenu(pathname, tenantNav)?.label ?? null;
+  const activeHref = findActiveHref(pathname, tenantNav);
+  const pageSidebar = (activeHref && PAGE_SIDEBAR[activeHref]) || {};
+  const sidebarWidth = pageSidebar.width ?? 260;
+  const drawerHasContent = moduleLabel === 'Admin' || Boolean(pageSidebar.inDrawer) || recentListsFor(activeHref, moduleLabel).length > 0;
 
   // Wide screens: show/hide the docked sidebar (remembered). Narrower screens: open/close the drawer.
   const toggleSidebar = () => {
@@ -123,7 +133,7 @@ export function TenantLayoutShell({
         />
 
         <Breadcrumbs
-          showSidebarToggle={hasSidebar}
+          showSidebarToggle={hasSidebar && (docked || drawerHasContent)}
           sidebarOpen={docked ? !collapsed : drawerOpen}
           onToggleSidebar={toggleSidebar}
         />
@@ -135,11 +145,13 @@ export function TenantLayoutShell({
           </main>
 
           {hasSidebar && collapsed && docked && <HiddenSidebarSlot />}
+          {hasSidebar && !docked && pageSidebar.inDrawer && !drawerOpen && <HiddenSidebarSlot />}
           {hasSidebar && !collapsed && (
             <aside
               id="context-sidebar"
               aria-label="Page sidebar"
-              className="order-1 hidden w-[260px] shrink-0 overflow-y-auto border-r border-border bg-muted/20 scrollbar-thin xl:block"
+              className="order-1 hidden shrink-0 overflow-y-auto border-r border-border bg-muted/20 scrollbar-thin xl:block"
+              style={{ width: sidebarWidth }}
             >
               <ContextSidebar withSlot={docked} />
             </aside>
@@ -148,11 +160,11 @@ export function TenantLayoutShell({
 
         {hasSidebar && (
           <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
-            <SheetContent side="left" className="w-[88vw] max-w-[300px] p-0">
+            <SheetContent side="left" className="w-[88vw] max-w-[300px] p-0" style={pageSidebar.width ? { maxWidth: pageSidebar.width } : undefined}>
               <SheetTitle className="sr-only">Page sidebar</SheetTitle>
               <SheetDescription className="sr-only">Recently opened records for this page</SheetDescription>
               <div className="h-full overflow-y-auto pt-8">
-                <ContextSidebar onNavigate={() => setDrawerOpen(false)} />
+                <ContextSidebar onNavigate={() => setDrawerOpen(false)} withSlot={Boolean(pageSidebar.inDrawer)} />
               </div>
             </SheetContent>
           </Sheet>

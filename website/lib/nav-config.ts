@@ -151,7 +151,7 @@ export const tenantNav: NavMenu[] = [
       {
         heading: 'Receivables',
         items: [
-          { label: 'AR Open Balances', href: '/financials/ar' },
+          { label: 'AR Open Balances Report', href: '/financials/ar' },
           { label: 'AR Aging Report', href: '/financials/aging' },
           { label: 'Customer Statements', href: '/financials/statements' },
         ],

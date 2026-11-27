@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, ChevronUp, Download, Play, Printer, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -8,10 +9,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CustomerPicker, type PickAccount } from './CustomerPicker';
 import { OpenItemsDetail } from './OpenItemsDetail';
+import { useNav } from '@/components/layout/nav-context';
 import type { ReportKind } from '@/lib/reports/financial';
 
 const CONFIG: Record<ReportKind, { title: string; help: string }> = {
-  ar: { title: 'AR Open Balances', help: 'Customers with something open on a date. Click a name to see its open items below; tick customers to put them in the report.' },
+  ar: { title: 'AR Open Balances Report', help: 'Customers with something open on a date. Click a name to see its open items below; tick customers to put them in the report.' },
   aging: { title: 'AR Aging Report', help: 'What each selected customer owes, by how far past due it is.' },
   statements: { title: 'Customer Statements', help: 'One statement per selected customer. Saving keeps each customer’s statement with its own as-of date.' },
   sales: { title: 'Sales Reports', help: 'Invoiced sales, credits and items for the selected customers over a date range.' },
@@ -41,6 +43,9 @@ export function FinancialReport({ tenantId, kind }: { tenantId: number; kind: Re
   const [activeId, setActiveId] = useState<number | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const openList = kind === 'ar';
+  // AR Open Balances: the customer list lives in the page sidebar (docked, or the drawer on narrow screens)
+  const { sidebarSlot } = useNav();
+  const listInSidebar = openList && sidebarSlot !== null;
 
   // AR Aging and Sales list only active accounts that have an invoice in the period (up to the as-of date, or from-to).
   // AR Open Balances lists only accounts with something open on the as-of date, with the balance.
@@ -101,9 +106,9 @@ export function FinancialReport({ tenantId, kind }: { tenantId: number; kind: Re
 
   const none = selected.size === 0;
   const active = accounts?.find((a) => a.customer_id === activeId) ?? null;
-  const openAccount = (id: number) => { setActiveId(id); setCollapsed(true); };
+  const openAccount = (id: number) => { setActiveId(id); if (!listInSidebar) setCollapsed(true); };
   return (
-    <div className="mx-auto max-w-5xl space-y-4 p-2 sm:p-3">
+    <div className={listInSidebar ? 'space-y-4 p-2' : 'mx-auto max-w-5xl space-y-4 p-2 sm:p-3'}>
       <div>
         <h1 className="text-2xl font-semibold">{cfg.title}</h1>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{cfg.help}</p>
@@ -116,12 +121,12 @@ export function FinancialReport({ tenantId, kind }: { tenantId: number; kind: Re
             <span className="min-w-0 truncate text-xs text-muted-foreground">
               As of {asOf}{accounts ? ` · ${accounts.length} with an open balance` : ''}{active ? ` · showing ${active.customer_name}` : ''}{selected.size ? ` · ${selected.size} in report` : ''}
             </span>
-            <Button variant="ghost" size="sm" className="ml-auto h-7 gap-1 px-2 text-xs" onClick={() => setCollapsed((c) => !c)} aria-expanded={!collapsed} aria-controls="ar-customers">
+            {!listInSidebar && <Button variant="ghost" size="sm" className="ml-auto h-7 gap-1 px-2 text-xs" onClick={() => setCollapsed((c) => !c)} aria-expanded={!collapsed} aria-controls="ar-customers">
               {collapsed ? <><ChevronDown className="h-4 w-4" />Show</> : <><ChevronUp className="h-4 w-4" />Hide</>}
-            </Button>
+            </Button>}
           </div>
         )}
-        {!(openList && collapsed) && <CardContent id="ar-customers" className={`space-y-4 ${openList ? 'pt-4' : 'pt-6'}`}>
+        {!(openList && collapsed) && !listInSidebar && <CardContent id="ar-customers" className={`space-y-4 ${openList ? 'pt-4' : 'pt-6'}`}>
         <div className="flex flex-wrap items-end gap-4">
           {kind === 'sales' ? (
             <>
@@ -154,6 +159,22 @@ export function FinancialReport({ tenantId, kind }: { tenantId: number; kind: Re
         {message && <p role="status" className={`text-sm ${message.error ? 'text-destructive' : 'text-foreground'}`}>{message.text}</p>}
       </CardContent>}
       </Card>
+
+      {listInSidebar && sidebarSlot && createPortal(
+        <section aria-label="Customers with an open balance" className="flex min-h-0 flex-1 flex-col gap-2 border-t border-border px-1 pt-3">
+          <div className="flex items-end gap-2 px-1">
+            <div className="min-w-0 flex-1">
+              <Label htmlFor="asof" className="text-xs">As of date</Label>
+              <Input id="asof" type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)} className="h-8 text-xs" />
+            </div>
+            <Button size="sm" onClick={() => run(false)} disabled={busy || none} className="h-8 gap-1.5"><Play className="h-4 w-4" />{busy ? 'Running…' : 'Run'}</Button>
+          </div>
+          {message && <p role="status" className={`px-1 text-xs ${message.error ? 'text-destructive' : 'text-foreground'}`}>{message.text}</p>}
+          {accounts === null ? <p className="px-2 text-xs text-muted-foreground">Loading customers…</p>
+            : <CustomerPicker accounts={accounts} selected={selected} onChange={setSelected} onOpen={openAccount} activeId={activeId} inSidebar />}
+        </section>,
+        sidebarSlot,
+      )}
 
       {openList && activeId !== null && <OpenItemsDetail tenantId={tenantId} accountId={activeId} asOf={asOf} />}
 

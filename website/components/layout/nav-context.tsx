@@ -39,7 +39,7 @@ type NavContextValue = {
   setQuickHrefs: (hrefs: string[]) => void;
   /** Where a page may render its own sidebar content (null when the sidebar is not docked and open). */
   sidebarSlot: HTMLElement | null;
-  setSidebarSlot: (el: HTMLElement | null) => void;
+  setSidebarSlot: React.Dispatch<React.SetStateAction<HTMLElement | null>>;
 };
 
 const noop = () => {};

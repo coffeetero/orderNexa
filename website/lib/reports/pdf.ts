@@ -29,6 +29,8 @@ function fit(font: PDFFont, text: string, size: number, width: number): string {
 /** One PDF; every spec starts on a new page. Tables repeat their header row when they continue on the next page. */
 export async function renderPdf(specs: PdfSpec[]): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
+  // Without a title the browser's PDF viewer shows the preview's blob id in its toolbar.
+  if (specs.length === 1) pdf.setTitle(specs[0].title, { showInWindowTitleBar: true });
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
 
