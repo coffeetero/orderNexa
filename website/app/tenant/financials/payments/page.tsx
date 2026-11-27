@@ -6,7 +6,8 @@ export const metadata = {
   title: 'Payment History — Financials',
 };
 
-export default async function ManagePaymentsPage({ searchParams }: { searchParams: { id?: string } }) {
+export default async function ManagePaymentsPage(props: { searchParams: Promise<{ id?: string }> }) {
+  const searchParams = await props.searchParams;
   await requireArea('financials.payments');
   const tenantId = await getCurrentTenantId();
   if (tenantId === null) {

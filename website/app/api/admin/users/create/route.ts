@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   const auth = await requireStaff();
   if (!auth.ok) return auth.response;
   const ids = (v: unknown) => (Array.isArray(v) ? v.map(toInt).filter((n): n is number => n !== null) : []);
-  const db = createClient();
+  const db = await createClient();
   const email = typeof body.email === 'string' ? body.email : '';
   const { data, error } = await db.rpc('fnd_user_create', {
     p_tenant_id: tenantId,

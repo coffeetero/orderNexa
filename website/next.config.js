@@ -5,9 +5,6 @@
 // dns.setDefaultResultOrder('ipv4first');
 
 const nextConfig = {
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   images: { unoptimized: true },
   // async redirects() {
   //   return [

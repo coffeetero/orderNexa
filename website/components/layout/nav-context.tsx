@@ -78,7 +78,7 @@ export function NavProvider({ tenantId, areas = null, children }: { tenantId: nu
   const pendingLeave = useRef<(() => void) | null>(null);
   const tenantRef = useRef(tenantId);
   tenantRef.current = tenantId;
-  const bumpTimer = useRef<ReturnType<typeof setTimeout>>();
+  const bumpTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const touch = useCallback((payload: TouchPayload) => {
     const tid = tenantRef.current;

@@ -23,7 +23,7 @@ export async function GET(request: Request) {
   if (!auth.ok) return auth.response;
 
   const code = url.searchParams.get('production_code');
-  const { data, error } = await createClient().rpc('om_report_customers_get', {
+  const { data, error } = await (await createClient()).rpc('om_report_customers_get', {
     p_tenant_id: tenantId, p_from: from, p_to: to, p_production_code: code && code.trim() !== '' ? code : null, p_basis: basis,
   });
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });

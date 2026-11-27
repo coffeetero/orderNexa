@@ -16,7 +16,7 @@ export async function GET(request: Request) {
   const auth = await requireStaff();
   if (!auth.ok) return auth.response;
 
-  const { data, error } = await createClient().rpc('ar_credit_find', { p_tenant_id: tenantId, p_kind: kind, p_value: q });
+  const { data, error } = await (await createClient()).rpc('ar_credit_find', { p_tenant_id: tenantId, p_kind: kind, p_value: q });
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ data });
 }

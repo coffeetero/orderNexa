@@ -9,9 +9,10 @@ export const metadata = {
 
 const TYPES = ['STATEMENT', 'INVOICE'];
 
-export default async function AccountDocumentsPage({ params }: { params: { account_slug: string } }) {
+export default async function AccountDocumentsPage(props: { params: Promise<{ account_slug: string }> }) {
+  const params = await props.params;
   const tenantId = await getCurrentTenantId();
-  const { data: customer } = await createClient()
+  const { data: customer } = await (await createClient())
     .from('fnd_customers')
     .select('customer_id')
     .eq('account_slug', params.account_slug)

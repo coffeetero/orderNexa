@@ -20,9 +20,9 @@ export async function POST() {
   const tenantId = await getCurrentTenantId();
   if (tenantId === null) return NextResponse.json({ ok: true });
 
-  const h = headers();
+  const h = await headers();
   const ip = (h.get('x-forwarded-for') || h.get('x-real-ip') || '').split(',')[0].trim();
-  const { error } = await createClient().rpc('fnd_activity_record', {
+  const { error } = await (await createClient()).rpc('fnd_activity_record', {
     p_tenant_id: tenantId,
     p_ip: ip || null,
     p_city: decoded(h.get('x-vercel-ip-city')),

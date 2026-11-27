@@ -15,7 +15,7 @@ export async function GET(request: Request) {
   const auth = await requireStaff();
   if (!auth.ok) return auth.response;
 
-  const { data, error } = await createClient().rpc('fnd_tenant_sequences_get', { p_tenant_id: tenantId });
+  const { data, error } = await (await createClient()).rpc('fnd_tenant_sequences_get', { p_tenant_id: tenantId });
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ data });
 }
@@ -35,7 +35,7 @@ export async function POST(request: Request) {
   if (!auth.ok) return auth.response;
 
   const { sequence_name, mask, start_value, next_value, increment_by, reset_period, requires_gapless } = body;
-  const { data, error } = await createClient().rpc('fnd_tenant_sequences_save', {
+  const { data, error } = await (await createClient()).rpc('fnd_tenant_sequences_save', {
     p_tenant_id: tenantId,
     p_payload: { sequence_name, mask, start_value, next_value, increment_by, reset_period, requires_gapless: requires_gapless === true },
   });

@@ -26,7 +26,7 @@ export async function POST(request: Request) {
   const auth = await requireStaff();
   if (!auth.ok) return auth.response;
 
-  const { data, error } = await createClient().rpc('om_production_runs_process', {
+  const { data, error } = await (await createClient()).rpc('om_production_runs_process', {
     p_tenant_id: tenantId, p_from: body.from, p_to: body.to, p_production_code: code,
   });
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });

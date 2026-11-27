@@ -45,10 +45,10 @@ interface OrderHeaderRowProps {
   isLoadingCustomers: boolean;
   productionCodes: { value: string; label: string }[];
   /** External ref for the customer search <input> (used by useOrderFocus, alwaysOpen mode). */
-  customerInputRef: React.RefObject<HTMLInputElement>;
-  departmentEventInputRef: React.RefObject<HTMLInputElement>;
-  productionDateInputRef: React.RefObject<HTMLInputElement>;
-  productionCodeTriggerRef: React.RefObject<HTMLButtonElement>;
+  customerInputRef: React.RefObject<HTMLInputElement | null>;
+  departmentEventInputRef: React.RefObject<HTMLInputElement | null>;
+  productionDateInputRef: React.RefObject<HTMLInputElement | null>;
+  productionCodeTriggerRef: React.RefObject<HTMLButtonElement | null>;
   departmentEventOptions: DepartmentEventOption[];
   /** Customers that already have an order for the production date and code (coloured, and their account sorted to the top). */
   customerIdsWithOrders?: Set<number>;

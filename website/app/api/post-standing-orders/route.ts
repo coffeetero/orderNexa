@@ -28,7 +28,7 @@ export async function GET(request: Request) {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const supabase = createClient();
+  const supabase = await createClient();
 
   // Available production codes for this tenant
   const { data: codesData } = await supabase
@@ -85,7 +85,7 @@ export async function POST(request: Request) {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const supabase = createClient();
+  const supabase = await createClient();
 
   // One call per production date + code with the selected customers.
   const groups = new Map<string, { date: string; code: string; customerIds: number[] }>();

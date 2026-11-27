@@ -23,7 +23,7 @@ export async function GET(request: Request) {
 
   const code = url.searchParams.get('production_code');
   const status = url.searchParams.get('status');
-  const { data, error } = await createClient().rpc('om_shipments_get', {
+  const { data, error } = await (await createClient()).rpc('om_shipments_get', {
     p_tenant_id: tenantId, p_from: from, p_to: to,
     p_production_code: code && code.trim() !== '' ? code : null,
     p_status: status && status.trim() !== '' ? status : null,

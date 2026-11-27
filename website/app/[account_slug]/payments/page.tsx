@@ -20,7 +20,7 @@ const methodLabels: Record<string, string> = {
 };
 
 export default async function AccountPaymentsPage() {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data: myPayments, error } = await supabase
     .from('ar_payments')

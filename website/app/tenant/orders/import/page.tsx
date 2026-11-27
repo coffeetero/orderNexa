@@ -6,7 +6,7 @@ export const metadata = {
 };
 
 export default async function ImportOrdersPage() {
-  const { data } = await createClient().rpc('fnd_tenants_get');
+  const { data } = await (await createClient()).rpc('fnd_tenants_get');
   const tenants = Array.isArray(data) ? data : [];
   const tenantId: number | null = tenants.length > 0 ? tenants[0].tenant_id : null;
   if (tenantId === null) {

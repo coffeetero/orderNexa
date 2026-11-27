@@ -13,7 +13,7 @@ export default async function Page() {
   if (tenantId === null) {
     return <div className="p-6 text-sm text-muted-foreground">No company found for this user.</div>;
   }
-  const supabase = createClient();
+  const supabase = await createClient();
   const [w, d] = await Promise.all([
     supabase.rpc('fnd_has_access', { p_area: 'purchasing.vendors', p_action: 'W' }),
     supabase.rpc('fnd_has_access', { p_area: 'purchasing.vendors', p_action: 'D' }),

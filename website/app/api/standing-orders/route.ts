@@ -24,7 +24,7 @@ export async function GET(request: Request) {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data, error } = await supabase.rpc('om_standing_orders_get', {
     p_tenant_id:       tenantId,
     p_customer_id:     customerId,
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data, error } = await (supabase.rpc as any)('om_standing_orders_save', {
     p_tenant_id:        tenantId,
     p_customer_id:      customerId,

@@ -13,7 +13,7 @@ export async function GET() {
   const auth = await requireStaff();
   if (!auth.ok) return auth.response;
 
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data, error } = await supabase.rpc('fnd_user_preferences_get');
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
   // Only known fields survive; colours are re-validated, so nothing else can be stored.
   const appearance = readAppearance(appearanceIn);
 
-  const supabase = createClient();
+  const supabase = await createClient();
   const { error } = await supabase.rpc('fnd_user_preferences_save', { p_appearance: appearance });
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 

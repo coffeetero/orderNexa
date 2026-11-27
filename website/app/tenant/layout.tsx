@@ -21,16 +21,16 @@ export default async function TenantLayout({ children }: { children: React.React
   // Tenant the sidebar tracks recent records for (same RPC the pages use).
   let tenantId: number | null = null;
   if (access.userType === 'TENANCY_USER') {
-    const { data: tenantData } = await createClient().rpc('fnd_tenants_get');
+    const { data: tenantData } = await (await createClient()).rpc('fnd_tenants_get');
     const first = Array.isArray(tenantData) ? tenantData[0] : null;
     tenantId = typeof first?.tenant_id === 'number' ? first.tenant_id : null;
   }
   let areas: string[] | null = null;
   if (access.userType === 'TENANCY_USER') {
-    const { data: areaData } = await createClient().rpc('fnd_my_areas');
+    const { data: areaData } = await (await createClient()).rpc('fnd_my_areas');
     areas = Array.isArray(areaData) ? (areaData as string[]) : [];
   }
-  const sidebarCollapsed = cookies().get(SIDEBAR_COOKIE)?.value === SIDEBAR_COLLAPSED;
+  const sidebarCollapsed = (await cookies()).get(SIDEBAR_COOKIE)?.value === SIDEBAR_COLLAPSED;
 
   return (
     <TenantLayoutShell

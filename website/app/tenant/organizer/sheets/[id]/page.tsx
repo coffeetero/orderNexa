@@ -5,8 +5,9 @@ export const metadata = {
   title: 'Sheet — Organizer',
 };
 
-export default async function SheetPage({ params }: { params: { id: string } }) {
-  const { data } = await createClient().rpc('fnd_tenants_get');
+export default async function SheetPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const { data } = await (await createClient()).rpc('fnd_tenants_get');
   const tenants = Array.isArray(data) ? data : [];
   const tenantId: number | null = tenants.length > 0 ? tenants[0].tenant_id : null;
   if (tenantId === null) {

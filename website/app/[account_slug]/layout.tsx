@@ -12,21 +12,21 @@ export default async function AccountSlugLayout({
   params,
 }: {
   children: React.ReactNode;
-  params: { account_slug: string };
+  params: Promise<{ account_slug: string }>;
 }) {
-  const host = headers().get('host') || '';
+  const host = (await headers()).get('host') || '';
   if (!parseTenantSubdomain(host)) {
     notFound();
   }
 
-  const { account_slug } = params;
+  const { account_slug } = await params;
   const user = await getSessionUser();
 
   if (!user) {
     redirect('/login');
   }
 
-  const supabase = createClient();
+  const supabase = await createClient();
   const access = await getUserAccess(user.id);
 
   if (access.userType === 'TENANCY_USER') {

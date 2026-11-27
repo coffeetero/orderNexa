@@ -8,7 +8,8 @@ export const dynamic = 'force-dynamic';
  * POST /api/customers/import/:id { tenant_id, action: 'apply' }
  *      → checks the rows again and inserts the new / updates the changed customers (fnd_customer_import_apply)
  */
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const id = toInt(params.id);
   const body = await readBody(request);
   if (id === null || !body) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });

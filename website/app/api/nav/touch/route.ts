@@ -42,7 +42,7 @@ export async function POST(request: Request) {
   const record = hasRecord ? normalizeRecord(o.record) : null;
   if (hasRecord && !record) return NextResponse.json({ error: 'Invalid record' }, { status: 400 });
 
-  const supabase = createClient();
+  const supabase = await createClient();
   const { error } = await supabase.rpc('fnd_nav_touch', {
     p_tenant_id: tenantId,
     p_action_key: actionKey,

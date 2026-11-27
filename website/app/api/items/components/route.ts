@@ -20,7 +20,7 @@ export async function GET(request: Request) {
   const itemId = parseInteger(q.get('item_id'));
   if (tenantId === null || itemId === null) return NextResponse.json({ error: 'Invalid or missing tenant_id / item_id' }, { status: 400 });
   if (!(await getSessionUser())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const { data, error } = await createClient().rpc('fnd_item_components_get', { p_tenant_id: tenantId, p_item_id: itemId });
+  const { data, error } = await (await createClient()).rpc('fnd_item_components_get', { p_tenant_id: tenantId, p_item_id: itemId });
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ data: data ?? [] });
 }
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'tenant_id, item_id and entries are required' }, { status: 400 });
   }
   if (!(await getSessionUser())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const { data, error } = await createClient().rpc('fnd_item_components_set', { p_tenant_id: tenantId, p_item_id: itemId, p_entries: body.entries });
+  const { data, error } = await (await createClient()).rpc('fnd_item_components_set', { p_tenant_id: tenantId, p_item_id: itemId, p_entries: body.entries });
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ data });
 }

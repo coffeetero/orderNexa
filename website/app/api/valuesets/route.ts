@@ -19,7 +19,7 @@ export async function GET(request: Request) {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data: vs, error: vsErr } = await supabase
     .from('fnd_valuesets')

@@ -19,7 +19,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const user = await getSessionUser();
 
   // The theme last applied on this device (cookie), painted into the first HTML so there is no flash of the default colours.
-  const saved = readCookie(cookies().get(APPEARANCE_COOKIE)?.value);
+  const saved = readCookie((await cookies()).get(APPEARANCE_COOKIE)?.value);
   const initial = saved ?? { mode: DEFAULT_MODE, theme: DEFAULT_THEME };
   const mode = htmlMode(initial.theme, initial.mode);
 

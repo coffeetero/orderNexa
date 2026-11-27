@@ -13,7 +13,8 @@ const text = (v: unknown) => (typeof v === 'string' ? v.slice(0, 500) : null);
  *   action 'unapply' { application_ids, credit_application_ids, reason } → ar_payment_unapply (empty lists = all)
  *   action 'void'    { reason }                                    → ar_payment_void
  */
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const id = toInt(params.id);
   if (id === null) return NextResponse.json({ error: 'Invalid payment id' }, { status: 400 });
   const body = await readBody(request);

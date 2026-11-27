@@ -11,7 +11,7 @@ export async function GET(request: Request) {
   if (tenantId === null) return NextResponse.json({ error: 'Invalid or missing tenant_id' }, { status: 400 });
   if (!(await getSessionUser())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const types = q.get('types')?.split(',').map((t) => t.trim().toUpperCase()).filter(Boolean);
-  const { data, error } = await createClient().rpc('fnd_documents_get', {
+  const { data, error } = await (await createClient()).rpc('fnd_documents_get', {
     p_tenant_id: tenantId, p_customer_id: toInt(q.get('customer_id')), p_types: types && types.length ? types : null,
   });
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });

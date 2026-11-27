@@ -19,7 +19,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   }
   const auth = await requireStaff();
   if (!auth.ok) return auth.response;
-  const { data, error } = await createClient().rpc('om_call_up_list_get', { p_tenant_id: tenantId, p_date: date });
+  const { data, error } = await (await createClient()).rpc('om_call_up_list_get', { p_tenant_id: tenantId, p_date: date });
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ data: data ?? [] });
 }
@@ -38,7 +38,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
   const auth = await requireStaff();
   if (!auth.ok) return auth.response;
-  const { data, error } = await createClient().rpc('om_call_up_called_set', {
+  const { data, error } = await (await createClient()).rpc('om_call_up_called_set', {
     p_tenant_id: tenantId, p_customer_id: customerId, p_date: body.date, p_called: body.called,
   });
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });

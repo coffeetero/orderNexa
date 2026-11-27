@@ -60,7 +60,7 @@ export const dynamic = 'force-dynamic';
 
 /** AR figures, read once per request and shared by the Outstanding AR figure and both AR panels, which stream in after the rest. */
 const loadAr = cache(async (tenantId: number): Promise<ArDashboard | null> => {
-  const { data } = await createClient().rpc('ar_dashboard_get', { p_tenant_id: tenantId, p_limit: 8 });
+  const { data } = await (await createClient()).rpc('ar_dashboard_get', { p_tenant_id: tenantId, p_limit: 8 });
   return (data ?? null) as ArDashboard | null;
 });
 
@@ -157,7 +157,7 @@ async function ArAging({ tenantId }: { tenantId: number }) {
 }
 
 export default async function TenantDashboardPage() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const tenantId = await getCurrentTenantId();
   if (tenantId !== null) void loadAr(tenantId);   // start the AR read now; its panels wait for it, the rest of the page does not
   const [areasRes, ordersRes, todoRes, metricsRes] = tenantId === null

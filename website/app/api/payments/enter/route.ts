@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   if (tenantId === null || !body) return NextResponse.json({ error: 'tenant_id is required' }, { status: 400 });
   const auth = await requireStaff();
   if (!auth.ok) return auth.response;
-  const { data, error } = await createClient().rpc('ar_payment_enter', {
+  const { data, error } = await (await createClient()).rpc('ar_payment_enter', {
     p_tenant_id: tenantId,
     p_payload: {
       customer_id: toInt(body.customer_id), payment_date: body.payment_date, check_no: body.check_no, amount: body.amount,

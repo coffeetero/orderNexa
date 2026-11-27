@@ -23,7 +23,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   }
   const auth = await requireStaff();
   if (!auth.ok) return auth.response;
-  const { data, error } = await createClient().rpc('om_standing_order_call_get', {
+  const { data, error } = await (await createClient()).rpc('om_standing_order_call_get', {
     p_tenant_id: tenantId, p_customer_id: customerId, p_production_dow: dow, p_production_code: code,
   });
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
@@ -47,7 +47,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
   const auth = await requireStaff();
   if (!auth.ok) return auth.response;
-  const { data, error } = await createClient().rpc('om_standing_order_call_save', {
+  const { data, error } = await (await createClient()).rpc('om_standing_order_call_save', {
     p_tenant_id: tenantId, p_customer_id: customerId, p_production_dows: dows, p_production_code: code,
     p_is_call: body.is_call, p_assigned_user_id: assigned,
   });

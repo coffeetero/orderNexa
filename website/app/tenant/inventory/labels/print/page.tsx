@@ -6,7 +6,8 @@ export const metadata = {
   title: 'Print Nutrition Labels — Inventory',
 };
 
-export default async function NutritionLabelsPrintPage({ searchParams }: { searchParams: { ids?: string } }) {
+export default async function NutritionLabelsPrintPage(props: { searchParams: Promise<{ ids?: string }> }) {
+  const searchParams = await props.searchParams;
   await requireArea('inventory.labels');
   const tenantId = await getCurrentTenantId();
   if (tenantId === null) {

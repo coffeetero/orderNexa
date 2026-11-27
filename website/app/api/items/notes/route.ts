@@ -22,7 +22,7 @@ export async function GET(request: Request) {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data, error } = await supabase.rpc('fnd_notes_get', {
     p_tenant_id:    tenantId,
     p_entity_id:    itemId,
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data, error } = await supabase.rpc('fnd_notes_save', {
     p_tenant_id: tenantId,
     p_entry:     payload.entry,
@@ -72,7 +72,7 @@ export async function DELETE(request: Request) {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data, error } = await supabase.rpc('fnd_notes_delete', {
     p_tenant_id: tenantId,
     p_note_id:   noteId,

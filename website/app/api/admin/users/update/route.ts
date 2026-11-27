@@ -19,7 +19,7 @@ export async function POST(request: Request) {
   const auth = await requireStaff();
   if (!auth.ok) return auth.response;
 
-  const { data, error } = await createClient().rpc('fnd_user_update', {
+  const { data, error } = await (await createClient()).rpc('fnd_user_update', {
     p_tenant_id: tenantId, p_user_id: userId,
     p_user_name: typeof body.user_name === 'string' ? body.user_name : '',
     p_email: typeof body.email === 'string' ? body.email : '',

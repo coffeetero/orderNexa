@@ -102,13 +102,13 @@ export type EntityComboBoxProps<T> = {
    * Works in both popover and alwaysOpen modes.
    * Use this to imperatively focus the search field from parent components.
    */
-  inputRef?: React.RefObject<HTMLInputElement>;
+  inputRef?: React.RefObject<HTMLInputElement | null>;
 
   /**
    * External ref populated with the popover trigger <button>.
    * Only used in popover mode (alwaysOpen = false).
    */
-  triggerRef?: React.RefObject<HTMLButtonElement>;
+  triggerRef?: React.RefObject<HTMLButtonElement | null>;
 };
 
 type RowModel<T> = {

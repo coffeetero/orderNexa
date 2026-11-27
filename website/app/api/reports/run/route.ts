@@ -13,7 +13,7 @@ export const runtime = 'nodejs';
 const isDate = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
 
 function pdfResponse(bytes: Uint8Array, filename: string): Response {
-  return new Response(bytes, {
+  return new Response(new Uint8Array(bytes), {
     headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${filename}"`, 'Cache-Control': 'no-store' },
   });
 }
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
   const auth = await requireStaff();
   if (!auth.ok) return auth.response;
 
-  const supabase = createClient();
+  const supabase = await createClient();
   const args = { p_tenant_id: tenantId, p_from: body.from, p_to: body.to, p_production_code: code };
   const label = `${body.from}${body.from === body.to ? '' : ` to ${body.to}`}${code ? ` ${code}` : ''}`;
   const name = `${report}-${body.from}${body.from === body.to ? '' : `-to-${body.to}`}.pdf`;
