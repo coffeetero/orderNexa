@@ -188,6 +188,7 @@ export function OrderHeaderRow({
               `${c.customer_number ?? ''} ${c.customer_name}`
             }
             getParentId={(c) => c.customer_parent_id}
+            includeParentFamily
             getSortKey={(c) => `${topIdsWithOrders.has(topIdOf(c)) ? '0' : '1'}|${c.sort_path}`}
             getItemLabelClassName={(c) =>
               customerIdsWithOrders?.has(c.customer_id) || (topIdsWithOrders.has(c.customer_id) && !c.customer_parent_id)
@@ -204,7 +205,6 @@ export function OrderHeaderRow({
             clearSearchOnFocus
             inputRef={customerInputRef}
             triggerId="customer-select"
-            contextParentsSelectable={false}
           />
         </div>
 

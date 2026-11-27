@@ -67,6 +67,8 @@ export type EntityComboBoxProps<T> = {
   autoFocus?: boolean;
   /** When true (default), a direct search match also includes all descendants in the result set. */
   includeChildren?: boolean;
+  /** When searching, also show every child of each match's parent (the whole family under the parent), as context rows. */
+  includeParentFamily?: boolean;
   /** When false, rows included only as ancestors of a match (not a direct hit) cannot be selected. */
   contextParentsSelectable?: boolean;
   maxResults?: number;
@@ -174,6 +176,7 @@ export function EntityComboBox<T>({
   loading,
   autoFocus,
   includeChildren = true,
+  includeParentFamily = false,
   contextParentsSelectable = true,
   maxResults = 2000,
   emptyText = 'No results.',
@@ -346,12 +349,27 @@ export function EntityComboBox<T>({
       }
     };
 
+    // The whole family under a parent, shown as context (not counted as matches).
+    const includeFamily = (parentId: string) => {
+      const queue = [...(prepared.childrenByParent.get(parentId) ?? [])];
+      const seen = new Set<string>();
+      while (queue.length > 0) {
+        const id = queue.shift()!;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        included.add(id);
+        queue.push(...(prepared.childrenByParent.get(id) ?? []));
+      }
+    };
+
     for (const entry of prepared.items) {
       if (!entry.searchTextLower.includes(queryLower)) continue;
       matched.add(entry.idStr);
       included.add(entry.idStr);
       includeAncestors(entry.idStr);
       if (includeChildren) includeDescendants(entry.idStr);
+      const parentId = prepared.parentById.get(entry.idStr);
+      if (includeParentFamily && parentId) includeFamily(parentId);
     }
 
     const list: RowModel<T>[] = [];
@@ -372,6 +390,7 @@ export function EntityComboBox<T>({
     };
   }, [
     includeChildren,
+    includeParentFamily,
     maxResults,
     prepared,
     filterQuery,
@@ -399,6 +418,24 @@ export function EntityComboBox<T>({
       return selectableRowIndexes[0];
     });
   }, [selectableRowIndexes]);
+
+  // While searching, start on the first row that actually matches (not a parent shown only for context), so Enter
+  // picks a match; parents stay selectable with the arrows or a click.
+  React.useEffect(() => {
+    if (!filterQuery.trim()) return;
+    const firstMatch = rows.findIndex((row) => !row.contextOnly);
+    if (firstMatch >= 0) setActiveRowIndex(firstMatch);
+  }, [filterQuery, rows]);
+
+  // Not searching: start on the row whose label is already in the box (e.g. a default filled in), so Enter keeps it.
+  React.useEffect(() => {
+    if (filterQuery.trim()) return;
+    const text = currentInputValue.trim().toLowerCase();
+    if (!text) return;
+    const same = rows.findIndex((row) => (getInputLabel ?? getLabel)(row.item).trim().toLowerCase() === text);
+    if (same >= 0) setActiveRowIndex(same);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows]);
 
   React.useEffect(() => {
     if (listCollapsed) return;

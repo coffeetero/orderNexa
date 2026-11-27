@@ -569,6 +569,20 @@ export function OrderEntryForm({
       ))
         .filter((dept) => !withOrders.has(dept))
         .map((dept) => ({ id: `new:${dept}`, order_id: null, order_number: null, department_event: dept, total_quantity: 0, amount: 0, is_new: true }));
+      // The departments set up as customers are always offered: for an account or site, the departments under it; for a
+      // department, all of its parent's departments (itself included, already filled in as the default).
+      const selected = customers.find((c) => c.customer_id === draft.customer_id);
+      const familyParentId = selected
+        ? (isDepartmentEventCustomer(selected) ? selected.customer_parent_id : selected.customer_id)
+        : null;
+      const departmentNames = customers
+        .filter((c) => familyParentId !== null && c.customer_parent_id === familyParentId && isDepartmentEventCustomer(c))
+        .map((c) => normalizeDepartmentEventText(c.customer_name));
+      if (selected && isDepartmentEventCustomer(selected)) departmentNames.push(normalizeDepartmentEventText(selected.customer_name));
+      for (const name of departmentNames) {
+        if (!name || withOrders.has(name) || recentOptions.some((o) => o.department_event === name)) continue;
+        recentOptions.push({ id: `new:${name}`, order_id: null, order_number: null, department_event: name, total_quantity: 0, amount: 0, is_new: true });
+      }
       setDepartmentEventOptions([...existingOptions, ...recentOptions].sort((a, b) => a.department_event.localeCompare(b.department_event)));
     } catch {
       // silently ignore — the field still takes typed text
@@ -581,6 +595,7 @@ export function OrderEntryForm({
     tenantId,
     draft.customer_id,
     draft.production_date,
+    customers,
     getDefaultDepartmentEvent,
     fetchOrderHeaders,
     mode,
@@ -676,8 +691,9 @@ export function OrderEntryForm({
     (customer: CustomerOption | null) => {
       setShouldFocusItemWhenReady(false);
       setCustomer(customer?.customer_id ?? null, customer?.customer_name ?? '');
-      // Left empty: the clerk types the department/event; Enter on a blank field starts a new order with the default event.
-      setField('department_event', '');
+      // A department fills in its own name (Enter then opens its order for the slot, or starts one); otherwise left empty
+      // for the clerk to type. Enter on a blank field uses the default event.
+      setField('department_event', customer && isDepartmentEventCustomer(customer) ? normalizeDepartmentEventText(customer.customer_name) : '');
       setDepartmentEventOptions([]);
       setSelectedDepartmentEventId(null);
       setIsLoadingDepartmentEvents(false);
@@ -788,8 +804,9 @@ export function OrderEntryForm({
   const handleDepartmentEventCommit = useCallback(
     async (value: string) => {
       const norm = (v: string) => v.toUpperCase().replace(/\s+/g, ' ').trim();
-      const text = norm(value);
-      if (!text || !draft.customer_id) { startNewOrderWithEvent(getDefaultDepartmentEvent(draft.customer_id)); return; }
+      // Blank → the default event; either way an existing order with that event for the slot is opened.
+      const text = norm(value) || norm(getDefaultDepartmentEvent(draft.customer_id));
+      if (!text || !draft.customer_id) { startNewOrderWithEvent(text); return; }
       let rows: OrderHeaderListRow[] = [];
       try { rows = (await fetchOrderHeaders(draft.customer_id)).filter((r) => r.department_event); }
       catch { startNewOrderWithEvent(text); return; }
