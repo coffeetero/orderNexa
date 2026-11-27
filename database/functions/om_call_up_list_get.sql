@@ -2,7 +2,8 @@
 -- om_call_up_list_get
 -- Call Up List (Order Entry side panel): the active customers with Call ticked on their standing order for the day of
 -- the week of p_date (any production time). One row per customer: one call covers all of that day's times. Staff only.
--- Each row: customer_id, customer_number, customer_name, customer_type, parent_name, phone (the customer's PHONE contact,
+-- Each row: customer_id, customer_number, customer_name, customer_type, codes (the production times with Call ticked),
+--   parent_name, phone (the customer's PHONE contact,
 --   else its parent's), assigned (clerk names from the ticked times; empty = anyone), called_at, called_by,
 --   not_posted (a ticked time with standing order lines has no posted order yet),
 --   orders: [{ order_id, order_number, production_code, department_event, amount }] (that day's orders for the customer:
@@ -48,6 +49,7 @@ BEGIN
                    'customer_number', COALESCE(x.customer_number, ''),
                    'customer_name', x.customer_name,
                    'customer_type', x.customer_type,
+                   'codes', (SELECT jsonb_agg(DISTINCT f.production_code) FROM flagged f WHERE f.customer_id = x.customer_id),
                    'parent_name', x.parent_name,
                    'phone', (SELECT cp.value
                                FROM fnd_contacts k JOIN fnd_contact_points cp ON cp.contact_id = k.contact_id

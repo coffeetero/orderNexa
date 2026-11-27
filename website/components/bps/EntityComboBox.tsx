@@ -5,7 +5,7 @@
  */
 
 import * as React from 'react';
-import { Check, ChevronDown, ChevronsUpDown, Loader2, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronsUpDown, Loader2, Search, X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -552,11 +552,21 @@ export function EntityComboBox<T>({
     input.setSelectionRange(caretPosition, caretPosition);
   }, []);
 
+  // autoFocus: once, when the box is first ready. Later loading/disabled changes (e.g. the list loading again) must not
+  // pull the cursor back from a field the user has moved to.
+  const autoFocusedRef = React.useRef(false);
   React.useEffect(() => {
-    if (!autoFocus || disabled || loading) return;
+    if (!autoFocus || disabled || loading || autoFocusedRef.current) return;
+    autoFocusedRef.current = true;
+    const userIsElsewhere = () => {
+      const active = document.activeElement;
+      return !!active && active !== document.body && active !== searchInputRef.current;
+    };
+    if (userIsElsewhere()) return;
     requestAnimationFrame(() => {
+      if (userIsElsewhere()) return;
       focusSearchInput('caret-end');
-      requestAnimationFrame(() => focusSearchInput('caret-end'));
+      requestAnimationFrame(() => { if (!userIsElsewhere()) focusSearchInput('caret-end'); });
     });
   }, [autoFocus, disabled, focusSearchInput, loading]);
 
@@ -626,12 +636,24 @@ export function EntityComboBox<T>({
   const handleSearchFocus = React.useCallback(() => {
     cancelBlurRestoreTimer();
     if (!alwaysOpen) return;
-    requestAnimationFrame(() => focusSearchInput('caret-end'));
+    // Caret to the end, only if this box still has the cursor: calling focus() here would pull the cursor back from
+    // another box that took it meanwhile, and two such boxes then fight for it forever (focus loop).
+    requestAnimationFrame(() => {
+      const input = searchInputRef.current;
+      if (!input || document.activeElement !== input) return;
+      const end = input.value.length;
+      input.setSelectionRange(end, end);
+    });
   }, [
     alwaysOpen,
     cancelBlurRestoreTimer,
-    focusSearchInput,
   ]);
+
+  // The inline list's element id (set by cmdk), for the plain input's aria-controls.
+  const [listDomId, setListDomId] = React.useState<string | undefined>(undefined);
+  React.useEffect(() => {
+    if (alwaysOpen) setListDomId(listRef.current?.id || undefined);
+  }, [alwaysOpen]);
 
   const handleAlwaysOpenKeyDown = React.useCallback(
     async (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -891,18 +913,32 @@ export function EntityComboBox<T>({
             )}
           >
             <div className="flex h-9 shrink-0 items-center gap-1 px-1 [&_[cmdk-input-wrapper]]:h-full [&_[cmdk-input-wrapper]]:min-h-0 [&_[cmdk-input-wrapper]]:flex-1 [&_[cmdk-input-wrapper]]:items-center [&_[cmdk-input-wrapper]]:border-0 [&_[cmdk-input-wrapper]]:px-2 [&_[cmdk-input-wrapper]]:py-0">
-              <CommandInput
-                ref={searchInputRef}
-                id={triggerId}
-                placeholder={placeholder}
-                value={currentInputValue}
-                onValueChange={handleQueryChange}
-                onFocus={handleSearchFocus}
-                onBlur={handleSearchBlur}
-                onKeyDown={handleAlwaysOpenKeyDown}
-                disabled={disabled}
-                className="h-9 min-h-0 border-0 py-0 text-sm leading-none shadow-none outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0"
-              />
+              {/* A plain input, not cmdk's: when cmdk's search text changes it re-selects and moves the cursor into its own
+                  input whenever ANY cmdk input has it, so picking a customer (its text set) pulled the cursor back from the
+                  item box. This list does not use cmdk items, so cmdk does not need to see the text. Same look as CommandInput. */}
+              <div className="flex items-center border-b px-3" cmdk-input-wrapper="">
+                <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                <input
+                  ref={searchInputRef}
+                  id={triggerId}
+                  type="text"
+                  role="combobox"
+                  aria-autocomplete="list"
+                  aria-expanded={!listCollapsed}
+                  aria-controls={listDomId}
+                  autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  placeholder={placeholder}
+                  value={currentInputValue}
+                  onChange={(event) => handleQueryChange(event.target.value)}
+                  onFocus={handleSearchFocus}
+                  onBlur={handleSearchBlur}
+                  onKeyDown={handleAlwaysOpenKeyDown}
+                  disabled={disabled}
+                  className="flex h-9 min-h-0 w-full rounded-md border-0 bg-transparent py-0 text-sm leading-none shadow-none outline-none placeholder:text-muted-foreground focus:outline-none focus-visible:outline-none focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50"
+                />
+              </div>
               {clearable && selectedItem ? (
                 <Button
                   type="button"

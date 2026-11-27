@@ -134,7 +134,7 @@ export function TopNav({
         <Link
           href={item.href}
           aria-current={item.href === activeHref ? 'page' : undefined}
-          className={cn('cursor-pointer', item.href === activeHref && 'bg-accent font-medium text-accent-foreground')}
+          className={cn('cursor-pointer', item.href === activeHref && 'bg-accent font-medium text-accent-foreground', item.bold && 'font-semibold')}
         >
           {item.label}
           {quickKey(item.href) && (
@@ -354,6 +354,7 @@ export function TopNav({
                                   className={cn(
                                     'flex h-10 items-center rounded-md pl-6 pr-3 text-sm hover:bg-muted',
                                     item.href === activeHref ? 'bg-accent font-medium text-accent-foreground' : 'text-foreground/80',
+                                    item.bold && 'font-semibold',
                                   )}
                                 >
                                   {item.label}

@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { EntityComboBox } from '@/components/bps/EntityComboBox';
 import { cn } from '@/lib/utils';
+import { useNavGuard } from '@/components/layout/nav-context';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -210,8 +211,8 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
   }, [selectedCustomer, selectedDow, selectedCode, load]);
 
   // Save
-  const save = async () => {
-    if (!selectedCustomer || !tenantId) return;
+  const save = async (): Promise<boolean> => {
+    if (!selectedCustomer || !tenantId) return false;
     setIsSaving(true);
     try {
       const res  = await fetch('/api/standing-orders', {
@@ -223,7 +224,7 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
         }),
       });
       const json = await res.json() as { error?: string };
-      if (!res.ok || json.error) { toast.error(json.error ?? 'Could not save.'); return; }
+      if (!res.ok || json.error) { toast.error(json.error ?? 'Could not save.'); return false; }
       const callRes = await fetch('/api/standing-orders/call', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -233,11 +234,14 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
         }),
       });
       const callJson = await callRes.json() as { error?: string };
-      if (!callRes.ok || callJson.error) { toast.error(callJson.error ?? 'Could not save the call setting.'); return; }
+      if (!callRes.ok || callJson.error) { toast.error(callJson.error ?? 'Could not save the call setting.'); return false; }
       toast.success('Standing order saved.');
       await load(selectedCustomer.customer_id, selectedDow, selectedCode);
+      return true;
     } finally { setIsSaving(false); }
   };
+  // Leaving with unsaved changes asks Cancel / Leave without saving / Save
+  useNavGuard(Boolean(selectedCustomer) && isDirty, save);
 
   // Commit entry row → update existing line or append
   const commitEntry = useCallback(() => {

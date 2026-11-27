@@ -17,6 +17,8 @@ export interface CallUpRow {
   customer_number: string;
   customer_name: string;
   customer_type: string;
+  /** Production times with Call ticked for the day. */
+  codes: string[] | null;
   parent_name: string | null;
   phone: string | null;
   assigned: string[];
@@ -120,12 +122,6 @@ export function CallUpPanel({
           const called = Boolean(r.called_at);
           return (
             <li key={r.customer_id} className={cn('flex items-start gap-2 rounded px-1.5 py-1 hover:bg-muted/40', called && 'opacity-55')}>
-              <Checkbox
-                className="mt-0.5"
-                checked={called}
-                onCheckedChange={(v) => void setCalled(r, v === true)}
-                aria-label={`Called ${r.customer_name}`}
-              />
               <div className="min-w-0 flex-1">
                 <button
                   type="button"
@@ -150,6 +146,12 @@ export function CallUpPanel({
                   {r.assigned.length > 0 && <span>· {r.assigned.join(', ')}</span>}
                 </div>
               </div>
+              <Checkbox
+                className="ml-auto mt-0.5 shrink-0"
+                checked={called}
+                onCheckedChange={(v) => void setCalled(r, v === true)}
+                aria-label={`Called ${r.customer_name}`}
+              />
             </li>
           );
         })}

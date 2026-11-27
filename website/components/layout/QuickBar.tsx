@@ -102,7 +102,7 @@ export function QuickBar() {
       const href = m ? buttonsRef.current[Number(m[1]) - 1] : undefined;
       if (!href) return;
       e.preventDefault();
-      if (confirmLeave()) router.push(href);
+      if (confirmLeave(() => router.push(href))) router.push(href);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -229,10 +229,10 @@ function ScreenSearch({ actions, shortcut }: { actions: BuiltAction[]; shortcut:
     : [];
 
   const go = (a: BuiltAction) => {
-    if (!confirmLeave()) return;
     setQ('');
     setOpen(false);
     inputRef.current?.blur();
+    if (!confirmLeave(() => router.push(a.href))) return;
     router.push(a.href);
   };
 

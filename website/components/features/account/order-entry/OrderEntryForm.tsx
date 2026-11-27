@@ -1013,6 +1013,8 @@ export function OrderEntryForm({
   // order for a future date starts filled in with it (the clerk changes quantities and adds extras).
   const [standingOrderLines, setStandingOrderLines] = useState<{ item_id: number; quantity: number; prep_options: string[] | null }[]>([]);
   const standingOrderFilledKeyRef = useRef<string | null>(null);
+  // Set when a not-posted customer is opened from the Call Up List: fill the new order from the standing order even today.
+  const callUpFillRef = useRef(false);
   // Whose standing order: a saved department order is stored under its parent, so the department under this customer
   // whose name is the department/event owns it; otherwise the customer itself.
   const standingOrderCustomerId = useMemo(() => {
@@ -1044,10 +1046,11 @@ export function OrderEntryForm({
   const standingOrderItemIds = useMemo(() => new Set(standingOrderLines.map((l) => l.item_id)), [standingOrderLines]);
 
   useEffect(() => {
-    // Only a brand-new, still empty order for a future date, under the customer's own department/event.
+    // Only a brand-new, still empty order for a future date (or any date when opened from the Call Up List), under the
+    // customer's own department/event.
     if (draft.order_id || draft.order_number !== 'New Order' || draft.lines.length > 0) return;
-    if (!draft.customer_id || standingOrderLines.length === 0 || items.length === 0) return;
-    if (!draft.production_date || draft.production_date <= localDateIso()) return;
+    if (!draft.customer_id || standingOrderLines.length === 0 || items.length === 0 || isLoadingItems) return;
+    if (!draft.production_date || (draft.production_date <= localDateIso() && !callUpFillRef.current)) return;
     const customer = customers.find((c) => c.customer_id === draft.customer_id);
     const ownEvents = [getDefaultDepartmentEvent(draft.customer_id), customer?.customer_name?.trim().toUpperCase()];
     if (!ownEvents.includes(draft.department_event.trim().toUpperCase())) return;
@@ -1061,26 +1064,36 @@ export function OrderEntryForm({
     });
     if (picks.length === 0) return;
     addCopiedLines(picks, { fromStandingOrder: true });
+    callUpFillRef.current = false;
+    setShouldFocusItemWhenReady(true);
     showStatusMessage({ text: `Filled in from the standing order (${picks.length} item${picks.length === 1 ? '' : 's'}). Change the quantities and add extras.`, type: 'success' });
   }, [draft.order_id, draft.order_number, draft.lines.length, draft.customer_id, draft.production_date, draft.production_code,
-      draft.department_event, standingOrderLines, items, customers, getDefaultDepartmentEvent, addCopiedLines, showStatusMessage]);
+      draft.department_event, standingOrderLines, items, isLoadingItems, customers, getDefaultDepartmentEvent, addCopiedLines, showStatusMessage]);
 
-  // Call Up List (side panel): clicking a customer opens their order for the day, or selects them when nothing is posted yet.
+  // Call Up List (side panel): clicking a customer opens their order for the day; when nothing is posted yet it starts
+  // their order for the ticked production time, filled in from the standing order.
   const handleCallUpOpen = useCallback(
     (row: CallUpRow, order: CallUpOrder | null) => {
-      if (!confirmLeave()) return;
+      const open = () => {
       if (order) {
         suppressNextSlotLookupRef.current = true;
         setField('order_id', order.order_id);
         setField('order_number', order.order_number);
         setField('order_ref', order.order_number);
         void loadOrderById(order.order_id, { preserveSelectedCustomer: false });
+        setShouldFocusItemWhenReady(true);
         return;
       }
       const customer = customers.find((c) => c.customer_id === row.customer_id) ?? null;
-      if (customer) handleCustomerChange(customer);
+      if (!customer) return;
+      handleCustomerChange(customer);
+      if (row.codes?.[0]) setField('production_code', row.codes[0]);
+      callUpFillRef.current = true;
+      startNewOrderWithEvent(normalizeDepartmentEventText(customer.customer_name));
+      };
+      if (confirmLeave(open)) open();
     },
-    [confirmLeave, customers, handleCustomerChange, loadOrderById, setField],
+    [confirmLeave, customers, handleCustomerChange, loadOrderById, setField, startNewOrderWithEvent],
   );
 
   const handleOrderPickNew = useCallback(() => {

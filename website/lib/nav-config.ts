@@ -18,6 +18,8 @@ export type NavItem = {
   sections?: { key: string; label: string }[];
   /** Draw a thin line above this entry (splits a group into parts). */
   divider?: boolean;
+  /** Show the entry in bold (the screen used most). */
+  bold?: boolean;
 };
 export type NavGroup = { heading?: string; items: NavItem[] };
 export type NavMenu = {
@@ -45,7 +47,7 @@ export const tenantNav: NavMenu[] = [
         items: [
           { label: 'Post Standing Orders', href: '/orders/standing' },
           { label: 'Call Up List', href: '/orders/callup', soon: true },
-          { label: 'Enter Orders', href: '/orders' },
+          { label: 'Enter Orders', href: '/orders', bold: true },
           { label: 'Import Orders', href: '/orders/import' },
           { label: 'Export Orders', href: '/orders/export' },
           { label: 'Manage Orders', href: '/manage-orders', divider: true },
