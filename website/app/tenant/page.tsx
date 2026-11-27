@@ -13,7 +13,7 @@ interface Todo { kind: 'PRICEBOOK_NOT_IN_EFFECT'; customer_name: string; pricebo
 interface Buckets { current_amt: number; d1_30: number; d31_60: number; d61_90: number; d90_plus: number; total: number }
 interface Compare { value: number; previous: number; change_pct: number | null }
 interface Metrics { today: string; revenue: Compare; orders: Compare; customers: Compare; units: Compare; avg_order: Compare; top_items: { item_description: string; quantity: number; pct: number }[] }
-interface ArDashboard { as_of: string; totals: Buckets; accounts: { customer_id: string; customer_name: string; total: number; d90_plus: number }[] }
+interface ArDashboard { as_of: string; totals: Buckets; accounts: { customer_id: string; customer_name: string; total: number; d90_plus: number; d60_plus: number }[] }
 
 /** Whole-dollar or count display with the sign in front of the $ ("-$35,355", not "$-35,355"). */
 const whole = (v: number, prefix = '') => `${v < 0 ? '-' : ''}${prefix}${Math.abs(Math.round(v)).toLocaleString('en-US')}`;
@@ -114,14 +114,14 @@ async function CustomerAccounts({ tenantId }: { tenantId: number }) {
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead className="text-left">
-          <tr><th className={TH}>Account</th><th className={`${TH} text-right`}>Balance</th><th className={`${TH} text-right`}>Over 90 days</th></tr>
+          <tr><th className={TH}>Account</th><th className={`${TH} text-right`}>Balance</th><th className={`${TH} text-right`}>Over 60 days</th></tr>
         </thead>
         <tbody>
           {ar.accounts.map((a) => (
             <tr key={a.customer_id} className="border-t border-border hover:bg-muted/40">
               <td className={TD}>{a.customer_name}</td>
               <td className={`${TD} text-right`}>{money(a.total)}</td>
-              <td className={`${TD} text-right ${Number(a.d90_plus) > 0 ? 'font-medium text-destructive' : 'text-muted-foreground'}`}>{money(a.d90_plus)}</td>
+              <td className={`${TD} text-right ${Number(a.d60_plus) > 0 ? 'font-medium text-destructive' : 'text-muted-foreground'}`}>{money(a.d60_plus)}</td>
             </tr>
           ))}
         </tbody>
@@ -130,30 +130,36 @@ async function CustomerAccounts({ tenantId }: { tenantId: number }) {
   );
 }
 
+/** AR aging as vertical bars, one per age bucket, each labelled with its amount; bucket colours keep their status meaning. */
 async function ArAging({ tenantId }: { tenantId: number }) {
   const ar = await loadAr(tenantId);
   if (!ar) return <p className={EMPTY}>AR aging is not available.</p>;
+  const buckets = [
+    { label: 'Current', amount: Number(ar.totals.current_amt), color: 'bg-success' },
+    { label: '1–30', amount: Number(ar.totals.d1_30), color: 'bg-info' },
+    { label: '31–60', amount: Number(ar.totals.d31_60), color: 'bg-warning' },
+    { label: '61–90', amount: Number(ar.totals.d61_90), color: 'bg-destructive opacity-60' },
+    { label: 'Over 90', amount: Number(ar.totals.d90_plus), color: 'bg-destructive' },
+  ];
+  const max = Math.max(1, ...buckets.map((b) => b.amount));
   return (
-    <table className="w-full text-sm">
-      <tbody>
-        {[
-          { label: 'Current', amount: ar.totals.current_amt, color: 'bg-success' },
-          { label: '1–30 days', amount: ar.totals.d1_30, color: 'bg-info' },
-          { label: '31–60 days', amount: ar.totals.d31_60, color: 'bg-warning' },
-          { label: '61–90 days', amount: ar.totals.d61_90, color: 'bg-destructive opacity-60' },
-          { label: 'Over 90 days', amount: ar.totals.d90_plus, color: 'bg-destructive' },
-        ].map((bucket) => (
-          <tr key={bucket.label} className="border-b border-border">
-            <td className={TD}><span className="flex items-center gap-2"><span className={`h-2 w-2 shrink-0 rounded-full ${bucket.color}`} />{bucket.label}</span></td>
-            <td className={`${TD} text-right font-medium`}>{money(bucket.amount)}</td>
-          </tr>
+    <div className="px-4 pb-3 pt-2">
+      <div className="mb-2 flex items-baseline justify-between text-xs text-muted-foreground">
+        <span>Days past due</span>
+        <span>Total AR <span className="font-semibold tabular-nums text-foreground">{money(ar.totals.total)}</span></span>
+      </div>
+      <div className="grid h-[200px] grid-cols-5 items-end gap-3 border-b border-border">
+        {buckets.map((b) => (
+          <div key={b.label} className="flex h-full flex-col items-center justify-end gap-1" title={`${b.label}${b.label === 'Current' ? '' : ' days'}: ${money(b.amount)}`}>
+            <span className="text-[11px] font-medium tabular-nums">{money(Math.round(b.amount))}</span>
+            <div className={`w-full max-w-[88px] rounded-t ${b.color}`} style={{ height: `${(Math.max(b.amount, 0) / max) * 80}%` }} />
+          </div>
         ))}
-        <tr className="bg-muted/50 font-semibold">
-          <td className={TD}>Total AR</td>
-          <td className={`${TD} text-right`}>{money(ar.totals.total)}</td>
-        </tr>
-      </tbody>
-    </table>
+      </div>
+      <div className="grid grid-cols-5 gap-3 pt-1">
+        {buckets.map((b) => <span key={b.label} className="text-center text-[11px] text-muted-foreground">{b.label}</span>)}
+      </div>
+    </div>
   );
 }
 
@@ -217,7 +223,16 @@ export default async function TenantDashboardPage() {
         </section>
       )}
 
-      {showAr && <SalesCharts tenantId={tenantId!} />}
+      {showAr && (
+        <SalesCharts
+          tenantId={tenantId!}
+          extra={(
+            <Panel title="AR Aging" sub={todays ? `As of ${todays.today}` : undefined} href="/financials/aging" linkLabel="Report">
+              <Suspense fallback={<Pending rows={6} />}><ArAging tenantId={tenantId!} /></Suspense>
+            </Panel>
+          )}
+        />
+      )}
 
       {(todos.length > 0 || signals.length > 0) && (
         <Panel title="To-Do's" sub={`${todos.length + signals.length} item${todos.length + signals.length === 1 ? '' : 's'} need attention`} className="border-warning/50">
@@ -306,20 +321,12 @@ export default async function TenantDashboardPage() {
         </Panel>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-        <Panel className="lg:col-span-2" title="Customer Accounts" sub="Largest open balances" href="/customers" linkLabel="View all">
+      <div className="grid gap-3 md:grid-cols-2">
+        <Panel title="Customer Accounts" sub="Largest open balances" href="/customers" linkLabel="View all">
           {!showAr ? (
             <p className={EMPTY}>Balances are not available to your role.</p>
           ) : (
             <Suspense fallback={<Pending rows={8} />}><CustomerAccounts tenantId={tenantId!} /></Suspense>
-          )}
-        </Panel>
-
-        <Panel title="AR Aging" sub={showAr && todays ? `As of ${todays.today}` : undefined} href="/financials/aging" linkLabel="Report">
-          {!showAr ? (
-            <p className={EMPTY}>AR aging is not available to your role.</p>
-          ) : (
-            <Suspense fallback={<Pending rows={6} />}><ArAging tenantId={tenantId!} /></Suspense>
           )}
         </Panel>
       </div>

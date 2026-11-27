@@ -72,8 +72,8 @@ function MonthBars({ data }: { data: SalesData }) {
             const label = `${MONTHS[m.month - 1]}${m.month === lastMonth ? ` (1–${Number(data.as_of.slice(8, 10))})` : ''}: ${data.year} ${money(m.this)}, ${data.last_year} ${money(m.last)}`;
             return (
               <div key={m.month} title={label} aria-label={label} role="img" className="flex items-end justify-center gap-0.5 rounded-t px-[3px] hover:bg-muted/40">
-                <div className="max-w-[12px] flex-1 rounded-t" style={{ height: `${(Math.max(m.last, 0) / top) * 100}%`, background: 'var(--chart-last)' }} />
-                <div className="max-w-[12px] flex-1 rounded-t" style={{ height: `${(Math.max(m.this, 0) / top) * 100}%`, background: 'var(--chart-this)' }} />
+                <div className="max-w-[24px] flex-1 rounded-t" style={{ height: `${(Math.max(m.last, 0) / top) * 100}%`, background: 'var(--chart-last)' }} />
+                <div className="max-w-[24px] flex-1 rounded-t" style={{ height: `${(Math.max(m.this, 0) / top) * 100}%`, background: 'var(--chart-this)' }} />
               </div>
             );
           })}
@@ -131,7 +131,7 @@ function Pie({ parts, label, year, lastYear }: { parts: Part[]; label: string; y
  * Dashboard: year-to-date sales against the same days of last year, from ar_sales_dashboard_get.
  * By account (monthly bars, one account or all), by segment and by item (pies of this year's shares with the change vs last year).
  */
-export function SalesCharts({ tenantId }: { tenantId: number }) {
+export function SalesCharts({ tenantId, extra }: { tenantId: number; /** a further card in the grid, after By item (AR Aging) */ extra?: React.ReactNode }) {
   const [accountId, setAccountId] = useState<string>('');
   const [data, setData] = useState<SalesData | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
@@ -161,7 +161,7 @@ export function SalesCharts({ tenantId }: { tenantId: number }) {
         <span className="text-sm font-semibold text-foreground">Sales, year to date</span>
         Jan 1 – {asOf}, invoiced less credits, against the same days of {data.last_year}
       </p>
-      <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-2">
         <Card
           title="By account"
           action={(
@@ -194,6 +194,7 @@ export function SalesCharts({ tenantId }: { tenantId: number }) {
         <Card title="By item" sub={`${data.year} share of sales, vs ${data.last_year}`}>
           <Pie parts={items} label={`Sales by item, ${data.year}`} year={data.year} lastYear={data.last_year} />
         </Card>
+        {extra}
       </div>
     </section>
   );
