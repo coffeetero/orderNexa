@@ -643,7 +643,6 @@ export function OrderEntryForm({
       if (generation !== orderPickLookupGenerationRef.current) return;
       if (rows.length === 0) {
         setOrderPickCandidates([]);
-        showStatusMessage({ text: 'No existing orders found for this production slot.', type: 'error' });
         return;
       }
 
