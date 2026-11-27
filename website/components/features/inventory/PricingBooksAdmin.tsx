@@ -1,6 +1,7 @@
 'use client';
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -8,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { adminCall, adminPost, useBanner } from '@/components/features/admin/adminShared';
+import { useNav } from '@/components/layout/nav-context';
 import { cn } from '@/lib/utils';
 
 interface BookRow {
@@ -34,6 +36,7 @@ const formFrom = (b: BookRow) => ({ pricebook_id: b.pricebook_id, pricebook_name
 
 export function PricingBooksAdmin({ tenantId }: { tenantId: number }) {
   const { notify, banner } = useBanner();
+  const { sidebarSlot } = useNav(); // docked sidebar: the book list lives there (on the page while the sidebar is closed)
   const [books, setBooks] = useState<BookRow[]>([]);
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const [selectedId, setSelectedId] = useState<number | 'new' | null>(null);
@@ -129,6 +132,48 @@ export function PricingBooksAdmin({ tenantId }: { tenantId: number }) {
     } catch (e) { notify((e as Error).message, 'error'); } finally { setBusy(false); }
   }
 
+  const listPane = (
+    <section aria-label="Pricing book list" className={cn('flex min-h-0 flex-col', sidebarSlot ? 'flex-1 border-t border-border pt-3' : 'space-y-2')}>
+      <div className={cn('space-y-2', sidebarSlot ? 'px-2 pb-2' : 'border-b p-3')}>
+        <h1 className={cn('text-xl font-semibold', sidebarSlot && 'sr-only')}>Pricing Books</h1>
+        <div className="flex gap-2">
+          <Button size="sm" className="gap-1" onClick={() => void open('new')}><Plus className="h-4 w-4" />New</Button>
+          <Button size="sm" variant="outline" disabled={typeof selectedId !== 'number'} onClick={copyAsNew}>Copy As New</Button>
+        </div>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+          {FILTERS.map((f) => (
+            <label key={f} className="flex items-center gap-1.5 text-sm">
+              <Checkbox checked={filters.includes(f)} onCheckedChange={(v) => { setFilters((cur) => (v === true ? [...cur, f] : cur.filter((x) => x !== f))); setSelectedId(null); }} />
+              {f === 'Stale' ? `Stale (${staleYears} ${staleYears === 1 ? 'Year' : 'Years'})` : f}
+            </label>
+          ))}
+        </div>
+      </div>
+      <div className={cn('overflow-y-auto', sidebarSlot ? 'min-h-0 flex-1' : 'max-h-[70vh]')}>
+        <div className="sticky top-0 z-10 grid grid-cols-[1fr_2.25rem_2.5rem_2.75rem] items-end gap-1 border-b bg-muted px-3 py-1 text-[11px] font-semibold text-muted-foreground">
+          <span>Name</span><span className="text-center">Items</span><span className="text-center">Agmts</span><span className="text-center leading-tight">Last<br />Used</span>
+        </div>
+        <ul className="divide-y">
+          {visibleBooks.map((b) => (
+            <li key={b.pricebook_id}>
+              {/* 12px text, row padding 20% under the old py-2 (8px to 6.4px), owner request 2026-11-27 */}
+              <button type="button" onClick={() => void open(b.pricebook_id)}
+                className={cn('w-full px-3 py-[0.4rem] text-left text-xs hover:bg-muted', !b.is_active && 'bg-muted/60 text-muted-foreground', selectedId === b.pricebook_id && 'bg-accent')}>
+                <div className="grid grid-cols-[1fr_2.25rem_2.5rem_2.75rem] items-center gap-1">
+                  <span className="truncate font-medium">{b.pricebook_name}</span>
+                  <span className="text-center">{b.item_count}</span>
+                  <span className="text-center">{b.assigned_count}</span>
+                  <span className="text-center">{b.last_used_months === null ? '—' : `${b.last_used_months} mo`}</span>
+                </div>
+              </button>
+            </li>
+          ))}
+          {visibleBooks.length === 0 && <li className="px-3 py-4 text-xs text-muted-foreground">No pricing books.</li>}
+        </ul>
+      </div>
+    </section>
+  );
+
   return (
     <div className="mx-auto max-w-7xl space-y-4 p-2 sm:p-3">
       <div className="flex items-start justify-between gap-3">
@@ -142,45 +187,9 @@ export function PricingBooksAdmin({ tenantId }: { tenantId: number }) {
       </div>
       {banner}
 
-      <div className="grid gap-4 lg:grid-cols-[18rem_1fr]">
-        <Card><CardContent className="space-y-2 p-0">
-          <div className="space-y-2 border-b p-3">
-            <h1 className="text-xl font-semibold">Pricing Books</h1>
-            <div className="flex gap-2">
-              <Button size="sm" className="gap-1" onClick={() => void open('new')}><Plus className="h-4 w-4" />New</Button>
-              <Button size="sm" variant="outline" disabled={typeof selectedId !== 'number'} onClick={copyAsNew}>Copy As New</Button>
-            </div>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-              {FILTERS.map((f) => (
-                <label key={f} className="flex items-center gap-1.5 text-sm">
-                  <Checkbox checked={filters.includes(f)} onCheckedChange={(v) => { setFilters((cur) => (v === true ? [...cur, f] : cur.filter((x) => x !== f))); setSelectedId(null); }} />
-                  {f === 'Stale' ? `Stale (${staleYears} ${staleYears === 1 ? 'Year' : 'Years'})` : f}
-                </label>
-              ))}
-            </div>
-          </div>
-          <div className="max-h-[70vh] overflow-y-auto">
-          <div className="sticky top-0 z-10 grid grid-cols-[1fr_2.25rem_2.5rem_2.75rem] items-end gap-1 border-b bg-muted px-3 py-1 text-[11px] font-semibold text-muted-foreground">
-            <span>Name</span><span className="text-center">Items</span><span className="text-center">Agmts</span><span className="text-center leading-tight">Last<br />Used</span>
-          </div>
-          <ul className="divide-y">
-            {visibleBooks.map((b) => (
-              <li key={b.pricebook_id}>
-                <button type="button" onClick={() => void open(b.pricebook_id)}
-                  className={cn('w-full px-3 py-2 text-left text-sm hover:bg-muted', !b.is_active && 'bg-muted/60 text-muted-foreground', selectedId === b.pricebook_id && 'bg-accent')}>
-                  <div className="grid grid-cols-[1fr_2.25rem_2.5rem_2.75rem] items-center gap-1">
-                    <span className="truncate font-medium">{b.pricebook_name}</span>
-                    <span className="text-center text-xs">{b.item_count}</span>
-                    <span className="text-center text-xs">{b.assigned_count}</span>
-                    <span className="text-center text-xs">{b.last_used_months === null ? '—' : `${b.last_used_months} mo`}</span>
-                  </div>
-                </button>
-              </li>
-            ))}
-            {visibleBooks.length === 0 && <li className="px-3 py-4 text-sm text-muted-foreground">No pricing books.</li>}
-          </ul>
-          </div>
-        </CardContent></Card>
+      <div className={cn('grid gap-4', !sidebarSlot && 'lg:grid-cols-[18rem_1fr]')}>
+        {sidebarSlot ? createPortal(listPane, sidebarSlot) : <Card><CardContent className="p-0">{listPane}</CardContent></Card>}
+
 
         {selectedId === null ? (
           <Card><CardContent className="flex min-h-[40vh] items-center justify-center p-6 text-center text-sm text-muted-foreground">Select a pricing book, or create a new one.</CardContent></Card>

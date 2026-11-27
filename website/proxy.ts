@@ -12,7 +12,7 @@ function copyAuthCookies(from: NextResponse, to: NextResponse) {
   }
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const url = request.nextUrl.clone();
   const host = request.headers.get('host') || '';
   const { pathname } = url;

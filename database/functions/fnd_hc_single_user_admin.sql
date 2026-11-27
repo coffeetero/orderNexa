@@ -39,6 +39,7 @@ AS $function$
     ('payments_over_applied',       'Payments applied for more than received',   'Data',  'Payments whose applications to invoices add up to more than the payment amount.', false, 130),
     ('items_stale',                 'Items not ordered',                         'Data',  'Active items not ordered within the Stale years (Application Settings > Pricing). Also refreshes each item''s last-ordered date.', false, 140),
     ('ar_open_items_drift',         'Open balances out of step',                 'Data',  'Invoices and payments whose stored open balance (used by the dashboard, aging and statements for today) differs from a full recalculation.', false, 150),
-    ('single_user_admin',           'Only one user administrator',              'Setup', 'The company has only one active person who can manage users, so nobody can check their access or clear security To-Dos about them.', false, 80)
+    ('single_user_admin',           'Only one user administrator',              'Setup', 'The company has only one active person who can manage users, so nobody can check their access or clear security To-Dos about them.', false, 80),
+    ('invoices_need_reprint',       'Invoices changed after printing',          'Data',  'Invoices posted to AR that got a debit or credit memo (order changes) after they were last printed.', true, 160)
   ) v(check_code, name, category, description, runs_before_production, sort_order)
 $function$;

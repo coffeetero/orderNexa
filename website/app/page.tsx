@@ -9,7 +9,7 @@ import { parseTenantSubdomain } from '@/lib/tenant-subdomain';
 export default async function HomePage() {
   const user = await getSessionUser();
 
-  const host = headers().get('host') || '';
+  const host = (await headers()).get('host') || '';
   const subdomain = parseTenantSubdomain(host);
 
   // This page only serves `/`; middleware passes subdomain `/` through with next()

@@ -10,7 +10,8 @@ export const dynamic = 'force-dynamic';
  * PATCH  /api/organizer/tasks/:id { tenant_id, restore: true }                → undo a delete (org_task_delete)
  * DELETE /api/organizer/tasks/:id?tenant_id=n                                 → deletes with its subtasks (org_task_delete)
  */
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const id = toInt(params.id);
   if (id === null) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
   const body = await readBody(request);
@@ -28,7 +29,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   return NextResponse.json({ error: 'Nothing to change' }, { status: 400 });
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const id = toInt(params.id);
   if (id === null) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
   return adminRpc(new URL(request.url).searchParams.get('tenant_id'), 'org_task_delete', { p_task_id: id, p_restore: false });

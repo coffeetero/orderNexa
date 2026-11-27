@@ -4,10 +4,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { RotateCcw, Trash2, Wheat } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { EntityComboBox } from '@/components/bps/EntityComboBox';
 import { cn } from '@/lib/utils';
+import { useNavGuard } from '@/components/layout/nav-context';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -102,7 +104,13 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
   const itemInputRef     = useRef<HTMLInputElement>(null);
   const qtyInputRef      = useRef<HTMLInputElement>(null);
 
-  const isDirty = JSON.stringify(lines) !== JSON.stringify(savedLines);
+  // Call Up List: call this customer for this day and time, and who calls (blank = anyone)
+  const [isCall, setIsCall] = useState(false);
+  const [assignedUserId, setAssignedUserId] = useState<string>('');
+  const [savedCall, setSavedCall] = useState('false|');
+  const [callUsers, setCallUsers] = useState<{ user_id: number; user_name: string }[]>([]);
+  const callDirty = `${isCall}|${assignedUserId}` !== savedCall;
+  const isDirty = JSON.stringify(lines) !== JSON.stringify(savedLines) || callDirty;
 
   // Focus helpers using requestAnimationFrame (matching Enter Orders)
   const focusItemSearch = useCallback(() => {
@@ -177,6 +185,13 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
       }));
       setLines(loaded);
       setSavedLines(loaded.map(l => ({ ...l })));
+      const callRes = await fetch(`/api/standing-orders/call?tenant_id=${tenantId}&customer_id=${customerId}&production_dow=${dow}&production_code=${code}`);
+      const callJson = await callRes.json() as { data?: { is_call: boolean; assigned_user_id: number | null; users: { user_id: number; user_name: string }[] } };
+      const c = callJson.data;
+      setIsCall(Boolean(c?.is_call));
+      setAssignedUserId(c?.assigned_user_id ? String(c.assigned_user_id) : '');
+      setSavedCall(`${Boolean(c?.is_call)}|${c?.assigned_user_id ? String(c.assigned_user_id) : ''}`);
+      setCallUsers(c?.users ?? []);
     } finally { setIsLoading(false); }
   }, [tenantId]);
 
@@ -196,8 +211,8 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
   }, [selectedCustomer, selectedDow, selectedCode, load]);
 
   // Save
-  const save = async () => {
-    if (!selectedCustomer || !tenantId) return;
+  const save = async (): Promise<boolean> => {
+    if (!selectedCustomer || !tenantId) return false;
     setIsSaving(true);
     try {
       const res  = await fetch('/api/standing-orders', {
@@ -209,11 +224,24 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
         }),
       });
       const json = await res.json() as { error?: string };
-      if (!res.ok || json.error) { toast.error(json.error ?? 'Could not save.'); return; }
+      if (!res.ok || json.error) { toast.error(json.error ?? 'Could not save.'); return false; }
+      const callRes = await fetch('/api/standing-orders/call', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenant_id: tenantId, customer_id: selectedCustomer.customer_id,
+          production_dows: Array.from(targetDows), production_code: selectedCode,
+          is_call: isCall, assigned_user_id: assignedUserId ? Number(assignedUserId) : null,
+        }),
+      });
+      const callJson = await callRes.json() as { error?: string };
+      if (!callRes.ok || callJson.error) { toast.error(callJson.error ?? 'Could not save the call setting.'); return false; }
       toast.success('Standing order saved.');
       await load(selectedCustomer.customer_id, selectedDow, selectedCode);
+      return true;
     } finally { setIsSaving(false); }
   };
+  // Leaving with unsaved changes asks Cancel / Leave without saving / Save
+  useNavGuard(Boolean(selectedCustomer) && isDirty, save);
 
   // Commit entry row → update existing line or append
   const commitEntry = useCallback(() => {
@@ -300,6 +328,29 @@ export function StandingOrderMgtPage({ tenants, initialTenantId }: StandingOrder
                 {codeOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Call Up List: call this customer for this day and time (one call covers all of the day's times) */}
+          <div className="flex shrink-0 flex-col items-center gap-1">
+            <Label htmlFor="so-call" className={LABEL_CLASS}>Call</Label>
+            <div className="flex h-9 items-center">
+              <Checkbox id="so-call" checked={isCall} disabled={!selectedCustomer}
+                onCheckedChange={(v) => setIsCall(v === true)} aria-label="Call this customer on this day" />
+            </div>
+          </div>
+
+          <div className="flex w-36 shrink-0 flex-col gap-1">
+            <Label htmlFor="so-assigned" className={LABEL_CLASS}>Assigned to</Label>
+            <select
+              id="so-assigned"
+              className="h-9 rounded-md border border-input bg-background px-2 text-sm disabled:opacity-50"
+              value={assignedUserId}
+              disabled={!selectedCustomer || !isCall}
+              onChange={(e) => setAssignedUserId(e.target.value)}
+            >
+              <option value="">Anyone</option>
+              {callUsers.map(u => <option key={u.user_id} value={String(u.user_id)}>{u.user_name}</option>)}
+            </select>
           </div>
 
           <div className="flex shrink-0 flex-col gap-1">

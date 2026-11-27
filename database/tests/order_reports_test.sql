@@ -88,10 +88,12 @@ BEGIN
   r := om_report_customers_get(200000000002, DATE '2032-03-10', DATE '2032-03-10', NULL, 'INVOICE');
   INSERT INTO _t VALUES ('invoice basis lists the 2 invoice owners after processing', jsonb_array_length(r) = 2);
 
-  -- print only the invoiced site first: A stays DRAFT
+  -- post only the invoiced site to AR, then print it: A stays DRAFT (printing never numbers)
+  r := om_invoices_post_to_ar(200000000002, DATE '2032-03-10', DATE '2032-03-10', NULL, ARRAY[d1]);
+  INSERT INTO _t VALUES ('post to AR: numbers only the selected owner', (r->>'numbered')::int = 1);
   r := om_report_packaging_issue(200000000002, DATE '2032-03-10', DATE '2032-03-10', NULL, ARRAY[d1]);
   inv := r->'invoices'->0;
-  INSERT INTO _t VALUES ('packaging: site invoice numbered from the sequence and OPEN', (r->>'newly_numbered')::int = 1 AND inv->>'document_number' LIKE 'INV-%'
+  INSERT INTO _t VALUES ('packaging: site invoice numbered from the sequence and OPEN', (r->>'newly_numbered')::int = 0 AND inv->>'document_number' LIKE 'INV-%'
       AND (SELECT status FROM ar_transactions WHERE ar_transaction_id = (inv->>'ar_transaction_id')::bigint) = 'OPEN');
   INSERT INTO _t VALUES ('packaging: unselected owner stays DRAFT without a number',
       (SELECT status = 'DRAFT' AND document_number IS NULL FROM ar_transactions WHERE customer_id = a AND transaction_type = 'INV' AND production_run_id IS NOT NULL
@@ -101,9 +103,12 @@ BEGIN
   n1 := inv->>'document_number';
 
   r := om_report_packaging_issue(200000000002, DATE '2032-03-10', DATE '2032-03-10', NULL, ARRAY[a, d1]);
-  INSERT INTO _t VALUES ('packaging: reprint keeps the locked number and numbers only the new one',
-      (r->>'newly_numbered')::int = 1 AND jsonb_array_length(r->'invoices') = 2
-      AND EXISTS (SELECT 1 FROM jsonb_array_elements(r->'invoices') i WHERE i->>'document_number' = n1));
+  INSERT INTO _t VALUES ('packaging: prints the draft without a number next to the numbered one',
+      (r->>'newly_numbered')::int = 0 AND jsonb_array_length(r->'invoices') = 2
+      AND EXISTS (SELECT 1 FROM jsonb_array_elements(r->'invoices') i WHERE i->>'document_number' = n1)
+      AND EXISTS (SELECT 1 FROM jsonb_array_elements(r->'invoices') i WHERE (i->>'customer_id')::bigint = a AND i->>'document_number' IS NULL));
+  PERFORM om_invoices_post_to_ar(200000000002, DATE '2032-03-10', DATE '2032-03-10', NULL, ARRAY[a, d1]);
+  r := om_report_packaging_issue(200000000002, DATE '2032-03-10', DATE '2032-03-10', NULL, ARRAY[a, d1]);
   n2 := (SELECT i->>'document_number' FROM jsonb_array_elements(r->'invoices') i WHERE (i->>'customer_id')::bigint = a);
   INSERT INTO _t VALUES ('packaging: invoice numbers are unique and sequential', n1 <> n2 AND n2 LIKE 'INV-%');
   INSERT INTO _t VALUES ('packaging: the account invoice groups its 2 orders (account and shared site), amount 27, copies = 2',

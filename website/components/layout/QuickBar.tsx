@@ -35,7 +35,7 @@ function iconFor(a: BuiltAction): LucideIcon {
 }
 
 /** true on Mac/iPad keyboards (⌘ and ⌥ instead of Ctrl and Alt). Set after mount to avoid a hydration mismatch. */
-function useIsMac() {
+export function useIsMac() {
   const [mac, setMac] = useState(false);
   useEffect(() => setMac(/Mac|iPhone|iPad/.test(navigator.userAgent)), []);
   return mac;
@@ -43,7 +43,7 @@ function useIsMac() {
 
 /** Screen search and the user's 4 quick buttons, at the right end of the breadcrumb bar. */
 export function QuickBar() {
-  const { tenantId, areas, version, confirmLeave } = useNav();
+  const { tenantId, areas, version, confirmLeave, setQuickHrefs } = useNav();
   const router = useRouter();
   const isMac = useIsMac();
   const [pinned, setPinned] = useState<string[] | null>(null);
@@ -77,6 +77,9 @@ export function QuickBar() {
   }, [tenantId, version]);
 
   const buttons = selectQuickButtons(pinned ?? [], actions);
+  const buttonsKey = pinned === null ? '' : buttons.join('|');
+  // Share the assignment with the menu, which shows each screen's key.
+  useEffect(() => { setQuickHrefs(buttonsKey ? buttonsKey.split('|') : []); }, [buttonsKey, setQuickHrefs]);
 
   const save = useCallback(async (keys: string[]) => {
     setPinned(keys);
@@ -99,7 +102,7 @@ export function QuickBar() {
       const href = m ? buttonsRef.current[Number(m[1]) - 1] : undefined;
       if (!href) return;
       e.preventDefault();
-      if (confirmLeave()) router.push(href);
+      if (confirmLeave(() => router.push(href))) router.push(href);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -226,10 +229,10 @@ function ScreenSearch({ actions, shortcut }: { actions: BuiltAction[]; shortcut:
     : [];
 
   const go = (a: BuiltAction) => {
-    if (!confirmLeave()) return;
     setQ('');
     setOpen(false);
     inputRef.current?.blur();
+    if (!confirmLeave(() => router.push(a.href))) return;
     router.push(a.href);
   };
 

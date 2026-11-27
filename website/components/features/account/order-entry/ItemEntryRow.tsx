@@ -16,9 +16,9 @@ interface ItemEntryRowProps {
   isLoadingItems: boolean;
   disabled: boolean;
   /** External ref for the item search <input> (used by useOrderFocus). */
-  itemInputRef: React.RefObject<HTMLInputElement>;
+  itemInputRef: React.RefObject<HTMLInputElement | null>;
   /** External ref for the qty <input>. */
-  qtyRef: React.RefObject<HTMLInputElement>;
+  qtyRef: React.RefObject<HTMLInputElement | null>;
   /** Called when Enter is pressed in the Qty field with a valid quantity. */
   onCommit: (item: OrderEntryItem, quantity: number) => void;
   /** Display-only current order number/reference. */

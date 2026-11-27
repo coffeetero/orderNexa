@@ -8,7 +8,8 @@ export const dynamic = 'force-dynamic';
  * DELETE /api/organizer/calendar/events/:id?tenant_id=n&scope=ONE|FOLLOWING|ALL&occurrence_date=YYYY-MM-DD
  * → deletes the event, or for a repeating event that occurrence / it and later ones / the series (org_event_delete)
  */
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const id = toInt(params.id);
   if (id === null) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
   const q = new URL(request.url).searchParams;

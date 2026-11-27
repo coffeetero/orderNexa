@@ -8,7 +8,8 @@ export const dynamic = 'force-dynamic';
  * POST   /api/organizer/contacts/:id/notes { tenant_id, note_id?, note_text, is_pinned } → adds / edits a note (org_contact_note_save)
  * DELETE /api/organizer/contacts/:id/notes?tenant_id=n&note_id=n → removes a note (org_contact_note_delete)
  */
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const id = toInt(params.id);
   if (id === null) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
   const body = await readBody(request);

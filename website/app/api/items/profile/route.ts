@@ -49,7 +49,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const supabase = createClient();
+  const supabase = await createClient();
   const itemId = parseInteger(url.searchParams.get('item_id'));
 
   // ── Detail mode: single item requested ──────────────────────────────────
@@ -164,7 +164,7 @@ export async function POST(request: Request) {
   const allowedPrepOptions = prepCodes(payload, 'allowed');
   const defaultPrepOptions = prepCodes(payload, 'default').filter((code) => allowedPrepOptions.includes(code));
   const itemId = parseInteger(payload.item_id);
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data, error } = await supabase.rpc('fnd_items_profile_save', {
     p_tenant_id:            tenantId,

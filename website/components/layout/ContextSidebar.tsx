@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { GuardedLink } from '@/components/layout/GuardedLink';
 import { useNav } from '@/components/layout/nav-context';
@@ -30,6 +30,7 @@ function SectionTitle({ children, action }: { children: React.ReactNode; action?
 export function ContextSidebar({ onNavigate, withSlot = false }: { onNavigate?: () => void; withSlot?: boolean }) {
   const pathname = usePathname();
   const { tenantId, version, areas, setSidebarSlot } = useNav();
+  const slotRef = useSlotRef(setSidebarSlot);
   const searchParams = useSearchParams();
   const adminMenu = tenantNav.find((m) => m.label === 'Admin');
   const [data, setData] = useState<SidebarData | null>(null);
@@ -164,7 +165,7 @@ export function ContextSidebar({ onNavigate, withSlot = false }: { onNavigate?: 
       })}
       {failed && <p className="px-2 text-xs text-muted-foreground">Couldn&apos;t refresh. Showing the last list.</p>}
       {/* The page's own sidebar content (e.g. the Recipes list), only in the docked sidebar. */}
-      {withSlot && <div ref={setSidebarSlot} className="flex min-h-0 flex-1 flex-col empty:hidden" />}
+      {withSlot && <div ref={slotRef} className="flex min-h-0 flex-1 flex-col empty:hidden" />}
     </div>
   );
 }
@@ -172,5 +173,17 @@ export function ContextSidebar({ onNavigate, withSlot = false }: { onNavigate?: 
 /** While the docked sidebar is closed, page sidebar content goes here and stays hidden (it is not shown in the page instead). */
 export function HiddenSidebarSlot() {
   const { setSidebarSlot } = useNav();
-  return <div ref={setSidebarSlot} hidden />;
+  return <div ref={useSlotRef(setSidebarSlot)} hidden />;
+}
+
+/**
+ * Claims the page-sidebar slot while mounted. Several slots can exist at once (docked sidebar, drawer, hidden holder),
+ * and the drawer unmounts only after its closing animation, so a slot clears the shared value only if it still holds it.
+ */
+function useSlotRef(setSlot: React.Dispatch<React.SetStateAction<HTMLElement | null>>) {
+  return useCallback((el: HTMLDivElement | null) => {
+    if (!el) return;
+    setSlot(el);
+    return () => setSlot((cur) => (cur === el ? null : cur));
+  }, [setSlot]);
 }

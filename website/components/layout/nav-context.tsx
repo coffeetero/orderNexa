@@ -3,6 +3,11 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { findActiveHref, tenantNav } from '@/lib/nav-config';
+import {
+  AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
 import type { CurrentRecord } from '@/lib/nav-records';
 
 type TouchPayload = { action_key?: string; record?: CurrentRecord };
@@ -20,15 +25,21 @@ type NavContextValue = {
   /** Fire-and-forget usage tracking (never blocks or throws). */
   touch: (payload: TouchPayload) => void;
   /** Pages register an "is dirty?" check so navigation can warn before discarding changes. */
-  registerGuard: (isDirty: () => boolean) => () => void;
-  /** true = OK to leave (nothing dirty, or the user agreed to discard). */
-  confirmLeave: () => boolean;
+  registerGuard: (isDirty: () => boolean, save?: () => Promise<boolean>) => () => void;
+  /**
+   * true = nothing unsaved, go ahead. false = there are unsaved changes: the "Unsaved changes" dialog opens
+   * (Cancel / Leave without saving / Save when the page can save) and runs onLeave if the user leaves.
+   */
+  confirmLeave: (onLeave?: () => void) => boolean;
   /** The Quick Buttons dialog (opened from the avatar menu, shown by the breadcrumb bar). */
   quickButtonsOpen: boolean;
   setQuickButtonsOpen: (open: boolean) => void;
+  /** The screens on the user's quick buttons, in order (Alt+Shift+1..4); the menu shows their keys. */
+  quickHrefs: string[];
+  setQuickHrefs: (hrefs: string[]) => void;
   /** Where a page may render its own sidebar content (null when the sidebar is not docked and open). */
   sidebarSlot: HTMLElement | null;
-  setSidebarSlot: (el: HTMLElement | null) => void;
+  setSidebarSlot: React.Dispatch<React.SetStateAction<HTMLElement | null>>;
 };
 
 const noop = () => {};
@@ -43,6 +54,8 @@ const defaultValue: NavContextValue = {
   confirmLeave: () => true,
   quickButtonsOpen: false,
   setQuickButtonsOpen: noop,
+  quickHrefs: [],
+  setQuickHrefs: noop,
   sidebarSlot: null,
   setSidebarSlot: noop,
 };
@@ -55,11 +68,17 @@ export function NavProvider({ tenantId, areas = null, children }: { tenantId: nu
   const [record, setRecord] = useState<CurrentRecord | null>(null);
   const [version, setVersion] = useState(0);
   const [quickButtonsOpen, setQuickButtonsOpen] = useState(false);
+  const [quickHrefs, setQuickHrefs] = useState<string[]>([]);
   const [sidebarSlot, setSidebarSlot] = useState<HTMLElement | null>(null);
-  const guards = useRef(new Set<() => boolean>());
+  type Guard = { isDirty: () => boolean; save?: () => Promise<boolean> };
+  const guards = useRef(new Set<Guard>());
+  const [leaveOpen, setLeaveOpen] = useState(false);
+  const [leaveCanSave, setLeaveCanSave] = useState(false);
+  const [leaveSaving, setLeaveSaving] = useState(false);
+  const pendingLeave = useRef<(() => void) | null>(null);
   const tenantRef = useRef(tenantId);
   tenantRef.current = tenantId;
-  const bumpTimer = useRef<ReturnType<typeof setTimeout>>();
+  const bumpTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const touch = useCallback((payload: TouchPayload) => {
     const tid = tenantRef.current;
@@ -83,26 +102,54 @@ export function NavProvider({ tenantId, areas = null, children }: { tenantId: nu
     }
   }, []);
 
-  const registerGuard = useCallback((isDirty: () => boolean) => {
-    guards.current.add(isDirty);
+  const registerGuard = useCallback((isDirty: () => boolean, save?: () => Promise<boolean>) => {
+    const guard: Guard = { isDirty, save };
+    guards.current.add(guard);
     return () => {
-      guards.current.delete(isDirty);
+      guards.current.delete(guard);
     };
   }, []);
 
-  const anyDirty = useCallback(() => {
-    let dirty = false;
+  const dirtyGuards = useCallback(() => {
+    const out: Guard[] = [];
     guards.current.forEach((g) => {
       try {
-        if (g()) dirty = true;
+        if (g.isDirty()) out.push(g);
       } catch {
         /* a broken guard must not block navigation */
       }
     });
-    return dirty;
+    return out;
+  }, []);
+  const anyDirty = useCallback(() => dirtyGuards().length > 0, [dirtyGuards]);
+
+  const confirmLeave = useCallback((onLeave?: () => void) => {
+    const dirty = dirtyGuards();
+    if (dirty.length === 0) return true;
+    pendingLeave.current = onLeave ?? null;
+    setLeaveCanSave(dirty.every((g) => g.save));
+    setLeaveOpen(true);
+    return false;
+  }, [dirtyGuards]);
+
+  const leave = useCallback(() => {
+    setLeaveOpen(false);
+    const go = pendingLeave.current;
+    pendingLeave.current = null;
+    go?.();
   }, []);
 
-  const confirmLeave = useCallback(() => !anyDirty() || window.confirm(LEAVE_MESSAGE), [anyDirty]);
+  const saveAndLeave = useCallback(async () => {
+    setLeaveSaving(true);
+    try {
+      for (const g of dirtyGuards()) {
+        if (!g.save || !(await g.save())) { setLeaveOpen(false); return; } // the page shows why it could not save
+      }
+      leave();
+    } finally {
+      setLeaveSaving(false);
+    }
+  }, [dirtyGuards, leave]);
 
   // Closing the tab / reloading with unsaved changes.
   useEffect(() => {
@@ -116,14 +163,29 @@ export function NavProvider({ tenantId, areas = null, children }: { tenantId: nu
   }, [anyDirty]);
 
   const value = useMemo<NavContextValue>(
-    () => ({ tenantId, areas, record, setRecord, version, touch, registerGuard, confirmLeave, quickButtonsOpen, setQuickButtonsOpen, sidebarSlot, setSidebarSlot }),
-    [tenantId, areas, record, version, touch, registerGuard, confirmLeave, quickButtonsOpen, sidebarSlot],
+    () => ({ tenantId, areas, record, setRecord, version, touch, registerGuard, confirmLeave, quickButtonsOpen, setQuickButtonsOpen, quickHrefs, setQuickHrefs, sidebarSlot, setSidebarSlot }),
+    [tenantId, areas, record, version, touch, registerGuard, confirmLeave, quickButtonsOpen, quickHrefs, sidebarSlot],
   );
 
   return (
     <NavContext.Provider value={value}>
       <ActionTracker />
       {children}
+      <AlertDialog open={leaveOpen} onOpenChange={(open) => { if (!open && !leaveSaving) setLeaveOpen(false); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unsaved changes</AlertDialogTitle>
+            <AlertDialogDescription>
+              {leaveCanSave ? 'Save your changes before leaving this page?' : LEAVE_MESSAGE}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={leaveSaving}>Cancel</AlertDialogCancel>
+            <Button variant="outline" onClick={leave} disabled={leaveSaving}>Leave without saving</Button>
+            {leaveCanSave && <Button onClick={() => void saveAndLeave()} disabled={leaveSaving}>{leaveSaving ? 'Saving…' : 'Save'}</Button>}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </NavContext.Provider>
   );
 }
@@ -185,9 +247,16 @@ export function useCurrentRecord(record: CurrentRecord | null) {
 }
 
 /** Registers an unsaved-changes check while the page is mounted. */
-export function useNavGuard(isDirty: boolean) {
+/** Registers the page's "has unsaved changes" state; with onSave the leave dialog also offers Save (true = saved). */
+export function useNavGuard(isDirty: boolean, onSave?: () => Promise<boolean>) {
   const { registerGuard } = useNav();
   const ref = useRef(isDirty);
   ref.current = isDirty;
-  useEffect(() => registerGuard(() => ref.current), [registerGuard]);
+  const saveRef = useRef(onSave);
+  saveRef.current = onSave;
+  const canSave = Boolean(onSave);
+  useEffect(
+    () => registerGuard(() => ref.current, canSave ? () => saveRef.current?.() ?? Promise.resolve(false) : undefined),
+    [registerGuard, canSave],
+  );
 }

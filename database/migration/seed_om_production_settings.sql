@@ -30,6 +30,7 @@ BEGIN
     VALUES
         (v_tenant_id, 'invoice_number',     1000, 1000, 1, 'INV-######', 'NEVER', FALSE),
         (v_tenant_id, 'shipment_number',    1000, 1000, 1, 'SHP-######', 'NEVER', FALSE),
-        (v_tenant_id, 'credit_memo_number', 1000, 1000, 1, 'CM-######',  'NEVER', FALSE)
+        (v_tenant_id, 'credit_memo_number', 1000, 1000, 1, 'CM-######',  'NEVER', FALSE),
+        (v_tenant_id, 'debit_memo_number',  1000, 1000, 1, 'DM-######',  'NEVER', FALSE)
     ON CONFLICT (tenant_id, sequence_name) DO NOTHING;
 END $$;

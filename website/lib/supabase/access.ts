@@ -17,7 +17,7 @@ export type UserAccess = {
  * This is the same path the login page uses.
  */
 export async function getUserAccess(authUserId: string): Promise<UserAccess> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data: profile, error: profileError } = await supabase
     .from('fnd_users')

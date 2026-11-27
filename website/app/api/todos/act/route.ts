@@ -23,7 +23,7 @@ export async function POST(request: Request) {
   const auth = await requireStaff();
   if (!auth.ok) return auth.response;
   const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
-  const { error } = await createClient().rpc('fnd_security_signal_act', {
+  const { error } = await (await createClient()).rpc('fnd_security_signal_act', {
     p_tenant_id: tenantId, p_user_id: userId, p_action: action, p_city: str(body?.city), p_region: str(body?.region), p_country: str(body?.country),
     p_event_id: toInt(body?.event_id),
   });

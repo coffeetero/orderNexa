@@ -1,4 +1,4 @@
-import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
+import { PDFDocument, StandardFonts, degrees, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
 
 /**
  * Invoices in the old BPS layout (Letter, portrait), one or more pages per invoice. Positions are in points, measured
@@ -6,10 +6,18 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf
  */
 export interface InvoiceLine { item_number: string | null; description: string | null; quantity: number; unit: string | null; unit_price: number; amount: number }
 export interface InvoiceGroup { department_event: string | null; department_number: string | null; subtotal: number; lines: InvoiceLine[] }
+/** A debit (DM) or credit (CM) memo applied to the invoice: order changes after it was posted to AR, or credits. */
+export interface InvoiceMemo {
+  document_number: string; transaction_type: 'DM' | 'CM'; transaction_date: string; amount: number;
+  lines: { description: string | null; quantity: number; unit_price: number | null; amount: number }[];
+}
 export interface PrintInvoice {
-  document_number: string; production_date: string; weekday: string; production_code_label: string;
+  ar_transaction_id: number;
+  /** null while the invoice is a DRAFT (not posted to AR): it prints marked DRAFT. */
+  document_number: string | null; status?: string; production_date: string; weekday: string; production_code_label: string;
   account_type: string | null; customer_name: string; customer_number: string | null; address_lines: string[]; phone: string | null;
   item_quantity: number; item_amount: number; delivery_amount: number; amount: number; groups: InvoiceGroup[];
+  memos?: InvoiceMemo[]; total_with_memos?: number;
 }
 export interface InvoicesData { company_name: string; footer_note: string | null; tagline: string | null; invoices: PrintInvoice[] }
 
@@ -63,7 +71,7 @@ export async function invoicesPdf(data: InvoicesData): Promise<Uint8Array> {
       // header box, top right
       const top = 792 - 153;
       for (const [label, a, b] of BOX) { cell(a, b, top, 9, GREY); y = top - 7; center(label, a, b, 6.5, bold); }
-      const values = [inv.account_type ?? '', inv.customer_number ?? '', shortDate(inv.production_date), inv.production_code_label ?? '', inv.document_number];
+      const values = [inv.account_type ?? '', inv.customer_number ?? '', shortDate(inv.production_date), inv.production_code_label ?? '', inv.document_number ?? 'DRAFT'];
       BOX.forEach(([, a, b], i) => { cell(a, b, top - 9, 13); y = top - 19; center(values[i], a, b, 8.5); });
       // company and weekday
       y = 792 - 240; text(data.company_name.toUpperCase(), L, 9);
@@ -100,6 +108,25 @@ export async function invoicesPdf(data: InvoicesData): Promise<Uint8Array> {
       y -= ROW + 3;
     }
 
+    // debit and credit memos applied to the invoice, below the items
+    for (const m of inv.memos ?? []) {
+      room(3);
+      text(`${m.transaction_type === 'DM' ? 'Debit memo' : 'Credit memo'} ${m.document_number}  ${shortDate(m.transaction_date)}`, L, 8.5, bold);
+      y -= ROW;
+      for (const ln of m.lines) {
+        room(1);
+        text(ln.description ?? '', 86, 8.5);
+        right(`${m.transaction_type === 'CM' ? 'less ' : ''}${qty(ln.quantity)}`, 340, 8.5, bold);
+        if (ln.unit_price != null) right(money(ln.unit_price), 522, 8.5);
+        right(money(ln.amount), R - 2, 8.5);
+        y -= ROW;
+      }
+      y += 3;
+      right(money(m.amount), R - 2, 8.5, bold);
+      y -= ROW + 3;
+    }
+    const total = (inv.memos?.length ?? 0) > 0 ? inv.total_with_memos ?? inv.amount : inv.amount;
+
     // footer on every page: allergen note, totals, tagline; then "Page x of y"
     pages.forEach((p, i) => {
       page = p;
@@ -110,9 +137,13 @@ export async function invoicesPdf(data: InvoicesData): Promise<Uint8Array> {
       const vals = [qty(inv.item_quantity), money(inv.item_amount), money(inv.delivery_amount), ''];
       FOOT.forEach(([, a, b], k) => { cell(a, b, top - 9, 13); y = top - 19; center(vals[k], a, b, 8.5); });
       cell(L, 224, top - 9, 13);
-      cell(FOOT_TOTAL[0], FOOT_TOTAL[1], top - 9, 13); y = top - 19; center(`$${money(inv.amount)}`, FOOT_TOTAL[0], FOOT_TOTAL[1], 9, bold);
+      cell(FOOT_TOTAL[0], FOOT_TOTAL[1], top - 9, 13); y = top - 19; center(`$${money(total)}`, FOOT_TOTAL[0], FOOT_TOTAL[1], 9, bold);
       y = 792 - 785; if (data.tagline) center(`'${data.tagline}'`, L, R, 9, bold);
       y = 792 - 143; right(`Page ${i + 1} of ${pages.length}`, R, 7.5);
+      // not posted to AR yet: for the customer's approval only
+      if (inv.document_number == null) {
+        p.drawText('DRAFT', { x: 150, y: 300, size: 120, font: bold, color: rgb(0.75, 0.75, 0.75), opacity: 0.35, rotate: degrees(35) });
+      }
     });
   }
   return pdf.save();

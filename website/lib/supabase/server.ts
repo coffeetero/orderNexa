@@ -23,7 +23,7 @@ function isStaleSessionAuthError(err: unknown): boolean {
  */
 export async function getSessionUser(): Promise<User | null> {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const {
       data: { user },
       error,
@@ -40,8 +40,8 @@ export async function getSessionUser(): Promise<User | null> {
   }
 }
 
-export function createClient() {
-  const cookieStore = cookies();
+export async function createClient() {
+  const cookieStore = await cookies();
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

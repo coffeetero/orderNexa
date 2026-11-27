@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data, error } = await supabase.rpc('om_orders_save', {
     p_tenant_id,
     p_action: p_action ?? null,

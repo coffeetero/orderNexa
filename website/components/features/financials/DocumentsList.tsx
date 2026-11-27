@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 interface Doc { document_id: number; document_type: string; title: string; as_of_date: string; byte_size: number; created_at: string }
 
 const TYPE_LABEL: Record<string, string> = {
-  INVOICE: 'Invoice', STATEMENT: 'Statement', AR_OPEN_BALANCES: 'AR Open Balances', AR_AGING: 'AR Aging', SALES: 'Sales report', FORECAST: 'Forecast',
+  INVOICE: 'Invoice', STATEMENT: 'Statement', AR_OPEN_BALANCES: 'AR Open Balances Report', AR_AGING: 'AR Aging', SALES: 'Sales report', FORECAST: 'Forecast',
 };
 const kb = (n: number) => (n >= 1_048_576 ? `${(n / 1_048_576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 

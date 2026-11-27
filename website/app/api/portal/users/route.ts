@@ -8,14 +8,14 @@ export const dynamic = 'force-dynamic';
 
 const ids = (v: unknown) => (Array.isArray(v) ? v.map(toInt).filter((n): n is number => n !== null) : []);
 
-type Context = { ok: false; response: NextResponse } | { ok: true; tenantId: number; db: ReturnType<typeof createClient> };
+type Context = { ok: false; response: NextResponse } | { ok: true; tenantId: number; db: Awaited<ReturnType<typeof createClient>> };
 
 async function context(): Promise<Context> {
   const user = await getSessionUser();
   if (!user) return { ok: false, response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
   const tenantId = await getCurrentTenantId();
   if (tenantId === null) return { ok: false, response: NextResponse.json({ error: 'No company found' }, { status: 400 }) };
-  return { ok: true, tenantId, db: createClient() };
+  return { ok: true, tenantId, db: await createClient() };
 }
 
 /**

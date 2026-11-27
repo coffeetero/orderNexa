@@ -16,7 +16,7 @@ interface Prepared extends Sender {
  * the link comes back so it can be passed on by hand.
  */
 export async function sendUserInvite(request: Request, tenantId: number, userId: number): Promise<NextResponse> {
-  const db = createClient();
+  const db = await createClient();
   const { data, error } = await db.rpc('fnd_user_invite_prepare', { p_tenant_id: tenantId, p_user_id: userId });
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   const u = data as Prepared;

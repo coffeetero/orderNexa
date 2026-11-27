@@ -23,7 +23,7 @@ export async function POST(request: Request) {
   const auth = await requireStaff();
   if (!auth.ok) return auth.response;
 
-  const { data, error } = await createClient().rpc('ar_credit_memo_create', {
+  const { data, error } = await (await createClient()).rpc('ar_credit_memo_create', {
     p_tenant_id: tenantId,
     p_applies_to_ar_transaction_id: invoiceId,
     p_payload: { reason: typeof body.reason === 'string' ? body.reason : null, lines: body.lines },

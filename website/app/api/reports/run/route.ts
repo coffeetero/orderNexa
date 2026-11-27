@@ -13,7 +13,7 @@ export const runtime = 'nodejs';
 const isDate = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
 
 function pdfResponse(bytes: Uint8Array, filename: string): Response {
-  return new Response(bytes, {
+  return new Response(new Uint8Array(bytes), {
     headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${filename}"`, 'Cache-Control': 'no-store' },
   });
 }
@@ -23,7 +23,7 @@ const fail = (message: string, status = 400) => NextResponse.json({ error: messa
 /**
  * POST /api/reports/run { report: 'bakers'|'labels'|'packaging'|'invoices'|'delivery', tenant_id, from, to, production_code?, customer_ids? }
  * → application/pdf. The data and every total come from the database functions (om_report_*); this route only draws them.
- * Labels, Packaging and Invoices need customer_ids. Invoices prints issued invoices (ar_invoices_print_get) and changes nothing.
+ * Labels, Packaging and Invoices need customer_ids. Invoices prints the invoices, drafts marked DRAFT (ar_invoices_print_get), and records the print.
  * Printing records the print time on the runs; Packaging also numbers the invoices.
  */
 export async function POST(request: Request) {
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
   const auth = await requireStaff();
   if (!auth.ok) return auth.response;
 
-  const supabase = createClient();
+  const supabase = await createClient();
   const args = { p_tenant_id: tenantId, p_from: body.from, p_to: body.to, p_production_code: code };
   const label = `${body.from}${body.from === body.to ? '' : ` to ${body.to}`}${code ? ` ${code}` : ''}`;
   const name = `${report}-${body.from}${body.from === body.to ? '' : `-to-${body.to}`}.pdf`;
@@ -77,13 +77,15 @@ export async function POST(request: Request) {
     const { data, error } = await supabase.rpc('ar_invoices_print_get', { ...args, p_customer_ids: ids });
     if (error) return fail(error.message);
     const d = data as InvoicesData;
-    if (!d.invoices.length) return fail('No issued invoices for the selected customers and dates.');
-    return pdfResponse(await invoicesPdf(d), name);
+    if (!d.invoices.length) return fail('No invoices for the selected customers and dates.');
+    const bytes = await invoicesPdf(d);
+    await supabase.rpc('ar_invoices_mark_printed', { p_tenant_id: args.p_tenant_id, p_ar_transaction_ids: d.invoices.map((i) => i.ar_transaction_id) });
+    return pdfResponse(bytes, name);
   }
   const { data, error } = await supabase.rpc('om_report_delivery_get', args);
   if (error) return fail(error.message);
   const d = data as DeliveryData;
-  if (!d.stops.length) return fail('No deliveries found. Process the run first.');
+  if (!d.stops.length) return fail('No deliveries found. Post the orders to production first.');
   const bytes = await deliveryPdf(d, label);
   await supabase.rpc('om_production_runs_mark_printed', { ...args, p_report: 'DELIVERY' });
   return pdfResponse(bytes, name);

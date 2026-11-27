@@ -20,7 +20,7 @@ export async function POST(request: Request) {
   const auth = await requireStaff();
   if (!auth.ok) return auth.response;
 
-  const { data, error } = await createClient().rpc('fnd_user_release_email', { p_tenant_id: tenantId, p_user_id: userId });
+  const { data, error } = await (await createClient()).rpc('fnd_user_release_email', { p_tenant_id: tenantId, p_user_id: userId });
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   const authUserId = data as string | null;
   if (authUserId) {

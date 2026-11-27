@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   if (tenantId === null || customerId === null) return NextResponse.json({ error: 'tenant_id and customer_id are required' }, { status: 400 });
   const auth = await requireStaff();
   if (!auth.ok) return auth.response;
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const list = await supabase.rpc('ar_invoices_unsaved_get', { p_tenant_id: tenantId, p_account_id: customerId });
   if (list.error) return NextResponse.json({ error: list.error.message }, { status: 400 });

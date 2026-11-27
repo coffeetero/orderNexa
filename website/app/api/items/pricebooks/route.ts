@@ -22,7 +22,7 @@ export async function GET(request: Request) {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data, error } = await supabase.rpc('fnd_pricebook_items_get', {
     p_tenant_id: tenantId,
     p_item_id: itemId,
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ data: { saved: 0 } });
   }
 
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data, error } = await supabase.rpc('fnd_pricebook_items_save', {
     p_tenant_id: tenantId,
     p_item_id: itemId,

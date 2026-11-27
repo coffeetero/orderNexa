@@ -3,7 +3,7 @@ import { day, money, qty, renderPdf, type PdfSpec } from './pdf';
 export type ReportKind = 'ar' | 'aging' | 'statements' | 'sales' | 'forecast';
 
 export const REPORT_TYPES: Record<ReportKind, { documentType: string; title: string }> = {
-  ar: { documentType: 'AR_OPEN_BALANCES', title: 'AR Open Balances' },
+  ar: { documentType: 'AR_OPEN_BALANCES', title: 'AR Open Balances Report' },
   aging: { documentType: 'AR_AGING', title: 'AR Aging Report' },
   statements: { documentType: 'STATEMENT', title: 'Customer Statement' },
   sales: { documentType: 'SALES', title: 'Sales Report' },
@@ -17,24 +17,16 @@ const TYPE_NAME: Record<string, string> = { INV: 'Invoice', CM: 'Credit memo', P
 export function openBalancesSpec(data: Json, company: string): PdfSpec {
   const accounts: Json[] = data.accounts;
   return {
-    title: `AR Open Balances - as of ${day(data.as_of)}`, company, landscape: true,
-    subtitle: [`${accounts.length} account${accounts.length === 1 ? '' : 's'} selected. Amounts in dollars.`],
-    sections: [
-      ...accounts.map((a) => ({
+    title: `AR Open Balances Report - as of ${day(data.as_of)}`, company,
+    sections: accounts.map((a) => ({
         heading: `${label(a)}  -  balance ${money(a.balance)}`,
         columns: [
-          { label: 'Document', width: 14 }, { label: 'Type', width: 10 }, { label: 'Date', width: 10 }, { label: 'Due', width: 10 },
+          { label: 'Date', width: 10 }, { label: 'Document', width: 14 }, { label: 'Type', width: 10 }, { label: 'Due', width: 10 },
           { label: 'Amount', width: 10, align: 'right' as const }, { label: 'Paid', width: 10, align: 'right' as const }, { label: 'Open', width: 10, align: 'right' as const },
         ],
-        rows: (a.items as Json[]).map((i) => [i.document_number, TYPE_NAME[i.type] ?? i.type, day(i.date), day(i.due_date), money(i.amount), money(i.paid), money(i.open)]),
+        rows: (a.items as Json[]).map((i) => [day(i.date), i.document_number, TYPE_NAME[i.type] ?? i.type, day(i.due_date), money(i.amount), money(i.paid), money(i.open)]),
         footer: ['', '', '', '', '', 'Balance', money(a.balance)],
       })),
-      {
-        heading: 'All selected accounts',
-        columns: [{ label: 'Total open balance', width: 60 }, { label: '', width: 10, align: 'right' as const }],
-        rows: [], footer: ['Total open balance', money(accounts.reduce((s, a) => s + Number(a.balance), 0))],
-      },
-    ],
   };
 }
 
@@ -42,7 +34,7 @@ export function agingSpec(data: Json, company: string): PdfSpec {
   const t = data.totals;
   const accounts = (data.accounts as Json[]).filter((a) => Number(a.total) !== 0);
   return {
-    title: `AR Aging Report - as of ${day(data.as_of)}`, company, landscape: true,
+    title: `AR Aging Report - as of ${day(data.as_of)}`, company,
     subtitle: ['Days past due date (the document date when no due date is set). Accounts with nothing open are not listed.'],
     sections: [{
       columns: [

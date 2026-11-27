@@ -3,7 +3,7 @@ import { getCurrentTenantId } from '@/lib/supabase/tenant';
 import { FinancialReport } from '@/components/features/financials/FinancialReport';
 
 export const metadata = {
-  title: 'AR Open Balances — Financials',
+  title: 'AR Open Balances Report — Financials',
 };
 
 export default async function FinancialArPage() {

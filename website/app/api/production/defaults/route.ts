@@ -11,7 +11,7 @@ export async function GET(request: Request) {
   const auth = await requireStaff();
   if (!auth.ok) return auth.response;
 
-  const { data, error } = await createClient().rpc('om_report_defaults_get', { p_tenant_id: tenantId });
+  const { data, error } = await (await createClient()).rpc('om_report_defaults_get', { p_tenant_id: tenantId });
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ data });
 }

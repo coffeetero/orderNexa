@@ -165,7 +165,7 @@ export function ReportRunner({ tenantId, report, title, description, customerBas
           {customers.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               {customerBasis === 'INVOICE'
-                ? 'No invoices for these dates. Process the run first (Production > Process Run).'
+                ? 'No invoices for these dates. Post the orders to production first (Production > Post Orders to Production).'
                 : customerBasis === 'PRINT'
                   ? 'No issued invoices for these dates. Draft invoices get their numbers when the Packaging List is printed.'
                   : 'No orders for these dates.'}

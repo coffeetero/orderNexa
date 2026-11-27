@@ -8,7 +8,7 @@ export const metadata = {
 };
 
 export default async function EnterOrdersPage() {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   // Resolve tenant via RPC (same pattern as customers page)
   const { data: tenantData } = await supabase.rpc('fnd_tenants_get');
@@ -19,7 +19,7 @@ export default async function EnterOrdersPage() {
   let initialCustomers: CustomerOption[] = [];
 
   if (tenantId !== null) {
-    const h = headers();
+    const h = await headers();
     const host = h.get('host');
     const proto = h.get('x-forwarded-proto') ?? 'http';
     const cookie = h.get('cookie') ?? '';

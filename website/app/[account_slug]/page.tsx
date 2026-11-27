@@ -7,10 +7,10 @@ import { CustomerMetricCard } from '@/components/features/customer/CustomerMetri
 import { OrderHistoryTable } from '@/components/features/customer/OrderHistoryTable';
 import { mockCustomerMetrics, mockOrders, mockInvoices } from '@/lib/mock-data';
 
-type Props = { params: { account_slug: string } };
+type Props = { params: Promise<{ account_slug: string }> };
 
-export default function AccountCustomerDashboardPage({ params }: Props) {
-  const { account_slug } = params;
+export default async function AccountCustomerDashboardPage({ params }: Props) {
+  const { account_slug } = await params;
   const base = `/${account_slug}`;
 
   const myOrders = mockOrders.filter((o) => o.customerId === 'c1');

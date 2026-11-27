@@ -13,6 +13,6 @@ export default async function TasksPage() {
   if (tenantId === null) {
     return <div className="p-6 text-sm text-muted-foreground">No company found for this user.</div>;
   }
-  const w = await createClient().rpc('fnd_has_access', { p_area: 'organizer.tasks', p_action: 'W' });
+  const w = await (await createClient()).rpc('fnd_has_access', { p_area: 'organizer.tasks', p_action: 'W' });
   return <TasksBoard tenantId={tenantId} canEdit={w.data === true} />;
 }

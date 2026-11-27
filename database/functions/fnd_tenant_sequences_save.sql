@@ -1,6 +1,6 @@
 -- ============================================================
 -- fnd_tenant_sequences_save
--- Upserts one numbering sequence (order_number, invoice_number, shipment_number or credit_memo_number). Staff only.
+-- Upserts one numbering sequence (order_number, invoice_number, shipment_number, credit_memo_number or debit_memo_number). Staff only.
 -- p_payload: { sequence_name, mask, start_value, next_value, increment_by, reset_period, requires_gapless }
 -- next_value is only applied when it is not lower than the current next_value (numbers are never reused).
 -- ============================================================
@@ -16,7 +16,7 @@ BEGIN
     IF NOT bps.fnd_is_tenant_staff(p_tenant_id) THEN
         RAISE EXCEPTION 'Only tenant staff can change numbering';
     END IF;
-    IF v_name IS NULL OR v_name NOT IN ('order_number', 'invoice_number', 'shipment_number', 'credit_memo_number') THEN
+    IF v_name IS NULL OR v_name NOT IN ('order_number', 'invoice_number', 'shipment_number', 'credit_memo_number', 'debit_memo_number') THEN
         RAISE EXCEPTION 'Unknown sequence %', v_name;
     END IF;
     IF NULLIF(TRIM(p_payload ->> 'mask'), '') IS NULL OR POSITION('#' IN p_payload ->> 'mask') = 0 THEN

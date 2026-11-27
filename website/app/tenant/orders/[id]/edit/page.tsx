@@ -8,10 +8,11 @@ export const metadata = {
 };
 
 interface EditOrderPageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
-export default async function EditOrderPage({ params }: EditOrderPageProps) {
+export default async function EditOrderPage(props: EditOrderPageProps) {
+  const params = await props.params;
   const orderId = parseInt(params.id, 10);
 
   if (isNaN(orderId)) {
@@ -22,7 +23,7 @@ export default async function EditOrderPage({ params }: EditOrderPageProps) {
     );
   }
 
-  const supabase = createClient();
+  const supabase = await createClient();
 
   // Resolve tenant via RPC
   const { data: tenantData } = await supabase.rpc('fnd_tenants_get');
@@ -33,7 +34,7 @@ export default async function EditOrderPage({ params }: EditOrderPageProps) {
   let initialCustomers: CustomerOption[] = [];
 
   if (tenantId !== null) {
-    const h = headers();
+    const h = await headers();
     const host = h.get('host');
     const proto = h.get('x-forwarded-proto') ?? 'http';
     const cookie = h.get('cookie') ?? '';

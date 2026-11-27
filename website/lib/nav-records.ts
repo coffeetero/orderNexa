@@ -25,22 +25,31 @@ export type RecentRow = {
 /** Which recent lists each module shows, in order. Keys are top-level menu labels in nav-config. */
 export const MODULE_RECENTS: Record<string, { type: RecordType; title: string }[]> = {
   Customers: [{ type: 'customer', title: 'Recent customers' }],
+  // Recent orders dropped 2026-11-27 (Enter Orders shows the Call Up List instead)
   Operations: [
     { type: 'customer', title: 'Recent customers' },
-    { type: 'order', title: 'Recent orders' },
     { type: 'production_run', title: 'Recent production runs' },
   ],
   Inventory: [{ type: 'item', title: 'Recent items' }],
+};
+
+/**
+ * Pages whose own list in the sidebar needs a wider docked sidebar (px; default 260), or that keep that list in the
+ * drawer on narrow screens instead of on the page (inDrawer).
+ */
+export const PAGE_SIDEBAR: Record<string, { width?: number; inDrawer?: boolean }> = {
+  '/financials/ar': { width: 340, inDrawer: true }, // customer list with number and balance (owner request 2026-11-27)
+  '/financials/aging': { width: 340, inDrawer: true }, // same layout as AR Open Balances
 };
 
 /** Pages that choose their own recent lists (keyed by menu href). They win over the module's lists. */
 export const PAGE_RECENTS: Record<string, { type: RecordType; title: string }[]> = {
   '/orders': [
     { type: 'customer', title: 'Recent customers' },
-    { type: 'order', title: 'Recent orders' },
-  ],
+  ], // the Call Up List sits below, in place of Recent orders (decided 2026-11-27)
   '/inventory/recipes': [], // the recipe list sits in the sidebar instead
   '/inventory/item-profile': [], // so does the item list
+  '/inventory/pricing': [], // and the pricing book list
   '/purchasing/vendors': [], // and the vendor list
   '/purchasing/items': [],
 };

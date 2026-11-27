@@ -19,7 +19,7 @@ export async function GET(request: Request) {
   if (tenantId === null) return NextResponse.json({ error: 'No company found' }, { status: 400 });
   const q = new URL(request.url).searchParams;
   const page = Math.max(Number.parseInt(q.get('page') ?? '1', 10) || 1, 1);
-  const { data, error } = await createClient().rpc('om_orders_manage_get', {
+  const { data, error } = await (await createClient()).rpc('om_orders_manage_get', {
     p_tenant_id: tenantId,
     p_period: oneOf(q.get('period'), ['yesterday', 'today', 'tomorrow', 'this_week', 'custom'] as const, 'today'),
     p_from: isDate(q.get('from')) ? q.get('from') : null,

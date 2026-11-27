@@ -8,10 +8,11 @@ export const metadata = {
 
 const SECTIONS: ProductionSection[] = ['codes', 'methods', 'numbering', 'pricing', 'runs'];
 
-export default async function AdminProductionPage({ searchParams }: { searchParams: { section?: string } }) {
+export default async function AdminProductionPage(props: { searchParams: Promise<{ section?: string }> }) {
+  const searchParams = await props.searchParams;
   await requireArea('admin.production');
   // Resolve the tenant on the server (same pattern as Enter Orders); the browser session has no tenant_id claim.
-  const { data } = await createClient().rpc('fnd_tenants_get');
+  const { data } = await (await createClient()).rpc('fnd_tenants_get');
   const tenants = Array.isArray(data) ? data : [];
   const tenantId: number | null = tenants.length > 0 ? tenants[0].tenant_id : null;
 

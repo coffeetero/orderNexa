@@ -20,7 +20,7 @@ export async function GET(request: Request) {
   const auth = await requireStaff();
   if (!auth.ok) return auth.response;
 
-  const { data, error } = await createClient().rpc('ar_credit_orders_get', {
+  const { data, error } = await (await createClient()).rpc('ar_credit_orders_get', {
     p_tenant_id: tenantId, p_customer_id: customerId, p_production_date: date, p_production_code: code,
   });
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });

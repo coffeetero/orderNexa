@@ -21,7 +21,7 @@ export async function POST(request: Request) {
 
   const svc = createServiceClient();
   const { data, error } = await svc.rpc('fnd_user_reset_prepare', {
-    p_email: emailAddr, p_host_slug: parseTenantSubdomain(headers().get('host') || ''),
+    p_email: emailAddr, p_host_slug: parseTenantSubdomain((await headers()).get('host') || ''),
   });
   if (error) console.error('[forgot] lookup failed:', error.message);
   const t = data as ResetTarget | null;

@@ -2,7 +2,8 @@ import { cell, createWriter, ensure, footerPageNumbers, LETTER, money, newPage, 
 
 export interface PackagingData {
   invoices: {
-    document_number: string;
+    /** null while the invoice is a DRAFT (not posted to AR yet). */
+    document_number: string | null;
     customer_name: string;
     customer_number: string | null;
     production_date: string;
@@ -25,7 +26,7 @@ const X = { qty: 40, desc: 90, priceRight: 480, amountRight: 572 };
 function invoiceHeader(w: Writer, inv: PackagingData['invoices'][number], copy: number, copies: number): void {
   text(w, 'INVOICE / PACKING LIST', { size: 16, bold: true }, 20);
   const top = w.y;
-  cell(w, inv.document_number, X.qty, top, { size: 14, bold: true });
+  cell(w, inv.document_number ?? 'DRAFT', X.qty, top, { size: 14, bold: true });
   cell(w, `Deliver ${inv.delivery_date}`, X.amountRight, top, { size: 10, bold: true, align: 'right', right: X.amountRight });
   w.y -= 20;
   text(w, `${inv.customer_name}${inv.customer_number ? `  (${inv.customer_number})` : ''}`, { size: 12, bold: true }, 16);

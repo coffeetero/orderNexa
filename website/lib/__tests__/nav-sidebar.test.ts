@@ -43,14 +43,14 @@ describe('normalizePins', () => {
 describe('recent records', () => {
   it('maps modules to the lists they show', () => {
     expect(recentTypesFor('Customers')).toEqual(['customer']);
-    expect(recentTypesFor('Operations')).toEqual(['customer', 'order', 'production_run']);
+    expect(recentTypesFor('Operations')).toEqual(['customer', 'production_run']);
     expect(recentTypesFor('Inventory')).toEqual(['item']);
     expect(recentTypesFor('Financials')).toEqual([]);
     expect(recentTypesFor(null)).toEqual([]);
-    expect(recentTypesFor('Operations', '/orders')).toEqual(['customer', 'order']); // Enter Orders chooses its own
+    expect(recentTypesFor('Operations', '/orders')).toEqual(['customer']); // Enter Orders chooses its own (Call Up List instead of Recent orders)
     expect(recentTypesFor('Inventory', '/inventory/recipes')).toEqual([]);
     expect(recentTypesFor('Inventory', '/inventory/item-profile')).toEqual([]);
-    expect(recentTypesFor('Operations', '/manage-orders')).toEqual(['customer', 'order', 'production_run']);
+    expect(recentTypesFor('Operations', '/manage-orders')).toEqual(['customer', 'production_run']);
     expect(Object.keys(MODULE_RECENTS).every((m) => tenantNav.some((n) => n.label === m))).toBe(true);
   });
   it('builds deep links per module', () => {
@@ -101,7 +101,7 @@ describe('buildBreadcrumbs', () => {
   });
   it("sends a module crumb to the module's first built page", () => {
     expect(buildBreadcrumbs('/inventory/item-profile', tenantNav)[0]).toEqual({ label: 'Inventory', href: '/inventory/item-profile' });
-    expect(buildBreadcrumbs('/orders/standing', tenantNav)[0]).toEqual({ label: 'Operations', href: '/orders' });
+    expect(buildBreadcrumbs('/orders/standing', tenantNav)[0]).toEqual({ label: 'Operations', href: '/orders/standing' });
   });
   it('handles dashboard, extra pages, edit-order and the internal /tenant prefix', () => {
     expect(buildBreadcrumbs('/dashboard', tenantNav)).toEqual([{ label: 'Dashboard' }]);

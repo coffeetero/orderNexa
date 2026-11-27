@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
  */
 type Guarded =
   | { ok: false; response: NextResponse }
-  | { ok: true; supabase: ReturnType<typeof createClient>; tenantId: number; vendorId: number };
+  | { ok: true; supabase: Awaited<ReturnType<typeof createClient>>; tenantId: number; vendorId: number };
 
 async function guard(tenantRaw: unknown, vendorRaw: unknown, action: 'R' | 'W'): Promise<Guarded> {
   const tenantId = toInt(tenantRaw);
@@ -23,7 +23,7 @@ async function guard(tenantRaw: unknown, vendorRaw: unknown, action: 'R' | 'W'):
   }
   const auth = await requireStaff();
   if (!auth.ok) return { ok: false, response: auth.response };
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: ok } = await supabase.rpc('fnd_has_access', { p_area: 'purchasing.vendors', p_action: action });
   if (ok !== true) return { ok: false, response: NextResponse.json({ error: 'You do not have access to vendors' }, { status: 403 }) };
   return { ok: true, supabase, tenantId, vendorId };

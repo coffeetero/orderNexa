@@ -244,7 +244,7 @@ export function ConfirmDeliveries({ tenantId }: { tenantId: number }) {
       </CardContent></Card>
 
       {shipments !== null && shipments.length === 0 && (
-        <p className="text-sm text-muted-foreground">No shipments for these filters. Process the run first (Production &gt; Process Run).</p>
+        <p className="text-sm text-muted-foreground">No shipments for these filters. Post the orders to production first (Production &gt; Post Orders to Production).</p>
       )}
       {shipments?.map((s) => (
         <ShipmentCard

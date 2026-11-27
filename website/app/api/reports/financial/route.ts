@@ -29,11 +29,11 @@ export async function GET(request: Request) {
   if (q.get('open') === '1') {
     const asOf = q.get('as_of');
     if (!isDate(asOf)) return NextResponse.json({ error: 'as_of must be YYYY-MM-DD' }, { status: 400 });
-    const r = await createClient().rpc('ar_open_accounts_get', { p_tenant_id: tenantId, p_as_of: asOf });
+    const r = await (await createClient()).rpc('ar_open_accounts_get', { p_tenant_id: tenantId, p_as_of: asOf });
     if (r.error) return NextResponse.json({ error: r.error.message }, { status: 400 });
     return NextResponse.json({ data: r.data });
   }
-  const { data, error } = await createClient().rpc('fnd_report_accounts_get', {
+  const { data, error } = await (await createClient()).rpc('fnd_report_accounts_get', {
     p_tenant_id: tenantId, p_with_invoices: q.get('with_invoices') === '1', p_from: from || null, p_to: to || null,
   });
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
 
   const auth = await requireStaff();
   if (!auth.ok) return auth.response;
-  const supabase = createClient();
+  const supabase = await createClient();
   const fail = (m: string) => NextResponse.json({ error: m }, { status: 400 });
 
   const { data: tenant } = await supabase.from('fnd_tenants').select('tenant_name').eq('tenant_id', tenantId).maybeSingle();

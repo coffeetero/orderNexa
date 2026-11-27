@@ -5,7 +5,7 @@ function calcExtended(qty: number, price: number, discount: number): number {
   return qty * (price - discount);
 }
 
-function resolveItemUnitPrice(item: OrderEntryItem): number {
+export function resolveItemUnitPrice(item: OrderEntryItem): number {
   const candidate = (item as OrderEntryItem & { item_price?: unknown; price?: unknown });
   const raw =
     item.unit_price ??
@@ -179,14 +179,15 @@ export function useOrderEntryState(initial?: OrderEntryDraft) {
    * quantity added; a new one is priced from the current order's items. Prep options and scoring come from the copied line.
    */
   const addCopiedLines = useCallback(
-    (copies: { item: OrderEntryItem; quantity: number; prep_options: PrepOption[]; is_scored: boolean }[]) => {
+    (copies: { item: OrderEntryItem; quantity: number; prep_options: PrepOption[]; is_scored: boolean }[], options?: { fromStandingOrder?: boolean }) => {
+      const copied = !options?.fromStandingOrder;
       setDraft((prev) => {
         let newLines = [...prev.lines];
         for (const { item, quantity, prep_options, is_scored } of copies) {
           const existing = newLines.find((l) => l.item_id === item.item_id);
           if (existing) {
             newLines = newLines.map((l) => l === existing
-              ? { ...l, quantity: l.quantity + quantity, extended_amount: calcExtended(l.quantity + quantity, l.unit_price, l.unit_discount), copied: true }
+              ? { ...l, quantity: l.quantity + quantity, extended_amount: calcExtended(l.quantity + quantity, l.unit_price, l.unit_discount), copied }
               : l);
             continue;
           }
@@ -205,7 +206,7 @@ export function useOrderEntryState(initial?: OrderEntryDraft) {
             unit_price: unitPrice,
             unit_discount: 0,
             extended_amount: calcExtended(quantity, unitPrice, 0),
-            copied: true,
+            copied,
           });
         }
         return { ...prev, lines: newLines, total_amount: calcTotal(newLines) };
@@ -229,6 +230,7 @@ export function useOrderEntryState(initial?: OrderEntryDraft) {
         unit_price: 0,
         unit_discount: 0,
         extended_amount: 0,
+        is_sample: true,
       })),
       total_amount: 0,
     }));

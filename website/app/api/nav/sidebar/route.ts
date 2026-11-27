@@ -22,7 +22,7 @@ export async function GET(request: Request) {
 
   const types = recentTypesFor(url.searchParams.get('module'), url.searchParams.get('page'));
 
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data, error } = await supabase.rpc('fnd_nav_sidebar_get', {
     p_tenant_id: tenantId,
     p_types: types.length > 0 ? types : [],

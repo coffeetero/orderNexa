@@ -11,7 +11,7 @@ function toNumber(v: unknown): number | null {
 }
 
 export default async function StandingOrderMgtRoute() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: tenantData } = await supabase.rpc('fnd_tenants_get');
 
   const tenants: { tenant_id: number; tenant_name: string }[] = Array.isArray(tenantData)

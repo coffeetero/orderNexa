@@ -422,6 +422,57 @@ function PricingEditor({ tenantId, notify }: { tenantId: number; notify: Notify 
   );
 }
 
+function AccountingRulesEditor({ tenantId, notify }: { tenantId: number; notify: Notify }) {
+  const [rules, setRules] = useState('STRICT');
+  const [saved, setSaved] = useState('STRICT');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    call<{ accounting_rules: string }>(`/api/admin/accounting-settings?tenant_id=${tenantId}`)
+      .then((d) => { setRules(d.accounting_rules); setSaved(d.accounting_rules); })
+      .catch((e) => notify((e as Error).message, 'error'));
+  }, [tenantId, notify]);
+
+  const save = async () => {
+    setBusy(true);
+    try {
+      await post('/api/admin/accounting-settings', { tenant_id: tenantId, accounting_rules: rules });
+      setSaved(rules);
+      notify('Accounting rules saved.', 'success');
+    } catch (e) {
+      notify((e as Error).message, 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mt-6 border-t pt-4">
+      <div className="mb-1 flex items-start justify-between gap-3">
+        <h2 className="text-lg font-medium">Accounting rules</h2>
+        <Button size="sm" onClick={save} disabled={busy || rules === saved}>Save</Button>
+      </div>
+      <p className="mb-3 text-xs text-muted-foreground">
+        What happens when an order changes after its invoice was posted to AR (Production &gt; Post Orders to AR).
+        Strict: the invoice is never changed; more becomes a debit memo and less a credit memo, applied to the same invoice
+        and printed under its items. Relaxed: the invoice itself is changed (same number).
+      </p>
+      <div className="flex items-center gap-2 text-sm">
+        <Label htmlFor="acct-rules" className="text-xs">Accounting rules</Label>
+        <select
+          id="acct-rules"
+          className="h-9 w-40 rounded-md border border-input bg-background px-2 text-sm"
+          value={rules}
+          onChange={(e) => setRules(e.target.value)}
+        >
+          <option value="STRICT">Strict</option>
+          <option value="RELAXED">Relaxed</option>
+        </select>
+      </div>
+    </div>
+  );
+}
+
 export type ProductionSection = 'codes' | 'methods' | 'numbering' | 'pricing' | 'runs';
 
 export function ProductionSettings({ tenantId, section = 'codes' }: { tenantId: number; section?: ProductionSection }) {
@@ -486,6 +537,7 @@ export function ProductionSettings({ tenantId, section = 'codes' }: { tenantId: 
       <Card><CardContent className="pt-6">
         <FormatsEditor rows={sequences} tenantId={tenantId} notify={notify} />
         <CustomerNumberMaskEditor tenantId={tenantId} notify={notify} />
+        <AccountingRulesEditor tenantId={tenantId} notify={notify} />
       </CardContent></Card>
       )}
 

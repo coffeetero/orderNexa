@@ -30,6 +30,8 @@ const dollars = (v: unknown) => `$ ${money(v)}`;
 
 export async function statementPdf(statements: Json[]): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
+  // Shown in the browser's PDF viewer instead of the preview's blob id.
+  pdf.setTitle(statements.length === 1 ? `Statement ${statements[0].customer_name}` : 'Customer Statements', { showInWindowTitleBar: true });
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
 

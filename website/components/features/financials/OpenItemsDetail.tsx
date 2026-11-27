@@ -1,7 +1,7 @@
 'use client';
 
 import { Fragment, useEffect, useState } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, FileSpreadsheet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 /** What was applied to an open document: a payment or credit (for an invoice), or an invoice (for an unapplied payment). */
@@ -14,7 +14,8 @@ interface OpenItem {
   ar_transaction_id: number | null; ar_payment_id: number | null; document_number: string; type: string; date: string; due_date: string;
   amount: number; paid: number; open: number; days_past_due: number; applied: Applied[];
 }
-interface Details { as_of: string; customer_id: number; customer_name: string; customer_number: string | null; balance: number; items: OpenItem[] }
+interface Aging { current_amt: number; d1_30: number; d31_60: number; d61_90: number; d90_plus: number; total: number }
+interface Details { as_of: string; customer_id: number; customer_name: string; customer_number: string | null; balance: number; items: OpenItem[]; aging?: Aging | null }
 
 const TYPE_NAME: Record<string, string> = { INV: 'Invoice', CM: 'Credit memo', PMT: 'Payment' };
 /** Money with the sign in front of the $ ("-$5,768.69"). */
@@ -26,11 +27,38 @@ const TH = 'h-8 whitespace-nowrap bg-muted/50 px-3 text-left text-[11px] font-se
 const TD = 'px-3 py-1.5 whitespace-nowrap';
 const keyOf = (i: OpenItem) => `${i.ar_transaction_id ?? ''}-${i.ar_payment_id ?? ''}`;
 
+/** The open items as an Excel file, the same rows and figures as on screen (no applied-payment detail). */
+async function downloadExcel(d: Details) {
+  const { default: ExcelJS } = await import('exceljs');
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Open items');
+  ws.addRow([`${d.customer_name}${d.customer_number ? ` (${d.customer_number})` : ''}`]).font = { bold: true, size: 13 };
+  ws.addRow([`Open items as of ${d.as_of}`]);
+  ws.addRow([]);
+  const head = ws.addRow(['Document', 'Type', 'Date', 'Due', 'Days past due', 'Amount', 'Paid', 'Open']);
+  head.font = { bold: true };
+  for (const i of d.items) {
+    ws.addRow([i.document_number, TYPE_NAME[i.type] ?? i.type, i.date, i.due_date, Number(i.days_past_due), Number(i.amount), Number(i.paid), Number(i.open)]);
+  }
+  const total = ws.addRow(['', '', '', '', '', '', 'Balance', Number(d.balance)]);
+  total.font = { bold: true };
+  ws.columns = [{ width: 14 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 13 }, { width: 14 }, { width: 14 }, { width: 14 }];
+  for (const c of [6, 7, 8]) ws.getColumn(c).numFmt = '$#,##0.00;-$#,##0.00';
+  [5, 6, 7, 8].forEach((c) => { ws.getRow(4).getCell(c).alignment = { horizontal: 'right' }; });
+  const buf = await wb.xlsx.writeBuffer();
+  const url = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `open-items-${d.customer_number ?? d.customer_id}-${d.as_of}.xlsx`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 /**
  * One account's open items on a date (ar_open_item_details_get). A row with applications opens to show each payment or credit applied to
  * it and the other documents that payment or credit covered, so a user can see why something is still open.
  */
-export function OpenItemsDetail({ tenantId, accountId, asOf }: { tenantId: number; accountId: number; asOf: string }) {
+export function OpenItemsDetail({ tenantId, accountId, asOf, withAging = false }: { tenantId: number; accountId: number; asOf: string; /** AR Aging: show the account's aging buckets */ withAging?: boolean }) {
   const [data, setData] = useState<Details | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<Set<string>>(new Set());
@@ -39,12 +67,13 @@ export function OpenItemsDetail({ tenantId, accountId, asOf }: { tenantId: numbe
     let live = true;
     setData(null); setError(null); setOpen(new Set());
     const qs = new URLSearchParams({ tenant_id: String(tenantId), account_id: String(accountId), as_of: asOf });
+    if (withAging) qs.set('aging', '1');
     fetch(`/api/reports/financial/open-items?${qs}`)
       .then((r) => r.json())
       .then((j: { data?: Details; error?: string }) => { if (live) { if (j.error) setError(j.error); else setData(j.data ?? null); } })
       .catch((e: Error) => live && setError(e.message));
     return () => { live = false; };
-  }, [tenantId, accountId, asOf]);
+  }, [tenantId, accountId, asOf, withAging]);
 
   const toggle = (k: string) => setOpen((prev) => { const n = new Set(prev); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const withApplied = data?.items.filter((i) => i.applied.length > 0) ?? [];
@@ -60,12 +89,28 @@ export function OpenItemsDetail({ tenantId, accountId, asOf }: { tenantId: numbe
           </span>
         )}
         {data && <span className="ml-auto text-sm font-semibold tabular-nums">Balance {money(data.balance)}</span>}
+        {data && data.items.length > 0 && (
+          <Button variant="outline" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={() => void downloadExcel(data).catch((e: Error) => setError(e.message))}>
+            <FileSpreadsheet className="h-4 w-4" />Excel
+          </Button>
+        )}
         {withApplied.length > 0 && (
           <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setOpen(allOpen ? new Set() : new Set(withApplied.map(keyOf)))}>
             {allOpen ? 'Collapse all' : 'Expand all'}
           </Button>
         )}
       </div>
+
+      {data?.aging && (
+        <dl className="grid grid-cols-3 border-b border-border text-xs sm:grid-cols-6" aria-label="Aging">
+          {([['Current', data.aging.current_amt], ['1-30', data.aging.d1_30], ['31-60', data.aging.d31_60], ['61-90', data.aging.d61_90], ['Over 90', data.aging.d90_plus], ['Total', data.aging.total]] as const).map(([label, v]) => (
+            <div key={label} className="border-r border-border px-4 py-1.5 last:border-r-0">
+              <dt className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</dt>
+              <dd className={`text-right text-sm tabular-nums ${label === 'Total' ? 'font-semibold' : ''}`}>{money(v)}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
 
       {error ? (
         <p role="alert" className="px-4 py-3 text-sm text-destructive">{error}</p>

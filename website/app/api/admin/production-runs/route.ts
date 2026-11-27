@@ -22,7 +22,7 @@ export async function GET(request: Request) {
   const auth = await requireStaff();
   if (!auth.ok) return auth.response;
 
-  const { data, error } = await createClient().rpc('om_production_runs_get', {
+  const { data, error } = await (await createClient()).rpc('om_production_runs_get', {
     p_tenant_id: tenantId, p_from: from, p_to: to, p_upcoming_only: url.searchParams.get('upcoming') === 'true',
   });
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
   const auth = await requireStaff();
   if (!auth.ok) return auth.response;
 
-  const { data, error } = await createClient().rpc('om_production_run_cutoff_save', {
+  const { data, error } = await (await createClient()).rpc('om_production_run_cutoff_save', {
     p_tenant_id: tenantId, p_production_run_id: runId, p_cutoff_local: cutoff,
   });
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });

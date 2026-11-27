@@ -82,7 +82,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const supabase = createClient();
+  const supabase = await createClient();
 
   if (p_order_id !== null) {
     const p_return_headers_only = parseHeadersOnly(url.searchParams.get('headers_only'));

@@ -23,6 +23,7 @@ AS $function$
       FROM (VALUES (1, 'order_number',       'Order numbers',       '####-####'),
                    (2, 'invoice_number',     'Invoice numbers',     'INV-######'),
                    (3, 'shipment_number',    'Shipment numbers',    'SHP-######'),
-                   (4, 'credit_memo_number', 'Credit memo numbers', 'CM-######')) AS n(ord, sequence_name, label, default_mask)
+                   (4, 'credit_memo_number', 'Credit memo numbers', 'CM-######'),
+                   (5, 'debit_memo_number',  'Debit memo numbers',  'DM-######')) AS n(ord, sequence_name, label, default_mask)
       LEFT JOIN fnd_tenant_sequences s ON s.tenant_id = p_tenant_id AND s.sequence_name = n.sequence_name;
 $function$;

@@ -1,18 +1,21 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, ChevronUp, Download, Play, Printer, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CustomerPicker, type PickAccount } from './CustomerPicker';
 import { OpenItemsDetail } from './OpenItemsDetail';
+import { useNav } from '@/components/layout/nav-context';
 import type { ReportKind } from '@/lib/reports/financial';
 
 const CONFIG: Record<ReportKind, { title: string; help: string }> = {
-  ar: { title: 'AR Open Balances', help: 'Customers with something open on a date. Click a name to see its open items below; tick customers to put them in the report.' },
-  aging: { title: 'AR Aging Report', help: 'What each selected customer owes, by how far past due it is.' },
+  ar: { title: 'AR Open Balances Report', help: 'Click the customer name to show the transactions. Select the customers to include in the PDF report.' },
+  aging: { title: 'AR Aging Report', help: 'Click the customer name to show the transactions. Select the customers to include in the PDF report.' },
   statements: { title: 'Customer Statements', help: 'One statement per selected customer. Saving keeps each customer’s statement with its own as-of date.' },
   sales: { title: 'Sales Reports', help: 'Invoiced sales, credits and items for the selected customers over a date range.' },
   forecast: { title: 'Revenue Forecasting', help: 'Projects revenue from each customer’s sales history, at its weekly average.' },
@@ -36,15 +39,23 @@ export function FinancialReport({ tenantId, kind }: { tenantId: number; kind: Re
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
   const [result, setResult] = useState<Result | null>(null);
-  const frame = useRef<HTMLIFrameElement>(null);
+  const frame = useRef<HTMLIFrameElement | null>(null);
+  // The report window element; tracked in state so its height is measured once it is actually on the page (tabs mount it late).
+  const [frameEl, setFrameEl] = useState<HTMLIFrameElement | null>(null);
   // AR Open Balances: the customer whose open items show below, and whether the first section is folded
   const [activeId, setActiveId] = useState<number | null>(null);
   const [collapsed, setCollapsed] = useState(false);
-  const openList = kind === 'ar';
+  // AR Open Balances and AR Aging: customers with something open (with the balance) in the sidebar, Transactions and PDF tabs
+  const openList = kind === 'ar' || kind === 'aging';
+  // AR Open Balances: the customer list lives in the page sidebar (docked, or the drawer on narrow screens)
+  const { sidebarSlot } = useNav();
+  const listInSidebar = openList && sidebarSlot !== null;
+  // AR Open Balances: the open items and the PDF each have a tab; opening a customer or running the report switches to it
+  const [tab, setTab] = useState<'transactions' | 'pdf'>('transactions');
 
   // AR Aging and Sales list only active accounts that have an invoice in the period (up to the as-of date, or from-to).
   // AR Open Balances lists only accounts with something open on the as-of date, with the balance.
-  const needsInvoices = kind === 'aging' || kind === 'sales';
+  const needsInvoices = kind === 'sales';
   const listAsOf = openList ? asOf : '';
   const periodFrom = kind === 'sales' ? from : '';
   const periodTo = kind === 'sales' ? to : asOf;
@@ -76,6 +87,23 @@ export function FinancialReport({ tenantId, kind }: { tenantId: number; kind: Re
 
   useEffect(() => () => { if (result) URL.revokeObjectURL(result.url); }, [result]);
 
+  // The report window reaches the bottom of the screen (at least 400px when it starts low, e.g. under open items).
+  const [frameHeight, setFrameHeight] = useState<number | null>(null);
+  useEffect(() => {
+    const el = frameEl;
+    if (!el) return;
+    const fit = () => {
+      if (el.offsetParent === null) return; // on the hidden tab: measure when it is shown
+      const scroller = el.closest('main');
+      const top = el.getBoundingClientRect().top + (scroller?.scrollTop ?? 0);
+      // 48px below: the card's bottom padding and the page padding, so the whole card fits without scrolling
+      setFrameHeight(Math.max(window.innerHeight - top - 48, 400));
+    };
+    fit();
+    window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  }, [frameEl, activeId, tab]);
+
   async function run(save: boolean) {
     setBusy(true);
     setMessage(null);
@@ -91,6 +119,7 @@ export function FinancialReport({ tenantId, kind }: { tenantId: number; kind: Re
       if (!res.ok || !j.data) throw new Error(j.error ?? 'The report could not be created');
       const bytes = Uint8Array.from(atob(j.data.pdf_base64), (c) => c.charCodeAt(0));
       setResult({ title: j.data.title, fileName: j.data.file_name, url: URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' })) });
+      setTab('pdf');
       if (save) setMessage({ text: j.data.saved_ids.length === 1 ? 'Saved to documents.' : `Saved ${j.data.saved_ids.length} documents.`, error: false });
     } catch (e) {
       setMessage({ text: (e as Error).message, error: true });
@@ -100,28 +129,43 @@ export function FinancialReport({ tenantId, kind }: { tenantId: number; kind: Re
   }
 
   const none = selected.size === 0;
+  const resultCard = result && (
+        <Card><CardContent className="space-y-3 pt-6">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="mr-auto text-lg font-medium">{result.title}</h2>
+            <Button asChild variant="outline" size="sm" className="gap-1.5"><a href={result.url} download={result.fileName}><Download className="h-4 w-4" />Download</a></Button>
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => frame.current?.contentWindow?.print()}><Printer className="h-4 w-4" />Print</Button>
+            <Button size="sm" className="gap-1.5" onClick={() => run(true)} disabled={busy}><Save className="h-4 w-4" />Save to documents</Button>
+          </div>
+          {/* Chrome's viewer: fit the page to the window width (about 125% on a 1920 screen) with the thumbnail pane closed,
+              which FitH needs; Safari ignores these. */}
+          <iframe ref={(el) => { frame.current = el; setFrameEl(el); }} src={`${result.url}#view=FitH&navpanes=0`} title={result.title} className="w-full rounded-md border"
+            style={{ height: frameHeight ?? '70vh' }} />
+        </CardContent></Card>
+  );
   const active = accounts?.find((a) => a.customer_id === activeId) ?? null;
-  const openAccount = (id: number) => { setActiveId(id); setCollapsed(true); };
+  const openAccount = (id: number) => { setActiveId(id); setTab('transactions'); if (!listInSidebar) setCollapsed(true); };
   return (
-    <div className="mx-auto max-w-5xl space-y-4 p-2 sm:p-3">
+    <div className={listInSidebar ? 'space-y-4 p-2' : 'mx-auto max-w-5xl space-y-4 p-2 sm:p-3'}>
       <div>
         <h1 className="text-2xl font-semibold">{cfg.title}</h1>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{cfg.help}</p>
       </div>
 
-      <Card>
+      {/* With the list in the sidebar there is nothing left for this panel (summary line removed, owner request 2026-11-27). */}
+      {!listInSidebar && <Card>
         {openList && (
           <div className="flex min-h-[40px] items-center gap-3 border-b border-border px-4 py-1.5">
             <h2 className="text-sm font-semibold">Customers</h2>
             <span className="min-w-0 truncate text-xs text-muted-foreground">
               As of {asOf}{accounts ? ` · ${accounts.length} with an open balance` : ''}{active ? ` · showing ${active.customer_name}` : ''}{selected.size ? ` · ${selected.size} in report` : ''}
             </span>
-            <Button variant="ghost" size="sm" className="ml-auto h-7 gap-1 px-2 text-xs" onClick={() => setCollapsed((c) => !c)} aria-expanded={!collapsed} aria-controls="ar-customers">
+            {!listInSidebar && <Button variant="ghost" size="sm" className="ml-auto h-7 gap-1 px-2 text-xs" onClick={() => setCollapsed((c) => !c)} aria-expanded={!collapsed} aria-controls="ar-customers">
               {collapsed ? <><ChevronDown className="h-4 w-4" />Show</> : <><ChevronUp className="h-4 w-4" />Hide</>}
-            </Button>
+            </Button>}
           </div>
         )}
-        {!(openList && collapsed) && <CardContent id="ar-customers" className={`space-y-4 ${openList ? 'pt-4' : 'pt-6'}`}>
+        {!(openList && collapsed) && !listInSidebar && <CardContent id="ar-customers" className={`space-y-4 ${openList ? 'pt-4' : 'pt-6'}`}>
         <div className="flex flex-wrap items-end gap-4">
           {kind === 'sales' ? (
             <>
@@ -153,21 +197,40 @@ export function FinancialReport({ tenantId, kind }: { tenantId: number; kind: Re
           : <CustomerPicker accounts={accounts} selected={selected} onChange={setSelected} />}
         {message && <p role="status" className={`text-sm ${message.error ? 'text-destructive' : 'text-foreground'}`}>{message.text}</p>}
       </CardContent>}
-      </Card>
+      </Card>}
 
-      {openList && activeId !== null && <OpenItemsDetail tenantId={tenantId} accountId={activeId} asOf={asOf} />}
-
-      {result && (
-        <Card><CardContent className="space-y-3 pt-6">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="mr-auto text-lg font-medium">{result.title}</h2>
-            <Button asChild variant="outline" size="sm" className="gap-1.5"><a href={result.url} download={result.fileName}><Download className="h-4 w-4" />Download</a></Button>
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => frame.current?.contentWindow?.print()}><Printer className="h-4 w-4" />Print</Button>
-            <Button size="sm" className="gap-1.5" onClick={() => run(true)} disabled={busy}><Save className="h-4 w-4" />Save to documents</Button>
+      {listInSidebar && sidebarSlot && createPortal(
+        <section aria-label="Customers with an open balance" className="flex min-h-0 flex-1 flex-col gap-2 border-t border-border px-1 pt-3">
+          <div className="flex items-end gap-2 px-1">
+            <div className="min-w-0 flex-1">
+              <Label htmlFor="asof" className="text-xs">As of date</Label>
+              <Input id="asof" type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)} className="h-8 text-xs" />
+            </div>
+            <Button size="sm" onClick={() => run(false)} disabled={busy || none} className="h-8 gap-1.5"><Play className="h-4 w-4" />{busy ? 'Running…' : 'Run'}</Button>
           </div>
-          <iframe ref={frame} src={result.url} title={result.title} className="h-[70vh] w-full rounded-md border" />
-        </CardContent></Card>
+          {message && <p role="status" className={`px-1 text-xs ${message.error ? 'text-destructive' : 'text-foreground'}`}>{message.text}</p>}
+          {accounts === null ? <p className="px-2 text-xs text-muted-foreground">Loading customers…</p>
+            : <CustomerPicker accounts={accounts} selected={selected} onChange={setSelected} onOpen={openAccount} activeId={activeId} inSidebar />}
+        </section>,
+        sidebarSlot,
       )}
+
+      {openList ? (
+        <Tabs value={tab} onValueChange={(v) => setTab(v as 'transactions' | 'pdf')}>
+          <TabsList>
+            <TabsTrigger value="transactions">Transactions</TabsTrigger>
+            <TabsTrigger value="pdf">PDF Report</TabsTrigger>
+          </TabsList>
+          {/* forceMount: switching tabs keeps both loaded instead of fetching the open items / reloading the PDF again */}
+          <TabsContent value="transactions" forceMount className="data-[state=inactive]:hidden">
+            {activeId !== null ? <OpenItemsDetail tenantId={tenantId} accountId={activeId} asOf={asOf} withAging={kind === 'aging'} />
+              : <p className="rounded-lg border bg-card p-6 text-center text-sm text-muted-foreground">Click a customer name to see its open items.</p>}
+          </TabsContent>
+          <TabsContent value="pdf" forceMount className="data-[state=inactive]:hidden">
+            {resultCard || <p className="rounded-lg border bg-card p-6 text-center text-sm text-muted-foreground">Tick customers and click Run to make the report.</p>}
+          </TabsContent>
+        </Tabs>
+      ) : resultCard}
     </div>
   );
 }

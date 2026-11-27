@@ -11,7 +11,7 @@ export async function GET() {
   if (!auth.ok) return auth.response;
   const tenantId = await getCurrentTenantId();
   if (tenantId === null) return NextResponse.json({ data: { state: 'none', infos: 0, warnings: 0, errors: 0, last_run_at: null } });
-  const { data, error } = await createClient().rpc('fnd_health_status', { p_tenant_id: tenantId });
+  const { data, error } = await (await createClient()).rpc('fnd_health_status', { p_tenant_id: tenantId });
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ data });
 }

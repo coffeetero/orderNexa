@@ -119,7 +119,8 @@ BEGIN
                         'allowed_prep_options', COALESCE(prep_allowed.allowed_prep_options, '[]'::JSONB),
                         'prep_options',         COALESCE(l.prep_options, '[]'::JSONB),
                         'is_scored',            FALSE,
-                        'can_score',            FALSE
+                        'can_score',            FALSE,
+                        'is_sample',            l.is_sample
                     ) ORDER BY l.order_line_id
                 ) AS lines
                 FROM om_order_lines l

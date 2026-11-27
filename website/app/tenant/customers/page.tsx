@@ -118,12 +118,11 @@ function getSearchParam(
   return Array.isArray(value) ? value[0] : value;
 }
 
-export default async function ManageCustomersPage({
-  searchParams,
-}: {
-  searchParams: { [key: string]: string | string[] | undefined };
+export default async function ManageCustomersPage(props: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const supabase = createClient();
+  const searchParams = await props.searchParams;
+  const supabase = await createClient();
 
   const isDebug = getSearchParam(searchParams, 'debug') === 'true';
   const requestedTenantId = toNumber(getSearchParam(searchParams, 'tenantId'));
@@ -145,7 +144,7 @@ export default async function ManageCustomersPage({
   let initialCustomers: CustomerRow[] = [];
 
   if (initialTenantId !== null) {
-    const h = headers();
+    const h = await headers();
     const host = h.get('host');
     const proto = h.get('x-forwarded-proto') ?? 'http';
     const cookie = h.get('cookie') ?? '';
