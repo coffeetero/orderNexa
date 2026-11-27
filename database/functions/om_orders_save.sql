@@ -13,6 +13,10 @@
 --
 -- delivery_amount (payload) is stored in om_orders.delivery_charge; entered with the order, defaults to 0.
 --
+-- lines[].is_sample: the clerk marked the line as a sample (saved on om_order_lines.is_sample).
+-- from_standing_order (payload, true): the order was filled in from the customer's standing order in Order Entry; it is
+-- recorded in om_standing_order_postings so posting standing orders later finds this order and only adds missing items.
+--
 -- Customer types (as in the old BPS): an ACCOUNT or SITE order is stored under that customer's own customer_id
 -- (own order number; a SITE is a location with its own invoice). A DEPARTMENT is within its account or site: its order
 -- is stored under the parent customer_id and the department name is the default department_event (can be overridden).
@@ -317,13 +321,14 @@ BEGIN
             INSERT INTO om_order_lines (
                 order_id, item_id, item_description,
                 quantity, unit_price, unit_discount, extended_amount,
-                prep_options, tenant_id
+                prep_options, is_sample, tenant_id
             ) VALUES (
                 v_order_id,
                 NULLIF((v_line->>'item_id')::TEXT, 'null')::BIGINT,
                 COALESCE(TRIM(v_line->>'item_description'), ''),
                 v_qty, v_price, v_discount, v_extended,
                 COALESCE(v_line->'prep_options', '[]'::JSONB),
+                COALESCE((v_line->>'is_sample')::BOOLEAN, FALSE),
                 p_tenant_id
             )
             RETURNING order_line_id INTO v_line_id;
@@ -335,7 +340,8 @@ BEGIN
                 unit_price       = v_price,
                 unit_discount    = v_discount,
                 extended_amount  = v_extended,
-                prep_options     = COALESCE(v_line->'prep_options', '[]'::JSONB)
+                prep_options     = COALESCE(v_line->'prep_options', '[]'::JSONB),
+                is_sample        = COALESCE((v_line->>'is_sample')::BOOLEAN, FALSE)
             WHERE order_line_id = v_line_id
               AND order_id      = v_order_id
               AND tenant_id     = p_tenant_id;
@@ -377,6 +383,15 @@ BEGIN
 
     IF v_order_number IS NULL THEN
         SELECT order_number INTO v_order_number FROM om_orders WHERE order_id = v_order_id;
+    END IF;
+
+    -- Filled in from the standing order: posting standing orders for this slot later only adds missing items to it.
+    IF COALESCE((p_payload->>'from_standing_order')::BOOLEAN, FALSE) AND v_payload_customer_id IS NOT NULL
+       AND bps.fnd_is_tenant_staff(p_tenant_id) THEN
+        INSERT INTO om_standing_order_postings (tenant_id, customer_id, production_date, production_code, order_id, lines_added, posted_by)
+        VALUES (p_tenant_id, v_payload_customer_id, v_production_date, v_production_code, v_order_id, 0, bps.fnd_nav_app_user_id())
+        ON CONFLICT (tenant_id, customer_id, production_date, production_code) DO UPDATE
+           SET order_id = EXCLUDED.order_id, last_posted_at = now(), posted_by = EXCLUDED.posted_by;
     END IF;
 
     RETURN jsonb_build_object(

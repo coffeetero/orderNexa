@@ -27,16 +27,20 @@ const LABEL_CLASS = 'text-xs font-semibold text-muted-foreground tracking-wide t
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface Candidate {
+  production_date: string;
   customer_id:     number;
   customer_number: string;
   customer_name:   string;
   production_code: string;
+  /** NEW | POSTED (posting again only adds missing items) | POSTED_TO_AR | ORDER_DELETED (both left alone) */
+  status:          string;
   already_posted:  boolean;
+  order_number?:   string | null;
   is_context_only?: boolean; // parent injected for display only — not postable
   // set after posting
-  status?:       'POSTED' | 'FAILED';
-  order_number?: string;
-  message?:      string;
+  result?:       string;
+  lines_added?:  number;
+  message?:      string | null;
 }
 
 interface PostStandingOrdersPageProps {
@@ -44,14 +48,28 @@ interface PostStandingOrdersPageProps {
   defaultDate:     string;
 }
 
+// Before posting (from the list)
 const STATUS_LABEL: Record<string, string> = {
-  POSTED: '✓ Posted',
-  FAILED: '✗ Failed',
+  POSTED:        'Posted',
+  POSTED_TO_AR:  'Posted to AR',
+  ORDER_DELETED: 'Posted, order deleted',
 };
-const STATUS_CLASS: Record<string, string> = {
+// After posting (from the post results)
+const RESULT_LABEL: Record<string, string> = {
+  POSTED:        '✓ Posted',
+  ADDED:         '✓ Added',
+  UP_TO_DATE:    'Up to date',
+  POSTED_TO_AR:  'Posted to AR, left alone',
+  ORDER_DELETED: 'Order deleted, left alone',
+  FAILED:        '✗ Failed',
+};
+const RESULT_CLASS: Record<string, string> = {
   POSTED: 'text-success',
+  ADDED:  'text-success',
   FAILED: 'text-destructive',
 };
+/** NEW rows can be posted; POSTED rows can be posted again (adds only missing items). */
+const canPost = (r: Candidate) => !r.is_context_only && (r.status === 'NEW' || r.status === 'POSTED');
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -60,6 +78,7 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
 
   // Filters
   const [productionDate, setProductionDate] = useState(defaultDate);
+  const [productionDateTo, setProductionDateTo] = useState(defaultDate);
   const [availableCodes, setAvailableCodes] = useState(DEFAULT_CODES);
   const [selectedCodes, setSelectedCodes]  = useState<string[]>(DEFAULT_CODES.map(c => c.value));
 
@@ -82,7 +101,7 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
 
   // ── Load candidates ────────────────────────────────────────────────────────
 
-  const load = useCallback(async (date: string, codes: string[]) => {
+  const load = useCallback(async (date: string, dateTo: string, codes: string[]) => {
     if (!tenantId || !date || codes.length === 0) {
       setCandidates([]); setChecked(new Set()); return;
     }
@@ -92,9 +111,10 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
     setCandidates([]); setChecked(new Set()); setPosted(false);
     try {
       const params = new URLSearchParams({
-        tenant_id:        String(tenantId),
-        production_date:  date,
-        production_codes: codes.join(','),
+        tenant_id:          String(tenantId),
+        production_date:    date,
+        production_date_to: dateTo || date,
+        production_codes:   codes.join(','),
       });
       const res  = await fetch(`/api/post-standing-orders?${params}`, { signal: abortRef.current.signal });
       const json = await res.json() as { data?: Candidate[]; availableCodes?: string[]; error?: string };
@@ -144,9 +164,10 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
 
       // 2. Load candidates with defaults
       const params = new URLSearchParams({
-        tenant_id:        String(tenantId),
-        production_date:  productionDate,
-        production_codes: selectedCodes.join(','),
+        tenant_id:          String(tenantId),
+        production_date:    productionDate,
+        production_date_to: productionDateTo,
+        production_codes:   selectedCodes.join(','),
       });
       const cRes  = await fetch(`/api/post-standing-orders?${params}`);
       const cJson = await cRes.json() as { data?: Candidate[] };
@@ -161,11 +182,12 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
-  const rowKey = (r: Pick<Candidate, 'customer_id' | 'production_code'>) =>
-    `${r.customer_id}|${r.production_code}`;
+  const rowKey = (r: Pick<Candidate, 'production_date' | 'customer_id' | 'production_code'>) =>
+    `${r.production_date}|${r.customer_id}|${r.production_code}`;
 
-  const postable = candidates.filter(r => !r.already_posted && !r.is_context_only);
+  const postable = candidates.filter(canPost);
   const numChecked = postable.filter(r => checked.has(rowKey(r))).length;
+  const numRepost = postable.filter(r => r.status === 'POSTED' && checked.has(rowKey(r))).length;
   const numAlready = candidates.filter(r => r.already_posted).length;
 
   // ── Post ──────────────────────────────────────────────────────────────────
@@ -177,7 +199,7 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
 
     const orders = postable
       .filter(r => checked.has(rowKey(r)))
-      .map(r => ({ customer_id: r.customer_id, production_date: productionDate, production_code: r.production_code }));
+      .map(r => ({ customer_id: r.customer_id, production_date: r.production_date, production_code: r.production_code }));
 
     try {
       const res  = await fetch('/api/post-standing-orders', {
@@ -185,25 +207,26 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
         body: JSON.stringify({ tenant_id: tenantId, orders, order_date: localDateIso() }),
       });
       const json = await res.json() as {
-        results?: { customer_id: number; production_code: string; status: string; order_number?: string; message?: string }[];
-        summary?: { posted: number; failed: number };
+        results?: { production_date: string; customer_id: number; production_code: string; status: string; order_number?: string | null; lines_added?: number; message?: string | null }[];
+        summary?: { posted: number; added: number; up_to_date: number; skipped: number; failed: number };
         error?: string;
       };
       if (!res.ok || json.error) { toast.error(json.error ?? 'Post failed.'); return; }
 
       // Merge status back into candidates
       const resultMap = new Map(
-        (json.results ?? []).map(r => [`${r.customer_id}|${r.production_code}`, r])
+        (json.results ?? []).map(r => [rowKey(r), r])
       );
       setCandidates(prev => prev.map(c => {
         const r = resultMap.get(rowKey(c));
         if (!r) return c;
-        return { ...c, status: r.status as 'POSTED' | 'FAILED', order_number: r.order_number, message: r.message };
+        return { ...c, result: r.status, order_number: r.order_number ?? c.order_number, lines_added: r.lines_added, message: r.message };
       }));
 
-      const { posted: p = 0, failed: f = 0 } = json.summary ?? {};
-      if (f === 0) toast.success(`${p} order${p !== 1 ? 's' : ''} posted.`);
-      else toast.warning(`${p} posted · ${f} failed`);
+      const { posted: p = 0, added: a = 0, failed: f = 0 } = json.summary ?? {};
+      const msg = `${p} order${p !== 1 ? 's' : ''} posted${a > 0 ? ` · ${a} updated with missing items` : ''}`;
+      if (f === 0) toast.success(`${msg}.`);
+      else toast.warning(`${msg} · ${f} failed`);
       setPosted(true);
     } finally {
       setIsPosting(false);
@@ -212,10 +235,11 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
 
   // ── Grouped grid ──────────────────────────────────────────────────────────
 
-  const grouped = availableCodes
+  const dates = Array.from(new Set(candidates.map(r => r.production_date))).sort();
+  const grouped = dates.flatMap(date => availableCodes
     .filter(({ value }) => selectedCodes.includes(value))
     .map(({ value: code }) => {
-      const groupRows = candidates.filter(r => r.production_code === code);
+      const groupRows = candidates.filter(r => r.production_date === date && r.production_code === code);
       const groupIds  = new Set(groupRows.map(r => r.customer_id));
       const ctx: Candidate[] = [];
 
@@ -229,10 +253,12 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
         if (!ph) return;
         groupIds.add(parentId);
         ctx.push({
+          production_date: date,
           customer_id:     parentId,
           customer_number: ph.customer_number ?? '',
           customer_name:   ph.customer_name,
           production_code: code,
+          status:          'NEW',
           already_posted:  false,
           is_context_only: true,
         });
@@ -247,14 +273,15 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
         return sa.localeCompare(sb);
       });
 
-      return { code, rows: allRows };
+      return { date, code, rows: allRows };
     })
-    .filter(g => g.rows.length > 0);
+    .filter(g => g.rows.length > 0));
 
-  const dowLabel = (() => {
-    const d = new Date(productionDate + 'T00:00:00');
-    return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-  })();
+  const dayLabel = (iso: string, weekday: 'long' | 'short' = 'long') =>
+    new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { weekday, month: weekday === 'long' ? 'long' : 'short', day: 'numeric' });
+  const rangeLabel = productionDateTo && productionDateTo !== productionDate
+    ? `${dayLabel(productionDate)} to ${dayLabel(productionDateTo)}`
+    : dayLabel(productionDate);
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -269,7 +296,23 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
           <input
             type="date"
             value={productionDate}
-            onChange={e => setProductionDate(e.target.value)}
+            onChange={e => {
+              const v = e.target.value;
+              setProductionDate(v);
+              if (!productionDateTo || productionDateTo < v) setProductionDateTo(v);
+            }}
+            className="h-9 rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+        </div>
+
+        {/* To date: post several days at once (e.g. Thursday for Friday to Sunday) */}
+        <div className="flex flex-col gap-1">
+          <Label className={LABEL_CLASS}>To</Label>
+          <input
+            type="date"
+            value={productionDateTo}
+            min={productionDate}
+            onChange={e => setProductionDateTo(e.target.value)}
             className="h-9 rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
           />
         </div>
@@ -315,7 +358,7 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
           <Button variant="outline" size="icon" className="h-9 w-9"
             title="Retrieve"
             disabled={isLoading || isPosting || selectedCodes.length === 0}
-            onClick={() => void load(productionDate, selectedCodes)}>
+            onClick={() => void load(productionDate, productionDateTo, selectedCodes)}>
             <RotateCcw className="h-4 w-4" />
           </Button>
           <Button variant="outline" size="sm"
@@ -324,7 +367,7 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
             <Square className="mr-1.5 h-3.5 w-3.5" />Clear All
           </Button>
           <Button variant="outline" size="sm"
-            onClick={() => setChecked(new Set(postable.map(rowKey)))}
+            onClick={() => setChecked(new Set(postable.filter(r => r.status === 'NEW').map(rowKey)))}
             disabled={isLoading || isPosting || postable.length === 0}>
             <CheckSquare className="mr-1.5 h-3.5 w-3.5" />Select All
           </Button>
@@ -350,16 +393,16 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
           </p>
         )}
 
-        {!isLoading && grouped.map(({ code, rows }) => (
-          <div key={code}>
+        {!isLoading && grouped.map(({ date, code, rows }) => (
+          <div key={`${date}|${code}`}>
             {/* Group header */}
             <div className="bg-success-soft px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-success border-b border-success/40">
-              {availableCodes.find(c => c.value === code)?.label ?? code}
+              {dates.length > 1 ? `${dayLabel(date, 'short')} · ` : ''}{availableCodes.find(c => c.value === code)?.label ?? code}
             </div>
 
             {/* Column headers */}
             <div className="grid border-b border-border/60 bg-muted/20 px-3 py-1.5 text-xs font-semibold text-muted-foreground"
-              style={{ gridTemplateColumns: '1fr 140px 36px' }}>
+              style={{ gridTemplateColumns: '1fr 220px 36px' }}>
               <span>Customer</span>
               <span />
               <span />
@@ -368,16 +411,16 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
             {rows.map(row => {
               const key       = rowKey(row);
               const isChecked = checked.has(key);
-              const canCheck  = !row.already_posted && !row.is_context_only && !posted;
+              const canCheck  = canPost(row) && !posted;
 
               return (
                 <div key={key}
                   className={cn(
                     'grid items-center border-b border-border/40 px-3 py-1.5 transition-colors',
-                    row.already_posted ? 'opacity-50' : 'hover:bg-muted/20',
-                    isChecked && !row.already_posted ? 'bg-primary/5' : '',
+                    row.already_posted && !isChecked ? 'opacity-50' : 'hover:bg-muted/20',
+                    isChecked ? 'bg-primary/5' : '',
                   )}
-                  style={{ gridTemplateColumns: '1fr 140px 36px' }}
+                  style={{ gridTemplateColumns: '1fr 220px 36px' }}
                 >
                   {(() => {
                     const h     = hierarchyRef.current.get(row.customer_id);
@@ -394,10 +437,13 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
                       </span>
                     );
                   })()}
-                  <span className={cn('text-xs', row.status ? STATUS_CLASS[row.status] : 'text-muted-foreground/60')}>
-                    {row.status
-                      ? `${STATUS_LABEL[row.status]}${row.order_number ? ` #${row.order_number}` : ''}${row.message ? ` — ${row.message}` : ''}`
-                      : row.already_posted ? '— Already posted' : ''}
+                  <span className={cn('truncate text-xs', row.result ? RESULT_CLASS[row.result] ?? 'text-muted-foreground' : 'text-muted-foreground/60')}
+                    title={row.message ?? undefined}>
+                    {row.is_context_only ? '' : row.result
+                      ? `${RESULT_LABEL[row.result] ?? row.result}${row.result === 'ADDED' && row.lines_added ? ` ${row.lines_added}` : ''}${row.order_number ? ` #${row.order_number}` : ''}${row.message ? ` — ${row.message}` : ''}`
+                      : STATUS_LABEL[row.status]
+                        ? `${STATUS_LABEL[row.status]}${row.order_number ? ` #${row.order_number}` : ''}`
+                        : ''}
                   </span>
                   {row.is_context_only ? (
                     <div />
@@ -424,8 +470,8 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
 
         {!isLoading && candidates.length > 0 && (
           <div className="flex items-center justify-between border-t border-border/60 bg-muted/20 px-4 py-2 text-xs text-muted-foreground">
-            <span>{candidates.length} customer{candidates.length !== 1 ? 's' : ''}</span>
-            {numAlready > 0 && <span>{numAlready} already posted</span>}
+            <span>{candidates.length} standing order{candidates.length !== 1 ? 's' : ''}</span>
+            {numAlready > 0 && <span>{numAlready} already posted (check one to add missing items)</span>}
             <span>{numChecked} selected</span>
           </div>
         )}
@@ -438,10 +484,10 @@ export function PostStandingOrdersPage({ initialTenantId, defaultDate }: PostSta
             <AlertDialogTitle>Post Standing Orders</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-1 text-sm">
-                <p>Post standing orders for <strong>{dowLabel}</strong>?</p>
-                <p><strong>{numChecked}</strong> customer{numChecked !== 1 ? 's' : ''} selected.</p>
-                {numAlready > 0 && (
-                  <p className="text-muted-foreground">{numAlready} already posted will be skipped.</p>
+                <p>Post standing orders for <strong>{rangeLabel}</strong>?</p>
+                <p><strong>{numChecked}</strong> selected.</p>
+                {numRepost > 0 && (
+                  <p className="text-muted-foreground">{numRepost} already posted: only standing order items missing from the order are added; quantities already entered are not changed.</p>
                 )}
               </div>
             </AlertDialogDescription>

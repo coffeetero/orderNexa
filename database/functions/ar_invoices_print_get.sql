@@ -1,12 +1,15 @@
 -- ============================================================
 -- ar_invoices_print_get
--- Production > Print Invoices: the issued invoices (not DRAFT or CANCELLED) of the chosen invoice owners whose orders are
+-- Production > Print Invoices: the invoices (DRAFT ones too, printed without a number for customer approval; not CANCELLED) of the chosen invoice owners whose orders are
 -- for a production date in [p_from, p_to] (one code when given), laid out like the old BPS invoice. Covers migrated and
 -- BPS-made invoices (an invoice's slot comes from its run, else from its orders). Staff only.
 -- Returns { company_name, footer_note, tagline, invoices: [{
 --   ar_transaction_id, document_number, status, production_date, weekday, production_code, production_code_label,
 --   account_type, customer_name, customer_number (masked), address_lines, phone (PHONE contact, else Phone1 of the legacy note),
 --   item_quantity, item_amount, delivery_amount, other_amount, amount,
+--   memos: [{ document_number, transaction_type (DM debit / CM credit), transaction_date, amount,
+--             lines: [{ description, quantity, unit_price, amount }] }]  (memos applied to the invoice, not cancelled),
+--   total_with_memos (amount + the memos),
 --   groups: [{ department_event, department_number, subtotal,
 --              lines: [{ item_number (masked), description, quantity, unit, unit_price, amount }] }] }] }
 -- A group is one order (its Department/Event and, when known, the department number), sorted by department number
@@ -50,7 +53,7 @@ BEGIN
                   LEFT JOIN om_shipment_lines sl ON sl.shipment_line_id = l.shipment_line_id
                   JOIN om_orders o ON o.order_id = COALESCE(l.order_id, sl.order_id)
                  WHERE l.ar_transaction_id = t.ar_transaction_id) os ON t.production_run_id IS NULL
-         WHERE t.tenant_id = p_tenant_id AND t.transaction_type = 'INV' AND t.status NOT IN ('DRAFT', 'CANCELLED')
+         WHERE t.tenant_id = p_tenant_id AND t.transaction_type = 'INV' AND t.status <> 'CANCELLED'
            AND t.customer_id = ANY (p_customer_ids)
            -- an invoice is dated on or near its production date; this keeps the lateral lookup to a few weeks
            AND t.transaction_date BETWEEN p_from - 14 AND p_to + 14
@@ -111,6 +114,20 @@ BEGIN
                  'delivery_amount', COALESCE((SELECT sum(amount) FROM ln WHERE source_type = 'DELIVERY'), 0),
                  'other_amount', COALESCE((SELECT sum(amount) FROM ln WHERE source_type NOT IN ('ITEM', 'DELIVERY')), 0),
                  'amount', v_inv.amount,
+                 'memos', COALESCE((SELECT jsonb_agg(jsonb_build_object(
+                                'document_number', m.document_number, 'transaction_type', m.transaction_type,
+                                'transaction_date', m.transaction_date, 'amount', m.amount,
+                                'lines', COALESCE((SELECT jsonb_agg(jsonb_build_object('description', ml.item_description, 'quantity', ml.quantity,
+                                                                                         'unit_price', ml.unit_price, 'amount', ml.amount)
+                                                                    ORDER BY ml.line_number)
+                                                     FROM ar_transaction_lines ml WHERE ml.ar_transaction_id = m.ar_transaction_id), '[]'::jsonb))
+                              ORDER BY m.transaction_date, m.ar_transaction_id)
+                       FROM ar_transactions m
+                      WHERE m.tenant_id = p_tenant_id AND m.applies_to_ar_transaction_id = v_inv.ar_transaction_id
+                        AND m.transaction_type IN ('DM', 'CM') AND m.status <> 'CANCELLED'), '[]'::jsonb),
+                 'total_with_memos', v_inv.amount + COALESCE((SELECT SUM(m.amount) FROM ar_transactions m
+                      WHERE m.tenant_id = p_tenant_id AND m.applies_to_ar_transaction_id = v_inv.ar_transaction_id
+                        AND m.transaction_type IN ('DM', 'CM') AND m.status <> 'CANCELLED'), 0),
                  'groups', COALESCE((SELECT jsonb_agg(jsonb_build_object('department_event', g.department_event, 'department_number', g.department_number,
                                                                         'subtotal', COALESCE(g.subtotal, 0), 'lines', g.lines)
                                                      ORDER BY g.order_id IS NULL, g.department_number NULLS LAST, g.department_event, g.first_line) FROM grp g), '[]'::jsonb))

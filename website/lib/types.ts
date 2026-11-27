@@ -199,6 +199,8 @@ export interface OrderEntryLine {
   extended_amount: number;
   /** On screen only: the line came from Copy order; cleared when its quantity is changed. */
   copied?: boolean;
+  /** Marked as a sample (prospects only): priced at 0. */
+  is_sample?: boolean;
 }
 
 /** The full in-memory draft held by useOrderEntryState. */
@@ -235,6 +237,7 @@ export interface OrderSavePayloadLine {
   unit_discount: number;
   prep_options: PrepOption[];
   is_scored: boolean;
+  is_sample?: boolean;
 }
 
 export interface OrderSavePayload {
@@ -247,6 +250,8 @@ export interface OrderSavePayload {
   department_event: string;
   delivery_amount: number;
   lines: OrderSavePayloadLine[];
+  /** The lines were filled in from the customer's standing order (recorded so posting later only adds missing items). */
+  from_standing_order?: boolean;
 }
 
 export interface OrderSaveResult {

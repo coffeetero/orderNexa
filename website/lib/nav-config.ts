@@ -55,7 +55,8 @@ export const tenantNav: NavMenu[] = [
         items: [
           { label: 'Order Analysis', href: '/production/analysis', soon: true },
           { label: 'Estimate Production', href: '/production/estimate', soon: true },
-          { label: 'Process Run', href: '/production/process' },
+          { label: 'Post Orders to Production', href: '/production/process' },
+          { label: 'Post Orders to AR', href: '/production/post-to-ar' },
           { label: 'Confirm Deliveries', href: '/production/deliveries' },
           { label: "Baker's Report", href: '/production/report' },
           { label: 'Mixing Sheets', href: '/production/mixing', soon: true },

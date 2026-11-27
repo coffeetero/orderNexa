@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { ProcessRun } from '@/components/features/production/ProcessRun';
 
 export const metadata = {
-  title: 'Process Run — Production',
+  title: 'Post Orders to Production — Production',
 };
 
 export default async function ProcessRunPage() {

@@ -15,6 +15,10 @@ interface OrderLineGridProps {
   registerGridCell: (tempId: string, col: 'qty' | 'price' | 'discount', el: HTMLInputElement | null) => void;
   /** Called when user presses Enter in the Discount cell — moves focus to Item Search. */
   onDiscountEnter: () => void;
+  /** Sample checkbox: checked prices the line at 0, unchecked restores the item price. */
+  onSampleToggle: (tempId: string, isSample: boolean) => void;
+  /** Items on the customer's standing order for this slot: their lines cannot be deleted (set the quantity to 0). */
+  standingOrderItemIds?: Set<number>;
 }
 
 /** Shared cell input used for Qty, Price, and Discount columns. */
@@ -154,6 +158,8 @@ export function OrderLineGrid({
   onLineRemove,
   registerGridCell,
   onDiscountEnter,
+  onSampleToggle,
+  standingOrderItemIds,
 }: OrderLineGridProps) {
   const totals = lines.reduce(
     (acc, l) => ({
@@ -177,13 +183,14 @@ export function OrderLineGrid({
             <th className="px-2 py-1.5 text-right font-semibold text-muted-foreground w-20">Discnt</th>
             <th className="px-2 py-1.5 text-right font-semibold text-muted-foreground w-24">Total</th>
             <th className="w-7" aria-label="Remove" />
+            <th className="px-1 py-1.5 text-center font-semibold text-muted-foreground w-12">Sample</th>
           </tr>
         </thead>
         <tbody>
           {lines.length === 0 && (
             <tr>
               <td
-                colSpan={8}
+                colSpan={9}
                 className="py-8 text-center text-xs text-muted-foreground italic"
               >
                 No items added yet. Use the search above to add items.
@@ -265,14 +272,33 @@ export function OrderLineGrid({
                 </td>
 
                 <td className="px-1 py-1 text-center">
-                  <button
-                    type="button"
-                    onClick={() => onLineRemove(line.tempId)}
-                    className="rounded p-0.5 text-muted-foreground/50 hover:bg-destructive/10 hover:text-destructive transition-colors"
-                    aria-label="Remove line"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </button>
+                  {standingOrderItemIds?.has(line.item_id) ? (
+                    <span
+                      className="inline-flex rounded p-0.5 text-muted-foreground/25 cursor-not-allowed"
+                      title="On the standing order: set the quantity to 0 instead of deleting"
+                      aria-label="On the standing order: set the quantity to 0 instead of deleting"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => onLineRemove(line.tempId)}
+                      className="rounded p-0.5 text-muted-foreground/50 hover:bg-destructive/10 hover:text-destructive transition-colors"
+                      aria-label="Remove line"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  )}
+                </td>
+
+                <td className="px-1 py-1 text-center">
+                  <Checkbox
+                    checked={Boolean(line.is_sample)}
+                    onCheckedChange={(v) => onSampleToggle(line.tempId, v === true)}
+                    aria-label={`Sample: ${line.item_description}`}
+                    title="Sample (prospects only): priced at 0"
+                  />
                 </td>
               </tr>
             );
@@ -291,6 +317,7 @@ export function OrderLineGrid({
               <td className="px-2 py-1.5 text-right tabular-nums text-sm font-bold text-foreground">
                 ${totals.amount.toFixed(2)}
               </td>
+              <td />
               <td />
             </tr>
           </tfoot>

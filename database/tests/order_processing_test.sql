@@ -143,13 +143,20 @@ BEGIN
   INSERT INTO _t VALUES ('draft invoice with no orders left is deleted', NOT EXISTS (SELECT 1 FROM ar_transactions WHERE production_run_id = v_run AND customer_id = d1));
   INSERT INTO _t VALUES ('its shipment is removed too', (SELECT COUNT(*) FROM om_shipments WHERE production_run_id = v_run) = 2);
 
-  -- a numbered (OPEN) invoice whose orders are gone is cancelled, not deleted
+  -- a numbered (OPEN) invoice whose orders are gone: STRICT keeps it and credits it in full; RELAXED cancels it (never deleted)
   UPDATE ar_transactions SET status = 'OPEN', document_number = 'TESTINV-1' WHERE ar_transaction_id = ia;
   PERFORM om_orders_save(200000000002, 'delete', (SELECT v FROM _id WHERE k='o1'), NULL);
   PERFORM om_orders_save(200000000002, 'delete', (SELECT v FROM _id WHERE k='o3'), NULL);
   PERFORM om_orders_save(200000000002, 'delete', (SELECT v FROM _id WHERE k='o5'), NULL);
   PERFORM om_production_runs_process(200000000002, DATE '2031-05-10', DATE '2031-05-10', NULL);
-  INSERT INTO _t VALUES ('numbered invoice with no orders left is CANCELLED (kept)', (SELECT status FROM ar_transactions WHERE ar_transaction_id = ia) = 'CANCELLED');
+  INSERT INTO _t VALUES ('STRICT: numbered invoice with no orders left stays OPEN and unchanged',
+    (SELECT status = 'OPEN' AND amount = 46 FROM ar_transactions WHERE ar_transaction_id = ia));
+  INSERT INTO _t VALUES ('STRICT: ... and a credit memo for all of it is applied to it',
+    (SELECT SUM(amount) FROM ar_transactions WHERE applies_to_ar_transaction_id = ia AND transaction_type = 'CM') = -46);
+  UPDATE fnd_tenants SET accounting_rules = 'RELAXED' WHERE tenant_id = 200000000002;
+  PERFORM om_production_runs_process(200000000002, DATE '2031-05-10', DATE '2031-05-10', NULL);
+  UPDATE fnd_tenants SET accounting_rules = 'STRICT' WHERE tenant_id = 200000000002;
+  INSERT INTO _t VALUES ('RELAXED: numbered invoice with no orders left is CANCELLED (kept)', (SELECT status FROM ar_transactions WHERE ar_transaction_id = ia) = 'CANCELLED');
 END $$;
 
 -- ── shipped runs cannot be reprocessed; closed runs neither ─────────────────
@@ -194,7 +201,7 @@ DO $$
 DECLARE j jsonb; d boolean;
 BEGIN
   j := fnd_tenant_sequences_get(200000000002);
-  INSERT INTO _t VALUES ('numbering get returns the 4 sequences', jsonb_array_length(j) = 4 AND (j -> 1 ->> 'sequence_name') = 'invoice_number');
+  INSERT INTO _t VALUES ('numbering get returns the 5 sequences', jsonb_array_length(j) = 5 AND (j -> 1 ->> 'sequence_name') = 'invoice_number');
   PERFORM fnd_tenant_sequences_save(200000000002, '{"sequence_name":"invoice_number","mask":"INV-[YYYY]-#####","start_value":5000,"next_value":5000,"reset_period":"YEARLY"}'::jsonb);
   INSERT INTO _t VALUES ('staff can save the invoice numbering mask', (SELECT mask = 'INV-[YYYY]-#####' AND reset_period = 'YEARLY' FROM fnd_tenant_sequences WHERE tenant_id = 200000000002 AND sequence_name = 'invoice_number'));
   PERFORM fnd_tenant_sequences_save(200000000002, '{"sequence_name":"invoice_number","mask":"INV-######","start_value":1000,"next_value":10}'::jsonb);

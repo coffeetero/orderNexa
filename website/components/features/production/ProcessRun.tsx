@@ -19,6 +19,7 @@ interface RunResult {
   shipments: number;
   invoices: number;
   orders_waiting_approval?: number;
+  memos?: number;
 }
 
 export function ProcessRun({ tenantId }: { tenantId: number }) {
@@ -53,7 +54,7 @@ export function ProcessRun({ tenantId }: { tenantId: number }) {
         body: JSON.stringify({ tenant_id: tenantId, from, to, production_code: code || null }),
       });
       const json = (await res.json()) as { data?: RunResult[]; error?: string };
-      if (!res.ok || json.error) throw new Error(json.error ?? 'Processing failed');
+      if (!res.ok || json.error) throw new Error(json.error ?? 'Posting failed');
       setResults(json.data ?? []);
     } catch (e) {
       setError((e as Error).message);
@@ -65,10 +66,11 @@ export function ProcessRun({ tenantId }: { tenantId: number }) {
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-2 sm:p-3">
       <div>
-        <h1 className="text-2xl font-semibold">Process run</h1>
+        <h1 className="text-2xl font-semibold">Post Orders to Production</h1>
         <p className="text-sm text-muted-foreground">
-          Locks the runs in the date range and prepares shipments and draft invoices. Nothing is printed and no invoice
-          numbers are used until the Packaging List is printed. You can process a run again until a delivery has shipped.
+          Locks the runs in the date range and prepares shipments and draft invoices. Post as often as you like (for
+          example once most orders are in, and again later) until a delivery has shipped. No invoice numbers are used until
+          Post Orders to AR. Changes to orders already posted to AR become debit or credit memos on their invoice.
         </p>
       </div>
 
@@ -93,14 +95,14 @@ export function ProcessRun({ tenantId }: { tenantId: number }) {
               {codes.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
             </select>
           </div>
-          <Button onClick={run} disabled={busy || !from || !to}>{busy ? 'Processing…' : 'Process'}</Button>
+          <Button onClick={run} disabled={busy || !from || !to}>{busy ? 'Posting…' : 'Post to Production'}</Button>
         </div>
         {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
       </CardContent></Card>
 
       {results && (
         <Card><CardContent className="pt-6">
-          <h2 className="mb-2 text-lg font-medium">Processed {results.length} run{results.length === 1 ? '' : 's'}</h2>
+          <h2 className="mb-2 text-lg font-medium">Posted {results.length} run{results.length === 1 ? '' : 's'} to production</h2>
           <div className="grid grid-cols-[1fr_6rem_6rem_6rem_6rem] gap-2 border-b pb-1 text-xs font-medium text-muted-foreground">
             <span>Production</span><span className="text-right">Orders</span><span className="text-right">Shipments</span><span className="text-right">Invoices</span><span />
           </div>
@@ -111,6 +113,11 @@ export function ProcessRun({ tenantId }: { tenantId: number }) {
               <span className="text-right tabular-nums">{r.shipments}</span>
               <span className="text-right tabular-nums">{r.invoices}</span>
               <span />
+              {(r.memos ?? 0) > 0 && (
+                <span className="col-span-5 text-xs text-amber-700 dark:text-amber-400">
+                  {r.memos} debit/credit memo{r.memos === 1 ? '' : 's'} added to invoices already posted to AR. Print those invoices again.
+                </span>
+              )}
               {(r.orders_waiting_approval ?? 0) > 0 && (
                 <span className="col-span-5 text-xs text-amber-700 dark:text-amber-400">
                   {r.orders_waiting_approval} imported order{r.orders_waiting_approval === 1 ? ' is' : 's are'} waiting for approval and {r.orders_waiting_approval === 1 ? 'was' : 'were'} left out (Orders › Import Orders).

@@ -29,7 +29,7 @@ import {
 } from './OrderHeaderRow';
 import { ItemEntryRow } from './ItemEntryRow';
 import { OrderLineGrid } from './OrderLineGrid';
-import { useOrderEntryState } from './useOrderEntryState';
+import { resolveItemUnitPrice, useOrderEntryState } from './useOrderEntryState';
 import { useOrderFocus } from './useOrderFocus';
 import type {
   OrderEntryDraft,
@@ -150,7 +150,7 @@ function draftSignature(d: OrderEntryDraft): string {
     d.production_date,
     d.production_code,
     d.delivery_amount,
-    d.lines.map((l) => [l.item_id, l.quantity, l.unit_price, l.unit_discount, l.is_scored, (l.prep_options ?? []).map((o) => o.value)]),
+    d.lines.map((l) => [l.item_id, l.quantity, l.unit_price, l.unit_discount, l.is_scored, Boolean(l.is_sample), (l.prep_options ?? []).map((o) => o.value)]),
   ]);
 }
 
@@ -299,6 +299,7 @@ export function OrderEntryForm({
       unit_price: Number(l.unit_price ?? 0),
       unit_discount: Number(l.unit_discount ?? 0),
       extended_amount: Number(l.extended_amount ?? 0),
+      is_sample: Boolean(l.is_sample),
     }));
     const totalAmount = lines.reduce(
       (s: number, l: { extended_amount: number }) => s + l.extended_amount,
@@ -994,6 +995,74 @@ export function OrderEntryForm({
     zeroLinePrices();
   }, [zeroLinePrices]);
 
+  // Sample checkbox on a line: checked = priced at 0; unchecked = back to the item's price.
+  const handleSampleToggle = useCallback(
+    (tempId: string, isSample: boolean) => {
+      if (isSample) { updateLine(tempId, { is_sample: true, unit_price: 0, unit_discount: 0 }); return; }
+      const line = draft.lines.find((l) => l.tempId === tempId);
+      const item = line ? items.find((i) => i.item_id === line.item_id) : undefined;
+      updateLine(tempId, { is_sample: false, unit_price: item ? resolveItemUnitPrice(item) : line?.unit_price ?? 0 });
+    },
+    [draft.lines, items, updateLine],
+  );
+
+  // ── Standing order for the customer + production day + time ─────────────
+  // Its items cannot be deleted from the order (set the quantity to 0: posting would add a deleted item back), and a new
+  // order for a future date starts filled in with it (the clerk changes quantities and adds extras).
+  const [standingOrderLines, setStandingOrderLines] = useState<{ item_id: number; quantity: number; prep_options: string[] | null }[]>([]);
+  const standingOrderFilledKeyRef = useRef<string | null>(null);
+  // Whose standing order: a saved department order is stored under its parent, so the department under this customer
+  // whose name is the department/event owns it; otherwise the customer itself.
+  const standingOrderCustomerId = useMemo(() => {
+    if (!draft.customer_id) return null;
+    const event = draft.department_event.trim().toUpperCase();
+    const dept = event
+      ? customers.find((c) => c.customer_parent_id === draft.customer_id && isDepartmentEventCustomer(c)
+          && c.customer_name.trim().toUpperCase() === event)
+      : undefined;
+    return dept?.customer_id ?? draft.customer_id;
+  }, [customers, draft.customer_id, draft.department_event]);
+  useEffect(() => {
+    setStandingOrderLines([]);
+    if (!tenantId || !standingOrderCustomerId || !draft.production_date || !draft.production_code) return;
+    const dow = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][new Date(`${draft.production_date}T00:00:00`).getDay()];
+    let cancelled = false;
+    const params = new URLSearchParams({
+      tenant_id: String(tenantId), customer_id: String(standingOrderCustomerId), production_dow: dow, production_code: draft.production_code,
+    });
+    fetch(`/api/standing-orders?${params}`)
+      .then((r) => r.json())
+      .then((j: { data?: { item_id: number; quantity: number; prep_options: string[] | null }[] }) => {
+        if (!cancelled) setStandingOrderLines(Array.isArray(j.data) ? j.data : []);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [tenantId, standingOrderCustomerId, draft.production_date, draft.production_code]);
+
+  const standingOrderItemIds = useMemo(() => new Set(standingOrderLines.map((l) => l.item_id)), [standingOrderLines]);
+
+  useEffect(() => {
+    // Only a brand-new, still empty order for a future date, under the customer's own department/event.
+    if (draft.order_id || draft.order_number !== 'New Order' || draft.lines.length > 0) return;
+    if (!draft.customer_id || standingOrderLines.length === 0 || items.length === 0) return;
+    if (!draft.production_date || draft.production_date <= localDateIso()) return;
+    const customer = customers.find((c) => c.customer_id === draft.customer_id);
+    const ownEvents = [getDefaultDepartmentEvent(draft.customer_id), customer?.customer_name?.trim().toUpperCase()];
+    if (!ownEvents.includes(draft.department_event.trim().toUpperCase())) return;
+    const key = `${draft.customer_id}|${draft.production_date}|${draft.production_code}|${draft.department_event}`;
+    if (standingOrderFilledKeyRef.current === key) return;
+    standingOrderFilledKeyRef.current = key;
+    const picks = standingOrderLines.flatMap((l) => {
+      const item = items.find((i) => i.item_id === l.item_id);
+      if (!item) return [];
+      return [{ item, quantity: Number(l.quantity ?? 0), prep_options: normalizePrepOptions(l.prep_options), is_scored: false }];
+    });
+    if (picks.length === 0) return;
+    addCopiedLines(picks, { fromStandingOrder: true });
+    showStatusMessage({ text: `Filled in from the standing order (${picks.length} item${picks.length === 1 ? '' : 's'}). Change the quantities and add extras.`, type: 'success' });
+  }, [draft.order_id, draft.order_number, draft.lines.length, draft.customer_id, draft.production_date, draft.production_code,
+      draft.department_event, standingOrderLines, items, customers, getDefaultDepartmentEvent, addCopiedLines, showStatusMessage]);
+
   const handleOrderPickNew = useCallback(() => {
     setOrderPickOpen(false);
     setField('order_id', undefined);
@@ -1061,7 +1130,11 @@ export function OrderEntryForm({
           unit_discount: l.unit_discount,
           prep_options: l.prep_options,
           is_scored: l.is_scored,
+          is_sample: Boolean(l.is_sample),
         })),
+        // A new order filled in from the standing order (same customer, slot and department/event as the fill-in).
+        ...(!draft.order_id && standingOrderFilledKeyRef.current ===
+          `${draft.customer_id}|${draft.production_date}|${draft.production_code}|${draft.department_event}` ? { from_standing_order: true } : {}),
       };
 
       const res = await fetch('/api/orders/save', {
@@ -1320,6 +1393,8 @@ export function OrderEntryForm({
             onLineRemove={removeLine}
             registerGridCell={registerGridCell}
             onDiscountEnter={handleDiscountEnter}
+            onSampleToggle={handleSampleToggle}
+            standingOrderItemIds={standingOrderItemIds}
           />
         </div>
 

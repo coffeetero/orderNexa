@@ -45,6 +45,7 @@ BEGIN
   PERFORM om_orders_save(200000000002, NULL, NULL, jsonb_build_object('customer_id', b, 'production_date', '2033-02-10', 'production_code', 'MORNING',
        'lines', jsonb_build_array(jsonb_build_object('item_id', (SELECT item_id FROM bps.fnd_items WHERE tenant_id = 200000000002 AND legacy_id = 11608), 'item_description','Frozen bun','quantity',3,'unit_price',10))));
   PERFORM om_production_runs_process(200000000002, DATE '2033-02-10', DATE '2033-02-10', NULL);
+  PERFORM om_invoices_post_to_ar(200000000002, DATE '2033-02-10', DATE '2033-02-10', NULL, ARRAY[a, b]);
   PERFORM om_report_packaging_issue(200000000002, DATE '2033-02-10', DATE '2033-02-10', NULL, ARRAY[a, b]);
 
   r := om_shipments_get(200000000002, DATE '2033-02-10', DATE '2033-02-10', 'MORNING', NULL);
