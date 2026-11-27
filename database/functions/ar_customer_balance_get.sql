@@ -27,13 +27,15 @@ BEGIN
         SELECT c.customer_id FROM fnd_customers c JOIN tree ON c.customer_parent_id = tree.customer_id
          WHERE c.tenant_id = p_tenant_id AND UPPER(TRIM(c.customer_type)) <> 'ACCOUNT'
     ), docs AS (
-        SELECT t.ar_transaction_id, t.transaction_type, t.amount FROM ar_transactions t
+        SELECT t.ar_transaction_id, t.transaction_type, t.amount, t.settled_amount FROM ar_transactions t
          WHERE t.tenant_id = p_tenant_id AND t.customer_id IN (SELECT customer_id FROM tree) AND t.status NOT IN ('DRAFT', 'CANCELLED')
     )
     SELECT COALESCE(SUM(d.amount) FILTER (WHERE d.transaction_type = 'INV'), 0),
            COALESCE(SUM(d.amount) FILTER (WHERE d.transaction_type = 'CM'), 0),
            COALESCE((SELECT SUM(pa.applied_amount) FROM ar_payment_applications pa WHERE pa.tenant_id = p_tenant_id
                         AND pa.reversed_at IS NULL AND pa.ar_transaction_id IN (SELECT ar_transaction_id FROM docs)), 0)
+           -- settled amounts (e.g. closed by the data migration) close part of a document like a payment
+           + COALESCE(SUM(d.settled_amount), 0)
       INTO v_inv, v_cred, v_pay
       FROM docs d;
 

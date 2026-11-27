@@ -69,7 +69,7 @@ BEGIN
     WHERE a.ar_trn_type = 'INV'
       AND a.ar_trn_ref IS NOT NULL
       -- Not migrated: entries dated after tomorrow (the old system accepted entries with a wrong year).
-      AND COALESCE(a.ar_trn_date, DATE '2000-01-01') <= CURRENT_DATE + 1;
+      AND COALESCE(a.ar_trn_date, DATE '2000-01-01') <= CURRENT_DATE + 14;  -- skip typo dates in the future; keep documents posted up to 2 weeks ahead
 
     GET DIAGNOSTICS v_inserted = ROW_COUNT;
     RAISE NOTICE 'ar_transactions: inserted % rows (from om_orders + ordr; check transaction_type literal in seed file)', v_inserted;
@@ -97,7 +97,7 @@ BEGIN
         ON c.tenant_id = v_tenant_id
        AND c.legacy_id = a.cus_id::INT
     WHERE a.ar_trn_type IN ('CRE', 'DEB')
-      AND COALESCE(a.ar_trn_date, DATE '2000-01-01') <= CURRENT_DATE + 1;
+      AND COALESCE(a.ar_trn_date, DATE '2000-01-01') <= CURRENT_DATE + 14;  -- skip typo dates in the future; keep documents posted up to 2 weeks ahead
 
     GET DIAGNOSTICS v_inserted = ROW_COUNT;
     RAISE NOTICE 'ar_transactions: inserted % old credits/debits', v_inserted;

@@ -37,7 +37,8 @@ BEGIN
   ), pays AS (
     SELECT p.ar_payment_id, p.payment_number, p.payment_date, p.payment_method, p.reference_number, p.amount,
            p.amount - COALESCE((SELECT SUM(pa.applied_amount) FROM ar_payment_applications pa
-                                 WHERE pa.tenant_id = p_tenant_id AND pa.ar_payment_id = p.ar_payment_id AND pa.reversed_at IS NULL), 0) AS unapplied
+                                 WHERE pa.tenant_id = p_tenant_id AND pa.ar_payment_id = p.ar_payment_id AND pa.reversed_at IS NULL), 0)
+           - p.settled_amount AS unapplied
       FROM ar_payments p JOIN tree ON tree.customer_id = p.customer_id
      WHERE p.tenant_id = p_tenant_id AND p.voided_at IS NULL
   )

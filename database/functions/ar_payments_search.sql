@@ -47,16 +47,16 @@ BEGIN
        AND (v_void OR p.voided_at IS NULL)
        AND (NOT v_unapplied OR p.voided_at IS NULL)
   ), shown AS (
-    SELECT h.* FROM hits h WHERE NOT v_unapplied OR h.amount > h.applied
+    SELECT h.* FROM hits h WHERE NOT v_unapplied OR h.amount > h.applied + h.settled_amount
      ORDER BY h.payment_date DESC, h.ar_payment_id DESC LIMIT 501
   )
   SELECT jsonb_agg(jsonb_build_object(
            'ar_payment_id', s.ar_payment_id, 'payment_number', s.payment_number, 'payment_date', s.payment_date,
            'customer_id', s.customer_id, 'customer_name', c.customer_name, 'customer_number', c.customer_number,
            'payment_method', s.payment_method, 'reference_number', s.reference_number, 'amount', s.amount,
-           'applied', s.applied, 'unapplied', CASE WHEN s.voided_at IS NULL THEN s.amount - s.applied ELSE 0 END,
-           'status', CASE WHEN s.voided_at IS NOT NULL THEN 'VOID' WHEN s.applied = 0 THEN 'UNAPPLIED'
-                          WHEN s.applied < s.amount THEN 'PARTIAL' ELSE 'APPLIED' END,
+           'applied', s.applied, 'unapplied', CASE WHEN s.voided_at IS NULL THEN s.amount - s.applied - s.settled_amount ELSE 0 END,
+           'status', CASE WHEN s.voided_at IS NOT NULL THEN 'VOID' WHEN s.applied + s.settled_amount = 0 THEN 'UNAPPLIED'
+                          WHEN s.applied + s.settled_amount < s.amount THEN 'PARTIAL' ELSE 'APPLIED' END,
            'void_reason', s.void_reason)
            ORDER BY s.payment_date DESC, s.ar_payment_id DESC)
     INTO v_rows

@@ -29,7 +29,7 @@ BEGIN
   IF v_payment_id IS NOT NULL THEN
     SELECT p.customer_id,
            p.amount - COALESCE((SELECT SUM(pa.applied_amount) FROM ar_payment_applications pa
-                                 WHERE pa.tenant_id = p_tenant_id AND pa.ar_payment_id = p.ar_payment_id AND pa.reversed_at IS NULL), 0)
+                                 WHERE pa.tenant_id = p_tenant_id AND pa.ar_payment_id = p.ar_payment_id AND pa.reversed_at IS NULL), 0) - p.settled_amount
       INTO v_customer, v_money
       FROM ar_payments p WHERE p.tenant_id = p_tenant_id AND p.ar_payment_id = v_payment_id;
     IF NOT FOUND THEN RAISE EXCEPTION 'Payment % not found', v_payment_id; END IF;

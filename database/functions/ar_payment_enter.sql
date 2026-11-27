@@ -68,7 +68,8 @@ BEGIN
         SELECT c.customer_id FROM fnd_customers c JOIN tree ON c.customer_parent_id = tree.customer_id
          WHERE c.tenant_id = p_tenant_id AND upper(btrim(c.customer_type)) <> 'ACCOUNT')
       SELECT round(p.amount - COALESCE((SELECT SUM(pa.applied_amount) FROM ar_payment_applications pa
-                                         WHERE pa.tenant_id = p_tenant_id AND pa.ar_payment_id = p.ar_payment_id AND pa.reversed_at IS NULL), 0), 2)
+                                         WHERE pa.tenant_id = p_tenant_id AND pa.ar_payment_id = p.ar_payment_id AND pa.reversed_at IS NULL), 0)
+                   - p.settled_amount, 2)
         INTO v_unapp
         FROM ar_payments p JOIN tree ON tree.customer_id = p.customer_id
        WHERE p.tenant_id = p_tenant_id AND p.ar_payment_id = (l ->> 'ar_payment_id')::bigint AND p.voided_at IS NULL;

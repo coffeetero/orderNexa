@@ -86,7 +86,7 @@ BEGIN
           AND (ABS(COALESCE(a.ar_trn_amt, 0)) > 0
                OR EXISTS (SELECT 1 FROM pmt_detail d WHERE d.pd_pmt_no = a.ar_trn_ref AND COALESCE(d.pd_pmt_amt, 0) <> 0))
           -- Not migrated: entries dated after tomorrow (the old system accepted entries with a wrong year).
-          AND COALESCE(a.ar_trn_date, DATE '2000-01-01') <= CURRENT_DATE + 1;
+          AND COALESCE(a.ar_trn_date, DATE '2000-01-01') <= CURRENT_DATE + 14;  -- skip typo dates in the future; keep documents posted up to 2 weeks ahead
 
         GET DIAGNOSTICS v_inserted = ROW_COUNT;
         RAISE NOTICE 'ar_payments: inserted % rows', v_inserted;

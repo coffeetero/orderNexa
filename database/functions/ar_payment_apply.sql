@@ -115,7 +115,8 @@ BEGIN
     RAISE EXCEPTION 'Credits used (%) are more than the amount applied to invoices (%)', v_sum_creds, v_sum_apps;
   END IF;
   v_unapplied := v_pay.amount - COALESCE((SELECT SUM(pa.applied_amount) FROM ar_payment_applications pa
-                                           WHERE pa.tenant_id = p_tenant_id AND pa.ar_payment_id = v_pay.ar_payment_id AND pa.reversed_at IS NULL), 0);
+                                           WHERE pa.tenant_id = p_tenant_id AND pa.ar_payment_id = v_pay.ar_payment_id AND pa.reversed_at IS NULL), 0)
+                 - v_pay.settled_amount;
   IF v_sum_apps - v_sum_creds > v_unapplied THEN
     RAISE EXCEPTION 'Applying % of cash is more than the payment has unapplied (%)', v_sum_apps - v_sum_creds, round(v_unapplied, 2);
   END IF;

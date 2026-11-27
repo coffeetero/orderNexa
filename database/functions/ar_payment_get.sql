@@ -23,9 +23,10 @@ BEGIN
            'ar_payment_id', p.ar_payment_id, 'payment_number', p.payment_number, 'customer_id', p.customer_id,
            'customer_name', c.customer_name, 'customer_number', c.customer_number, 'payment_date', p.payment_date,
            'payment_method', p.payment_method, 'reference_number', p.reference_number, 'amount', p.amount,
-           'applied', a.applied, 'unapplied', CASE WHEN p.voided_at IS NULL THEN p.amount - a.applied ELSE 0 END,
-           'status', CASE WHEN p.voided_at IS NOT NULL THEN 'VOID' WHEN a.applied = 0 THEN 'UNAPPLIED'
-                          WHEN a.applied < p.amount THEN 'PARTIAL' ELSE 'APPLIED' END,
+           'applied', a.applied, 'settled', p.settled_amount,
+           'unapplied', CASE WHEN p.voided_at IS NULL THEN p.amount - a.applied - p.settled_amount ELSE 0 END,
+           'status', CASE WHEN p.voided_at IS NOT NULL THEN 'VOID' WHEN a.applied + p.settled_amount = 0 THEN 'UNAPPLIED'
+                          WHEN a.applied + p.settled_amount < p.amount THEN 'PARTIAL' ELSE 'APPLIED' END,
            'created_at', p.created_at, 'created_by_name', (SELECT u.user_name FROM fnd_users u WHERE u.user_id = p.created_by),
            'voided_at', p.voided_at, 'voided_by_name', (SELECT u.user_name FROM fnd_users u WHERE u.user_id = p.voided_by),
            'void_reason', p.void_reason, 'legacy', p.legacy_ar_trn_id IS NOT NULL,

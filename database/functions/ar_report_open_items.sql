@@ -49,7 +49,10 @@ AS $function$
                    AND ca.applied_at::date <= p_as_of AND (ca.reversed_at IS NULL OR (ca.reversed_at AT TIME ZONE (SELECT tz FROM zone))::date > p_as_of)), 0)
            -- an allowance counts as paid from the day it was given
            + CASE WHEN t.allowance_amount <> 0 AND (t.allowance_at IS NULL OR (t.allowance_at AT TIME ZONE (SELECT tz FROM zone))::date <= p_as_of)
-                  THEN t.allowance_amount ELSE 0 END AS paid,
+                  THEN t.allowance_amount ELSE 0 END
+           -- a settled amount (e.g. closed by the data migration) counts as paid from the day it was settled
+           + CASE WHEN t.settled_amount <> 0 AND (t.settled_at IS NULL OR (t.settled_at AT TIME ZONE (SELECT tz FROM zone))::date <= p_as_of)
+                  THEN t.settled_amount ELSE 0 END AS paid,
            NULL::bigint AS ar_payment_id
       FROM bps.ar_transactions t JOIN tree ON tree.customer_id = t.customer_id
      WHERE t.tenant_id = p_tenant_id AND t.status NOT IN ('DRAFT','CANCELLED') AND t.transaction_type IN ('INV','CM') AND t.transaction_date <= p_as_of
@@ -58,7 +61,9 @@ AS $function$
            -p.amount,
            -COALESCE((SELECT SUM(pa.applied_amount) FROM bps.ar_payment_applications pa
                  WHERE pa.tenant_id = p_tenant_id AND pa.ar_payment_id = p.ar_payment_id AND pa.applied_at::date <= p_as_of
-                   AND (pa.reversed_at IS NULL OR (pa.reversed_at AT TIME ZONE (SELECT tz FROM zone))::date > p_as_of)), 0),
+                   AND (pa.reversed_at IS NULL OR (pa.reversed_at AT TIME ZONE (SELECT tz FROM zone))::date > p_as_of)), 0)
+           - CASE WHEN p.settled_amount <> 0 AND (p.settled_at IS NULL OR (p.settled_at AT TIME ZONE (SELECT tz FROM zone))::date <= p_as_of)
+                  THEN p.settled_amount ELSE 0 END,
            p.ar_payment_id
       FROM bps.ar_payments p JOIN tree ON tree.customer_id = p.customer_id
      WHERE p.tenant_id = p_tenant_id AND p.payment_date <= p_as_of AND (p.voided_at IS NULL OR (p.voided_at AT TIME ZONE (SELECT tz FROM zone))::date > p_as_of)

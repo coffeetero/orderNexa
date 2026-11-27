@@ -24,6 +24,7 @@ Order:
   15. seed_ar_transaction_lines     — INVOICE/DISCOUNT from shipments + legacy allowance
   16. seed_ar_payments              — legacy public.ar (PMT) -> ar_payments
   17. seed_ar_payment_applications  — pmt_detail -> ar_payment_applications (payment + invoice links)
+  17b. seed_ar_legacy_settlements  — settle documents the old system shows as closed (ar.ar_trn_bal = 0)
   18. after_seed                    — system roles, user roles, All Customers scope (emptied by the customer truncate);
                                       item last_ordered_date refresh
 
@@ -69,6 +70,8 @@ SEEDS: list[str] = [
     "seed_ar_transaction_lines.sql",
     "seed_ar_payments.sql",
     "seed_ar_payment_applications.sql",
+    # the old payment detail applies some payments twice: close what the old system shows as closed
+    "seed_ar_legacy_settlements.sql",
     # the customer reload empties roles and user access by cascade, and items lose last_ordered_date: put them back
     "after_seed.sql",
 ]

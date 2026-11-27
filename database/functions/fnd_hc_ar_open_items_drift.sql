@@ -1,7 +1,7 @@
 -- ============================================================
 -- fnd_hc_ar_open_items_drift
 -- Health check: documents whose stored open balance (bps.ar_open_items, kept by triggers) differs from a full recalculation from the
--- invoices, payments and applications. Any finding means a write path was missed; recalculate with
+-- invoices, payments, applications, allowances and settled amounts. Any finding means a write path was missed; recalculate with
 --   SELECT bps.ar_open_items_refresh(<tenant>, ARRAY[<ar_transaction_id>], NULL)   or   (<tenant>, NULL, ARRAY[<ar_payment_id>])
 -- plpgsql so it can be loaded before the table exists.
 -- ============================================================
@@ -15,7 +15,7 @@ BEGIN
   RETURN QUERY
   WITH actual AS (
     SELECT t.ar_transaction_id AS t_id, NULL::bigint AS p_id, t.customer_id, t.document_number AS doc,
-           t.amount - COALESCE(pa.s, 0) - COALESCE(ci.s, 0) + COALESCE(cc.s, 0) - t.allowance_amount AS open_amount
+           t.amount - COALESCE(pa.s, 0) - COALESCE(ci.s, 0) + COALESCE(cc.s, 0) - t.allowance_amount - t.settled_amount AS open_amount
       FROM bps.ar_transactions t
       LEFT JOIN (SELECT a.ar_transaction_id, sum(a.applied_amount) s FROM bps.ar_payment_applications a
                   WHERE a.tenant_id = p_tenant_id AND a.reversed_at IS NULL GROUP BY 1) pa ON pa.ar_transaction_id = t.ar_transaction_id
@@ -26,7 +26,7 @@ BEGIN
      WHERE t.tenant_id = p_tenant_id AND t.status NOT IN ('DRAFT', 'CANCELLED') AND t.transaction_type IN ('INV', 'CM')
     UNION ALL
     SELECT NULL, p.ar_payment_id, p.customer_id, COALESCE(p.payment_number, p.reference_number, p.ar_payment_id::text),
-           -p.amount + COALESCE(pa.s, 0)
+           -p.amount + COALESCE(pa.s, 0) + p.settled_amount
       FROM bps.ar_payments p
       LEFT JOIN (SELECT a.ar_payment_id, sum(a.applied_amount) s FROM bps.ar_payment_applications a
                   WHERE a.tenant_id = p_tenant_id AND a.reversed_at IS NULL GROUP BY 1) pa ON pa.ar_payment_id = p.ar_payment_id

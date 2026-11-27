@@ -5,8 +5,8 @@
 -- ar_payment_applications and ar_credit_applications, and once by the migration to fill the table.
 -- Same rules as ar_transaction_open_amount and ar_report_open_items:
 --   invoice / credit memo (not DRAFT or CANCELLED): amount - live payment applications - live credit applications that paid it
---                                                   + live credit applications that used it - allowance
---   payment (not voided):                           -(amount) + live applications   (negative = credit still available)
+--                                                   + live credit applications that used it - allowance - settled
+--   payment (not voided):                           -(amount) + live applications + settled   (negative = credit still available)
 -- One recalculation per company at a time (transaction-level advisory lock), so two payments applied to the same invoice at the
 -- same moment cannot leave a stale balance: the second waits, then reads the first one's committed applications.
 -- SECURITY DEFINER: writes the table, which has no write policies. Not granted to users.
@@ -28,7 +28,7 @@ BEGIN
     INSERT INTO bps.ar_open_items (tenant_id, ar_transaction_id, customer_id, open_amount)
     SELECT x.tenant_id, x.ar_transaction_id, x.customer_id, x.open_amount
       FROM (SELECT t.tenant_id, t.ar_transaction_id, t.customer_id,
-                   t.amount - COALESCE(pa.s, 0) - COALESCE(ci.s, 0) + COALESCE(cc.s, 0) - t.allowance_amount AS open_amount
+                   t.amount - COALESCE(pa.s, 0) - COALESCE(ci.s, 0) + COALESCE(cc.s, 0) - t.allowance_amount - t.settled_amount AS open_amount
               FROM bps.ar_transactions t
               LEFT JOIN (SELECT a.ar_transaction_id, sum(a.applied_amount) s FROM bps.ar_payment_applications a
                           WHERE a.tenant_id = p_tenant_id AND a.ar_transaction_id = ANY(p_transaction_ids) AND a.reversed_at IS NULL
@@ -48,7 +48,7 @@ BEGIN
     DELETE FROM bps.ar_open_items WHERE tenant_id = p_tenant_id AND ar_payment_id = ANY(p_payment_ids);
     INSERT INTO bps.ar_open_items (tenant_id, ar_payment_id, customer_id, open_amount)
     SELECT x.tenant_id, x.ar_payment_id, x.customer_id, x.open_amount
-      FROM (SELECT p.tenant_id, p.ar_payment_id, p.customer_id, -p.amount + COALESCE(pa.s, 0) AS open_amount
+      FROM (SELECT p.tenant_id, p.ar_payment_id, p.customer_id, -p.amount + COALESCE(pa.s, 0) + p.settled_amount AS open_amount
               FROM bps.ar_payments p
               LEFT JOIN (SELECT a.ar_payment_id, sum(a.applied_amount) s FROM bps.ar_payment_applications a
                           WHERE a.tenant_id = p_tenant_id AND a.ar_payment_id = ANY(p_payment_ids) AND a.reversed_at IS NULL
