@@ -41,6 +41,8 @@ export type EntityComboBoxProps<T> = {
   getLabel: (item: T) => string;
   /** Optional class applied to the row label text only. */
   getItemLabelClassName?: (item: T) => string | undefined;
+  /** Optional value shown right-aligned and bold at the end of a list row (e.g. an amount); the label truncates before it. */
+  getItemTrailing?: (item: T) => string | undefined;
   /** Semantic weight applied to the row label; getItemLabelClassName is applied after it (e.g. a colour). */
   getItemWeight?: (item: T) => ItemWeight | undefined;
   /** Text shown in the inline search input after selection; defaults to getLabel. */
@@ -157,6 +159,7 @@ export function EntityComboBox<T>({
   getId,
   getLabel,
   getItemLabelClassName,
+  getItemTrailing,
   getItemWeight,
   getInputLabel,
   getParentId,
@@ -715,7 +718,7 @@ export function EntityComboBox<T>({
   );
 
   const handleAlwaysOpenToggle = React.useCallback(
-    (event: React.MouseEvent<HTMLButtonElement>) => {
+    async (event: React.MouseEvent<HTMLButtonElement>) => {
       event.preventDefault();
       event.stopPropagation();
       cancelBlurRestoreTimer();
@@ -723,10 +726,15 @@ export function EntityComboBox<T>({
         setQuery('');
         setFilterQuery('');
       }
+      // Opening by click asks for the list the same way ArrowDown does.
+      if (listCollapsed && listOpenRequestKeyRef.current !== listRequestKey) {
+        listOpenRequestKeyRef.current = listRequestKey;
+        await onListOpenRequest?.();
+      }
       setListCollapsed((current) => !current);
       requestAnimationFrame(() => searchInputRef.current?.focus());
     },
-    [cancelBlurRestoreTimer, isInputControlled],
+    [cancelBlurRestoreTimer, isInputControlled, listCollapsed, listRequestKey, onListOpenRequest],
   );
 
   const triggerLabel = selectedItem ? getLabel(selectedItem) : null;
@@ -768,6 +776,9 @@ export function EntityComboBox<T>({
               >
                 {display}
               </span>
+              {getItemTrailing?.(item) ? (
+                <span className="ml-3 shrink-0 text-right font-mono text-xs font-bold leading-none tabular-nums">{getItemTrailing(item)}</span>
+              ) : null}
             </>
           );
 

@@ -113,7 +113,7 @@ export async function GET(request: Request) {
   let p_production_date_to: string | null = null;
 
   if (departmentEventsOnly && productionDateSingle !== null) {
-    p_production_date_from = addDays(productionDateSingle, -14);
+    p_production_date_from = addDays(productionDateSingle, -7);
     p_production_date_to = productionDateSingle;
   } else if (productionDateSingle !== null) {
     p_production_date_from = productionDateSingle;

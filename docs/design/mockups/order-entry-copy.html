@@ -1,0 +1,211 @@
+<title>Order Entry Copy</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Order Entry (protected screen): a Copy button sits beside the existing Search magnifier. It opens a Copy order drawer that lists
+   this customer's past orders for one date (Last <weekday> / Yesterday / a date) and production code. Copy adds the selected order's
+   lines to the current order, each marked "copied" until its quantity is changed. Search is unchanged. */
+:root{--bg:#f5f3f0;--surface:#fffefc;--side:#ede9e3;--line:#e1dbd3;--line2:#cfc7bc;--text:#1e1915;--text2:#544a41;--text3:#7a6e63;--accent:#a3451c;--accent-fg:#fff;--pos:#2d6e3e;--warn:#8f5a00;--focus:#a3451c;--copy:#e7eefb;--copy-fg:#1f4f99}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#161310;--surface:#1f1b17;--side:#1a1613;--line:#322c26;--line2:#433b33;--text:#efe9e2;--text2:#c4b9ad;--text3:#978b7e;--accent:#e58d60;--accent-fg:#1a120c;--pos:#7cc48c;--warn:#e0aa4a;--focus:#e58d60;--copy:#1d2a3f;--copy-fg:#9dbcf0;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#161310;--surface:#1f1b17;--side:#1a1613;--line:#322c26;--line2:#433b33;--text:#efe9e2;--text2:#c4b9ad;--text3:#978b7e;--accent:#e58d60;--accent-fg:#1a120c;--pos:#7cc48c;--warn:#e0aa4a;--focus:#e58d60;--copy:#1d2a3f;--copy-fg:#9dbcf0;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font:14px/20px Inter,system-ui,sans-serif;font-variant-numeric:tabular-nums;margin:0;padding-block:16px 32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+.wrap{max-width:1500px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+h1{font-size:18px;font-weight:600;margin:0}
+.note{font-size:13px;color:var(--text2);margin:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;min-width:0}
+.hdr{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px;padding:8px 12px}
+.f{display:flex;flex-direction:column;gap:4px;min-width:0}
+.lab{font-size:12px;font-weight:600;color:var(--text3);letter-spacing:.02em}
+.in{height:36px;border:1px solid var(--line2);border-radius:6px;background:var(--surface);padding:0 8px;display:flex;align-items:center;white-space:nowrap;overflow:hidden}
+.date{background:color-mix(in srgb,var(--pos) 14%,var(--surface))}
+.icon{width:36px;height:36px;border:1px solid var(--line2);border-radius:6px;background:var(--surface);display:grid;place-items:center;cursor:pointer;position:relative}
+.icon:disabled{opacity:.4;cursor:not-allowed}
+.icon.new::after{content:"new";position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:10px;font-weight:700;text-transform:uppercase;color:var(--warn)}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) 460px;gap:12px;align-items:start}
+@media (max-width:1100px){.grid2{grid-template-columns:1fr}}
+table{width:100%;border-collapse:collapse}
+th,td{padding:4px 12px;text-align:left;border-top:1px solid var(--line);font-size:13px}
+th{font-size:12px;font-weight:600;color:var(--text3);background:var(--bg)}
+td.n,th.n{text-align:right}
+td input{width:64px;height:28px;border:1px solid var(--line2);border-radius:4px;background:var(--surface);text-align:right;padding:0 6px}
+tr.copied td{background:var(--copy)}
+.cp{margin-left:6px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;color:var(--copy-fg)}
+.sheet{padding:12px;display:flex;flex-direction:column;gap:8px}
+.sheet h2{font-size:15px;font-weight:600;margin:0}
+.sub{font-size:13px;color:var(--text3);margin:-6px 0 0}
+.row{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
+select.in,input.in{appearance:auto;cursor:pointer}
+.btn{height:36px;padding:0 14px;border-radius:6px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-fg);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.list{border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.ord{display:grid;grid-template-columns:minmax(0,1fr) 84px;gap:8px;padding:4px 12px;border-top:1px solid var(--line);cursor:pointer;width:100%;background:none;border-left:0;border-right:0;border-bottom:0;text-align:left}
+.ord:first-child{border-top:0}
+.ord:hover{background:color-mix(in srgb,var(--accent) 8%,var(--surface))}
+.ord.on{background:var(--accent);color:var(--accent-fg)}
+.ord .t{font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ord .t span{opacity:.75}
+.ord .a{text-align:right;font-weight:600}
+.empty{padding:10px 12px;font-size:13px;color:var(--text3)}
+.prev{border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.prev .cap{padding:4px 12px;font-size:12px;font-weight:600;color:var(--text3);background:var(--bg)}
+.prev td{padding:2px 12px;font-size:12px}
+.skip td{color:var(--text3)}
+.skip td.d{text-decoration:line-through}
+.prev input{margin:0;vertical-align:middle}
+.np{font-size:10px;font-weight:700;text-transform:uppercase;color:var(--warn);margin-left:6px}
+.toast{font-size:13px;color:var(--pos);min-height:20px}
+ul{margin:4px 0 0;padding-left:18px;font-size:13px;color:var(--text2)}
+.tag{display:inline-block;font-size:11px;font-weight:600;padding:0 6px;border-radius:9px;border:1px solid var(--line2);color:var(--text2);margin-right:4px}
+.notes td{vertical-align:top;font-size:13px}
+</style>
+
+<div class="wrap">
+  <div>
+    <h1>Order Entry: Copy order</h1>
+    <p class="note">Protected screen. A Copy button is added beside the Search magnifier, and opens a Copy order drawer listing this customer's past orders. Search is unchanged. Production date in this mockup is Friday 11/27/2026. Try the dropdown, the date, selecting an order, Copy, then changing a copied quantity.</p>
+  </div>
+
+  <div class="grid2">
+    <div class="panel">
+      <div class="hdr">
+        <div class="f" style="flex:1.2 1 300px"><span class="lab">Customer</span><div class="in">1040 · Harvard Club of NY</div></div>
+        <div class="f" style="flex:1 1 200px"><span class="lab">Department/Event</span><div class="in">Kitchen</div></div>
+        <div class="f" style="width:144px"><span class="lab">Production Date</span><div class="in date">11/27/2026</div></div>
+        <div class="f" style="width:112px"><span class="lab">Production Time</span><div class="in">AM</div></div>
+        <button class="icon" aria-label="Search existing orders" title="Search existing orders">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        </button>
+        <button class="icon new" id="copyOpen" aria-label="Copy a previous order" title="Copy a previous order (needs a customer)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>
+        </button>
+      </div>
+      <div class="hdr" style="border-top:1px solid var(--line)">
+        <div class="f" style="flex:1 1 220px"><span class="lab">Item</span><div class="in" style="color:var(--text3)">Search items…</div></div>
+        <div class="f" style="width:80px"><span class="lab">Quantity</span><div class="in"></div></div>
+        <div class="f" style="width:115px"><span class="lab">PO Number</span><div class="in"></div></div>
+        <div class="f" style="width:96px"><span class="lab">Delivery</span><div class="in">0.00</div></div>
+        <div class="f" style="width:96px"><span class="lab">Total Order</span><div class="in" id="total" style="justify-content:flex-end;font-weight:700">$0.00</div></div>
+        <div class="f" style="width:120px"><span class="lab">Order Number</span><div class="in" style="justify-content:center">New Order</div></div>
+      </div>
+      <table aria-label="Order lines">
+        <thead><tr><th style="width:90px">Item</th><th>Description</th><th class="n" style="width:90px">Qty</th><th class="n" style="width:90px">Price</th><th class="n" style="width:100px">Amount</th></tr></thead>
+        <tbody id="lines"></tbody>
+      </table>
+    </div>
+
+    <div class="panel sheet" id="drawer" aria-label="Copy order drawer">
+      <h2>Copy order</h2>
+      <p class="sub">Harvard Club of NY · past orders</p>
+      <div class="row">
+        <div class="f" style="width:150px"><label class="lab" for="when">Orders from</label>
+          <select class="in" id="when"><option value="week">Last Friday</option><option value="yday">Yesterday</option><option value="date">Date</option></select></div>
+        <div class="f" style="width:150px"><label class="lab" for="d">Production Date</label><input class="in date" type="date" id="d"></div>
+        <div class="f" style="width:90px"><label class="lab" for="code">Code</label>
+          <select class="in" id="code"><option value="">All</option><option>AM</option><option>PM</option></select></div>
+      </div>
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <span class="sub" style="margin:0" id="count"></span>
+        <button class="btn" id="copyBtn" disabled>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>Copy</button>
+      </div>
+      <div id="list"></div>
+
+      <div class="toast" id="toast" role="status"></div>
+    </div>
+  </div>
+
+  <div class="panel" style="padding:12px">
+    <table class="notes">
+      <thead><tr><th style="width:110px">Kind</th><th>Change</th></tr></thead>
+      <tbody>
+        <tr><td><span class="tag">layout</span></td><td><b>Copy button</b> next to the Search magnifier. Enabled as soon as a customer is entered (no department needed); with no order started, Copy starts a new order using the copied order's department/event. Search stays as it is (all customers, the current date).</td></tr>
+        <tr><td><span class="tag">workflow</span></td><td><b>Copy order drawer</b> (right side, 460px wide so the three filters fit on one row). <b>Orders from</b>: <i>Last &lt;weekday&gt;</i> (default: same weekday as the production date, one week back), <i>Yesterday</i> (the day before the production date) or <i>Date</i>. Choosing one fills the date; typing a date switches it to <i>Date</i>. <b>Code</b> filters by production time.</td></tr>
+        <tr><td><span class="tag">workflow</span></td><td>Lists <b>this customer's</b> orders for that date, every department, <b>grouped by Department/Event</b>: each group shows its order (order no., code, invoice no.) and its lines. Checkboxes are on the right; the group checkbox checks or clears all of its lines.</td></tr>
+        <tr><td><span class="tag">workflow</span></td><td>Each line has a <b>checkbox</b>, all checked, with a <b>check all</b> box; uncheck to copy all except. Inactive items are unchecked and cannot be checked. An item with <b>no price</b> today is flagged; leaving it checked copies it anyway. <b>Copy</b> adds the checked lines to the current order (in addition), priced from today's price book; an item already on the order gets the copied quantity added to its line. Nothing is saved until the order is saved.</td></tr>
+        <tr><td><span class="tag">cosmetic</span></td><td>Copied lines show a small <b>copied</b> label (plain text) and a light tint. Changing the quantity clears it. On screen only for now.</td></tr>
+        <tr><td><span class="tag">data</span></td><td>Uses the existing order list and order detail APIs and the items already priced for the current order. No new database function, table or column. (Built 2026-11-26.)</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const PROD=new Date(2026,10,27); // Fri 11/27/2026
+const iso=d=>d.toISOString().slice(0,10);
+const add=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x};
+const DAY=PROD.toLocaleDateString('en-US',{weekday:'long'});
+document.querySelector('#when option[value=week]').textContent='Last '+DAY;
+const ORDERS={
+  [iso(add(PROD,-7))]:[
+    {id:1,no:'1120-0412',dept:'Kitchen',code:'AM',inv:'INV-000981',amt:212.5,lines:[['B101','French Baguette',40,1.25],['C210','Butter Croissant',60,1.1],['S305','Sourdough Loaf 2 lb',12,4.5],['R118','Multigrain Roll',48,.55],['D777','Pumpkin Loaf (seasonal)',6,6,true],['X900','Holiday Stollen',4,9]]},
+    {id:2,no:'1120-0419',dept:'Banquet',code:'PM',inv:'INV-000990',amt:96,lines:[['R120','Brioche Slider Bun',120,.6],['B101','French Baguette',20,1.25]]}],
+  [iso(add(PROD,-1))]:[
+    {id:3,no:'1126-0398',dept:'Kitchen',code:'AM',inv:'INV-000998',amt:188.2,lines:[['B101','French Baguette',36,1.25],['C210','Butter Croissant',54,1.1],['S305','Sourdough Loaf 2 lb',10,4.5],['R118','Multigrain Roll',40,.55]]}],
+};
+const PRICE={B101:1.3,C210:1.1,S305:4.6,R118:.55,R120:.6};
+const $=s=>document.querySelector(s);
+let sel=null,lines=[];
+const money=n=>'$'+n.toFixed(2);
+
+function setFrom(v){
+  if(v==='week')$('#d').value=iso(add(PROD,-7));
+  if(v==='yday')$('#d').value=iso(add(PROD,-1));
+  load();
+}
+function load(){
+  $('#toast').textContent='';
+  const code=$('#code').value;
+  const rows=(ORDERS[$('#d').value]||[]).filter(o=>!code||o.code===code).sort((a,b)=>a.dept.localeCompare(b.dept));
+  const d=new Date($('#d').value+'T12:00');
+  $('#count').textContent=rows.length+' order'+(rows.length===1?'':'s')+' · '+d.toLocaleDateString('en-US',{weekday:'short',month:'numeric',day:'numeric',year:'numeric'});
+  $('#list').innerHTML=rows.length?'':'<div class="list"><div class="empty">No orders for this customer on that date.</div></div>';
+  rows.forEach(o=>{
+    const sec=document.createElement('div');sec.className='prev';sec.style.marginBottom='8px';
+    sec.innerHTML=`<label class="cap" style="display:flex;gap:8px;align-items:center;justify-content:space-between;text-transform:uppercase;font-size:13px;color:var(--text)">${o.dept} <input type="checkbox" class="grp" aria-label="Check all ${o.dept}"></label>
+      <div style="display:flex;justify-content:space-between;padding:2px 12px;font-size:12px;color:var(--text3);border-top:1px solid var(--line)"><span>${o.no} · ${o.code} · ${o.inv} · ${o.lines.length} lines</span></div>
+      <table><tbody>${o.lines.map((l,i)=>`<tr class="${l[4]?'skip':''}"><td style="width:50px">${l[0]}</td><td class="d">${l[1]}${l[4]?' (inactive)':''}${!l[4]&&PRICE[l[0]]==null?'<span class="np">no price</span>':''}</td><td class="n">${l[2]}</td><td style="width:28px;text-align:right"><input type="checkbox" class="ln" data-o="${o.id}" data-i="${i}" ${l[4]?'disabled':'checked'} aria-label="Copy ${l[1]}"></td></tr>`).join('')}</tbody></table>`;
+    sec.querySelector('.grp').onchange=e=>{sec.querySelectorAll('.ln:not(:disabled)').forEach(c=>c.checked=e.target.checked);sync()};
+    sec.querySelectorAll('.ln').forEach(c=>c.onchange=sync);
+    $('#list').appendChild(sec);
+  });
+  sync();
+}
+function picked(){
+  const all=Object.values(ORDERS).flat();
+  return [...document.querySelectorAll('.ln:checked')].map(c=>{const o=all.find(x=>x.id===+c.dataset.o);return {o,l:o.lines[+c.dataset.i]}});
+}
+function sync(){
+  document.querySelectorAll('#list .prev').forEach(sec=>{
+    const b=[...sec.querySelectorAll('.ln:not(:disabled)')],n=b.filter(c=>c.checked).length,g=sec.querySelector('.grp');
+    g.checked=b.length>0&&n===b.length;g.indeterminate=n>0&&n<b.length;
+  });
+  const all=document.querySelectorAll('.ln:not(:disabled)').length,n=document.querySelectorAll('.ln:checked').length;
+  $('#copyBtn').disabled=n===0;$('#copyBtn').lastChild.textContent=n===0||n===all?'Copy':`Copy ${n}`;
+}
+function copy(){
+  const take=picked();if(!take.length)return;
+  take.forEach(({l})=>lines.push({item:l[0],desc:l[1],qty:l[2],price:PRICE[l[0]]??0,np:PRICE[l[0]]==null,copied:true}));
+  render();
+  const np=take.filter(({l})=>PRICE[l[0]]==null),src=[...new Set(take.map(({o})=>o.no))];
+  $('#toast').textContent=`Copied ${take.length} lines from ${src.join(', ')}.`+(np.length?` No price: ${np.map(({l})=>l[1]).join(', ')}.`:'');
+}
+function render(){
+  $('#lines').innerHTML=lines.length?'':'<tr><td colspan="5" style="color:var(--text3)">No lines yet.</td></tr>';
+  lines.forEach((l,i)=>{
+    const tr=document.createElement('tr');if(l.copied)tr.className='copied';
+    tr.innerHTML=`<td>${l.item}</td><td>${l.desc}${l.copied?'<span class="cp">copied</span>':''}${l.np?'<span class="np">no price</span>':''}</td><td class="n"><input aria-label="Quantity ${l.desc}" value="${l.qty}"></td><td class="n">${money(l.price)}</td><td class="n">${money(l.qty*l.price)}</td>`;
+    tr.querySelector('input').onchange=e=>{const q=+e.target.value;if(q!==l.qty){l.qty=q;l.copied=false;render()}};
+    $('#lines').appendChild(tr);
+  });
+  $('#total').textContent=money(lines.reduce((s,l)=>s+l.qty*l.price,0));
+}
+$('#when').onchange=e=>setFrom(e.target.value);
+$('#d').oninput=()=>{$('#when').value='date';load()};
+$('#code').onchange=load;
+$('#copyBtn').onclick=copy;
+$('#copyOpen').onclick=()=>$('#when').focus();
+setFrom('week');render();
+</script>

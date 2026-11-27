@@ -264,7 +264,7 @@ export function ItemEntryRow({
       </div>
 
       {/* Order Number */}
-      <div className="flex w-24 min-w-0 shrink-0 flex-col gap-1">
+      <div className="flex w-[120px] min-w-0 shrink-0 flex-col gap-1">
         <Label
           htmlFor="order-number-display"
           className={cn(CONTROL_LABEL, 'w-full justify-center text-center !items-center')}

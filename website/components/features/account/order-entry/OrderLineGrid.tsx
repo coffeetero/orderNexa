@@ -199,7 +199,7 @@ export function OrderLineGrid({
                   'border-b border-border/40 transition-colors',
                   isActive
                     ? 'bg-primary/8 border-l-2 border-l-primary'
-                    : 'hover:bg-muted/20',
+                    : line.copied ? 'bg-sky-50 hover:bg-sky-100/70 dark:bg-sky-950/40' : 'hover:bg-muted/20',
                 )}
               >
                 <td className="px-2 py-1 font-mono text-muted-foreground whitespace-nowrap">
@@ -208,6 +208,11 @@ export function OrderLineGrid({
 
                 <td className="px-2 py-1 font-medium text-foreground">
                   {line.item_description}
+                  {line.copied && (
+                    <span className="ml-1.5 text-[9px] font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300" title="Copied from a previous order; changing the quantity clears this">
+                      copied
+                    </span>
+                  )}
                 </td>
 
                 <td className="w-40 min-w-40 max-w-40 px-1 py-0.5">
