@@ -19,8 +19,8 @@
 -- Every mode except suggestions adds invoice_number / invoice_status (om_order_invoice_get); the list also adds
 -- customer_number, so Order Entry can search orders by invoice no., PO or customer number.
 --
--- Customer type: DEPARTMENT customers are looked up via their parent.
--- (LOCATION is no longer used — superseded by DEPARTMENT.)
+-- Customer type: DEPARTMENT customers are looked up via their parent (their orders are stored there, om_orders_save);
+-- an ACCOUNT or SITE by its own customer_id.
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION bps.om_orders_get_v2(
@@ -151,7 +151,7 @@ BEGIN
 
     IF p_customer_id IS NOT NULL THEN
         SELECT
-            CASE WHEN UPPER(TRIM(customer_type)) = 'SITE' AND customer_parent_id IS NOT NULL
+            CASE WHEN UPPER(TRIM(customer_type)) = 'DEPARTMENT' AND customer_parent_id IS NOT NULL
                  THEN customer_parent_id ELSE customer_id END,
             COALESCE(NULLIF(UPPER(TRIM(customer_name)), ''), 'ORDER')
           INTO v_lookup_customer_id, v_default_department_event

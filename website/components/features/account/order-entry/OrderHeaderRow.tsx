@@ -4,7 +4,8 @@ import { useMemo, useState } from 'react';
 import { EntityComboBox } from '@/components/bps/EntityComboBox';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Search } from 'lucide-react';
+import { Copy, Search } from 'lucide-react';
+import { HoverTip } from '@/components/bps/HoverTip';
 import {
   Select,
   SelectContent,
@@ -57,6 +58,9 @@ interface OrderHeaderRowProps {
   /** Optional — e.g. focus next control after pick (order entry defers to items-loaded focus). */
   onCustomerAfterSelect?: () => void;
   onSearchExistingOrders: () => void;
+  /** Copy order (needs a customer and an order to copy into). */
+  onCopyOrder: () => void;
+  copyDisabled: boolean;
   onDepartmentEventInputChange: (value: string) => void;
   onDepartmentEventSelect: (option: DepartmentEventOption | null) => void;
   onDepartmentEventCommit: (value: string) => void;
@@ -88,11 +92,6 @@ function localTomorrow(): string {
   return `${year}-${month}-${day}`;
 }
 
-function isDepartmentCustomer(customer: CustomerOption): boolean {
-  const customerType = customer.customer_type?.trim().toUpperCase();
-  return customerType === 'DEPARTMENT' || customerType === 'LOCATION';
-}
-
 export function OrderHeaderRow({
   draft,
   customers,
@@ -109,6 +108,8 @@ export function OrderHeaderRow({
   onCustomerChange,
   onCustomerAfterSelect,
   onSearchExistingOrders,
+  onCopyOrder,
+  copyDisabled,
   onDepartmentEventInputChange,
   onDepartmentEventSelect,
   onDepartmentEventCommit,
@@ -149,29 +150,16 @@ export function OrderHeaderRow({
       ? `${customer.customer_number} - ${customer.customer_name}`
       : customer.customer_name;
 
-  const getCustomerInputLabel = (customer: CustomerOption) => {
-    if (isDepartmentCustomer(customer)) {
-      const parent = customer.customer_parent_id
-        ? customerById.get(customer.customer_parent_id)
-        : undefined;
-      return parent ? getCustomerLabel(parent) : getCustomerLabel(customer);
-    }
-    return getCustomerLabel(customer);
-  };
-
   const formatMoney = (amount: number) =>
     new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
-      minimumFractionDigits: 0,
+      minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(amount);
 
-  const getDepartmentEventLabel = (option: DepartmentEventOption) => {
-    if (option.is_new || option.order_id === null) return option.department_event;
-    const orderNo = option.order_number ?? '';
-    return `${orderNo} ${option.department_event} Qty ${option.total_quantity} ${formatMoney(option.amount)}`.trim();
-  };
+  const getDepartmentEventAmount = (option: DepartmentEventOption) =>
+    option.is_new || option.order_id === null ? undefined : formatMoney(option.amount);
 
   return (
     <div className="border-b border-border/60 bg-card px-3 py-2">
@@ -196,7 +184,6 @@ export function OrderHeaderRow({
               if (t === 'DEPARTMENT') return 'muted';
               return undefined;
             }}
-            getInputLabel={getCustomerInputLabel}
             getSearchText={(c) =>
               `${c.customer_number ?? ''} ${c.customer_name}`
             }
@@ -237,7 +224,8 @@ export function OrderHeaderRow({
             onListOpenRequest={onDepartmentEventListRequest}
             listRequestKey={departmentEventListRequestKey}
             getId={(option) => option.id}
-            getLabel={getDepartmentEventLabel}
+            getLabel={(option) => option.department_event}
+            getItemTrailing={getDepartmentEventAmount}
             getInputLabel={(option) => option.department_event}
             getSearchText={(option) =>
               `${option.order_number ?? ''} ${option.department_event} ${option.total_quantity} ${option.amount}`
@@ -247,7 +235,7 @@ export function OrderHeaderRow({
             placeholder="Department/Event"
             disabled={!draft.customer_id}
             loading={isLoadingDepartmentEvents}
-            emptyText={draft.customer_id ? 'No existing Department/Event orders.' : 'Select a customer first.'}
+            emptyText={draft.customer_id ? 'No departments/events in the last 8 days.' : 'Select a customer first.'}
             clearable
             alwaysOpen
             collapseOnSelect
@@ -315,17 +303,31 @@ export function OrderHeaderRow({
           </Select>
         </div>
 
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          className="mb-0 h-9 w-9 shrink-0"
-          onClick={onSearchExistingOrders}
-          aria-label="Search existing orders"
-          title="Search existing orders"
-        >
-          <Search className="h-4 w-4" />
-        </Button>
+        <HoverTip label="Search existing orders">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="mb-0 h-9 w-9 shrink-0"
+            onClick={onSearchExistingOrders}
+            aria-label="Search existing orders"
+          >
+            <Search className="h-4 w-4" />
+          </Button>
+        </HoverTip>
+        <HoverTip label={copyDisabled ? 'Copy a previous order (enter the customer first)' : 'Copy a previous order'}>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="mb-0 h-9 w-9 shrink-0"
+            onClick={onCopyOrder}
+            disabled={copyDisabled}
+            aria-label="Copy a previous order"
+          >
+            <Copy className="h-4 w-4" />
+          </Button>
+        </HoverTip>
 
       </div>
     </div>

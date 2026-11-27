@@ -1,6 +1,7 @@
 'use client';
 
 import { Fragment, useCallback, useEffect, useRef, useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Plus, ChevronDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -17,7 +18,7 @@ import { ItemPricebooksTab, type ItemPricebooksTabHandle } from './ItemPricebook
 import { ItemNotesTab } from './ItemNotesTab';
 import { ItemComponentsTab, type ItemComponentsTabHandle } from './ItemComponentsTab';
 import type { PrepOption } from '@/lib/types';
-import { useCurrentRecord, useNavGuard } from '@/components/layout/nav-context';
+import { useCurrentRecord, useNav, useNavGuard } from '@/components/layout/nav-context';
 import { useDeepLinkId } from '@/lib/use-deep-link';
 
 interface ItemProfile {
@@ -342,6 +343,7 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
       : null,
   );
   useNavGuard(isAnythingDirty);
+  const { sidebarSlot } = useNav(); // docked sidebar: the item list lives there (hidden while the sidebar is closed)
   useDeepLinkId('item', items.length > 0, (id) => {
     setIsCreatingNew(false);
     void loadItemDetail(id);
@@ -406,7 +408,7 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
     try {
       // A saved compound item must keep at least one component (a brand-new one gets its components after its first save).
       if (draft.is_compound && selectedItemId !== null && (componentsRef.current?.count() ?? 0) === 0) {
-        toast.error('A compound item needs at least one component. Add components on the Components tab, or turn Compound item off.');
+        toast.error('A compound item needs at least one component. Add components on the Compound Items tab, or turn Compound item off.');
         setTab('components');
         return;
       }
@@ -480,15 +482,16 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
     <div className="space-y-6">
       <div className="flex min-h-0 flex-1 flex-col gap-4">
 
-        <div className={cn('grid items-start gap-4', listOpen && 'lg:grid-cols-[18rem_1fr]')}>
+        <div className={cn('grid items-start gap-4', listOpen && !sidebarSlot && 'lg:grid-cols-[18rem_1fr]')}>
 
-        {/* ── Item list ───────────────────────────────────────────────── */}
-        {listOpen && (
-          <Card><CardContent className="space-y-2 p-0">
-            <div className="space-y-2 border-b p-3">
-              <div className="-mx-3 flex items-center justify-between gap-2 border-b px-3 pb-3">
-                <h1 className="text-xl font-semibold">Items</h1>
-                <Button type="button" size="sm" className="gap-1" onClick={startNewItem} disabled={isLoading || isDetailLoading}><Plus className="h-4 w-4" />New</Button>
+        {/* ── Item list (in the docked sidebar when there is one) ───────── */}
+        {sidebarSlot
+          ? createPortal(<section aria-label="Item list" className="flex min-h-0 flex-1 flex-col border-t border-border pt-3">
+            <div className={cn('space-y-2', sidebarSlot ? 'px-2 pb-2' : 'border-b p-3')}>
+              {/* In the sidebar the breadcrumb already names the page, so only New sits on top. */}
+              <div className={cn('flex items-center justify-between gap-2', sidebarSlot ? 'mb-4' : '-mx-3 border-b px-3 pb-3')}>
+                <h1 className={cn('text-xl font-semibold', sidebarSlot && 'sr-only')}>Items</h1>
+                <Button type="button" size="sm" className={cn('gap-1', sidebarSlot && '-order-1')} onClick={startNewItem} disabled={isLoading || isDetailLoading}><Plus className="h-4 w-4" />New</Button>
               </div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1">
                 {(['Active', 'Inactive'] as const).map((f) => (
@@ -505,9 +508,9 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
                 <option value="">Include All</option>
                 {categories.filter((c) => usedCategories.has(c.value)).map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
               </select>
-              <div className="pt-[30px]"><Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search number or name" aria-label="Search items" /></div>
+              <div className={sidebarSlot ? undefined : 'pt-[30px]'}><Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search number or name" aria-label="Search items" /></div>
             </div>
-            <ul className="max-h-[70vh] divide-y overflow-y-auto">
+            <ul className={cn('divide-y overflow-y-auto', sidebarSlot ? 'min-h-0 flex-1 border-t' : 'max-h-[70vh]')}>
               {visibleItems.map(({ it, group }, idx) => (
                 <Fragment key={it.item_id}>
                   {(idx === 0 || visibleItems[idx - 1].group !== group) && (
@@ -515,7 +518,53 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
                   )}
                   <li>
                     <button type="button" onClick={() => selectItem(it)}
-                      className={cn('w-full px-3 py-1.5 text-left text-sm hover:bg-muted', !it.is_active && 'bg-muted/60 text-muted-foreground', selectedItemId === it.item_id && 'bg-accent')}>
+                      className={cn('w-full px-3 py-[4.8px] text-left text-[12.5px] hover:bg-muted', !it.is_active && 'bg-muted/60 text-muted-foreground', selectedItemId === it.item_id && 'bg-accent')}>
+                      <div className="truncate font-medium">{it.item_number} {it.item_name}</div>
+                      {(it.is_compound || !it.is_active) && (
+                        <div className="truncate text-xs text-muted-foreground">{[it.is_compound && 'Compound', !it.is_active && 'Inactive'].filter(Boolean).join(' · ')}</div>
+                      )}
+                    </button>
+                  </li>
+                </Fragment>
+              ))}
+              {visibleItems.length === 0 && <li className="px-3 py-4 text-sm text-muted-foreground">{isLoading ? 'Loading…' : 'No items.'}</li>}
+            </ul>
+            <div className="border-t px-3 py-1 text-xs text-muted-foreground">{visibleItems.length} of {items.length}</div>
+            </section>, sidebarSlot)
+          : listOpen && (
+          <Card><CardContent className="space-y-2 p-0">
+            <div className={cn('space-y-2', sidebarSlot ? 'px-2 pb-2' : 'border-b p-3')}>
+              {/* In the sidebar the breadcrumb already names the page, so only New sits on top. */}
+              <div className={cn('flex items-center justify-between gap-2', sidebarSlot ? 'mb-4' : '-mx-3 border-b px-3 pb-3')}>
+                <h1 className={cn('text-xl font-semibold', sidebarSlot && 'sr-only')}>Items</h1>
+                <Button type="button" size="sm" className={cn('gap-1', sidebarSlot && '-order-1')} onClick={startNewItem} disabled={isLoading || isDetailLoading}><Plus className="h-4 w-4" />New</Button>
+              </div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                {(['Active', 'Inactive'] as const).map((f) => (
+                  <label key={f} className="flex items-center gap-1.5 text-sm">
+                    <Checkbox checked={statusFilters.includes(f)} onCheckedChange={(v) => { setStatusFilters((cur) => (v === true ? [...cur, f] : cur.filter((x) => x !== f))); filterChanged(); }} />
+                    {f}
+                  </label>
+                ))}
+                <label className="flex items-center gap-1.5 text-sm"><Checkbox checked={onlyCompound} onCheckedChange={(v) => { setOnlyCompound(v === true); filterChanged(); }} />Compound</label>
+                <label className="flex items-center gap-1.5 text-sm"><Checkbox checked={onlyUnpriced} onCheckedChange={(v) => { setOnlyUnpriced(v === true); filterChanged(); }} />Unpriced</label>
+                <label className="col-span-2 flex items-center gap-1.5 text-sm"><Checkbox checked={onlyStale} onCheckedChange={(v) => { setOnlyStale(v === true); filterChanged(); }} />Stale ({staleYears} {staleYears === 1 ? 'Year' : 'Years'})</label>
+              </div>
+              <select aria-label="Category" className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm" value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); filterChanged(); }}>
+                <option value="">Include All</option>
+                {categories.filter((c) => usedCategories.has(c.value)).map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+              </select>
+              <div className={sidebarSlot ? undefined : 'pt-[30px]'}><Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search number or name" aria-label="Search items" /></div>
+            </div>
+            <ul className={cn('divide-y overflow-y-auto', sidebarSlot ? 'min-h-0 flex-1 border-t' : 'max-h-[70vh]')}>
+              {visibleItems.map(({ it, group }, idx) => (
+                <Fragment key={it.item_id}>
+                  {(idx === 0 || visibleItems[idx - 1].group !== group) && (
+                    <li className="sticky top-0 z-[1] border-l-4 border-primary bg-muted px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-primary">{group}</li>
+                  )}
+                  <li>
+                    <button type="button" onClick={() => selectItem(it)}
+                      className={cn('w-full px-3 py-[4.8px] text-left text-[12.5px] hover:bg-muted', !it.is_active && 'bg-muted/60 text-muted-foreground', selectedItemId === it.item_id && 'bg-accent')}>
                       <div className="truncate font-medium">{it.item_number} {it.item_name}</div>
                       {(it.is_compound || !it.is_active) && (
                         <div className="truncate text-xs text-muted-foreground">{[it.is_compound && 'Compound', !it.is_active && 'Inactive'].filter(Boolean).join(' · ')}</div>
@@ -533,11 +582,14 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
         <div className="flex min-w-0 flex-col gap-4">
         {/* ── Actions ─────────────────────────────────────────────────── */}
         <div className="sticky top-0 z-10 flex items-center justify-between gap-2 bg-background pb-2 pt-1">
-          <Button type="button" variant="outline" size="sm" onClick={() => setListOpen((o) => !o)} aria-label={listOpen ? 'Hide item list' : 'Show item list'}>
-            {listOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
-          </Button>
-          <div className="flex items-center gap-2">
-            {!listOpen && (
+          {/* The sidebar toggle shows and hides the list when it is in the sidebar. */}
+          {!sidebarSlot && (
+            <Button type="button" variant="outline" size="sm" onClick={() => setListOpen((o) => !o)} aria-label={listOpen ? 'Hide item list' : 'Show item list'}>
+              {listOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
+            </Button>
+          )}
+          <div className="ml-auto flex items-center gap-2">
+            {!listOpen && !sidebarSlot && (
               <Button type="button" variant="outline" size="sm" onClick={startNewItem} disabled={isLoading || isDetailLoading}>
                 <Plus className="mr-1 h-3.5 w-3.5" />
                 Item
@@ -562,7 +614,7 @@ export function ItemProfilePage({ tenantId }: ItemProfilePageProps) {
           <TabsList className="relative z-0 h-auto w-fit justify-start gap-0.5 rounded-none bg-transparent p-0">
             <TabsTrigger value="profile" className={TAB_TRIGGER}>Profile</TabsTrigger>
             <TabsTrigger value="details" className={TAB_TRIGGER}>Details</TabsTrigger>
-            <TabsTrigger value="components" disabled={!draft.is_compound} className={TAB_TRIGGER}>Components</TabsTrigger>
+            <TabsTrigger value="components" disabled={!draft.is_compound} className={TAB_TRIGGER}>Compound Items</TabsTrigger>
             <TabsTrigger value="pricebooks" className={TAB_TRIGGER}>Pricebooks</TabsTrigger>
             <TabsTrigger value="notes" className={TAB_TRIGGER}>Notes</TabsTrigger>
           </TabsList>

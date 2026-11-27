@@ -6,7 +6,8 @@ import { useBreadcrumbRecord, useNav, useNavGuard, useTrackRecent } from '@/comp
 import { useDeepLinkId } from '@/lib/use-deep-link';
 import type { CurrentRecord } from '@/lib/nav-records';
 import { useRouter } from 'next/navigation';
-import { Save, Trash2, RotateCcw } from 'lucide-react';
+import { Eraser, Gift, Save, Trash2 } from 'lucide-react';
+import { HoverTip } from '@/components/bps/HoverTip';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -33,6 +34,7 @@ import { useOrderFocus } from './useOrderFocus';
 import type {
   OrderEntryDraft,
   OrderEntryItem,
+  OrderEntryLine,
   OrderHeaderListRow,
   OrderSavePayload,
   OrderSaveResult,
@@ -40,6 +42,7 @@ import type {
   ProductionCode,
 } from '@/lib/types';
 import { OrderPickSheet } from './OrderPickSheet';
+import { CopyOrderSheet, type CopyPick } from './CopyOrderSheet';
 
 function normalizeOrderHeaderRow(raw: Record<string, unknown>): OrderHeaderListRow | null {
   const order_id = Number(raw.order_id);
@@ -241,6 +244,7 @@ export function OrderEntryForm({
     reset,
     loadOrder,
     addOrUpdateLine,
+    addCopiedLines,
     updateLine,
     removeLine,
     zeroLinePrices,
@@ -331,72 +335,6 @@ export function OrderEntryForm({
       if (!customer) return '';
 
       return isDepartmentEventCustomer(customer) ? customer.customer_name.toUpperCase() : 'ORDER';
-    },
-    [customers],
-  );
-
-  const buildDepartmentEventOptions = useCallback(
-    (customerId: number | null): DepartmentEventOption[] => {
-      if (customerId === null) return [];
-
-      const selectedCustomer = customers.find((customer) => customer.customer_id === customerId);
-      if (!selectedCustomer) return [];
-
-      const customersById = new Map(
-        customers.map((customer) => [customer.customer_id, customer]),
-      );
-      const hasAncestor = (customer: CustomerOption, ancestorId: number): boolean => {
-        let currentParentId = customer.customer_parent_id;
-        const seen = new Set<number>();
-        while (currentParentId !== null && !seen.has(currentParentId)) {
-          if (currentParentId === ancestorId) return true;
-          seen.add(currentParentId);
-          currentParentId = customersById.get(currentParentId)?.customer_parent_id ?? null;
-        }
-        return false;
-      };
-
-      const optionValues: string[] = [];
-      if (isDepartmentEventCustomer(selectedCustomer)) {
-        const rootCustomerId = selectedCustomer.customer_parent_id ?? selectedCustomer.customer_id;
-        const departmentCustomers = customers
-          .filter((customer) => (
-            isDepartmentEventCustomer(customer)
-            && (
-              customer.customer_id === rootCustomerId
-              || hasAncestor(customer, rootCustomerId)
-            )
-          ))
-          .sort((a, b) => a.sort_path.localeCompare(b.sort_path));
-        optionValues.push(...departmentCustomers.map((customer) => customer.customer_name));
-      } else {
-        optionValues.push('ORDER');
-        const departmentChildren = customers
-          .filter((customer) => (
-            isDepartmentEventCustomer(customer)
-            && hasAncestor(customer, selectedCustomer.customer_id)
-          ))
-          .sort((a, b) => a.sort_path.localeCompare(b.sort_path));
-        optionValues.push(...departmentChildren.map((customer) => customer.customer_name));
-      }
-
-      const options: DepartmentEventOption[] = [];
-      const seen = new Set<string>();
-      for (const value of optionValues) {
-        const departmentEvent = normalizeDepartmentEventText(value);
-        if (!departmentEvent || seen.has(departmentEvent)) continue;
-        seen.add(departmentEvent);
-        options.push({
-          id: `new:${departmentEvent}`,
-          order_id: null,
-          order_number: null,
-          department_event: departmentEvent,
-          total_quantity: 0,
-          amount: 0,
-          is_new: true,
-        });
-      }
-      return options;
     },
     [customers],
   );
@@ -590,11 +528,8 @@ export function OrderEntryForm({
     setIsLoadingDepartmentEvents(true);
     showStatusMessage(null);
 
-    // Build local stubs first (ORDER + dept names)
-    const localOptions = buildDepartmentEventOptions(draft.customer_id);
-    if (generation !== slotLookupGenerationRef.current) return;
-
-    setDepartmentEventOptions(localOptions);
+    // Clear the slot while the list loads.
+    setDepartmentEventOptions([]);
     setSelectedDepartmentEventId(null);
     setField('order_number', 'New Order');
     setField('po_number', '');
@@ -604,35 +539,39 @@ export function OrderEntryForm({
     setField('total_amount', 0);
     setOrderPickOpen(false);
 
-    // Also fetch existing orders from DB and merge as non-new entries
+    // One sorted list: every department/event this customer ordered under in the last 8 days (any production time),
+    // plus today's orders for this production time, which show their amount and open the order when picked.
     try {
-      const existingRows = await fetchOrderHeaders(draft.customer_id);
+      const recentQs = new URLSearchParams({
+        tenant_id: String(tenantId),
+        customer_id: String(draft.customer_id),
+        production_date: draft.production_date,
+        department_events_only: 'true',
+      });
+      const [existingRows, recentJson] = await Promise.all([
+        fetchOrderHeaders(draft.customer_id),
+        fetch(`/api/orders?${recentQs}`).then((r) => r.json() as Promise<{ data?: { department_event: string | null }[] }>),
+      ]);
       if (generation !== slotLookupGenerationRef.current) return;
-      if (existingRows.length > 0) {
-        const seenEvents = new Set(localOptions.map(o => o.department_event));
-        const existingOptions: DepartmentEventOption[] = existingRows
-          .filter(r => r.department_event)
-          .map(r => ({
-            id: String(r.order_id),
-            order_id: r.order_id,
-            order_number: r.order_number ?? null,
-            department_event: (r.department_event ?? '').toUpperCase(),
-            total_quantity: r.total_quantity ?? 0,
-            amount: r.amount ?? 0,
-            is_new: false,
-            import_status: r.import_status ?? null,
-          }));
-        // Merge: existing entries replace matching local stubs; new dept events are appended
-        const merged = localOptions.map(local =>
-          existingOptions.find(e => e.department_event === local.department_event) ?? local
-        );
-        existingOptions.forEach(e => {
-          if (!seenEvents.has(e.department_event)) merged.push(e);
-        });
-        setDepartmentEventOptions(merged);
-      }
+      const existingOptions: DepartmentEventOption[] = existingRows.map((r) => ({
+        id: String(r.order_id),
+        order_id: r.order_id,
+        order_number: r.order_number ?? null,
+        department_event: (r.department_event || getDefaultDepartmentEvent(draft.customer_id)).toUpperCase(),
+        total_quantity: r.total_quantity ?? 0,
+        amount: r.amount ?? 0,
+        is_new: false,
+        import_status: r.import_status ?? null,
+      }));
+      const withOrders = new Set(existingOptions.map((o) => o.department_event));
+      const recentOptions: DepartmentEventOption[] = Array.from(new Set(
+        (recentJson.data ?? []).map((r) => (r.department_event ?? '').trim().toUpperCase()).filter(Boolean),
+      ))
+        .filter((dept) => !withOrders.has(dept))
+        .map((dept) => ({ id: `new:${dept}`, order_id: null, order_number: null, department_event: dept, total_quantity: 0, amount: 0, is_new: true }));
+      setDepartmentEventOptions([...existingOptions, ...recentOptions].sort((a, b) => a.department_event.localeCompare(b.department_event)));
     } catch {
-      // silently ignore — local options remain
+      // silently ignore — the field still takes typed text
     } finally {
       if (generation === slotLookupGenerationRef.current) {
         setIsLoadingDepartmentEvents(false);
@@ -642,7 +581,7 @@ export function OrderEntryForm({
     tenantId,
     draft.customer_id,
     draft.production_date,
-    buildDepartmentEventOptions,
+    getDefaultDepartmentEvent,
     fetchOrderHeaders,
     mode,
     orderId,
@@ -705,7 +644,6 @@ export function OrderEntryForm({
       if (generation !== orderPickLookupGenerationRef.current) return;
       if (rows.length === 0) {
         setOrderPickCandidates([]);
-        showStatusMessage({ text: 'No existing orders found for this production slot.', type: 'error' });
         return;
       }
 
@@ -952,6 +890,61 @@ export function OrderEntryForm({
       addItemLine(item, quantity);
     },
     [addItemLine, draft.customer_id, draft.lines],
+  );
+
+  // ── Copy order: this customer's past orders; checked lines are added to this order ──
+  const [copyOpen, setCopyOpen] = useState(false);
+
+  const loadCopyHeaders = useCallback(
+    async (productionDate: string, productionCode: string): Promise<OrderHeaderListRow[]> => {
+      if (!tenantId || draft.customer_id === null) return [];
+      const qs = new URLSearchParams({
+        tenant_id: String(tenantId),
+        production_date: productionDate,
+        customer_id: String(draft.customer_id),
+        headers_only: 'true',
+      });
+      if (productionCode) qs.set('production_code', productionCode);
+      const response = await fetch(`/api/orders?${qs}`);
+      const json = (await response.json()) as { data: unknown; error?: string };
+      if (!response.ok || json.error) throw new Error(getErrorMessage(json.error, 'Could not load past orders.'));
+      // A department's orders are stored under its parent with the department as Department/Event: keep only those.
+      const selected = customers.find((c) => c.customer_id === draft.customer_id);
+      const department = selected && isDepartmentEventCustomer(selected) ? normalizeDepartmentEventText(selected.customer_name) : null;
+      return (Array.isArray(json.data) ? json.data : [])
+        .map((r) => (r && typeof r === 'object' ? normalizeOrderHeaderRow(r as Record<string, unknown>) : null))
+        .filter((r): r is OrderHeaderListRow => r !== null && r.order_id !== draft.order_id
+          && (!department || normalizeDepartmentEventText(r.department_event ?? '').startsWith(department)));
+    },
+    [tenantId, draft.customer_id, draft.order_id, customers],
+  );
+
+  const loadCopyLines = useCallback(
+    async (orderId: number): Promise<OrderEntryLine[]> => {
+      const response = await fetch(`/api/orders?tenant_id=${tenantId}&order_id=${orderId}&headers_only=false`);
+      const json = (await response.json()) as { data: unknown; error?: string };
+      if (!response.ok || json.error || !json.data || typeof json.data !== 'object') {
+        throw new Error(getErrorMessage(json.error, 'Could not load that order.'));
+      }
+      return mapOrderToDraft(json.data as Record<string, unknown>).lines;
+    },
+    [tenantId, mapOrderToDraft],
+  );
+
+  const handleCopy = useCallback(
+    (picks: CopyPick[], sources: OrderHeaderListRow[]) => {
+      // Only a customer so far: start a new order with the copied order's department/event.
+      if (!draft.order_number) startNewOrderWithEvent(sources[0]?.department_event || getDefaultDepartmentEvent(draft.customer_id));
+      addCopiedLines(picks.map(({ item, line }) => ({ item, quantity: line.quantity, prep_options: line.prep_options, is_scored: line.is_scored })));
+      setCopyOpen(false);
+      const unpriced = picks.filter((p) => p.item.in_pricebook === false).map((p) => p.item.item_name);
+      showStatusMessage({
+        text: `Copied ${picks.length} line${picks.length === 1 ? '' : 's'} from ${sources.map((r) => r.order_number).join(', ')}.${unpriced.length ? ` No price: ${unpriced.join(', ')}.` : ''}`,
+        type: 'success',
+      });
+      requestAnimationFrame(() => focusItem());
+    },
+    [addCopiedLines, showStatusMessage, focusItem, draft.order_number, draft.customer_id, startNewOrderWithEvent, getDefaultDepartmentEvent],
   );
 
   const handleDiscountEnter = useCallback(() => {
@@ -1224,6 +1217,8 @@ export function OrderEntryForm({
             onCustomerChange={handleCustomerChange}
             onCustomerAfterSelect={focusDepartmentEvent}
             onSearchExistingOrders={handleSearchExistingOrders}
+            onCopyOrder={() => setCopyOpen(true)}
+            copyDisabled={!draft.customer_id || orderPickOpen}
             onDepartmentEventInputChange={handleDepartmentEventInputChange}
             onDepartmentEventSelect={handleDepartmentEventSelect}
             onDepartmentEventCommit={handleDepartmentEventCommit}
@@ -1266,26 +1261,29 @@ export function OrderEntryForm({
             orderTotal={draft.total_amount + draft.delivery_amount}
             entryToolbar={
               <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-9 px-3 text-xs"
-                  onClick={handleSample}
-                  disabled={isSaving || draft.lines.length === 0}
-                  title="Zero line prices for a sample order"
-                >
-                  Sample
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-9 w-9 p-0"
-                  onClick={handleRefreshOrder}
-                  title="Refresh"
-                  aria-label="Refresh"
-                >
-                  <RotateCcw className="h-4 w-4" />
-                </Button>
+                <HoverTip label="Sample: zero line prices for a sample order">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 w-9 p-0"
+                    onClick={handleSample}
+                    disabled={isSaving || draft.lines.length === 0}
+                    aria-label="Sample: zero line prices"
+                  >
+                    <Gift className="h-4 w-4" />
+                  </Button>
+                </HoverTip>
+                <HoverTip label="Clear Order">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 w-9 p-0"
+                    onClick={handleRefreshOrder}
+                    aria-label="Clear Order"
+                  >
+                    <Eraser className="h-4 w-4" />
+                  </Button>
+                </HoverTip>
               </>
             }
           />
@@ -1334,6 +1332,17 @@ export function OrderEntryForm({
         loading={isLoadingOrderPickCandidates}
         onNewOrder={handleOrderPickNew}
         onSelect={handleOrderPickSelect}
+      />
+      <CopyOrderSheet
+        open={copyOpen}
+        onOpenChange={(open) => { setCopyOpen(open); if (!open) requestAnimationFrame(() => focusItem()); }}
+        customerName={draft.customer_name}
+        productionDate={draft.production_date}
+        productionCodes={productionCodes}
+        items={items}
+        loadHeaders={loadCopyHeaders}
+        loadLines={loadCopyLines}
+        onCopy={handleCopy}
       />
       <AlertDialog open={productionDateBlockedOpen} onOpenChange={setProductionDateBlockedOpen}>
         <AlertDialogContent>

@@ -23,22 +23,22 @@ END $$;
 
 GRANT ALL ON _id TO PUBLIC;
 
--- ── Setup (trusted connection): an account, two departments (one invoiced), two sites ──
+-- ── Setup (trusted connection): an account, two sites (one invoiced), two departments ──
 DO $$
 DECLARE a bigint; d1 bigint; d2 bigint; s1 bigint; s2 bigint;
 BEGIN
   INSERT INTO fnd_customers (tenant_id, customer_name, customer_type) VALUES (200000000002, 'TEST ACCOUNT', 'ACCOUNT') RETURNING customer_id INTO a;
-  INSERT INTO fnd_customers (tenant_id, customer_name, customer_type, customer_parent_id, is_invoice_required) VALUES (200000000002, 'TEST DEPT INVOICED', 'DEPARTMENT', a, TRUE) RETURNING customer_id INTO d1;
-  INSERT INTO fnd_customers (tenant_id, customer_name, customer_type, customer_parent_id, is_invoice_required) VALUES (200000000002, 'TEST DEPT SHARED', 'DEPARTMENT', a, FALSE) RETURNING customer_id INTO d2;
-  INSERT INTO fnd_customers (tenant_id, customer_name, customer_type, customer_parent_id) VALUES (200000000002, 'Test Site One', 'SITE', d1) RETURNING customer_id INTO s1;
-  INSERT INTO fnd_customers (tenant_id, customer_name, customer_type, customer_parent_id) VALUES (200000000002, 'Test Site Two', 'SITE', a) RETURNING customer_id INTO s2;
+  INSERT INTO fnd_customers (tenant_id, customer_name, customer_type, customer_parent_id, is_invoice_required) VALUES (200000000002, 'TEST SITE INVOICED', 'SITE', a, TRUE) RETURNING customer_id INTO d1;
+  INSERT INTO fnd_customers (tenant_id, customer_name, customer_type, customer_parent_id, is_invoice_required) VALUES (200000000002, 'TEST SITE SHARED', 'SITE', a, FALSE) RETURNING customer_id INTO d2;
+  INSERT INTO fnd_customers (tenant_id, customer_name, customer_type, customer_parent_id) VALUES (200000000002, 'Test Dept One', 'DEPARTMENT', d1) RETURNING customer_id INTO s1;
+  INSERT INTO fnd_customers (tenant_id, customer_name, customer_type, customer_parent_id) VALUES (200000000002, 'Test Dept Two', 'DEPARTMENT', a) RETURNING customer_id INTO s2;
   INSERT INTO _id VALUES ('a', a), ('d1', d1), ('d2', d2), ('s1', s1), ('s2', s2);
 
   INSERT INTO _t VALUES ('invoice owner: account owns itself', om_customer_invoice_owner(200000000002, a) = a);
-  INSERT INTO _t VALUES ('invoice owner: invoiced department owns itself', om_customer_invoice_owner(200000000002, d1) = d1);
-  INSERT INTO _t VALUES ('invoice owner: department without the flag rolls up to the account', om_customer_invoice_owner(200000000002, d2) = a);
-  INSERT INTO _t VALUES ('invoice owner: site under invoiced department -> department', om_customer_invoice_owner(200000000002, s1) = d1);
-  INSERT INTO _t VALUES ('invoice owner: site under account -> account', om_customer_invoice_owner(200000000002, s2) = a);
+  INSERT INTO _t VALUES ('invoice owner: invoiced site owns itself', om_customer_invoice_owner(200000000002, d1) = d1);
+  INSERT INTO _t VALUES ('invoice owner: site without the flag rolls up to the account', om_customer_invoice_owner(200000000002, d2) = a);
+  INSERT INTO _t VALUES ('invoice owner: department under invoiced site -> site', om_customer_invoice_owner(200000000002, s1) = d1);
+  INSERT INTO _t VALUES ('invoice owner: department under account -> account', om_customer_invoice_owner(200000000002, s2) = a);
   INSERT INTO _t VALUES ('delivery method defaults to the tenant own-fleet method', om_customer_delivery_method(200000000002, s1) = 'OWN_TRUCK');
   UPDATE fnd_customers SET delivery_method_code = 'CARRIER' WHERE customer_id = d1;
   INSERT INTO _t VALUES ('delivery method inherited from the parent', om_customer_delivery_method(200000000002, s1) = 'CARRIER');
@@ -69,12 +69,12 @@ BEGIN
 
   INSERT INTO _t VALUES ('account order keeps the account customer_id, event defaults to its name',
       (SELECT customer_id = a AND department_event = 'TEST ACCOUNT' FROM om_orders WHERE order_id = (SELECT v FROM _id WHERE k='o1')));
-  INSERT INTO _t VALUES ('department order keeps its own customer_id, event defaults to its name',
-      (SELECT customer_id = d1 AND department_event = 'TEST DEPT INVOICED' FROM om_orders WHERE order_id = (SELECT v FROM _id WHERE k='o2')));
-  INSERT INTO _t VALUES ('site order is stored under the parent, event defaults to the site name',
-      (SELECT customer_id = d1 AND department_event = 'TEST SITE ONE' FROM om_orders WHERE order_id = (SELECT v FROM _id WHERE k='o4')));
-  INSERT INTO _t VALUES ('site under the account is stored under the account',
-      (SELECT customer_id = a AND department_event = 'TEST SITE TWO' FROM om_orders WHERE order_id = (SELECT v FROM _id WHERE k='o5')));
+  INSERT INTO _t VALUES ('site order keeps its own customer_id, event defaults to its name',
+      (SELECT customer_id = d1 AND department_event = 'TEST SITE INVOICED' FROM om_orders WHERE order_id = (SELECT v FROM _id WHERE k='o2')));
+  INSERT INTO _t VALUES ('department order is stored under the parent, event defaults to the department name',
+      (SELECT customer_id = d1 AND department_event = 'TEST DEPT ONE' FROM om_orders WHERE order_id = (SELECT v FROM _id WHERE k='o4')));
+  INSERT INTO _t VALUES ('department under the account is stored under the account',
+      (SELECT customer_id = a AND department_event = 'TEST DEPT TWO' FROM om_orders WHERE order_id = (SELECT v FROM _id WHERE k='o5')));
   INSERT INTO _t VALUES ('every order has its own order number', (SELECT COUNT(DISTINCT order_number) = 5 FROM om_orders WHERE order_id IN (SELECT v FROM _id WHERE k LIKE 'o_')));
   r := om_orders_save(200000000002, NULL, NULL, jsonb_build_object('customer_id', s1, 'production_date', '2031-05-10', 'production_code', 'MORNING',
         'department_event', 'Judy wedding', 'lines', '[]'::jsonb));
@@ -96,7 +96,7 @@ BEGIN
   SELECT * INTO inv_a FROM ar_transactions WHERE production_run_id = v_run AND customer_id = a AND transaction_type = 'INV';
   SELECT * INTO inv_d FROM ar_transactions WHERE production_run_id = v_run AND customer_id = d1 AND transaction_type = 'INV';
   INSERT INTO _t VALUES ('invoice A is DRAFT without a number, total 36 (10+2+4 delivery + 10 + 10)', inv_a.status = 'DRAFT' AND inv_a.document_number IS NULL AND inv_a.amount = 36);
-  INSERT INTO _t VALUES ('invoice D1 (department + its site) is DRAFT, total 20', inv_d.status = 'DRAFT' AND inv_d.amount = 20);
+  INSERT INTO _t VALUES ('invoice D1 (site + its department) is DRAFT, total 20', inv_d.status = 'DRAFT' AND inv_d.amount = 20);
   INSERT INTO _t VALUES ('invoice A has 5 lines (3 order lines + delivery + 1 more order... )',
       (SELECT COUNT(*) FROM ar_transaction_lines WHERE ar_transaction_id = inv_a.ar_transaction_id) = 5);
   INSERT INTO _t VALUES ('invoice D1 has 2 lines', (SELECT COUNT(*) FROM ar_transaction_lines WHERE ar_transaction_id = inv_d.ar_transaction_id) = 2);
@@ -105,7 +105,7 @@ BEGIN
   INSERT INTO _t VALUES ('delivery charge becomes a DELIVERY line of 4',
       EXISTS (SELECT 1 FROM ar_transaction_lines WHERE ar_transaction_id = inv_a.ar_transaction_id AND source_type = 'DELIVERY' AND amount = 4));
   INSERT INTO _t VALUES ('invoice lines carry order number and department/event',
-      (SELECT COUNT(*) FROM ar_transaction_lines WHERE ar_transaction_id = inv_d.ar_transaction_id AND snapshot_data ->> 'order_number' IS NOT NULL AND snapshot_data ->> 'department_event' IN ('TEST DEPT INVOICED','TEST SITE ONE')) = 2);
+      (SELECT COUNT(*) FROM ar_transaction_lines WHERE ar_transaction_id = inv_d.ar_transaction_id AND snapshot_data ->> 'order_number' IS NOT NULL AND snapshot_data ->> 'department_event' IN ('TEST SITE INVOICED','TEST DEPT ONE')) = 2);
   INSERT INTO _t VALUES ('every item line is linked to a shipment line',
       (SELECT COUNT(*) FROM ar_transaction_lines WHERE ar_transaction_id IN (inv_a.ar_transaction_id, inv_d.ar_transaction_id) AND source_type = 'ITEM' AND shipment_line_id IS NULL) = 0);
   INSERT INTO _t VALUES ('3 PLANNED shipments with numbers, one per ship-to customer',
@@ -136,7 +136,7 @@ BEGIN
   PERFORM om_production_runs_process(200000000002, DATE '2031-05-10', DATE '2031-05-10', NULL);
   INSERT INTO _t VALUES ('order edit then reprocess updates the invoice total to 46', (SELECT amount FROM ar_transactions WHERE ar_transaction_id = ia) = 46);
 
-  -- removing the orders of the invoiced department drops its draft invoice
+  -- removing the orders of the invoiced site drops its draft invoice
   PERFORM om_orders_save(200000000002, 'delete', (SELECT v FROM _id WHERE k='o2'), NULL);
   PERFORM om_orders_save(200000000002, 'delete', (SELECT v FROM _id WHERE k='o4'), NULL);
   PERFORM om_production_runs_process(200000000002, DATE '2031-05-10', DATE '2031-05-10', NULL);

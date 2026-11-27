@@ -1,21 +1,21 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Copy, History, MoreHorizontal, Pencil, Plus, Printer, Search, Trash2, Wheat } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { ArrowLeft, Copy, MoreHorizontal, Pencil, Plus, Printer, Search, Trash2, Wheat } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { adminCall, adminDelete, adminPost } from '@/components/features/admin/adminShared';
-import { useNavGuard } from '@/components/layout/nav-context';
+import { useNav, useNavGuard } from '@/components/layout/nav-context';
 import { useDeepLinkId } from '@/lib/use-deep-link';
 import { cn } from '@/lib/utils';
-import { IngredientsDialog } from './IngredientsDialog';
+import { IngredientsCatalog } from './IngredientsDialog';
 import { RecipeEditor } from './RecipeEditor';
 import {
-  AllergenList, FormulaTable, MakeFirstTable, Panel, StatementBlock, StepList, SummaryList,
+  AllergenList, CostTable, FormulaTable, MakeFirstTable, Panel, StatementBlock, StepList, SummaryList,
 } from './RecipeFigures';
 import {
   fmtMinutes, fmtPct, fmtQty, scaleJson, SCALE_MODES, selectCls, TypePill, UNITS,
@@ -27,6 +27,16 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: 'ALL', label: 'All' }, { key: 'DOUGH', label: 'Doughs' }, { key: 'PREFERMENT', label: 'Pre-ferments' }, { key: 'OTHER', label: 'Other' }, { key: 'ARCHIVED', label: 'Archived' },
 ];
 const DEFAULT_VALUE: Record<ScaleMode, string> = { BATCHES: '1', DOUGH: '', FLOUR: '', PIECES: '' };
+
+/** Body tabs. Ingredients is not about the picked recipe: it always shows the ingredient catalog. */
+type Tab = 'formula' | 'costing' | 'labels' | 'history' | 'ingredients';
+const TABS: { key: Tab; label: string }[] = [
+  { key: 'formula', label: 'Formula' }, { key: 'costing', label: 'Costing' }, { key: 'labels', label: 'Labels' },
+  { key: 'history', label: 'History' }, { key: 'ingredients', label: 'Ingredients' },
+];
+const TAB_TRIGGER =
+  '-mb-px rounded-none border-b-2 border-transparent bg-transparent px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground ' +
+  'data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none';
 
 export function RecipesBook({ tenantId, canEdit, canDelete }: { tenantId: number; canEdit: boolean; canDelete: boolean }) {
   const [rows, setRows] = useState<RecipeRow[] | null>(null);
@@ -43,10 +53,11 @@ export function RecipesBook({ tenantId, canEdit, canDelete }: { tenantId: number
   const [scaleError, setScaleError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [ingOpen, setIngOpen] = useState(false);
+  const [tab, setTab] = useState<Tab>('formula');
   const reqSeq = useRef(0);
   const mainRef = useRef<HTMLElement>(null);
   useNavGuard(mode !== 'view' && dirty);
+  const { sidebarSlot } = useNav(); // docked sidebar: the list lives there (hidden while the sidebar is closed)
 
   const loadList = useCallback(() => {
     adminCall<RecipeRow[]>(`/api/inventory/recipes?tenant_id=${tenantId}`).then(setRows).catch((e: Error) => setError(e.message));
@@ -63,7 +74,7 @@ export function RecipesBook({ tenantId, canEdit, canDelete }: { tenantId: number
       .catch((e: Error) => { setError(e.message); setDetail(null); });
   }, [tenantId, show]);
   useEffect(() => { loadList(); loadOptions(); }, [loadList, loadOptions]);
-  useEffect(() => { mainRef.current?.scrollTo({ top: 0 }); }, [mode, selectedId]);
+  useEffect(() => { mainRef.current?.scrollTo({ top: 0 }); }, [mode, selectedId, tab]);
   useDeepLinkId('recipe', rows !== null, (id) => { setMode('view'); loadDetail(id); });
 
   // Scaled figures from the database whenever the scale bar changes.
@@ -86,6 +97,7 @@ export function RecipesBook({ tenantId, canEdit, canDelete }: { tenantId: number
   const select = (id: number) => {
     if (!leaveEdit()) return;
     setMode('view'); setDirty(false); setNotice(null); setError(null);
+    if (tab === 'ingredients') setTab('formula');
     if (detail?.recipe.recipe_id !== id) setDetail(null);
     setSelectedId(id);
     loadDetail(id);
@@ -127,28 +139,21 @@ export function RecipesBook({ tenantId, canEdit, canDelete }: { tenantId: number
   };
   const setMode2 = (m: ScaleMode) => setScale((s) => ({ ...s, mode: m, value: DEFAULT_VALUE[m] }));
 
-  const showDetailPane = mode !== 'view' || selectedId !== null;
+  const showDetailPane = mode !== 'view' || selectedId !== null || tab === 'ingredients';
+  const startNew = () => { if (!leaveEdit()) return; setCopyOf(null); setMode('new'); setTab('formula'); setDetail(null); setSelectedId(null); setNotice(null); };
   const c = calc ?? detail?.calc ?? null;
 
-  return (
-    <div className="flex min-h-[32rem] gap-3 p-2 sm:p-3 lg:h-[calc(100dvh-7.5rem)]">
-      {/* List pane */}
-      <aside className={cn('flex w-full flex-col rounded-lg border bg-card shadow-sm lg:w-[17rem] lg:shrink-0 xl:w-[19rem]', showDetailPane && 'hidden lg:flex')}>
-        <div className="space-y-2 border-b p-3">
-          <div className="flex items-center gap-1">
-            <h1 className="mr-auto text-lg font-semibold">Recipes</h1>
-            <Button size="sm" variant="outline" className="gap-1" onClick={() => setIngOpen(true)}><Wheat className="h-4 w-4" />Ingredients</Button>
-            {canEdit && (
-              <Button size="sm" className="gap-1" onClick={() => { if (!leaveEdit()) return; setCopyOf(null); setMode('new'); setDetail(null); setSelectedId(null); setNotice(null); }}>
-                <Plus className="h-4 w-4" />New
-              </Button>
-            )}
+  const listPane = (
+      <section aria-label="Recipe list" className={cn('flex min-h-0 flex-col',
+        sidebarSlot ? 'flex-1 border-t border-border pt-3' : cn('w-full rounded-lg border bg-card shadow-sm lg:w-[17rem] lg:shrink-0 xl:w-[19rem]', showDetailPane && 'hidden lg:flex'))}>
+        <div className={cn('space-y-2', sidebarSlot ? 'px-2 pb-2' : 'border-b p-3')}>
+          {/* In the sidebar the breadcrumb already names the page and Ingredients is a tab, so only New sits on top. */}
+          <div className={cn('flex items-center gap-1', sidebarSlot && 'mb-4')}>
+            <h1 className={cn('mr-auto text-lg font-semibold', sidebarSlot && 'sr-only')}>Recipes</h1>
+            {!sidebarSlot && <Button size="sm" variant="outline" className="gap-1" onClick={() => setTab('ingredients')}><Wheat className="h-4 w-4" />Ingredients</Button>}
+            {canEdit && <Button size="sm" className={cn('gap-1', sidebarSlot && '-order-1')} onClick={startNew}><Plus className="h-4 w-4" />New</Button>}
           </div>
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input type="search" placeholder="Search recipe or dough code" aria-label="Search recipes" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8" />
-          </div>
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap gap-1" role="group" aria-label="Filter recipes">
             {FILTERS.map((x) => (
               <button key={x.key} type="button" onClick={() => setFilter(x.key)} aria-pressed={filter === x.key}
                 className={cn('rounded-full px-2.5 py-0.5 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
@@ -156,6 +161,10 @@ export function RecipesBook({ tenantId, canEdit, canDelete }: { tenantId: number
                 {x.label}
               </button>
             ))}
+          </div>
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input type="search" placeholder="Search recipe or dough code" aria-label="Search recipes" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8" />
           </div>
         </div>
         <ul className="flex-1 overflow-y-auto">
@@ -181,12 +190,17 @@ export function RecipesBook({ tenantId, canEdit, canDelete }: { tenantId: number
             ))}
         </ul>
         <div className="border-t px-3 py-1.5 text-xs text-muted-foreground">{shown.length} of {rows?.length ?? 0} recipes</div>
-      </aside>
+      </section>
+  );
+
+  return (
+    <div className="flex min-h-[32rem] gap-3 p-2 sm:p-3 lg:h-[calc(100dvh-7.5rem)]">
+      {sidebarSlot ? createPortal(listPane, sidebarSlot) : listPane}
 
       {/* Detail pane */}
-      <main ref={mainRef} className={cn('min-w-0 flex-1 overflow-y-auto', !showDetailPane && 'hidden lg:block')}>
+      <main ref={mainRef} className={cn('min-w-0 flex-1 overflow-y-auto', !showDetailPane && !sidebarSlot && 'hidden lg:block')}>
         <button type="button" className="mb-2 flex items-center gap-1 text-sm text-primary lg:hidden"
-          onClick={() => { if (!leaveEdit()) return; setMode('view'); setSelectedId(null); setDetail(null); }}>
+          onClick={() => { if (!leaveEdit()) return; setMode('view'); setSelectedId(null); setDetail(null); if (tab === 'ingredients') setTab('formula'); }}>
           <ArrowLeft className="h-4 w-4" /> Recipes
         </button>
         {error && <p role="alert" className="mb-2 rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive">{error}</p>}
@@ -197,7 +211,19 @@ export function RecipesBook({ tenantId, canEdit, canDelete }: { tenantId: number
             tenantId={tenantId} detail={mode === 'edit' ? detail : null} copyOf={mode === 'new' ? copyOf : null} options={options}
             canEdit={canEdit} canDelete={canDelete} onSaved={afterSave} onOptionsChanged={loadOptions} onDirty={setDirty}
             onCancel={() => { setMode('view'); setCopyOf(null); }} />
-        ) : detail && c ? (
+        ) : (
+          <div className="space-y-3">
+            <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
+              <TabsList className="h-auto w-full justify-start gap-1 rounded-none border-b border-border bg-transparent p-0">
+                {TABS.map((t) => <TabsTrigger key={t.key} value={t.key} className={TAB_TRIGGER}>{t.label}</TabsTrigger>)}
+              </TabsList>
+            </Tabs>
+            {tab === 'ingredients' ? (
+              <section className="rounded-lg border bg-card p-3 shadow-sm">
+                <IngredientsCatalog tenantId={tenantId} canEdit={canEdit} canDelete={canDelete} showHelp
+                  onChanged={() => { loadOptions(); if (detail) loadDetail(detail.recipe.recipe_id); }} />
+              </section>
+            ) : detail && c ? (
           <div className="space-y-3">
             {/* Header */}
             <section className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border bg-card px-3 py-2.5 shadow-sm">
@@ -210,19 +236,6 @@ export function RecipesBook({ tenantId, canEdit, canDelete }: { tenantId: number
                   <span>Version {detail.recipe.version_no} · saved {detail.saved_on}{detail.saved_by_name ? ` by ${detail.saved_by_name}` : ''}</span>
                 </p>
               </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild><Button size="sm" variant="outline" className="gap-1"><History className="h-4 w-4" />History</Button></DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="max-h-80 w-80 overflow-y-auto">
-                  <DropdownMenuLabel>Versions</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {detail.versions.map((v) => (
-                    <DropdownMenuItem key={v.version_no} className="flex-col items-start gap-0" onSelect={(e) => e.preventDefault()}>
-                      <span className="text-sm font-medium">Version {v.version_no} · {v.saved_on}</span>
-                      <span className="text-xs text-muted-foreground">{v.change_note ?? 'No note'}{v.saved_by_name ? ` · ${v.saved_by_name}` : ''}</span>
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
               {(canEdit || canDelete) && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild><Button size="sm" variant="outline" aria-label="More actions"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
@@ -236,8 +249,8 @@ export function RecipesBook({ tenantId, canEdit, canDelete }: { tenantId: number
               {canEdit && <Button size="sm" className="gap-1" onClick={() => { setNotice(null); setMode('edit'); }}><Pencil className="h-4 w-4" />Edit</Button>}
             </section>
 
-            {/* Scale bar */}
-            <section className="flex flex-wrap items-end gap-3 rounded-lg border bg-card px-3 py-2.5 shadow-sm">
+            {/* Scale bar (the figures on Formula and Costing follow it) */}
+            {(tab === 'formula' || tab === 'costing') && <section className="flex flex-wrap items-end gap-3 rounded-lg border bg-card px-3 py-2.5 shadow-sm">
               <div className="min-w-0 max-w-full">
                 <span className="mb-1 block text-xs font-medium text-muted-foreground">Scale by</span>
                 <div role="group" aria-label="Scale by" className="inline-flex h-9 max-w-full overflow-x-auto rounded-md border border-input">
@@ -272,12 +285,13 @@ export function RecipesBook({ tenantId, canEdit, canDelete }: { tenantId: number
                     {c.totals.pieces !== null && <> · <b className="text-foreground">{c.totals.pieces.toLocaleString('en-US')}</b> pieces</>}</>
                 )}
               </p>
-            </section>
+            </section>}
 
+            {tab === 'formula' && (
             <div className="grid items-start gap-3 min-[1700px]:grid-cols-[minmax(0,1fr)_19rem]">
               <div className="min-w-0 space-y-3">
                 <Panel title="Formula" sub="baker's % of total flour, counting the flour in pre-ferments">
-                  <FormulaTable calc={c} onOpenRecipe={select} />
+                  <FormulaTable calc={c} onOpenRecipe={select} showCost={false} />
                 </Panel>
                 {c.make_first.map((m) => (
                   <Panel key={m.recipe_id} title={`Make first: ${m.recipe_name}`} sub={`${fmtQty(m.scaled_qty, c.out_unit)} for this batch${m.hydration_pct !== null ? ` · ${fmtPct(m.hydration_pct)} hydration` : ''}`}
@@ -290,10 +304,9 @@ export function RecipesBook({ tenantId, canEdit, canDelete }: { tenantId: number
                 </Panel>
                 {detail.recipe.notes && <Panel title="Notes"><p className="whitespace-pre-line px-3 py-2.5 text-sm">{detail.recipe.notes}</p></Panel>}
               </div>
-
               <div className="grid min-w-0 items-start gap-3 md:grid-cols-2 min-[1700px]:grid-cols-1">
                 <Panel title="Summary" sub={c.factor === 1 ? 'one batch' : `factor ${c.factor.toLocaleString('en-US', { maximumFractionDigits: 3 })}`}>
-                  <SummaryList calc={c} />
+                  <SummaryList calc={c} part="dough" />
                   {c.issues.filter((m) => !m.includes('no price')).map((m) => <p key={m} className="px-3 pb-2 text-xs text-warning">{m}</p>)}
                 </Panel>
                 {detail.recipe.ddt_f !== null && (
@@ -310,7 +323,6 @@ export function RecipesBook({ tenantId, canEdit, canDelete }: { tenantId: number
                     </p>
                   </Panel>
                 )}
-                <Panel title="Allergens" sub="from ingredients"><AllergenList calc={c} /></Panel>
                 {(detail.used_by_items.length > 0 || detail.recipe.dough_code) && (
                   <Panel title="Used by items" sub={detail.recipe.dough_code ? `dough code ${detail.recipe.dough_code}` : undefined}>
                     {detail.used_by_items.length === 0 ? <p className="px-3 py-2.5 text-sm text-muted-foreground">No item has this dough code.</p> : (
@@ -336,19 +348,47 @@ export function RecipesBook({ tenantId, canEdit, canDelete }: { tenantId: number
                     </ul>
                   </Panel>
                 )}
-                <StatementBlock text={c.ingredient_statement} />
               </div>
             </div>
+            )}
+
+            {tab === 'costing' && (
+              <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_19rem]">
+                <Panel title="Cost" sub="each line for this batch, from ingredient prices"><CostTable calc={c} /></Panel>
+                <Panel title="Cost summary"><SummaryList calc={c} part="cost" /></Panel>
+              </div>
+            )}
+
+            {tab === 'labels' && (
+              <div className="grid items-start gap-3 lg:grid-cols-2">
+                <Panel title="Allergens" sub="from ingredients"><AllergenList calc={c} /></Panel>
+                <StatementBlock text={c.ingredient_statement} />
+              </div>
+            )}
+
+            {tab === 'history' && (
+              <Panel title="Versions" sub="every save keeps a version">
+                <ul className="text-sm">
+                  {detail.versions.map((v) => (
+                    <li key={v.version_no} className="flex flex-wrap gap-x-3 border-t px-3 py-1.5 first:border-t-0">
+                      <span className="w-40 font-medium">Version {v.version_no} · {v.saved_on}</span>
+                      <span className="min-w-0 flex-1">{v.change_note ?? <span className="text-muted-foreground">No note</span>}</span>
+                      <span className="text-muted-foreground">{v.saved_by_name ?? ''}</span>
+                    </li>
+                  ))}
+                </ul>
+              </Panel>
+            )}
           </div>
-        ) : selectedId !== null ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
-        ) : (
-          <div className="flex h-full min-h-[20rem] items-center justify-center rounded-lg border bg-card text-sm text-muted-foreground">Pick a recipe, or add a new one.</div>
+            ) : selectedId !== null ? (
+              <p className="text-sm text-muted-foreground">Loading…</p>
+            ) : (
+              <div className="flex min-h-[20rem] items-center justify-center rounded-lg border bg-card text-sm text-muted-foreground">Pick a recipe, or add a new one.</div>
+            )}
+          </div>
         )}
       </main>
 
-      <IngredientsDialog tenantId={tenantId} open={ingOpen} onOpenChange={(o) => { setIngOpen(o); if (!o) { loadOptions(); if (detail && mode === 'view') loadDetail(detail.recipe.recipe_id); } }}
-        canEdit={canEdit} canDelete={canDelete} />
     </div>
   );
 }

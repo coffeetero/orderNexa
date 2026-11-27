@@ -119,7 +119,7 @@ export function useOrderEntryState(initial?: OrderEntryDraft) {
             // Keep the line's snapshotted price from when it was first added.
             const extended = calcExtended(quantity, l.unit_price, l.unit_discount);
             affectedTempId = l.tempId;
-            return { ...l, quantity, extended_amount: extended };
+            return { ...l, quantity, extended_amount: extended, copied: quantity === l.quantity ? l.copied : false };
           });
           return { ...prev, lines: newLines, total_amount: calcTotal(newLines) };
         }
@@ -160,6 +160,7 @@ export function useOrderEntryState(initial?: OrderEntryDraft) {
         const newLines = prev.lines.map((l) => {
           if (l.tempId !== tempId) return l;
           const merged = { ...l, ...updates };
+          if (updates.quantity !== undefined && updates.quantity !== l.quantity) merged.copied = false;
           merged.extended_amount = calcExtended(
             merged.quantity,
             merged.unit_price,
@@ -167,6 +168,46 @@ export function useOrderEntryState(initial?: OrderEntryDraft) {
           );
           return merged;
         });
+        return { ...prev, lines: newLines, total_amount: calcTotal(newLines) };
+      });
+    },
+    [],
+  );
+
+  /**
+   * Copy order: adds each copied line in addition to the order. An item already on the order gets the copied
+   * quantity added; a new one is priced from the current order's items. Prep options and scoring come from the copied line.
+   */
+  const addCopiedLines = useCallback(
+    (copies: { item: OrderEntryItem; quantity: number; prep_options: PrepOption[]; is_scored: boolean }[]) => {
+      setDraft((prev) => {
+        let newLines = [...prev.lines];
+        for (const { item, quantity, prep_options, is_scored } of copies) {
+          const existing = newLines.find((l) => l.item_id === item.item_id);
+          if (existing) {
+            newLines = newLines.map((l) => l === existing
+              ? { ...l, quantity: l.quantity + quantity, extended_amount: calcExtended(l.quantity + quantity, l.unit_price, l.unit_discount), copied: true }
+              : l);
+            continue;
+          }
+          const allowed = normalizePrepOptions(item.allowed_prep_options);
+          const unitPrice = resolveItemUnitPrice(item);
+          newLines.push({
+            tempId: crypto.randomUUID(),
+            item_id: item.item_id,
+            item_number: item.item_number,
+            item_description: item.item_name,
+            allowed_prep_options: allowed,
+            prep_options: normalizePrepOptions(prep_options).filter((o) => allowed.some((a) => a.value === o.value)),
+            is_scored: item.is_scoreable ? is_scored : false,
+            can_score: item.is_scoreable,
+            quantity,
+            unit_price: unitPrice,
+            unit_discount: 0,
+            extended_amount: calcExtended(quantity, unitPrice, 0),
+            copied: true,
+          });
+        }
         return { ...prev, lines: newLines, total_amount: calcTotal(newLines) };
       });
     },
@@ -212,6 +253,7 @@ export function useOrderEntryState(initial?: OrderEntryDraft) {
     reset,
     loadOrder,
     addOrUpdateLine,
+    addCopiedLines,
     updateLine,
     removeLine,
     zeroLinePrices,

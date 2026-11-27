@@ -6,6 +6,7 @@ import { ChevronRight, PanelLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { GuardedLink } from '@/components/layout/GuardedLink';
 import { useNav } from '@/components/layout/nav-context';
+import { QuickBar } from '@/components/layout/QuickBar';
 import { buildBreadcrumbs } from '@/lib/breadcrumbs';
 import { tenantNav } from '@/lib/nav-config';
 import { cn } from '@/lib/utils';
@@ -17,28 +18,26 @@ type BreadcrumbsProps = {
   onToggleSidebar?: () => void;
 };
 
-/** `Module › Page › Record`, directly under the top navigation. */
+/** `Module › Page › Record`, directly under the top navigation; screen search and quick buttons at the right. */
 export function Breadcrumbs({ showSidebarToggle, sidebarOpen, onToggleSidebar }: BreadcrumbsProps) {
   const pathname = usePathname();
   const { record } = useNav();
   const crumbs = buildBreadcrumbs(pathname, tenantNav, record);
 
-  if (crumbs.length === 0 && !showSidebarToggle) return null;
-
   return (
-    <div className="flex h-8 shrink-0 items-center gap-2 border-b border-border bg-muted/30 px-3 text-xs sm:px-4">
+    <div className="flex h-[42px] shrink-0 items-center gap-2 border-b border-border bg-muted/30 px-3 text-sm sm:px-4">
       {showSidebarToggle && (
         <Button
           type="button"
           variant="ghost"
           size="icon"
-          className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground"
+          className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
           onClick={onToggleSidebar}
           aria-label={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
           aria-expanded={!!sidebarOpen}
           aria-controls="context-sidebar"
         >
-          <PanelLeft className="h-4 w-4" />
+          <PanelLeft className="h-5 w-5" />
         </Button>
       )}
 
@@ -50,7 +49,7 @@ export function Breadcrumbs({ showSidebarToggle, sidebarOpen, onToggleSidebar }:
               <Fragment key={`${i}-${crumb.label}`}>
                 {i > 0 && (
                   <li aria-hidden="true" className={cn('shrink-0', crumbs.length > 2 && i === 1 && 'max-sm:hidden')}>
-                    <ChevronRight className="h-3 w-3" />
+                    <ChevronRight className="h-3.5 w-3.5" />
                   </li>
                 )}
                 <li
@@ -75,6 +74,8 @@ export function Breadcrumbs({ showSidebarToggle, sidebarOpen, onToggleSidebar }:
           })}
         </ol>
       </nav>
+
+      <QuickBar />
     </div>
   );
 }

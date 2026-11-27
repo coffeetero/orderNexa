@@ -1,7 +1,8 @@
 -- ============================================================
 -- om_customer_invoice_owner
 -- Which customer receives the invoice for an order placed by p_customer_id: the nearest ancestor-or-self that is an
--- ACCOUNT, or a DEPARTMENT with is_invoice_required. A SITE never owns an invoice. Falls back to the top ancestor.
+-- ACCOUNT, or a SITE with is_invoice_required (a location with its own invoice, as in the old BPS). A DEPARTMENT never
+-- owns an invoice: it is billed with its site or account. Falls back to the top ancestor.
 -- ============================================================
 CREATE OR REPLACE FUNCTION bps.om_customer_invoice_owner(p_tenant_id bigint, p_customer_id bigint)
 RETURNS bigint
@@ -23,7 +24,7 @@ AS $function$
     SELECT COALESCE(
         (SELECT customer_id FROM up
           WHERE UPPER(TRIM(customer_type)) = 'ACCOUNT'
-             OR (UPPER(TRIM(customer_type)) = 'DEPARTMENT' AND is_invoice_required)
+             OR (UPPER(TRIM(customer_type)) = 'SITE' AND is_invoice_required)
           ORDER BY depth LIMIT 1),
         (SELECT customer_id FROM up ORDER BY depth DESC LIMIT 1)
     );

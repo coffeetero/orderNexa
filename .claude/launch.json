@@ -4,7 +4,7 @@
     {
       "name": "orderNexa",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--", "--cwd", "website"],
+      "runtimeArgs": ["--prefix", "website", "run", "dev"],
       "port": 3000,
       "autoPort": false
     }

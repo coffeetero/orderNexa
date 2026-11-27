@@ -103,6 +103,10 @@ interface CustomerContactsTabProps {
   tenantId: number;
   customerId: number | null;
   onDirtyChange: (dirty: boolean) => void;
+  /** Reuse for another record type (e.g. vendors): its contacts API and id parameter. Defaults are the customer ones. */
+  apiPath?: string;
+  idParam?: string;
+  emptyText?: string;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -244,7 +248,7 @@ function AutoTextarea({ value, onChange, className, placeholder, minRows = 1 }: 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, CustomerContactsTabProps>(
-  function CustomerContactsTab({ tenantId, customerId, onDirtyChange }, ref) {
+  function CustomerContactsTab({ tenantId, customerId, onDirtyChange, apiPath = '/api/customers/contacts', idParam = 'customer_id', emptyText = 'Select a customer to view contacts.' }, ref) {
     const [contacts, setContacts]   = useState<Contact[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [selection, setSelection] = useState<number | 'new' | null>(null);
@@ -278,7 +282,7 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
       if (!customerId) return [];
       setIsLoading(true);
       try {
-        const res  = await fetch(`/api/customers/contacts?tenant_id=${tenantId}&customer_id=${customerId}`);
+        const res  = await fetch(`${apiPath}?tenant_id=${tenantId}&${idParam}=${customerId}`);
         const json = await res.json() as { data?: Contact[]; error?: string };
         if (!res.ok || json.error) {
           toast.error(json.error ?? 'Could not load contacts.', { duration: Infinity });
@@ -291,7 +295,7 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
       } finally {
         setIsLoading(false);
       }
-    }, [tenantId, customerId]);
+    }, [tenantId, customerId, apiPath, idParam]);
 
     useEffect(() => {
       if (customerId !== loadedCustomerIdRef.current) {
@@ -307,10 +311,10 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
       if (!customerId || !isFormValid) return;
       setIsSaving(true);
       try {
-        const res  = await fetch('/api/customers/contacts', {
+        const res  = await fetch(apiPath, {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ tenant_id: tenantId, customer_id: customerId, contact: form }),
+          body:    JSON.stringify({ tenant_id: tenantId, [idParam]: customerId, contact: form }),
         });
         const json = await res.json() as { data?: { contact_id?: number }; error?: string };
         if (!res.ok || json.error) {
@@ -325,7 +329,7 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
       } finally {
         setIsSaving(false);
       }
-    }, [customerId, form, isFormValid, load, tenantId]);
+    }, [customerId, form, isFormValid, load, tenantId, apiPath, idParam]);
 
     const cancel = useCallback(() => {
       const f = savedFormRef.current;
@@ -410,7 +414,7 @@ export const CustomerContactsTab = forwardRef<CustomerContactsTabHandle, Custome
     // ── Early exit ────────────────────────────────────────────────────────────
 
     if (!customerId) {
-      return <p className="py-4 text-sm text-muted-foreground">Select a customer to view contacts.</p>;
+      return <p className="py-4 text-sm text-muted-foreground">{emptyText}</p>;
     }
 
     const hasUseAsShipping = form.contact_points.some(p => p.use_as_shipping);

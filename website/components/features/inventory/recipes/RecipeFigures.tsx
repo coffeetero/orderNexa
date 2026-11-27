@@ -24,7 +24,7 @@ export function Panel({ title, sub, action, children, className }: { title: stri
 const roleTag = (l: CalcLine) => (l.kind === 'RECIPE' ? 'Recipe' : l.role === 'FLOUR' ? 'Flour' : l.role === 'LIQUID' ? 'Liquid' : null);
 
 /** The formula: one row per line with baker's %, base batch, scaled amount and cost; total and overall-formula rows. */
-export function FormulaTable({ calc, onOpenRecipe }: { calc: Calc; onOpenRecipe?: (id: number) => void }) {
+export function FormulaTable({ calc, onOpenRecipe, showCost = true }: { calc: Calc; onOpenRecipe?: (id: number) => void; showCost?: boolean }) {
   const t = calc.totals;
   const u = calc.out_unit;
   return (
@@ -36,7 +36,7 @@ export function FormulaTable({ calc, onOpenRecipe }: { calc: Calc; onOpenRecipe?
             <th className={cn(thCls, 'text-right')}>Baker&apos;s %</th>
             <th className={cn(thCls, 'text-right')}>Base batch</th>
             <th className={cn(thCls, 'text-right')}>Scaled</th>
-            <th className={cn(thCls, 'text-right')}>Cost</th>
+            {showCost && <th className={cn(thCls, 'text-right')}>Cost</th>}
           </tr>
         </thead>
         <tbody>
@@ -52,10 +52,10 @@ export function FormulaTable({ calc, onOpenRecipe }: { calc: Calc; onOpenRecipe?
               <td className={cn(tdCls, 'text-right')}>{fmtPct(l.bakers_pct, 2)}</td>
               <td className={cn(tdCls, 'text-right text-muted-foreground')}>{fmtQty(l.quantity, l.unit)}</td>
               <td className={cn(tdCls, 'text-right font-semibold')}>{fmtQty(l.scaled_qty, u)}</td>
-              <td className={cn(tdCls, 'text-right')}>{fmtMoney(l.scaled_cost)}</td>
+              {showCost && <td className={cn(tdCls, 'text-right')}>{fmtMoney(l.scaled_cost)}</td>}
             </tr>
           ))}
-          {calc.lines.length === 0 && <tr><td colSpan={5} className={cn(tdCls, 'text-muted-foreground')}>No ingredients yet.</td></tr>}
+          {calc.lines.length === 0 && <tr><td colSpan={showCost ? 5 : 4} className={cn(tdCls, 'text-muted-foreground')}>No ingredients yet.</td></tr>}
         </tbody>
         <tfoot>
           <tr className="bg-muted/30 font-semibold">
@@ -63,7 +63,7 @@ export function FormulaTable({ calc, onOpenRecipe }: { calc: Calc; onOpenRecipe?
             <td className={cn(tdCls, 'text-right')}>{fmtPct(t.total_pct, 2)}</td>
             <td className={cn(tdCls, 'text-right')}>{fmtQty(t.total_g, 'g')}</td>
             <td className={cn(tdCls, 'text-right')}>{fmtQty(t.total_qty, u)}</td>
-            <td className={cn(tdCls, 'text-right')}>{fmtMoney(calc.cost.batch)}{!calc.cost.complete && <span className="text-warning"> *</span>}</td>
+            {showCost && <td className={cn(tdCls, 'text-right')}>{fmtMoney(calc.cost.batch)}{!calc.cost.complete && <span className="text-warning"> *</span>}</td>}
           </tr>
           {t.flour_g > 0 && (
             <tr className="text-xs text-muted-foreground">
@@ -72,7 +72,7 @@ export function FormulaTable({ calc, onOpenRecipe }: { calc: Calc; onOpenRecipe?
               </td>
               <td className={cn(tdCls, 'text-right')}>flour {fmtQty(t.flour_g, 'g')}</td>
               <td className={cn(tdCls, 'text-right')}>flour {fmtQty(t.flour_qty, u)}</td>
-              <td className={tdCls} />
+              {showCost && <td className={tdCls} />}
             </tr>
           )}
         </tfoot>
@@ -81,8 +81,8 @@ export function FormulaTable({ calc, onOpenRecipe }: { calc: Calc; onOpenRecipe?
   );
 }
 
-/** Summary figures: dough, flour, hydration, yield, cost. */
-export function SummaryList({ calc }: { calc: Calc }) {
+/** Summary figures: dough, flour, hydration, yield (part 'dough'), cost (part 'cost'), or both. */
+export function SummaryList({ calc, part = 'all' }: { calc: Calc; part?: 'all' | 'dough' | 'cost' }) {
   const t = calc.totals;
   const u = calc.out_unit;
   const rows: [string, string][] = [
@@ -101,10 +101,10 @@ export function SummaryList({ calc }: { calc: Calc }) {
   if (calc.cost.per_piece !== null) cost.push(['Cost per piece', fmtMoney(calc.cost.per_piece)]);
   return (
     <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 px-3 py-2.5 text-sm">
-      {rows.map(([k, v]) => <Row key={k} k={k} v={v} />)}
-      <div className="col-span-2 my-1 border-t" />
-      {cost.map(([k, v]) => <Row key={k} k={k} v={v} />)}
-      {!calc.cost.complete && (
+      {part !== 'cost' && rows.map(([k, v]) => <Row key={k} k={k} v={v} />)}
+      {part === 'all' && <div className="col-span-2 my-1 border-t" />}
+      {part !== 'dough' && cost.map(([k, v]) => <Row key={k} k={k} v={v} />)}
+      {part !== 'dough' && !calc.cost.complete && (
         <p className="col-span-2 text-xs text-warning">* {calc.cost.missing_count} ingredient{calc.cost.missing_count === 1 ? ' has' : 's have'} no price; cost is incomplete.</p>
       )}
     </dl>
@@ -112,6 +112,34 @@ export function SummaryList({ calc }: { calc: Calc }) {
 }
 function Row({ k, v }: { k: string; v: string }) {
   return <><dt className="text-muted-foreground">{k}</dt><dd className="text-right font-semibold tabular-nums">{v}</dd></>;
+}
+
+/** Cost of each line for this batch, with the batch total. */
+export function CostTable({ calc }: { calc: Calc }) {
+  const u = calc.out_unit;
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead><tr><th className={thCls}>Ingredient</th><th className={cn(thCls, 'text-right')}>Scaled</th><th className={cn(thCls, 'text-right')}>Cost</th></tr></thead>
+        <tbody>
+          {calc.lines.map((l) => (
+            <tr key={l.line_no} className="hover:bg-muted/40">
+              <td className={tdCls}>{l.name}</td>
+              <td className={cn(tdCls, 'text-right')}>{fmtQty(l.scaled_qty, u)}</td>
+              <td className={cn(tdCls, 'text-right')}>{l.scaled_cost === null ? <span className="text-warning">No price</span> : fmtMoney(l.scaled_cost)}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr className="bg-muted/30 font-semibold">
+            <td className={tdCls}>Batch</td>
+            <td className={cn(tdCls, 'text-right')}>{fmtQty(calc.totals.total_qty, u)}</td>
+            <td className={cn(tdCls, 'text-right')}>{fmtMoney(calc.cost.batch)}{!calc.cost.complete && <span className="text-warning"> *</span>}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  );
 }
 
 export function AllergenList({ calc }: { calc: Calc }) {

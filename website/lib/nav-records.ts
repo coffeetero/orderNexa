@@ -25,16 +25,32 @@ export type RecentRow = {
 /** Which recent lists each module shows, in order. Keys are top-level menu labels in nav-config. */
 export const MODULE_RECENTS: Record<string, { type: RecordType; title: string }[]> = {
   Customers: [{ type: 'customer', title: 'Recent customers' }],
-  Orders: [
+  Operations: [
+    { type: 'customer', title: 'Recent customers' },
+    { type: 'order', title: 'Recent orders' },
+    { type: 'production_run', title: 'Recent production runs' },
+  ],
+  Inventory: [{ type: 'item', title: 'Recent items' }],
+};
+
+/** Pages that choose their own recent lists (keyed by menu href). They win over the module's lists. */
+export const PAGE_RECENTS: Record<string, { type: RecordType; title: string }[]> = {
+  '/orders': [
     { type: 'customer', title: 'Recent customers' },
     { type: 'order', title: 'Recent orders' },
   ],
-  Inventory: [{ type: 'item', title: 'Recent items' }],
-  Production: [{ type: 'production_run', title: 'Recent production runs' }],
+  '/inventory/recipes': [], // the recipe list sits in the sidebar instead
+  '/inventory/item-profile': [], // so does the item list
+  '/purchasing/vendors': [], // and the vendor list
+  '/purchasing/items': [],
 };
 
-export function recentTypesFor(module: string | null | undefined): RecordType[] {
-  return (module ? MODULE_RECENTS[module] ?? [] : []).map((r) => r.type);
+export function recentListsFor(page: string | null | undefined, module: string | null | undefined) {
+  return (page && PAGE_RECENTS[page]) || (module ? MODULE_RECENTS[module] ?? [] : []);
+}
+
+export function recentTypesFor(module: string | null | undefined, page?: string | null): RecordType[] {
+  return recentListsFor(page, module).map((r) => r.type);
 }
 
 const KEY_RE = /^[A-Za-z0-9|:_.-]{1,64}$/;
@@ -67,7 +83,7 @@ export function recordHref(type: RecordType, key: string, module: string | null 
   const k = encodeURIComponent(key);
   switch (type) {
     case 'customer':
-      return module === 'Orders' ? `/orders?customer=${k}` : `/customers?customer=${k}`;
+      return module === 'Operations' ? `/orders?customer=${k}` : `/customers?customer=${k}`;
     case 'order':
       return /^\d+$/.test(key) ? `/orders/${key}/edit` : null;
     case 'item':

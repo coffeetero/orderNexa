@@ -4,15 +4,9 @@ import { buildBreadcrumbs } from '@/lib/breadcrumbs';
 import {
   isValidActionKey, MODULE_RECENTS, normalizeRecord, parseIdParam, recentTypesFor, recordHref,
 } from '@/lib/nav-records';
-import { normalizePins, selectQuickAccess, type ActionRow } from '@/lib/quick-access';
+import { normalizePins } from '@/lib/quick-access';
 
 const allowed = builtActions(tenantNav);
-const NOW = new Date('2026-11-22T12:00:00Z');
-const row = (key: string, uses: number, daysAgo: number, pin: number | null = null): ActionRow => ({
-  action_key: key, use_count: uses, last_used_at: new Date(NOW.getTime() - daysAgo * 86_400_000).toISOString(),
-  is_pinned: pin !== null, pin_order: pin,
-});
-
 describe('builtActions / authorization', () => {
   it('lists only built entries with their module', () => {
     const hrefs = allowed.map((a) => a.href);
@@ -29,34 +23,6 @@ describe('builtActions / authorization', () => {
   it('firstBuiltHref skips "Soon" entries', () => {
     const inventory = tenantNav.find((m) => m.label === 'Inventory')!;
     expect(firstBuiltHref(inventory)).toBe('/inventory/item-profile');
-  });
-});
-
-describe('selectQuickAccess', () => {
-  it('starts with the defaults (Item Management stands in for the missing Inventory landing page)', () => {
-    expect(selectQuickAccess([], allowed, NOW)).toEqual(['/orders', '/customers', '/inventory/item-profile', '/orders/standing-mgmt']);
-  });
-  it('puts pins first, in pin order', () => {
-    const rows = [row('/manage-orders', 1, 1, 2), row('/customers', 5, 1, 1)];
-    expect(selectQuickAccess(rows, allowed, NOW).slice(0, 2)).toEqual(['/customers', '/manage-orders']);
-  });
-  it('ranks unpinned actions by use count, then recency, and fills with defaults', () => {
-    const rows = [row('/manage-orders', 10, 2), row('/orders/standing', 10, 1), row('/customers', 3, 1)];
-    expect(selectQuickAccess(rows, allowed, NOW)).toEqual(['/orders/standing', '/manage-orders', '/customers', '/orders']);
-  });
-  it('ignores usage older than 90 days', () => {
-    const rows = [row('/manage-orders', 99, 200)];
-    expect(selectQuickAccess(rows, allowed, NOW)).toEqual(['/orders', '/customers', '/inventory/item-profile', '/orders/standing-mgmt']);
-  });
-  it('never returns unbuilt or unknown actions, even if pinned', () => {
-    const rows = [row('/production/mixing', 50, 1, 1), row('/nope', 50, 1)];
-    expect(selectQuickAccess(rows, allowed, NOW)).toEqual(['/orders', '/customers', '/inventory/item-profile', '/orders/standing-mgmt']);
-  });
-  it('returns at most 4 with no duplicates', () => {
-    const rows = [row('/orders', 5, 1, 1), row('/orders', 9, 1), row('/customers', 9, 1)];
-    const out = selectQuickAccess(rows, allowed, NOW);
-    expect(out).toHaveLength(4);
-    expect(new Set(out).size).toBe(4);
   });
 });
 
@@ -77,20 +43,23 @@ describe('normalizePins', () => {
 describe('recent records', () => {
   it('maps modules to the lists they show', () => {
     expect(recentTypesFor('Customers')).toEqual(['customer']);
-    expect(recentTypesFor('Orders')).toEqual(['customer', 'order']);
+    expect(recentTypesFor('Operations')).toEqual(['customer', 'order', 'production_run']);
     expect(recentTypesFor('Inventory')).toEqual(['item']);
-    expect(recentTypesFor('Production')).toEqual(['production_run']);
     expect(recentTypesFor('Financials')).toEqual([]);
     expect(recentTypesFor(null)).toEqual([]);
+    expect(recentTypesFor('Operations', '/orders')).toEqual(['customer', 'order']); // Enter Orders chooses its own
+    expect(recentTypesFor('Inventory', '/inventory/recipes')).toEqual([]);
+    expect(recentTypesFor('Inventory', '/inventory/item-profile')).toEqual([]);
+    expect(recentTypesFor('Operations', '/manage-orders')).toEqual(['customer', 'order', 'production_run']);
     expect(Object.keys(MODULE_RECENTS).every((m) => tenantNav.some((n) => n.label === m))).toBe(true);
   });
   it('builds deep links per module', () => {
-    expect(recordHref('customer', '10700', 'Orders')).toBe('/orders?customer=10700');
+    expect(recordHref('customer', '10700', 'Operations')).toBe('/orders?customer=10700');
     expect(recordHref('customer', '10700', 'Customers')).toBe('/customers?customer=10700');
-    expect(recordHref('order', '55', 'Orders')).toBe('/orders/55/edit');
-    expect(recordHref('order', 'abc', 'Orders')).toBeNull();
+    expect(recordHref('order', '55', 'Operations')).toBe('/orders/55/edit');
+    expect(recordHref('order', 'abc', 'Operations')).toBeNull();
     expect(recordHref('item', '9', 'Inventory')).toBe('/inventory/item-profile?item=9');
-    expect(recordHref('production_run', '2026-11-23|AM', 'Production')).toBeNull();
+    expect(recordHref('production_run', '2026-11-23|AM', 'Operations')).toBeNull();
   });
   it('validates and normalizes untrusted records', () => {
     expect(normalizeRecord({ type: 'customer', key: 10700, label: '  10700 · HOBOKEN  ', sublabel: '' }))
@@ -132,14 +101,14 @@ describe('buildBreadcrumbs', () => {
   });
   it("sends a module crumb to the module's first built page", () => {
     expect(buildBreadcrumbs('/inventory/item-profile', tenantNav)[0]).toEqual({ label: 'Inventory', href: '/inventory/item-profile' });
-    expect(buildBreadcrumbs('/orders/standing', tenantNav)[0]).toEqual({ label: 'Orders', href: '/orders' });
+    expect(buildBreadcrumbs('/orders/standing', tenantNav)[0]).toEqual({ label: 'Operations', href: '/orders' });
   });
   it('handles dashboard, extra pages, edit-order and the internal /tenant prefix', () => {
     expect(buildBreadcrumbs('/dashboard', tenantNav)).toEqual([{ label: 'Dashboard' }]);
     expect(buildBreadcrumbs('/tenant/profile', tenantNav)).toEqual([{ label: 'User Profile' }]);
     expect(buildBreadcrumbs('/orders/55/edit', tenantNav, { type: 'order', key: '55', label: '0115-1087' }).map((c) => c.label))
-      .toEqual(['Orders', 'Enter Orders', '0115-1087']);
-    expect(buildBreadcrumbs('/tenant/manage-orders', tenantNav).map((c) => c.label)).toEqual(['Orders', 'Manage Orders']);
+      .toEqual(['Operations', 'Enter Orders', '0115-1087']);
+    expect(buildBreadcrumbs('/tenant/manage-orders', tenantNav).map((c) => c.label)).toEqual(['Operations', 'Manage Orders']);
   });
   it('returns nothing for unknown pages', () => {
     expect(buildBreadcrumbs('/nowhere', tenantNav)).toEqual([]);

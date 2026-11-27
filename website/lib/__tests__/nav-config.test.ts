@@ -37,7 +37,7 @@ describe('tenantNav matches the real routes', () => {
     ]) {
       expect(hrefs.has(href), href).toBe(true);
     }
-    expect(items.length).toBe(1 + 8 + 7 + 3 + 9 + 10 + 11 + 5 + 1 - 1 + 1); // + Financials > Enter Payments (Manage Payments became Payment History, 2026-11-25); - Orders > Returns & Credits (moved to Financials > Enter Returns, 2026-11-25); Dashboard + old sidebar sections + Admin > Appearance, Application Settings, Production > Process Run, Process Run + Orders > Export Orders + Production > Print Invoices + Organizer (Sheets and 4 planned) + Customers Import/Export split in two
+    expect(items.length).toBe(1 + 8 + 7 + 3 + 9 + 10 + 11 + 5 + 1 - 1 + 1 + 6 + 4); // + Inventory > Purchasing (Vendors, Vendor Items, 2 planned, 2026-11-26); + Operations > Delivery (Routes Maintenance + 5 planned fleet screens, 2026-11-26); + Financials > Enter Payments (Manage Payments became Payment History, 2026-11-25); - Orders > Returns & Credits (moved to Financials > Enter Returns, 2026-11-25); Dashboard + old sidebar sections + Admin > Appearance, Application Settings, Production > Process Run, Process Run + Orders > Export Orders + Production > Print Invoices + Organizer (Sheets and 4 planned) + Customers Import/Export split in two
   });
 });
 
@@ -85,7 +85,7 @@ describe('findActiveHref', () => {
 
 describe('findActiveMenu', () => {
   it('returns the parent menu of the active page', () => {
-    expect(findActiveMenu('/orders/standing', tenantNav)?.label).toBe('Orders');
+    expect(findActiveMenu('/orders/standing', tenantNav)?.label).toBe('Operations');
     expect(findActiveMenu('/inventory/item-profile', tenantNav)?.label).toBe('Inventory');
     expect(findActiveMenu('/dashboard', tenantNav)?.label).toBe('Dashboard');
   });
@@ -98,6 +98,6 @@ describe('visibleMenus', () => {
     expect(labels(['orders.enter'])).not.toContain('Admin');
     expect(labels(['orders.enter', 'admin.users'])).toContain('Admin');
     expect(labels(null)).toContain('Admin');
-    expect(labels([])).toContain('Orders');
+    expect(labels([])).toContain('Operations');
   });
 });

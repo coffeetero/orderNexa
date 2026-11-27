@@ -197,6 +197,8 @@ export interface OrderEntryLine {
   unit_discount: number;
   /** Calculated: quantity * (unit_price - unit_discount) */
   extended_amount: number;
+  /** On screen only: the line came from Copy order; cleared when its quantity is changed. */
+  copied?: boolean;
 }
 
 /** The full in-memory draft held by useOrderEntryState. */

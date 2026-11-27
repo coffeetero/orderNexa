@@ -9,7 +9,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
  * filters the list), search right above the list, 50 orders a page with group subtotals over all pages. Everything is
  * worked out by the database (om_orders_manage_get via /api/orders/manage). The filters live in the address, so returning
  * from an order keeps them. Clicking an order opens Order Entry (protected, unchanged). New order and Export Orders are in
- * Quick access.
+ * the menu.
  */
 
 type Status = 'OPEN' | 'IN_PRODUCTION' | 'SHIPPED' | 'INVOICED';

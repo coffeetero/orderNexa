@@ -5,6 +5,8 @@
 --   1. run_status -> PROCESSED (processed_at/by).
 --   2. Shipments: one PLANNED shipment per ship-to customer (the order's customer) and delivery method; one shipment
 --      line per order line (quantity > 0). Shipment numbers come from the tenant sequence 'shipment_number'.
+--      Own-fleet shipments get their route and stop number from Routes Maintenance (om_shipments_route_stamp: the run's
+--      delivery day of week + production code, date changes applied).
 --   3. Invoices: one per invoice owner (om_customer_invoice_owner) per run, DRAFT until the Packaging print numbers it.
 --      Lines: each order line with a quantity above zero (ITEM, net of discount) and each order's delivery charge (DELIVERY), ordered by
 --      department/event, order number, line. Invoices whose orders are gone are deleted (DRAFT) or CANCELLED (numbered).
@@ -81,6 +83,8 @@ BEGIN
     DELETE FROM om_shipments s
      WHERE s.production_run_id = p_production_run_id AND s.shipment_status = 'PLANNED'
        AND NOT EXISTS (SELECT 1 FROM om_shipment_lines l WHERE l.shipment_id = s.shipment_id);
+
+    PERFORM bps.om_shipments_route_stamp(p_tenant_id, p_production_run_id);
 
     -- ── Invoices ─────────────────────────────────────────────────────────
     INSERT INTO ar_transactions (tenant_id, customer_id, transaction_type, document_number, transaction_date, amount, status, production_run_id)

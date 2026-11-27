@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { CustomerRoutes } from '@/components/features/account/CustomerRoutes';
 import { DocumentsList } from '@/components/features/financials/DocumentsList';
 import { CustomerContactsTab, CustomerContactsTabHandle } from '@/components/features/account/CustomerContactsTab';
 import { CustomerNotesTab, CustomerNotesTabHandle } from '@/components/features/account/CustomerNotesTab';
@@ -888,6 +889,8 @@ export function CustomerManagementPage({
                     Returns Allowed
                   </label>
                 </div>
+
+                <CustomerRoutes tenantId={tenantId ?? 0} customerId={selectedCustomerId} />
 
                 {statusMessage && <p className="text-xs text-muted-foreground">{statusMessage}</p>}
                 </div>
