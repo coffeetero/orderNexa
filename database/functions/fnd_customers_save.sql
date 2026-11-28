@@ -123,7 +123,7 @@ BEGIN
     RETURNING customer_id INTO v_customer_id;
 
     -- Auto-create ADDRESSES system contact
-    INSERT INTO fnd_contacts (tenant_id, entity_id, source_table, contact_name, contact_type, is_primary, is_active, created_by, updated_by)
+    INSERT INTO fnd_contacts (tenant_id, entity_id, source_table, card_name, contact_type, is_primary, is_active, created_by, updated_by)
     VALUES (p_tenant_id, v_customer_id, 'fnd_customers', 'Billing & Shipping', 'ADDRESSES', FALSE, TRUE, v_app_user_id, v_app_user_id)
     ON CONFLICT DO NOTHING;
 

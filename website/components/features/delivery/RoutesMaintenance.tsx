@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import type { CustomerOption } from '@/components/features/account/order-entry/OrderHeaderRow';
 import { CopyDayDialog, DateChangesDialog, RouteDialog } from './RouteDialogs';
+import { RouteMap } from './RouteMap';
 import {
   DAYS, DAY_LETTER, DAY_SHORT, IN, TD, TH, call, customerLabel, isShipTo, post, shortDate, timeLabel,
   type Day, type Route, type RoutesData, type Stop, type StopsData, type Unassigned,
@@ -281,6 +282,7 @@ export function RoutesMaintenance({ tenantId, canEdit, canDelete }: { tenantId: 
           </section>
         </div>
 
+        <div className="flex min-w-0 flex-col gap-3">
         <section className="flex min-h-[20rem] min-w-0 flex-col rounded-lg border border-border bg-card shadow-sm">
           {route ? (<>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-3 py-1.5">
@@ -391,6 +393,8 @@ export function RoutesMaintenance({ tenantId, canEdit, canDelete }: { tenantId: 
             <p className="p-4 text-sm text-muted-foreground">{data ? (data.routes.length ? 'Pick a route on the left.' : 'No routes yet.') : 'Loading…'}</p>
           )}
         </section>
+        {route && stops && <RouteMap tenantId={tenantId} stops={list} origin={stops.origin ?? null} />}
+        </div>
       </div>
 
       {editing && data && (

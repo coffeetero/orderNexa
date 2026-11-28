@@ -24,6 +24,14 @@ export interface RoutesData {
   staff: { user_id: number; user_name: string }[];
   routes: Route[];
 }
+/** Where an address is on a map (om_customer_ship_point). */
+export interface MapPoint {
+  contact_point_id: number;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  geocode_status: string | null;
+}
 export interface Stop {
   route_stop_id: number;
   stop_no: number;
@@ -34,12 +42,14 @@ export interface Stop {
   parent_name: string | null;
   is_active: boolean;
   address: string | null;
+  point: MapPoint | null;
   window_from: string | null;
   window_to: string | null;
   driver_notes: string | null;
 }
 export interface StopsData {
   stops: Stop[];
+  origin: MapPoint | null;
   day_assignments: { customer_id: number; route_id: number; route_code: string; stop_no: number }[];
 }
 export interface Unassigned {

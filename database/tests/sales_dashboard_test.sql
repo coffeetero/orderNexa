@@ -46,6 +46,9 @@ BEGIN
   EXCEPTION WHEN OTHERS THEN ok := SQLERRM LIKE 'Unknown segment%';
   END;
   INSERT INTO _t VALUES ('save: a value not in the list is refused', ok);
+  r := fnd_customers_save(200000000002, NULL, 'create', jsonb_build_object('customer_name', 'ZZ SEG NEW', 'customer_type', 'ACCOUNT', 'segment_code', 'RETAIL'));
+  INSERT INTO _t VALUES ('create: a new account is saved with its segment and its Billing & Shipping contact',
+    (r->>'success')::boolean AND (SELECT segment_code FROM fnd_customers WHERE customer_id = (r->>'customer_id')::bigint) = 'RETAIL');
 
   r := ar_sales_dashboard_get(200000000002, a);
   INSERT INTO _t VALUES ('one account: this year = invoices less credits, drafts left out (900), last year 500',

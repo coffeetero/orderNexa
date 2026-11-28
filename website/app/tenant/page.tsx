@@ -1,9 +1,8 @@
 import Link from 'next/link';
 import { SalesCharts } from '@/components/features/dashboard/SalesCharts';
 import { Suspense, cache } from 'react';
-import { ArrowRight } from 'lucide-react';
+import { AlertTriangle, ArrowRight } from 'lucide-react';
 import { SecurityTodo, type SecuritySignal } from '@/components/features/dashboard/SecurityTodo';
-import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase/server';
 import { getCurrentTenantId } from '@/lib/supabase/tenant';
 
@@ -107,39 +106,15 @@ async function ArFigure({ tenantId }: { tenantId: number }) {
   return <FigureCell f={{ label: 'Outstanding AR', value: whole(Number(ar.totals.total), '$'), note: `over 90 days: ${whole(Number(ar.totals.d90_plus), '$')}` }} />;
 }
 
-async function CustomerAccounts({ tenantId }: { tenantId: number }) {
-  const ar = await loadAr(tenantId);
-  if (!ar || ar.accounts.length === 0) return <p className={EMPTY}>No account has an open balance.</p>;
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead className="text-left">
-          <tr><th className={TH}>Account</th><th className={`${TH} text-right`}>Balance</th><th className={`${TH} text-right`}>Over 60 days</th></tr>
-        </thead>
-        <tbody>
-          {ar.accounts.map((a) => (
-            <tr key={a.customer_id} className="border-t border-border hover:bg-muted/40">
-              <td className={TD}>{a.customer_name}</td>
-              <td className={`${TD} text-right`}>{money(a.total)}</td>
-              <td className={`${TD} text-right ${Number(a.d60_plus) > 0 ? 'font-medium text-destructive' : 'text-muted-foreground'}`}>{money(a.d60_plus)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
 /** AR aging as vertical bars, one per age bucket, each labelled with its amount; bucket colours keep their status meaning. */
 async function ArAging({ tenantId }: { tenantId: number }) {
   const ar = await loadAr(tenantId);
   if (!ar) return <p className={EMPTY}>AR aging is not available.</p>;
   const buckets = [
-    { label: 'Current', amount: Number(ar.totals.current_amt), color: 'bg-success' },
-    { label: '1–30', amount: Number(ar.totals.d1_30), color: 'bg-info' },
-    { label: '31–60', amount: Number(ar.totals.d31_60), color: 'bg-warning' },
-    { label: '61–90', amount: Number(ar.totals.d61_90), color: 'bg-destructive opacity-60' },
-    { label: 'Over 90', amount: Number(ar.totals.d90_plus), color: 'bg-destructive' },
+    { label: '1–30 Days', amount: Number(ar.totals.d1_30), color: 'bg-info' },
+    { label: '30 Days +', amount: Number(ar.totals.d31_60), color: 'bg-warning' },
+    { label: '60 Days +', amount: Number(ar.totals.d61_90), color: 'bg-destructive opacity-60' },
+    { label: '90 Days +', amount: Number(ar.totals.d90_plus), color: 'bg-destructive' },
   ];
   const max = Math.max(1, ...buckets.map((b) => b.amount));
   return (
@@ -148,18 +123,46 @@ async function ArAging({ tenantId }: { tenantId: number }) {
         <span>Days past due</span>
         <span>Total AR <span className="font-semibold tabular-nums text-foreground">{money(ar.totals.total)}</span></span>
       </div>
-      <div className="grid h-[200px] grid-cols-5 items-end gap-3 border-b border-border">
+      <div className="grid h-[200px] grid-cols-4 items-end gap-3 border-b border-border">
         {buckets.map((b) => (
-          <div key={b.label} className="flex h-full flex-col items-center justify-end gap-1" title={`${b.label}${b.label === 'Current' ? '' : ' days'}: ${money(b.amount)}`}>
+          <div key={b.label} className="flex h-full flex-col items-center justify-end gap-1" title={`${b.label}: ${money(b.amount)}`}>
             <span className="text-[11px] font-medium tabular-nums">{money(Math.round(b.amount))}</span>
             <div className={`w-full max-w-[88px] rounded-t ${b.color}`} style={{ height: `${(Math.max(b.amount, 0) / max) * 80}%` }} />
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-5 gap-3 pt-1">
+      <div className="grid grid-cols-4 gap-3 pt-1">
         {buckets.map((b) => <span key={b.label} className="text-center text-[11px] text-muted-foreground">{b.label}</span>)}
       </div>
     </div>
+  );
+}
+
+type AddressReview = { suggestions: number; not_found: number; no_bill: number; no_ship: number; total: number };
+
+/** Warning tile: customer addresses needing attention (fnd_address_review_get); opens Customer Management on those customers. */
+async function AddressReviewTile({ tenantId }: { tenantId: number }) {
+  const { data } = await (await createClient()).rpc('fnd_address_review_get', { p_tenant_id: tenantId });
+  const r = data as AddressReview | null;
+  if (!r || !r.total) return null;
+  const lines = [
+    r.suggestions ? `${r.suggestions} Google suggestion${r.suggestions === 1 ? '' : 's'} to accept or reject` : null,
+    r.not_found ? `${r.not_found} address${r.not_found === 1 ? '' : 'es'} Google can't confirm` : null,
+    r.no_ship ? `${r.no_ship} delivered customer${r.no_ship === 1 ? '' : 's'} with no Ship to (confirm against the old system)` : null,
+    r.no_bill ? `${r.no_bill} customer${r.no_bill === 1 ? '' : 's'} with no Bill to` : null,
+  ].filter(Boolean);
+  return (
+    <Link href="/customers?review=1" className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-warning/40 bg-warning-soft/40 px-4 py-2.5 shadow-sm hover:bg-warning-soft/70">
+      <span className="flex items-center gap-2.5">
+        <AlertTriangle className="h-5 w-5 text-warning" aria-hidden />
+        <span>
+          <span className="block text-xl font-semibold tabular-nums text-warning">{r.total}</span>
+          <span className="block text-xs text-muted-foreground">customer addresses need review</span>
+        </span>
+      </span>
+      <span className="text-xs leading-5 text-muted-foreground">{lines.map((l) => <span key={l} className="block">{l}</span>)}</span>
+      <ArrowRight className="ml-auto h-4 w-4 text-muted-foreground" aria-hidden />
+    </Link>
   );
 }
 
@@ -202,12 +205,6 @@ export default async function TenantDashboardPage() {
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <h1 className="text-lg font-semibold tracking-tight">Dashboard</h1>
         <p className="text-sm text-muted-foreground">{dateLabel}</p>
-        {showOrders && (
-          <div className="ml-auto flex gap-2">
-            <Button asChild variant="outline" size="sm"><Link href="/production/report">Production report</Link></Button>
-            {areas.includes('orders.enter') && <Button asChild size="sm"><Link href="/orders/new">New order</Link></Button>}
-          </div>
-        )}
       </div>
 
       {(figures.length > 0 || showAr) && (
@@ -221,6 +218,10 @@ export default async function TenantDashboardPage() {
             )}
           </div>
         </section>
+      )}
+
+      {tenantId !== null && (
+        <Suspense fallback={null}><AddressReviewTile tenantId={tenantId} /></Suspense>
       )}
 
       {showAr && (
@@ -321,15 +322,6 @@ export default async function TenantDashboardPage() {
         </Panel>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2">
-        <Panel title="Customer Accounts" sub="Largest open balances" href="/customers" linkLabel="View all">
-          {!showAr ? (
-            <p className={EMPTY}>Balances are not available to your role.</p>
-          ) : (
-            <Suspense fallback={<Pending rows={8} />}><CustomerAccounts tenantId={tenantId!} /></Suspense>
-          )}
-        </Panel>
-      </div>
     </div>
   );
 }

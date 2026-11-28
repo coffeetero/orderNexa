@@ -5,7 +5,9 @@
 -- so the add search can say "on 102, stop 4".
 -- Returns { route: { route_id, route_code, route_name, is_active }, day_of_week, production_code,
 --   stops: [{ route_stop_id, stop_no, customer_id, customer_number, customer_name, customer_type, parent_name, is_active,
---             address, window_from 'HH:MM', window_to, driver_notes }],
+--             address, point: { contact_point_id, address, latitude, longitude, geocode_status } (for the map),
+--             window_from 'HH:MM', window_to, driver_notes }],
+--   origin: the company's own address point (the map's start), or null
 --   day_assignments: [{ customer_id, route_id, route_code, stop_no }] }
 -- ============================================================
 CREATE OR REPLACE FUNCTION bps.om_route_stops_get(p_tenant_id bigint, p_route_id bigint, p_dow text, p_code text)
@@ -24,12 +26,14 @@ BEGIN
   RETURN jsonb_build_object(
     'route', jsonb_build_object('route_id', v.route_id, 'route_code', v.route_code, 'route_name', v.route_name, 'is_active', v.is_active),
     'day_of_week', v_dow, 'production_code', v_code,
+    'origin', bps.om_customer_ship_point(p_tenant_id, p_tenant_id, 'fnd_tenants'),
     'stops', COALESCE((
       SELECT jsonb_agg(jsonb_build_object(
                'route_stop_id', s.route_stop_id, 'stop_no', s.stop_no, 'customer_id', c.customer_id,
                'customer_number', c.customer_number, 'customer_name', c.customer_name, 'customer_type', c.customer_type,
                'parent_name', p.customer_name, 'is_active', c.is_active,
                'address', bps.om_customer_ship_address(p_tenant_id, c.customer_id),
+               'point', bps.om_customer_ship_point(p_tenant_id, c.customer_id),
                'window_from', to_char(s.window_from, 'HH24:MI'), 'window_to', to_char(s.window_to, 'HH24:MI'),
                'driver_notes', s.driver_notes) ORDER BY s.stop_no)
         FROM om_route_stops s
