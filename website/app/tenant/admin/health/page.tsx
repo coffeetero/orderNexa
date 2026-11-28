@@ -6,11 +6,12 @@ export const metadata = {
   title: 'Health Checks — Admin',
 };
 
-export default async function AdminHealthPage() {
+export default async function AdminHealthPage({ searchParams }: { searchParams: Promise<{ check?: string | string[] }> }) {
   await requireArea('admin.health');
   const tenantId = await getCurrentTenantId();
   if (tenantId === null) {
     return <div className="p-6 text-sm text-muted-foreground">No company found for this user.</div>;
   }
-  return <HealthChecksAdmin tenantId={tenantId} />;
+  const check = (await searchParams).check;
+  return <HealthChecksAdmin tenantId={tenantId} initialCheck={typeof check === 'string' && check ? check : null} />;
 }

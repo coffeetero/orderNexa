@@ -203,7 +203,7 @@ function ButtonsEditor({ buttons, actions, onSave }: { buttons: string[]; action
   );
 }
 
-/** Find a screen by name; Ctrl+K (⌘K on a Mac) focuses it. */
+/** Find a screen by name. Hidden until Ctrl+K (⌘K on a Mac) shows and focuses it (owner request 2026-11-28: no box in the breadcrumb bar). */
 function ScreenSearch({ actions, shortcut }: { actions: BuiltAction[]; shortcut: string }) {
   const router = useRouter();
   const { confirmLeave } = useNav();
@@ -211,12 +211,14 @@ function ScreenSearch({ actions, shortcut }: { actions: BuiltAction[]; shortcut:
   const [q, setQ] = useState('');
   const [active, setActive] = useState(0);
   const [open, setOpen] = useState(false);
+  const [shown, setShown] = useState(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        inputRef.current?.focus();
+        setShown(true);
+        requestAnimationFrame(() => inputRef.current?.focus());
       }
     };
     window.addEventListener('keydown', onKey);
@@ -237,7 +239,7 @@ function ScreenSearch({ actions, shortcut }: { actions: BuiltAction[]; shortcut:
   };
 
   return (
-    <div className="relative mr-8 hidden sm:block">
+    <div className={cn('relative mr-8', shown ? 'hidden sm:block' : 'hidden')}>
       <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
       <input
         ref={inputRef}
@@ -255,7 +257,7 @@ function ScreenSearch({ actions, shortcut }: { actions: BuiltAction[]; shortcut:
           setOpen(true);
         }}
         onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onBlur={() => setTimeout(() => { setOpen(false); setQ(''); setShown(false); }, 150)}
         onKeyDown={(e) => {
           if (e.key === 'ArrowDown') { e.preventDefault(); setActive((i) => Math.min(i + 1, matches.length - 1)); }
           else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((i) => Math.max(i - 1, 0)); }

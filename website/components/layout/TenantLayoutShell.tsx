@@ -61,6 +61,13 @@ export function TenantLayoutShell({
     return () => mq.removeEventListener('change', update);
   }, []);
 
+  // A link in the drawer's page content (e.g. a Health Checks finding) goes to another page: close the drawer.
+  const [drawerPath, setDrawerPath] = useState(pathname);
+  if (drawerPath !== pathname) {
+    setDrawerPath(pathname);
+    setDrawerOpen(false);
+  }
+
   useEffect(() => {
     let isMounted = true;
     const supabase = createClient();
@@ -98,7 +105,8 @@ export function TenantLayoutShell({
   // A page can ask for its own list to sit in the drawer too (PAGE_SIDEBAR inDrawer), and for a wider docked sidebar.
   const moduleLabel = findActiveMenu(pathname, tenantNav)?.label ?? null;
   const activeHref = findActiveHref(pathname, tenantNav);
-  const pageSidebar = (activeHref && PAGE_SIDEBAR[activeHref]) || {};
+  const pageSidebarDef = (activeHref && PAGE_SIDEBAR[activeHref]) || {};
+  const pageSidebar = pageSidebarDef.area && !areas?.includes(pageSidebarDef.area) ? {} : pageSidebarDef;
   const sidebarWidth = pageSidebar.width ?? 260;
   const drawerHasContent = moduleLabel === 'Admin' || Boolean(pageSidebar.inDrawer) || recentListsFor(activeHref, moduleLabel).length > 0;
 

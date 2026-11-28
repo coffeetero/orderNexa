@@ -35,9 +35,10 @@ export const MODULE_RECENTS: Record<string, { type: RecordType; title: string }[
 
 /**
  * Pages whose own list in the sidebar needs a wider docked sidebar (px; default 260), or that keep that list in the
- * drawer on narrow screens instead of on the page (inDrawer).
+ * drawer on narrow screens instead of on the page (inDrawer; only for users with `area` when given).
  */
-export const PAGE_SIDEBAR: Record<string, { width?: number; inDrawer?: boolean }> = {
+export const PAGE_SIDEBAR: Record<string, { width?: number; inDrawer?: boolean; area?: string }> = {
+  '/dashboard': { width: 312, inDrawer: true, area: 'admin.health' }, // Health Checks findings, 20% wider (owner approved 2026-11-28)
   '/financials/ar': { width: 340, inDrawer: true }, // customer list with number and balance (owner request 2026-11-27)
   '/financials/aging': { width: 340, inDrawer: true }, // same layout as AR Open Balances
 };

@@ -1,0 +1,145 @@
+<title>Dashboard Health Checks</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Dashboard in the Hearth theme: the docked context sidebar (260px, from 1280px) shows Health Checks, the open findings
+   of fnd_health_findings_get grouped by type (Errors, Warnings, Information), then by check. A row opens the finding's
+   record (link_path); "Open" goes to Admin › Health. Shown only to users who can read admin.health. Data is the local
+   database's open findings on 2026-11-28; the Dashboard body is a placeholder (unchanged). */
+:root{--bg:#f5f3f0;--surface:#fffefc;--side:#ede9e3;--line:#e1dbd3;--line2:#cfc7bc;--text:#1e1915;--text2:#544a41;--text3:#7a6e63;--accent:#a3451c;--accent-fg:#fff;--pos:#2d6e3e;--warn:#8f5a00;--info:#2a5fa8;--neg:#b3312a;--focus:#a3451c}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#161310;--surface:#1f1b17;--side:#1a1613;--line:#322c26;--line2:#433b33;--text:#efe9e2;--text2:#c4b9ad;--text3:#978b7e;--accent:#e58d60;--accent-fg:#1a120c;--pos:#7cc48c;--warn:#e0aa4a;--info:#7fb0ee;--neg:#ee8177;--focus:#e58d60;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#161310;--surface:#1f1b17;--side:#1a1613;--line:#322c26;--line2:#433b33;--text:#efe9e2;--text2:#c4b9ad;--text3:#978b7e;--accent:#e58d60;--accent-fg:#1a120c;--pos:#7cc48c;--warn:#e0aa4a;--info:#7fb0ee;--neg:#ee8177;--focus:#e58d60;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font:14px/20px Inter,system-ui,sans-serif;margin:0;padding-block:16px 32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+.wrap{max-width:1320px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+.demo{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-size:12px;color:var(--text3);padding:8px 12px;border:1px dashed var(--line2);border-radius:8px}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line2);border-radius:6px;overflow:hidden}
+.seg button{border:0;background:var(--surface);padding:0 10px;min-height:28px;cursor:pointer;font-size:12px;font-weight:500;color:var(--text2)}
+.seg button+button{border-left:1px solid var(--line2)}
+.seg button.on{background:color-mix(in srgb,var(--accent) 14%,var(--surface));color:var(--text);box-shadow:inset 0 -2px 0 var(--accent)}
+.app{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--bg);box-shadow:0 1px 2px rgb(0 0 0 / .04)}
+.top{height:44px;display:flex;align-items:center;gap:18px;padding:0 14px;background:var(--surface);border-bottom:1px solid var(--line);font-size:13px;color:var(--text2);overflow:hidden;white-space:nowrap}
+.top b{color:var(--text);font-weight:700}
+.shell{display:grid;grid-template-columns:260px minmax(0,1fr);min-height:640px}
+/* sidebar */
+.side{background:var(--side);border-right:1px solid var(--line);min-width:0;display:flex;flex-direction:column}
+.sh{display:flex;align-items:center;gap:6px;padding:10px 12px 4px}
+.sh h2{margin:0;font-size:13px;font-weight:700}
+.sh .sp{flex:1}
+.sh a{color:var(--accent);font-size:12px;font-weight:600;text-decoration:none;padding:2px 4px;border-radius:4px}
+.sh a:hover{text-decoration:underline}
+.run{padding:0 12px 8px;font-size:11.5px;color:var(--text3);border-bottom:1px solid var(--line)}
+.type{border-bottom:1px solid var(--line)}
+.th{display:flex;align-items:center;gap:7px;width:100%;border:0;background:transparent;padding:7px 12px;cursor:pointer;text-align:left;font-size:12.5px;font-weight:700}
+.th:hover{background:color-mix(in srgb,var(--accent) 6%,var(--side))}
+.th .ic{width:16px;height:16px;flex:none}
+.th .sp{flex:1}
+.th .n{font-size:11px;font-weight:700;padding:0 7px;border-radius:9px;line-height:18px;border:1px solid var(--line2);font-variant-numeric:tabular-nums}
+.th .chev{width:12px;height:12px;flex:none;color:var(--text3);transition:transform .15s}
+.type.closed .chev{transform:rotate(-90deg)}
+.type.closed .body{display:none}
+.t-err .ic,.t-err .n{color:var(--neg)} .t-err .n{border-color:color-mix(in srgb,var(--neg) 45%,var(--line2))}
+.t-warn .ic,.t-warn .n{color:var(--warn)} .t-warn .n{border-color:color-mix(in srgb,var(--warn) 45%,var(--line2))}
+.t-info .ic,.t-info .n{color:var(--info)} .t-info .n{border-color:color-mix(in srgb,var(--info) 40%,var(--line2))}
+.ck{padding:2px 12px 2px 35px;font-size:11.5px;font-weight:600;color:var(--text2);display:flex;gap:6px}
+.ck .c{color:var(--text3);font-weight:500;font-variant-numeric:tabular-nums}
+.f{display:block;padding:3px 12px 3px 35px;font-size:12px;line-height:16px;color:var(--text);text-decoration:none;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.f:hover{background:color-mix(in srgb,var(--accent) 8%,var(--side));color:var(--accent)}
+.more{display:block;padding:2px 12px 6px 35px;font-size:11.5px;font-weight:600;color:var(--accent);text-decoration:none}
+.more:hover{text-decoration:underline}
+.body{padding-bottom:6px}
+.none{padding:2px 12px 8px 35px;font-size:12px;color:var(--text3)}
+.clear{display:flex;gap:8px;align-items:flex-start;padding:12px;font-size:12.5px;color:var(--text2)}
+.clear svg{color:var(--pos);flex:none;margin-top:2px}
+/* dashboard placeholder */
+.main{padding:12px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.mh{display:flex;gap:12px;align-items:baseline}
+.mh h1{margin:0;font-size:18px;font-weight:600}
+.ph{background:var(--surface);border:1px solid var(--line);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:12px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.note{font-size:12.5px;color:var(--text2);line-height:19px}
+.note ul{margin:4px 0 0;padding-left:18px}
+@media (max-width:820px){.shell{grid-template-columns:1fr}.side{border-right:0;border-bottom:1px solid var(--line)}.row2{grid-template-columns:1fr}}
+</style>
+
+<div class="wrap">
+  <div class="demo">
+    <span>Mockup, sample state:</span>
+    <div class="seg" role="group" aria-label="Sample state">
+      <button id="st-find" class="on" data-s="find">Open findings</button>
+      <button id="st-clear" data-s="clear">All clear</button>
+      <button id="st-never" data-s="never">Never run</button>
+    </div>
+    <span>Click a type to fold it.</span>
+  </div>
+
+  <div class="app">
+    <div class="top"><b>OrderNexa</b><span>Operations</span><span>Inventory</span><span>Financials</span><span>Purchasing</span><span>Admin</span></div>
+    <div class="shell">
+      <aside class="side" aria-label="Health Checks">
+        <div class="sh"><h2>Health Checks</h2><span class="sp"></span><a href="#" title="Admin › Health: run, fix, turn checks on or off">Open</a></div>
+        <div class="run" id="run">Last run today, 6:00 AM · 43 open</div>
+        <div id="groups"></div>
+      </aside>
+      <main class="main">
+        <div class="mh"><h1>Dashboard</h1><span class="note">Saturday, November 28, 2026</span></div>
+        <div class="ph" style="height:96px">Key figures (unchanged)</div>
+        <div class="ph" style="height:40px">Address review bar (unchanged)</div>
+        <div class="row2"><div class="ph" style="height:200px">Sales, year to date (unchanged)</div><div class="ph" style="height:200px">AR Aging (unchanged)</div></div>
+        <div class="row2"><div class="ph" style="height:150px">Today's Orders (unchanged)</div><div class="ph" style="height:150px">Production Summary (unchanged)</div></div>
+        <div class="note"><b>Notes</b>
+          <ul>
+            <li>Errors first, then Warnings, then Information. A type with nothing open shows "None open"; Errors and Warnings start open, Information folded when there are errors.</li>
+            <li>Under each check, the first 5 findings; "n more" opens Admin › Health on that check.</li>
+            <li>Below 1280px (iPad) the same list is in the sidebar drawer.</li>
+            <li>Users without Health Checks access keep today's sidebar.</li>
+          </ul>
+        </div>
+      </main>
+    </div>
+  </div>
+</div>
+
+<script>
+const ICON = {
+  Error:'<svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="8" cy="8" r="6.3"/><path d="M8 4.6v4M8 10.9v.1"/></svg>',
+  Warning:'<svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M8 2.2 14.3 13.3H1.7Z"/><path d="M8 6.4v3.2M8 11.4v.1"/></svg>',
+  Information:'<svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="8" cy="8" r="6.3"/><path d="M8 7.2v4M8 4.9v.1"/></svg>'
+};
+const CHEV = '<svg class="chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m3 4.5 3 3 3-3"/></svg>';
+const acct = (n, w) => `Account ${n} has ${w}.`;
+const FIND = [
+  { type:'Warning', check:'Accounts without a contact', total:34, rows:["ROSIE O'GRADYS 52ND STREET",'THE NEW YORK HILTON','AG FOOD CORP.','MRS BAKING','HEALTHY BAKERY'].map(n => acct(n,'no contact person')) },
+  { type:'Warning', check:'Accounts without a pricing book', total:4, rows:['MILLENIUM HILTON HOTEL NY','FIFTH AVE FOODS','BEL PANE','SUNSETPARK BAKING'].map(n => acct(n,'no active, Approved pricing book')) },
+  { type:'Warning', check:'Accounts without an address', total:3, rows:['FELIPE CAMILO','TOM CAT BAKERY','FOODTRENDS NJ'].map(n => acct(n,'no address')) },
+  { type:'Information', check:'Items not ordered', total:1, rows:['Found 587 active items not ordered in over 2 years.'] },
+  { type:'Information', check:'Pricing books not used', total:1, rows:['Found 27 price books not used in over 2 years.'] }
+];
+const LABEL = { Error:'Errors', Warning:'Warnings', Information:'Information' };
+const CLS = { Error:'t-err', Warning:'t-warn', Information:'t-info' };
+const esc = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function render(state) {
+  const g = document.getElementById('groups'), run = document.getElementById('run');
+  if (state === 'never') { run.textContent = 'Not run yet'; g.innerHTML = '<div class="clear"><span>The checks have not run yet. <a href="#" style="color:var(--accent);font-weight:600">Run them</a> in Admin › Health.</span></div>'; return; }
+  if (state === 'clear') { run.textContent = 'Last run today, 6:00 AM · 0 open'; g.innerHTML = '<div class="clear"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m3 8.5 3 3 7-7"/></svg><span>No open findings. All checks passed.</span></div>'; return; }
+  run.textContent = 'Last run today, 6:00 AM · 43 open';
+  g.innerHTML = ['Error','Warning','Information'].map(t => {
+    const checks = FIND.filter(f => f.type === t), n = checks.reduce((a, c) => a + c.total, 0);
+    const body = n === 0 ? '<div class="none">None open</div>' : checks.map(c =>
+      `<div class="ck">${esc(c.check)} <span class="c">${c.total}</span></div>` +
+      c.rows.slice(0, 5).map(r => `<a class="f" href="#" title="${esc(r)}">${esc(r)}</a>`).join('') +
+      (c.total > 5 ? `<a class="more" href="#">${c.total - 5} more</a>` : '')).join('');
+    return `<section class="type ${CLS[t]}"><button class="th" aria-expanded="true">${ICON[t]}<span>${LABEL[t]}</span><span class="sp"></span><span class="n">${n}</span>${CHEV}</button><div class="body">${body}</div></section>`;
+  }).join('');
+  g.querySelectorAll('.th').forEach(b => b.addEventListener('click', () => {
+    const s = b.parentElement; s.classList.toggle('closed'); b.setAttribute('aria-expanded', String(!s.classList.contains('closed')));
+  }));
+}
+document.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.seg button').forEach(x => x.classList.toggle('on', x === b)); render(b.dataset.s);
+}));
+render('find');
+</script>

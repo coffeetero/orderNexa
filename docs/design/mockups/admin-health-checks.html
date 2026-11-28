@@ -1,0 +1,158 @@
+<title>Admin Health Checks</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Admin › Health, extended (Hearth theme). The checks table stays; clicking a check (or arriving from the Dashboard's "n more",
+   /admin/health?check=code) filters Findings to that check. Findings are grouped by check: one group row with the type,
+   check name, count and What to do (said once), then one line per record: the customer's name (record_name from
+   fnd_health_findings_get) or the finding's sentence for non-customer checks, Found, Open, Mark fixed. Data: local, 2026-11-28. */
+:root{--bg:#f5f3f0;--surface:#fffefc;--side:#ede9e3;--line:#e1dbd3;--line2:#cfc7bc;--text:#1e1915;--text2:#544a41;--text3:#7a6e63;--accent:#a3451c;--accent-fg:#fff;--warn:#8f5a00;--warn-soft:#f6ead2;--info:#2a5fa8;--info-soft:#e3ecf8;--neg:#b3312a;--neg-soft:#f8e1de;--focus:#a3451c}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#161310;--surface:#1f1b17;--side:#1a1613;--line:#322c26;--line2:#433b33;--text:#efe9e2;--text2:#c4b9ad;--text3:#978b7e;--accent:#e58d60;--accent-fg:#1a120c;--warn:#e0aa4a;--warn-soft:#3a2d14;--info:#7fb0ee;--info-soft:#1b2a3d;--neg:#ee8177;--neg-soft:#3d1d1a;--focus:#e58d60;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#161310;--surface:#1f1b17;--side:#1a1613;--line:#322c26;--line2:#433b33;--text:#efe9e2;--text2:#c4b9ad;--text3:#978b7e;--accent:#e58d60;--accent-fg:#1a120c;--warn:#e0aa4a;--warn-soft:#3a2d14;--info:#7fb0ee;--info-soft:#1b2a3d;--neg:#ee8177;--neg-soft:#3d1d1a;--focus:#e58d60;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font:14px/20px Inter,system-ui,sans-serif;margin:0;padding-block:16px 32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+.wrap{max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+h1{font-size:18px;font-weight:600;margin:0}
+.muted{color:var(--text3)}.small{font-size:12px}
+.head{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}.head .sp{flex:1}
+.btn{height:30px;padding:0 12px;border-radius:6px;border:1px solid var(--line2);background:var(--surface);font-weight:500;cursor:pointer;white-space:nowrap;font-size:13px}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.btn.sm{height:26px;padding:0 9px;font-size:12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:0 1px 2px rgb(0 0 0 / .04);min-width:0}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:color-mix(in srgb,var(--side) 50%,var(--surface));text-align:left;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);padding:7px 12px;white-space:nowrap}
+td{padding:6px 12px;border-top:1px solid var(--line);vertical-align:top}
+.num{text-align:center;font-variant-numeric:tabular-nums}
+.cat td{background:color-mix(in srgb,var(--accent) 7%,var(--surface));font-size:11px;font-weight:700;letter-spacing:.05em;color:var(--accent);padding:4px 12px}
+tr.ck{cursor:pointer}
+tr.ck:hover td{background:color-mix(in srgb,var(--accent) 5%,var(--surface))}
+tr.ck.sel td{background:color-mix(in srgb,var(--accent) 12%,var(--surface))}
+tr.ck.sel td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+.cname{font-weight:600}.cdesc{font-size:12px;color:var(--text3)}
+.w{color:var(--warn);font-weight:600}.i{color:var(--info);font-weight:600}.e{color:var(--neg);font-weight:600}
+.fhead{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;padding:10px 12px;border-bottom:1px solid var(--line)}
+.fhead h2{margin:0;font-size:15px;font-weight:600;margin-right:auto}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid color-mix(in srgb,var(--accent) 50%,var(--line2));color:var(--accent);border-radius:12px;padding:0 4px 0 10px;font-size:12px;font-weight:600;line-height:22px}
+.chip button{border:0;background:transparent;color:inherit;cursor:pointer;font-size:14px;line-height:1;padding:2px 5px;border-radius:8px}
+label.cb{display:inline-flex;gap:6px;align-items:center;font-size:13px;color:var(--text2)}
+.grp td{background:color-mix(in srgb,var(--side) 40%,var(--surface));border-top:1px solid var(--line2)}
+.grp .t{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+.badge{font-size:11px;font-weight:600;padding:0 8px;border-radius:9px;line-height:18px}
+.b-w{background:var(--warn-soft);color:var(--warn)}.b-i{background:var(--info-soft);color:var(--info)}.b-e{background:var(--neg-soft);color:var(--neg)}
+.grp .n{font-size:12px;color:var(--text3);font-variant-numeric:tabular-nums}
+.grp .todo{font-size:12px;color:var(--text2)}
+.grp .todo b{font-weight:600;color:var(--text3)}
+td.name{padding-left:28px}
+td.name a{color:var(--text);text-decoration:none}
+td.name a:hover{color:var(--accent);text-decoration:underline}
+.found{white-space:nowrap;font-size:12px;color:var(--text3)}
+.acts{display:flex;justify-content:flex-end;gap:10px;align-items:center;white-space:nowrap}
+.acts a{color:var(--accent);font-size:13px;text-decoration:none}
+.note{font-size:12.5px;color:var(--text2);line-height:19px}.note ul{margin:4px 0 0;padding-left:18px}
+.demo{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-size:12px;color:var(--text3);padding:8px 12px;border:1px dashed var(--line2);border-radius:8px}
+</style>
+
+<div class="wrap">
+  <div class="demo">Mockup. Click a check's row to filter Findings to it; click × on the chip to show all. The sidebar's "n more" opens the page this way.</div>
+
+  <div class="head">
+    <div><h1>Health Checks</h1><div class="muted small" style="max-width:640px">Setup and data checks run automatically every night at midnight (company time). Run them any time, for example after changing setup or right before a Production Run.</div></div>
+    <span class="sp"></span><button class="btn pri" type="button">Run all</button>
+  </div>
+
+  <div class="card scroll">
+    <table>
+      <thead><tr><th style="width:64px" class="num">Enabled</th><th>Check</th><th>Last run</th><th class="num">Info</th><th class="num">Warnings</th><th class="num">Errors</th><th style="width:70px"></th></tr></thead>
+      <tbody id="checks"></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="fhead">
+      <h2 id="ftitle">Findings</h2>
+      <span id="chip"></span>
+      <label class="cb"><input id="t-e" type="checkbox" checked> Error</label>
+      <label class="cb"><input id="t-w" type="checkbox" checked> Warning</label>
+      <label class="cb"><input id="t-i" type="checkbox" checked> Information</label>
+      <label class="cb"><input id="fixed" type="checkbox"> Show fixed (30 days)</label>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Customer or finding</th><th>Found</th><th style="width:170px"></th></tr></thead>
+        <tbody id="finds"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="note"><b>Changes from today's page</b>
+    <ul>
+      <li>Click a check (or come from the Dashboard's "n more") to show only its findings; a chip names the filter.</li>
+      <li>Findings are grouped by check: the type, name, count and What to do appear once on the group row, not on every line.</li>
+      <li>Each line shows just the customer's name (or the sentence, for checks that are not about a customer), with Found, Open and Mark fixed.</li>
+      <li>The checks table, Run buttons, type filters and Show fixed stay as they are.</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+const CHECKS = [
+  ['Setup','users_without_role','Users without a role','Active users who have no role and so can open nothing.',0,0,0],
+  ['Setup','accounts_without_pricebook','Accounts without a pricing book','Active accounts with no active, Approved pricing book assigned.',0,6,0],
+  ['Setup','accounts_without_contact','Accounts without a contact','Active accounts with no contact person.',0,36,0],
+  ['Setup','accounts_without_address','Accounts without an address','Active accounts with no address.',0,4,0],
+  ['Setup','pricebook_unused','Pricing books not used','Active pricing books none of whose customers has ordered within the Stale years.',1,0,0],
+  ['Data','payments_over_applied','Payments applied for more than received','Payments whose applications add up to more than the payment amount.',0,0,0],
+  ['Data','items_stale','Items not ordered','Active items not ordered within the Stale years.',1,0,0],
+  ['Data','ar_open_items_drift','Open balances out of step','Invoices and payments whose stored open balance differs from a full recalculation.',0,0,0]
+];
+const TODO = {
+  accounts_without_pricebook:'Assign a pricing book and approve it on the customer\'s Pricing tab.',
+  accounts_without_contact:'Add a contact on the customer\'s Contacts tab.',
+  accounts_without_address:'Add an address on the customer\'s Contacts tab.',
+  pricebook_unused:'Review the pricing books and make unused ones inactive.',
+  items_stale:'Review the items and make unused ones inactive.'
+};
+const NAMES = {
+  accounts_without_pricebook:['FELLAS FOOD','MILLENNIUM UN PLAZA HOTEL','THE NEW YORK HILTON','ROSIE O\'GRADYS 52ND STREET','MILLENIUM HILTON HOTEL NY','BEL PANE'],
+  accounts_without_contact:['AG FOOD CORP.','MRS BAKING','HOBOKEN BREAD DIST','THE NEW YORK HILTON','FIFTH AVE FOODS','HEALTHY BAKERY','TOM CAT BAKERY','SUNSETPARK BAKING'],
+  accounts_without_address:['MRS BAKING','FELIPE CAMILO','FIFTH AVE // ALPINE','MEALPREP EMPIRE'],
+  pricebook_unused:['Found 10 pricing books not used in over 2 years.'],
+  items_stale:['Found 60 active items not ordered in over 2 years.']
+};
+let sel = null;
+const esc = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const typeOf = c => c[6] ? 'Error' : c[5] ? 'Warning' : c[4] ? 'Information' : null;
+
+function render() {
+  let cat = '';
+  document.getElementById('checks').innerHTML = CHECKS.map(c => {
+    const head = c[0] !== cat ? `<tr class="cat"><td colspan="7">${(cat = c[0]).toUpperCase()}</td></tr>` : '';
+    return head + `<tr class="ck${sel === c[1] ? ' sel' : ''}" data-c="${c[1]}"><td class="num"><input type="checkbox" checked aria-label="${esc(c[2])} enabled" onclick="event.stopPropagation()"></td>
+      <td><div class="cname">${esc(c[2])}</div><div class="cdesc">${esc(c[3])}</div></td><td class="small muted" style="white-space:nowrap">Nov 28, 2026, 8:18 AM</td>
+      <td class="num${c[4] ? ' i' : ''}">${c[4]}</td><td class="num${c[5] ? ' w' : ''}">${c[5]}</td><td class="num${c[6] ? ' e' : ''}">${c[6]}</td>
+      <td><button class="btn sm" type="button" onclick="event.stopPropagation()">Run</button></td></tr>`;
+  }).join('');
+  document.querySelectorAll('tr.ck').forEach(r => r.addEventListener('click', () => { sel = sel === r.dataset.c ? null : r.dataset.c; render(); }));
+
+  const groups = CHECKS.filter(c => typeOf(c) && (!sel || c[1] === sel)).sort((a, b) => (b[6] - a[6]) || (b[5] ? 1 : 0) - (a[5] ? 1 : 0));
+  const total = groups.reduce((n, c) => n + c[4] + c[5] + c[6], 0);
+  document.getElementById('ftitle').textContent = `Findings (${total})`;
+  const cur = CHECKS.find(c => c[1] === sel);
+  document.getElementById('chip').innerHTML = cur ? `<span class="chip">${esc(cur[2])}<button type="button" aria-label="Show all checks" id="clr">×</button></span>` : '';
+  const clr = document.getElementById('clr'); if (clr) clr.addEventListener('click', () => { sel = null; render(); });
+
+  document.getElementById('finds').innerHTML = groups.map(c => {
+    const t = typeOf(c), n = c[4] + c[5] + c[6], cls = t === 'Error' ? 'b-e' : t === 'Warning' ? 'b-w' : 'b-i';
+    const names = NAMES[c[1]] || [], isCust = c[1].startsWith('accounts');
+    const rows = names.map((nm, k) => `<tr><td class="name">${isCust ? `<a href="#">${esc(nm)}</a>` : esc(nm)}</td><td class="found">Nov 2${3 + (k % 5)}, 2026</td>
+      <td><div class="acts">${isCust ? '<a href="#">Open</a>' : ''}<button class="btn sm" type="button">Mark fixed</button></div></td></tr>`).join('');
+    const extra = n > names.length ? `<tr><td class="name muted small" colspan="3">and ${n - names.length} more (sample data)</td></tr>` : '';
+    return `<tr class="grp"><td colspan="3"><div class="t"><span class="badge ${cls}">${t}</span><b>${esc(c[2])}</b><span class="n">${n}</span>
+      <span class="todo"><b>What to do:</b> ${esc(TODO[c[1]] || '')}</span></div></td></tr>` + rows + extra;
+  }).join('');
+}
+render();
+</script>

@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { SalesCharts } from '@/components/features/dashboard/SalesCharts';
+import { HealthChecksSidebar } from '@/components/features/dashboard/HealthChecksSidebar';
 import { Suspense, cache } from 'react';
-import { AlertTriangle, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { SecurityTodo, type SecuritySignal } from '@/components/features/dashboard/SecurityTodo';
 import { createClient } from '@/lib/supabase/server';
 import { getCurrentTenantId } from '@/lib/supabase/tenant';
@@ -138,34 +139,6 @@ async function ArAging({ tenantId }: { tenantId: number }) {
   );
 }
 
-type AddressReview = { suggestions: number; not_found: number; no_bill: number; no_ship: number; total: number };
-
-/** Warning tile: customer addresses needing attention (fnd_address_review_get); opens Customer Management on those customers. */
-async function AddressReviewTile({ tenantId }: { tenantId: number }) {
-  const { data } = await (await createClient()).rpc('fnd_address_review_get', { p_tenant_id: tenantId });
-  const r = data as AddressReview | null;
-  if (!r || !r.total) return null;
-  const lines = [
-    r.suggestions ? `${r.suggestions} Google suggestion${r.suggestions === 1 ? '' : 's'} to accept or reject` : null,
-    r.not_found ? `${r.not_found} address${r.not_found === 1 ? '' : 'es'} Google can't confirm` : null,
-    r.no_ship ? `${r.no_ship} delivered customer${r.no_ship === 1 ? '' : 's'} with no Ship to (confirm against the old system)` : null,
-    r.no_bill ? `${r.no_bill} customer${r.no_bill === 1 ? '' : 's'} with no Bill to` : null,
-  ].filter(Boolean);
-  return (
-    <Link href="/customers?review=1" className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-warning/40 bg-warning-soft/40 px-4 py-2.5 shadow-sm hover:bg-warning-soft/70">
-      <span className="flex items-center gap-2.5">
-        <AlertTriangle className="h-5 w-5 text-warning" aria-hidden />
-        <span>
-          <span className="block text-xl font-semibold tabular-nums text-warning">{r.total}</span>
-          <span className="block text-xs text-muted-foreground">customer addresses need review</span>
-        </span>
-      </span>
-      <span className="text-xs leading-5 text-muted-foreground">{lines.map((l) => <span key={l} className="block">{l}</span>)}</span>
-      <ArrowRight className="ml-auto h-4 w-4 text-muted-foreground" aria-hidden />
-    </Link>
-  );
-}
-
 export default async function TenantDashboardPage() {
   const supabase = await createClient();
   const tenantId = await getCurrentTenantId();
@@ -202,6 +175,7 @@ export default async function TenantDashboardPage() {
 
   return (
     <div className="space-y-3 py-3">
+      {areas.includes('admin.health') && <HealthChecksSidebar />}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <h1 className="text-lg font-semibold tracking-tight">Dashboard</h1>
         <p className="text-sm text-muted-foreground">{dateLabel}</p>
@@ -218,10 +192,6 @@ export default async function TenantDashboardPage() {
             )}
           </div>
         </section>
-      )}
-
-      {tenantId !== null && (
-        <Suspense fallback={null}><AddressReviewTile tenantId={tenantId} /></Suspense>
       )}
 
       {showAr && (

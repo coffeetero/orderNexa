@@ -3,15 +3,19 @@
 -- Health check: documents whose stored open balance (bps.ar_open_items, kept by triggers) differs from a full recalculation from the
 -- invoices, payments, applications, allowances and settled amounts. Any finding means a write path was missed; recalculate with
 --   SELECT bps.ar_open_items_refresh(<tenant>, ARRAY[<ar_transaction_id>], NULL)   or   (<tenant>, NULL, ARRAY[<ar_payment_id>])
--- plpgsql so it can be loaded before the table exists.
+-- plpgsql so it can be loaded before the table exists. SECURITY DEFINER: it must compare every document, not only those the caller's
+-- row security shows (a scoped user would see false drift, and per-row policies on ~500k AR rows outran the 8s statement limit).
 -- ============================================================
 CREATE OR REPLACE FUNCTION bps.fnd_hc_ar_open_items_drift(p_tenant_id bigint)
  RETURNS TABLE(type text, findings text, remediation text, record_type text, record_id bigint, customer_id bigint, link_path text)
  LANGUAGE plpgsql
  STABLE
+ SECURITY DEFINER
  SET search_path TO 'bps', 'public'
 AS $function$
 BEGIN
+  PERFORM bps.fnd_assert_active_tenant(p_tenant_id);
+  IF NOT bps.fnd_has_access('admin.health', 'R') THEN RAISE EXCEPTION 'Not authorised to run health checks'; END IF;
   RETURN QUERY
   WITH actual AS (
     SELECT t.ar_transaction_id AS t_id, NULL::bigint AS p_id, t.customer_id, t.document_number AS doc,
