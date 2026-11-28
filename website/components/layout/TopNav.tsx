@@ -67,7 +67,7 @@ type TopNavProps = {
   /** Staff-only user-menu entries. Omit for customer users. */
   profileHref?: string;
   appearanceHref?: string;
-  /** Staff with Health Checks access: shows the heart, linking here. */
+  /** Staff with Health Checks access: shows the heart, linking here (Operations › Health Checks). */
   healthHref?: string;
 };
 

@@ -49,13 +49,14 @@ function Legend({ year, lastYear }: { year: number; lastYear: number }) {
   );
 }
 
-/** Vertical bars by month, last year then this year in each month. */
+/** Overlapping bars by month: both years in the same place, the taller behind and the shorter in front (outlined), so neither hides. */
 function MonthBars({ data }: { data: SalesData }) {
   const max = Math.max(1, ...data.months.flatMap((m) => [m.this, m.last]));
   const step = max <= 50_000 ? 10_000 : max <= 200_000 ? 50_000 : max <= 500_000 ? 100_000 : 250_000;
   const top = Math.ceil(max / step) * step;
   const ticks = Array.from({ length: Math.round(top / step) + 1 }, (_, i) => i * step);
   const lastMonth = Number(data.as_of.slice(5, 7));
+  const n = data.months.length;
   return (
     <div className="grid grid-cols-[44px_minmax(0,1fr)] gap-x-1.5 px-4 pb-2 pt-1">
       <div className="relative h-[180px]" aria-hidden="true">
@@ -67,20 +68,23 @@ function MonthBars({ data }: { data: SalesData }) {
       </div>
       <div className="relative h-[180px] border-b border-border">
         {ticks.map((t) => <div key={t} className="absolute inset-x-0 border-t border-border/50" style={{ bottom: `${(t / top) * 100}%` }} aria-hidden="true" />)}
-        <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${data.months.length}, minmax(0, 1fr))` }}>
+        <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` }}>
           {data.months.map((m) => {
             const label = `${MONTHS[m.month - 1]}${m.month === lastMonth ? ` (1–${Number(data.as_of.slice(8, 10))})` : ''}: ${data.year} ${money(m.this)}, ${data.last_year} ${money(m.last)}`;
+            const bars = [{ v: m.last, color: 'var(--chart-last)' }, { v: m.this, color: 'var(--chart-this)' }].sort((p, q) => q.v - p.v);
             return (
-              <div key={m.month} title={label} aria-label={label} role="img" className="flex items-end justify-center gap-0.5 rounded-t px-[3px] hover:bg-muted/40">
-                <div className="max-w-[24px] flex-1 rounded-t" style={{ height: `${(Math.max(m.last, 0) / top) * 100}%`, background: 'var(--chart-last)' }} />
-                <div className="max-w-[24px] flex-1 rounded-t" style={{ height: `${(Math.max(m.this, 0) / top) * 100}%`, background: 'var(--chart-this)' }} />
+              <div key={m.month} title={label} aria-label={label} role="img" className="relative rounded-t hover:bg-muted/40">
+                {bars.map((b, i) => (
+                  <div key={i} className={`absolute bottom-0 left-1/2 w-[calc(100%-8px)] max-w-[28px] -translate-x-1/2 rounded-t ${i === 1 ? 'ring-2 ring-card' : ''}`}
+                    style={{ height: `${(Math.max(b.v, 0) / top) * 100}%`, background: b.color }} />
+                ))}
               </div>
             );
           })}
         </div>
       </div>
       <div />
-      <div className="grid pt-1" style={{ gridTemplateColumns: `repeat(${data.months.length}, minmax(0, 1fr))` }} aria-hidden="true">
+      <div className="grid pt-1" style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` }} aria-hidden="true">
         {data.months.map((m) => <span key={m.month} className="text-center text-[11px] text-muted-foreground">{MONTHS[m.month - 1]}</span>)}
       </div>
     </div>
@@ -129,9 +133,9 @@ function Pie({ parts, label, year, lastYear }: { parts: Part[]; label: string; y
 
 /**
  * Dashboard: year-to-date sales against the same days of last year, from ar_sales_dashboard_get.
- * By account (monthly bars, one account or all), by segment and by item (pies of this year's shares with the change vs last year).
+ * AR Aging first (passed in as extra), then By account (overlapping monthly bars, one account or all), by segment and by item (pies of this year's shares with the change vs last year).
  */
-export function SalesCharts({ tenantId, extra }: { tenantId: number; /** a further card in the grid, after By item (AR Aging) */ extra?: React.ReactNode }) {
+export function SalesCharts({ tenantId, extra }: { tenantId: number; /** the first card in the grid (AR Aging) */ extra?: React.ReactNode }) {
   const [accountId, setAccountId] = useState<string>('');
   const [data, setData] = useState<SalesData | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
@@ -154,16 +158,12 @@ export function SalesCharts({ tenantId, extra }: { tenantId: number; /** a furth
   if (failed) return <p className="text-sm text-muted-foreground">Couldn&apos;t load the sales charts: {failed}</p>;
   if (!data) return <div className="h-[290px] animate-pulse rounded-lg border border-border bg-muted/40" aria-busy="true" aria-label="Loading sales charts" />;
 
-  const asOf = new Date(`${data.as_of}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   return (
     <section aria-label="Sales, year to date" className="space-y-2">
-      <p className="flex flex-wrap items-baseline gap-x-3 text-xs text-muted-foreground">
-        <span className="text-sm font-semibold text-foreground">Sales, year to date</span>
-        Jan 1 – {asOf}, invoiced less credits, against the same days of {data.last_year}
-      </p>
       <div className="grid gap-3 md:grid-cols-2">
+        {extra}
         <Card
-          title="By account"
+          title="YTD Sales By Account"
           action={(
             <>
               <label className="sr-only" htmlFor="sales-account">Account</label>
@@ -182,7 +182,7 @@ export function SalesCharts({ tenantId, extra }: { tenantId: number; /** a furth
           </div>
           <MonthBars data={data} />
         </Card>
-        <Card title="By segment" sub={`${data.year} share of sales, vs ${data.last_year}`}
+        <Card title="YTD Sales By Segment" sub={`${data.year} share of sales, vs ${data.last_year}`}
           action={<Link href="/customers" className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">Customers <ArrowRight className="h-3 w-3" /></Link>}>
           {unassignedOnly && (
             <p className="mx-4 mt-2 rounded bg-warning-soft px-2.5 py-1.5 text-xs text-warning">
@@ -191,10 +191,9 @@ export function SalesCharts({ tenantId, extra }: { tenantId: number; /** a furth
           )}
           <Pie parts={segments} label={`Sales by segment, ${data.year}`} year={data.year} lastYear={data.last_year} />
         </Card>
-        <Card title="By item" sub={`${data.year} share of sales, vs ${data.last_year}`}>
+        <Card title="YTD Sales By Item" sub={`${data.year} share of sales, vs ${data.last_year}`}>
           <Pie parts={items} label={`Sales by item, ${data.year}`} year={data.year} lastYear={data.last_year} />
         </Card>
-        {extra}
       </div>
     </section>
   );

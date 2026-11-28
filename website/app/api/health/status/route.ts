@@ -5,7 +5,7 @@ import { getCurrentTenantId } from '@/lib/supabase/tenant';
 
 export const dynamic = 'force-dynamic';
 
-/** GET /api/health/status → { state: none|never|ok|warning|error, infos, warnings, errors, last_run_at } for the heart icon (state none without access). */
+/** GET /api/health/status → { state: none|never|ok|info|warning|error, infos, warnings, errors, last_run_at } for the heart icon (state none without access). */
 export async function GET() {
   const auth = await requireStaff();
   if (!auth.ok) return auth.response;

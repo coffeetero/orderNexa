@@ -39,6 +39,7 @@ export const MODULE_RECENTS: Record<string, { type: RecordType; title: string }[
  */
 export const PAGE_SIDEBAR: Record<string, { width?: number; inDrawer?: boolean; area?: string }> = {
   '/dashboard': { width: 312, inDrawer: true, area: 'admin.health' }, // Health Checks findings, 20% wider (owner approved 2026-11-28)
+  '/production/health-checks': { width: 312, inDrawer: true }, // the same Health Checks list, picking a check (2026-11-28)
   '/financials/ar': { width: 340, inDrawer: true }, // customer list with number and balance (owner request 2026-11-27)
   '/financials/aging': { width: 340, inDrawer: true }, // same layout as AR Open Balances
 };
@@ -53,6 +54,7 @@ export const PAGE_RECENTS: Record<string, { type: RecordType; title: string }[]>
   '/inventory/pricing': [], // and the pricing book list
   '/purchasing/vendors': [], // and the vendor list
   '/purchasing/items': [],
+  '/production/health-checks': [], // the Health Checks list sits in the sidebar instead
 };
 
 export function recentListsFor(page: string | null | undefined, module: string | null | undefined) {

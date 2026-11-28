@@ -137,7 +137,7 @@ export function TenantLayoutShell({
           userName={userName}
           profileHref="/tenant/profile"
           appearanceHref="/profile/appearance"
-          healthHref={areas?.includes('admin.health') ? '/admin/health' : undefined}
+          healthHref={areas?.includes('admin.health') ? '/production/health-checks' : undefined}
         />
 
         <Breadcrumbs

@@ -9,6 +9,7 @@ export const dynamic = 'force-dynamic';
  * POST /api/admin/health { tenant_id, action: 'run', check_code? }          → run every enabled check (or one) → status
  * POST /api/admin/health { tenant_id, action: 'enable', check_code, enabled } → turn a check on or off (administrators)
  * POST /api/admin/health { tenant_id, action: 'fix', log_id }                → mark a finding fixed
+ * POST /api/admin/health { tenant_id, action: 'inactivate', log_ids }       → inactivate the items / disable the pricing books behind those findings
  */
 export async function GET(request: Request) {
   const q = new URL(request.url).searchParams;
@@ -29,6 +30,9 @@ export async function POST(request: Request) {
   }
   if (body.action === 'fix' && Number.isInteger(body.log_id)) {
     return adminRpc(body.tenant_id, 'fnd_health_finding_fix', { p_log_id: body.log_id });
+  }
+  if (body.action === 'inactivate' && Array.isArray(body.log_ids) && body.log_ids.length > 0 && body.log_ids.every(Number.isInteger)) {
+    return adminRpc(body.tenant_id, 'fnd_health_records_inactivate', { p_log_ids: body.log_ids });
   }
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
 }

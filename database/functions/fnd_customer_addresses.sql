@@ -91,8 +91,10 @@ BEGIN
     'inherited_from', CASE WHEN v_owner <> p_customer_id THEN
         (SELECT jsonb_build_object('customer_id', o.customer_id, 'customer_name', o.customer_name) FROM fnd_customers o WHERE o.customer_id = v_owner) END,
     'addresses', v_list,
-    'missing_bill', NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_list) e WHERE (e ->> 'bill')::boolean),
-    'missing_ship', NOT v_pickup AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_list) e WHERE (e ->> 'ship')::boolean));
+    -- owner rules 2026-11-28: only accounts need a Billing address; departments need no Shipping address of their own
+    'missing_bill', v_cust.customer_type = 'ACCOUNT' AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_list) e WHERE (e ->> 'bill')::boolean),
+    'missing_ship', NOT v_pickup AND v_cust.customer_type <> 'DEPARTMENT'
+                    AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_list) e WHERE (e ->> 'ship')::boolean));
 END;
 $function$;
 

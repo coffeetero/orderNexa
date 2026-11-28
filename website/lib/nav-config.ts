@@ -65,6 +65,7 @@ export const tenantNav: NavMenu[] = [
           { label: 'Packing Labels', href: '/production/labels' },
           { label: 'Packing Lists', href: '/production/packaging' },
           { label: 'Post Orders to AR', href: '/production/post-to-ar', divider: true },
+          { label: 'Health Checks', href: '/production/health-checks', area: 'admin.health', divider: true }, // findings; the checks' settings stay in Admin › Health (2026-11-28)
         ],
       },
       {

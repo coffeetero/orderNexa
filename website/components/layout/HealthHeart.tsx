@@ -5,11 +5,11 @@ import { Heart } from 'lucide-react';
 import { GuardedLink as Link } from '@/components/layout/GuardedLink';
 import { cn } from '@/lib/utils';
 
-type Status = { state: 'none' | 'never' | 'ok' | 'warning' | 'error'; infos: number; warnings: number; errors: number; last_run_at: string | null };
+type Status = { state: 'none' | 'never' | 'ok' | 'info' | 'warning' | 'error'; infos: number; warnings: number; errors: number; last_run_at: string | null };
 
 const REFRESH_MS = 5 * 60 * 1000;
 
-/** The health heart: grey never run, green clean, yellow warnings, red and blinking errors. Click opens the Health Checks page. */
+/** The health heart: grey never run, green nothing open, blue information only, orange warnings (no errors), red and blinking errors. Click opens Operations › Health Checks. */
 export function HealthHeart({ href }: { href: string }) {
   const [status, setStatus] = useState<Status | null>(null);
 
@@ -32,8 +32,8 @@ export function HealthHeart({ href }: { href: string }) {
 
   const label =
     status.state === 'never' ? 'Health checks have not run yet'
-    : status.state === 'ok' ? 'Health checks: no problems'
-    : `Health checks: ${status.errors} error${status.errors === 1 ? '' : 's'}, ${status.warnings} warning${status.warnings === 1 ? '' : 's'}`;
+    : status.state === 'ok' ? 'Health checks: nothing open'
+    : `Health checks: ${status.errors} error${status.errors === 1 ? '' : 's'}, ${status.warnings} warning${status.warnings === 1 ? '' : 's'}, ${status.infos} information`;
 
   return (
     <Link href={href} aria-label={label} title={label}
@@ -42,6 +42,7 @@ export function HealthHeart({ href }: { href: string }) {
         className={cn('h-4 w-4',
           status.state === 'never' && 'text-muted-foreground',
           status.state === 'ok' && 'fill-success/30 text-success',
+          status.state === 'info' && 'fill-info/30 text-info',
           status.state === 'warning' && 'fill-warning/30 text-warning',
           status.state === 'error' && 'animate-pulse fill-destructive/40 text-destructive motion-reduce:animate-none')}
       />

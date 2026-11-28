@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 
 type FindingType = 'Error' | 'Warning' | 'Information';
 interface Finding { log_id: number; check_code: string; check_name: string; type: FindingType; findings: string; link_path: string | null }
-interface Status { state: 'none' | 'never' | 'ok' | 'warning' | 'error'; last_run_at: string | null }
+interface Status { state: 'none' | 'never' | 'ok' | 'info' | 'warning' | 'error'; last_run_at: string | null }
 
 const TYPES: { type: FindingType; label: string; Icon: typeof Info; cls: string }[] = [
   { type: 'Error', label: 'Errors', Icon: AlertCircle, cls: 'text-destructive' },
@@ -17,9 +17,14 @@ const TYPES: { type: FindingType; label: string; Icon: typeof Info; cls: string 
   { type: 'Information', label: 'Information', Icon: Info, cls: 'text-info' },
 ];
 const ADMIN_HREF = '/admin/health';
+const FINDINGS_HREF = '/production/health-checks';
 
-/** Dashboard sidebar: the open health check findings counted by type, then by check. A check opens Admin › Health filtered to it; Open opens the page. */
-export function HealthChecksSidebar() {
+/**
+ * Sidebar list of the open health check findings by type, then by check with its count.
+ * On the Dashboard a check opens Operations › Health Checks filtered to it (Open opens that page; Run lives in Admin › Health).
+ * On the Health Checks page itself (onSelect given) a check selects it there instead; refreshKey reloads it after a run or an inactivation.
+ */
+export function HealthChecksSidebar({ selected = null, onSelect, refreshKey = 0 }: { selected?: string | null; onSelect?: (code: string | null) => void; refreshKey?: number } = {}) {
   const { tenantId, sidebarSlot } = useNav();
   const [status, setStatus] = useState<Status | null>(null);
   const [findings, setFindings] = useState<Finding[] | null>(null);
@@ -40,7 +45,7 @@ export function HealthChecksSidebar() {
       })
       .catch(() => { /* the sidebar stays empty */ });
     return () => ac.abort();
-  }, [tenantId]);
+  }, [tenantId, refreshKey]);
 
   if (!sidebarSlot || !status || status.state === 'none' || findings === null) return null;
 
@@ -52,7 +57,7 @@ export function HealthChecksSidebar() {
     <section aria-label="Health Checks" className="border-t border-border pt-3">
       <div className="flex items-center justify-between px-2">
         <h2 className="text-[13.5px] font-bold uppercase tracking-wider text-muted-foreground">Health Checks</h2>
-        <Link href={ADMIN_HREF} className="rounded px-1 text-xs font-semibold text-primary hover:underline">Open</Link>
+        {!onSelect && <Link href={FINDINGS_HREF} className="rounded px-1 text-xs font-semibold text-primary hover:underline">Open</Link>}
       </div>
       <p className="px-2 pb-2 text-[11.5px] text-muted-foreground">{lastRun}</p>
 
@@ -79,12 +84,20 @@ export function HealthChecksSidebar() {
                 <div className="ml-3 mr-2">
                   {checks.map((code) => {
                     const items = rows.filter((f) => f.check_code === code);
-                    return (
-                      <Link key={code} href={`${ADMIN_HREF}?check=${encodeURIComponent(code)}`}
-                        className="flex items-baseline gap-2 py-[5.5px] pl-1 pr-1 text-sm leading-5 text-foreground hover:bg-muted hover:text-primary">
+                    const body = (
+                      <>
                         <span className="min-w-0 flex-1">{items[0].check_name}</span>
                         <span className="tabular-nums text-muted-foreground">{items.length}</span>
-                      </Link>
+                      </>
+                    );
+                    const rowCls = 'flex w-full items-baseline gap-2 py-[5.5px] pl-1 pr-1 text-left text-sm leading-5 text-foreground hover:bg-muted hover:text-primary';
+                    return onSelect ? (
+                      <button key={code} type="button" aria-pressed={selected === code} onClick={() => onSelect(code)}
+                        className={cn(rowCls, 'rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', selected === code && 'bg-accent font-semibold text-accent-foreground hover:bg-accent')}>
+                        {body}
+                      </button>
+                    ) : (
+                      <Link key={code} href={`${FINDINGS_HREF}?check=${encodeURIComponent(code)}`} className={rowCls}>{body}</Link>
                     );
                   })}
                 </div>

@@ -3,24 +3,28 @@
 -- One finding per customer:
 --   address_suggested  Addresses Google corrects        an address has a Google suggestion waiting (Accept / Reject on Contacts)
 --   address_not_found  Addresses Google can't confirm   an address Google could not place (or only the street/area), not verified
---   address_no_bill    Customers with no Billing address  its own or its account's addresses have no Billing one (accounts with no
---                                                       address at all are left to accounts_without_address)
---   address_no_ship    Delivered customers with no Shipping address  not a pickup customer, has a Billing address, no Shipping one
--- Billing/Shipping follow fnd_customer_address_owner (a department without addresses uses its account's).
+--   address_no_bill    Accounts with no Billing address   an account with addresses, none ticked Billing (departments and sites
+--                                                       bill to their account; an account with no address at all is left to
+--                                                       accounts_without_address)
+--   address_no_ship    Delivered customers with no Shipping address  an account or site, not a pickup customer, with no Shipping
+--                                                       address of its own (departments are delivered to their account's or
+--                                                       site's address; an account with no address at all is left to
+--                                                       accounts_without_address; a site with none is listed here)
+-- (Owner rules 2026-11-28: departments need neither; sites and accounts need a Shipping address; accounts need a Billing one.)
 -- SECURITY DEFINER: app users have no direct access to the contact tables; tenant and Health Checks access are checked first.
 -- Also re-creates fnd_health_catalog with these checks added.
 -- ============================================================
+DROP FUNCTION IF EXISTS bps.fnd_hc_address_rows(bigint);
 CREATE OR REPLACE FUNCTION bps.fnd_hc_address_rows(p_tenant_id bigint)
-RETURNS TABLE (customer_id bigint, customer_name text, customer_type text, pickup boolean, has_address boolean, own_address boolean,
-               suggestions integer, not_found integer, has_bill boolean, has_ship boolean)
+RETURNS TABLE (customer_id bigint, customer_name text, customer_type text, pickup boolean, own_address boolean,
+               suggestions integer, not_found integer, own_bill boolean, own_ship boolean)
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = bps, public AS $$
 BEGIN
   PERFORM bps.fnd_assert_active_tenant(p_tenant_id);
   IF NOT bps.fnd_has_access('admin.health', 'R') THEN RAISE EXCEPTION 'Not authorised to run health checks'; END IF;
   RETURN QUERY
   WITH cust AS (
-    SELECT c.customer_id, c.customer_name, c.customer_type, COALESCE(c.delivery_method_code, '') = 'PICKUP' AS pickup,
-           bps.fnd_customer_address_owner(p_tenant_id, c.customer_id) AS owner_id
+    SELECT c.customer_id, c.customer_name, c.customer_type, COALESCE(c.delivery_method_code, '') = 'PICKUP' AS pickup
       FROM fnd_customers c WHERE c.tenant_id = p_tenant_id AND c.is_active
   ), pts AS (
     SELECT k.entity_id, cp.use_as_billing, cp.use_as_shipping, cp.suggested_address, cp.is_verified, cp.geocode_status,
@@ -29,13 +33,12 @@ BEGIN
      WHERE k.tenant_id = p_tenant_id AND k.source_table = 'fnd_customers' AND k.is_active AND cp.type = 'ADDRESS' AND cp.is_active
   )
   SELECT cu.customer_id, cu.customer_name, cu.customer_type, cu.pickup,
-         EXISTS (SELECT 1 FROM pts WHERE pts.entity_id = cu.owner_id),
          EXISTS (SELECT 1 FROM pts WHERE pts.entity_id = cu.customer_id),
          (SELECT count(*) FROM pts WHERE pts.entity_id = cu.customer_id AND pts.suggested_address IS NOT NULL)::int,
          (SELECT count(*) FROM pts WHERE pts.entity_id = cu.customer_id AND NOT pts.is_verified AND pts.suggested_address IS NULL
             AND (pts.vstatus IN ('NOT_FOUND', 'UNCONFIRMED') OR (pts.vstatus IS NULL AND pts.geocode_status = 'ZERO_RESULTS')))::int,
-         EXISTS (SELECT 1 FROM pts WHERE pts.entity_id = cu.owner_id AND pts.use_as_billing),
-         EXISTS (SELECT 1 FROM pts WHERE pts.entity_id = cu.owner_id AND pts.use_as_shipping)
+         EXISTS (SELECT 1 FROM pts WHERE pts.entity_id = cu.customer_id AND pts.use_as_billing),
+         EXISTS (SELECT 1 FROM pts WHERE pts.entity_id = cu.customer_id AND pts.use_as_shipping)
     FROM cust cu;
 END $$;
 
@@ -59,17 +62,19 @@ CREATE OR REPLACE FUNCTION bps.fnd_hc_address_no_bill(p_tenant_id bigint)
 RETURNS TABLE (type text, findings text, remediation text, record_type text, record_id bigint, customer_id bigint, link_path text)
 LANGUAGE sql STABLE SET search_path = bps, public AS $$
   SELECT 'Warning', r.customer_name || ' has no Billing address.',
-         'Add an address, or tick Billing Address on one, on the customer''s Contacts tab.', 'CUSTOMER', r.customer_id, r.customer_id, '/customers?customer=' || r.customer_id
+         'Tick Billing Address on one of the account''s addresses on its Contacts tab.', 'CUSTOMER', r.customer_id, r.customer_id, '/customers?customer=' || r.customer_id
     FROM bps.fnd_hc_address_rows(p_tenant_id) r
-   WHERE NOT r.has_bill AND NOT (r.customer_type = 'ACCOUNT' AND NOT r.own_address)
+   WHERE r.customer_type = 'ACCOUNT' AND r.own_address AND NOT r.own_bill
 $$;
 
 CREATE OR REPLACE FUNCTION bps.fnd_hc_address_no_ship(p_tenant_id bigint)
 RETURNS TABLE (type text, findings text, remediation text, record_type text, record_id bigint, customer_id bigint, link_path text)
 LANGUAGE sql STABLE SET search_path = bps, public AS $$
   SELECT 'Warning', r.customer_name || ' is delivered to but has no Shipping address.',
-         'Tick Shipping Address on the delivery address on the customer''s Contacts tab (confirm it against the old system).', 'CUSTOMER', r.customer_id, r.customer_id, '/customers?customer=' || r.customer_id
-    FROM bps.fnd_hc_address_rows(p_tenant_id) r WHERE NOT r.pickup AND r.has_bill AND NOT r.has_ship
+         'Add the delivery address, or tick Shipping Address on it, on the customer''s Contacts tab (confirm it against the old system).', 'CUSTOMER', r.customer_id, r.customer_id, '/customers?customer=' || r.customer_id
+    FROM bps.fnd_hc_address_rows(p_tenant_id) r
+   WHERE r.customer_type IN ('ACCOUNT', 'SITE') AND NOT r.pickup AND NOT r.own_ship
+     AND NOT (r.customer_type = 'ACCOUNT' AND NOT r.own_address)
 $$;
 
 REVOKE EXECUTE ON FUNCTION bps.fnd_hc_address_rows(bigint), bps.fnd_hc_address_suggested(bigint), bps.fnd_hc_address_not_found(bigint),
@@ -100,7 +105,7 @@ AS $function$
     ('invoices_need_reprint',       'Invoices changed after printing',          'Data',  'Invoices posted to AR that got a debit or credit memo (order changes) after they were last printed.', true, 160),
     ('address_suggested',           'Addresses Google corrects',                'Data',  'Customer addresses with a Google suggestion waiting to be accepted or rejected.', false, 170),
     ('address_not_found',           'Addresses Google can''t confirm',          'Data',  'Customer addresses Google could not place exactly and nobody has marked Validated. Statements are mailed to the Billing address.', false, 180),
-    ('address_no_bill',             'Customers with no Billing address',        'Data',  'Active customers (or their account) with addresses but none ticked as the Billing address used on invoices and statements.', false, 190),
-    ('address_no_ship',             'Delivered customers with no Shipping address', 'Data', 'Active customers who are not pickup customers and have no address ticked as the Shipping address used for routes and delivery.', false, 200)
+    ('address_no_bill',             'Accounts with no Billing address',         'Data',  'Active accounts with addresses but none ticked as the Billing address used on invoices and statements (departments and sites bill to their account).', false, 190),
+    ('address_no_ship',             'Delivered customers with no Shipping address', 'Data', 'Active accounts and sites that are not pickup customers and have no address of their own ticked as the Shipping address (departments are delivered to their account''s or site''s address).', false, 200)
   ) v(check_code, name, category, description, runs_before_production, sort_order)
 $function$;

@@ -69,8 +69,21 @@ BEGIN
   INSERT INTO _t VALUES ('if the problem is still there the next run opens it again', EXISTS (SELECT 1 FROM fnd_health_log WHERE tenant_id = 200000000002 AND record_id = acc AND check_code = 'accounts_without_pricebook' AND fixed_at IS NULL AND log_id <> lid));
 
   -- information findings and the unused-book summary
-  INSERT INTO _t VALUES ('the unused-books summary is an Information finding with a link',
-    EXISTS (SELECT 1 FROM jsonb_array_elements(fnd_health_findings_get(200000000002)) x WHERE x ->> 'check_code' = 'pricebook_unused' AND x ->> 'type' = 'Information' AND x ->> 'link_path' = '/inventory/pricing' AND x ->> 'findings' LIKE 'Found % price book%'));
+  -- 2026-11-28: one finding per unused book / stale item, which the page can inactivate
+  INSERT INTO _t VALUES ('an unused book is its own Information finding with a link, which an administrator may disable',
+    EXISTS (SELECT 1 FROM jsonb_array_elements(fnd_health_findings_get(200000000002)) x WHERE x ->> 'check_code' = 'pricebook_unused' AND x ->> 'type' = 'Information'
+             AND x ->> 'link_path' = '/inventory/pricing' AND x ->> 'record_type' = 'PRICEBOOK' AND (x ->> 'can_inactivate')::boolean));
+  INSERT INTO _t VALUES ('a stale item is its own finding',
+    (SELECT count(*) FROM fnd_health_log WHERE tenant_id = 200000000002 AND check_code = 'items_stale' AND fixed_at IS NULL AND record_type = 'ITEM')
+    = (SELECT count(*) FROM fnd_items i WHERE i.tenant_id = 200000000002 AND i.is_active AND (i.last_ordered_date IS NULL OR i.last_ordered_date < current_date - 365 * (SELECT pricebook_unused_years FROM fnd_tenants WHERE tenant_id = 200000000002))));
+  SELECT log_id INTO lid FROM fnd_health_log WHERE tenant_id = 200000000002 AND check_code = 'pricebook_unused' AND fixed_at IS NULL LIMIT 1;
+  n := fnd_health_records_inactivate(200000000002, ARRAY[lid]);
+  INSERT INTO _t VALUES ('inactivating from the page disables the book', n = 1
+    AND NOT (SELECT b.is_active FROM fnd_pricebooks b JOIN fnd_health_log l ON l.record_id = b.pricebook_id WHERE l.log_id = lid));
+  INSERT INTO _t VALUES ('and marks the finding fixed by the user', (SELECT fixed_by FROM fnd_health_log WHERE log_id = lid) = 200000174045);
+  SELECT log_id INTO lid FROM fnd_health_log WHERE tenant_id = 200000000002 AND check_code = 'accounts_without_contact' AND fixed_at IS NULL LIMIT 1;
+  INSERT INTO _t VALUES ('a customer finding cannot be inactivated from the page', fnd_health_records_inactivate(200000000002, ARRAY[lid]) = 0
+    AND (SELECT fixed_at FROM fnd_health_log WHERE log_id = lid) IS NULL);
 
   -- disabling a check
   PERFORM fnd_health_check_set_enabled(200000000002, 'items_stale', false);

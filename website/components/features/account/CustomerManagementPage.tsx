@@ -269,6 +269,11 @@ export function CustomerManagementPage({
     return customers.filter((c) => keep.has(c.customer_id));
   }, [customers, reviewOnly, reviewIds]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
+  // Each ?customer=ID link (Health Checks, Recent Customers, Contacts…) re-creates the search box with its list closed,
+  // so the customer shows instead of the open search list over it, also when the page is already open.
+  // The customer loads after the new box is in place (linkRow), so the box shows its name.
+  const [linkOpens, setLinkOpens] = useState(0);
+  const [linkRow, setLinkRow] = useState<CustomerRow | null>(null);
   const [selectedOriginal, setSelectedOriginal] = useState<CustomerRow | null>(null);
   const [formState, setFormState] = useState<CustomerFormState>(() =>
     emptyForm(initialTenantId ?? tenants[0]?.tenant_id ?? 0)
@@ -565,9 +570,14 @@ export function CustomerManagementPage({
       : null,
   );
   useNavGuard(profileIsDirty || contactsIsDirty || pricingIsDirty || notesIsDirty);
+  useEffect(() => {
+    if (!linkRow) return;
+    setLinkRow(null);
+    void loadCustomerIntoForm(linkRow);
+  }, [linkRow, loadCustomerIntoForm]);
   useDeepLinkId('customer', customers.length > 0, (id) => {
     const row = customers.find((c) => c.customer_id === id);
-    if (row) void loadCustomerIntoForm(row);
+    if (row) { setSelectedCustomerId(null); setLinkOpens((n) => n + 1); setLinkRow(row); }
     else setStatusMessage('That customer is not available.');
   });
 
@@ -663,9 +673,10 @@ export function CustomerManagementPage({
                 </p>
               )}
               <EntityComboBox<CustomerRow>
+                key={linkOpens}
                 alwaysOpen
                 collapseOnSelect
-                initialListCollapsed={false}
+                initialListCollapsed={linkOpens > 0}
                 triggerId="customer-combobox"
                 items={listedCustomers}
                 value={selectedCustomerId}

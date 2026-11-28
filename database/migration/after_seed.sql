@@ -11,6 +11,10 @@
 -- links (fnd_user_customers), customer group members. Re-attach those in Admin.
 -- 2) Refresh fnd_items.last_ordered_date from the order lines (the item reload leaves it empty; the stale-item
 --    filters and health checks read it).
+-- 3) Inactivate dormant customers (owner decision 2026-11-28): an active account or site with no order (order_date) in the
+--    last 2 years, neither its own nor any of its children's, goes inactive. So do its active departments and every active
+--    standing order of the customers inactivated. Nothing is reactivated (customers the old system turned off stay off).
+--    The health checks only look at active customers.
 -- Safe to re-run.
 -- ============================================================
 SET search_path = bps, public;
@@ -37,3 +41,32 @@ SELECT bps.fnd_items_last_ordered_refresh(tenant_id) AS items_refreshed FROM bps
 SELECT r.role_name, count(ur.user_id) AS users
   FROM bps.fnd_roles r LEFT JOIN bps.fnd_user_roles ur ON ur.role_id = r.role_id
  GROUP BY r.role_name ORDER BY 1;
+
+-- 3) Dormant accounts and sites → inactive, with their departments and standing orders.
+DO $$
+DECLARE v_customers int; v_departments int; v_standing int;
+BEGIN
+  CREATE TEMP TABLE tmp_dormant ON COMMIT DROP AS
+  WITH RECURSIVE tree AS (            -- every customer with itself and all its descendants
+    SELECT customer_id AS root_id, customer_id FROM bps.fnd_customers
+    UNION ALL
+    SELECT t.root_id, c.customer_id FROM tree t JOIN bps.fnd_customers c ON c.customer_parent_id = t.customer_id
+  )
+  SELECT c.customer_id FROM bps.fnd_customers c
+   WHERE c.is_active AND c.customer_type IN ('ACCOUNT', 'SITE')
+     AND NOT EXISTS (SELECT 1 FROM tree t JOIN bps.om_orders o ON o.customer_id = t.customer_id
+                      WHERE t.root_id = c.customer_id AND o.order_date >= current_date - interval '2 years');
+  UPDATE bps.fnd_customers SET is_active = false WHERE customer_id IN (SELECT customer_id FROM tmp_dormant);
+  GET DIAGNOSTICS v_customers = ROW_COUNT;
+
+  INSERT INTO tmp_dormant
+  SELECT c.customer_id FROM bps.fnd_customers c
+   WHERE c.is_active AND c.customer_type = 'DEPARTMENT' AND c.customer_parent_id IN (SELECT customer_id FROM tmp_dormant);
+  UPDATE bps.fnd_customers SET is_active = false
+   WHERE is_active AND customer_type = 'DEPARTMENT' AND customer_id IN (SELECT customer_id FROM tmp_dormant);
+  GET DIAGNOSTICS v_departments = ROW_COUNT;
+
+  UPDATE bps.om_standing_orders SET is_active = false WHERE is_active AND customer_id IN (SELECT customer_id FROM tmp_dormant);
+  GET DIAGNOSTICS v_standing = ROW_COUNT;
+  RAISE NOTICE 'Dormant: % accounts/sites, % departments, % standing orders inactivated', v_customers, v_departments, v_standing;
+END $$;
