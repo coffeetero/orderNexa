@@ -1,0 +1,272 @@
+<title>Customer Contacts</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Customers › Contacts tab in the Hearth theme, version 2: one list-and-card view. Left: Shipping and Billing Addresses,
+   Contacts and Notes. Right: the selected item's card with Cancel | Save. An address card has the address box, the
+   Billing Address / Shipping Address / Address Validated checkboxes beside it, its Instructions (printed at the bottom
+   of invoices when it is the Shipping address) and Google's suggestion under it. Rules live in the database; faked here. */
+:root{--bg:#f5f3f0;--surface:#fffefc;--side:#ede9e3;--line:#e1dbd3;--line2:#cfc7bc;--text:#1e1915;--text2:#544a41;--text3:#7a6e63;--accent:#a3451c;--accent-fg:#fff;--pos:#2d6e3e;--warn:#8f5a00;--info:#2a5fa8;--neg:#b3312a;--focus:#a3451c}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#161310;--surface:#1f1b17;--side:#1a1613;--line:#322c26;--line2:#433b33;--text:#efe9e2;--text2:#c4b9ad;--text3:#978b7e;--accent:#e58d60;--accent-fg:#1a120c;--pos:#7cc48c;--warn:#e0aa4a;--info:#7fb0ee;--neg:#ee8177;--focus:#e58d60;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#161310;--surface:#1f1b17;--side:#1a1613;--line:#322c26;--line2:#433b33;--text:#efe9e2;--text2:#c4b9ad;--text3:#978b7e;--accent:#e58d60;--accent-fg:#1a120c;--pos:#7cc48c;--warn:#e0aa4a;--info:#7fb0ee;--neg:#ee8177;--focus:#e58d60;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font:14px/20px Inter,system-ui,sans-serif;margin:0;padding-block:16px 32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+.head{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
+.head h1{font-size:18px;font-weight:600;margin:0}
+.muted{color:var(--text3)}.small{font-size:12px}
+.st{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:500;padding:0 8px;border-radius:10px;border:1px solid var(--line2);white-space:nowrap;line-height:20px;color:var(--text2)}
+.st.ok{color:var(--pos);border-color:color-mix(in srgb,var(--pos) 40%,var(--line2))}
+.st.wn{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 45%,var(--line2))}
+.st.ng{color:var(--neg);border-color:color-mix(in srgb,var(--neg) 45%,var(--line2))}
+.st.inh{color:var(--info);border-color:color-mix(in srgb,var(--info) 40%,var(--line2))}
+.btn{height:30px;padding:0 12px;border-radius:6px;border:1px solid var(--line2);background:var(--surface);font-weight:500;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;font-size:13px}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.btn.sm{height:26px;padding:0 9px;font-size:12px}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--text2)}
+.btn:disabled{opacity:.45;cursor:default}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line2);border-radius:6px;overflow:hidden;min-height:30px}
+.seg button{border:0;background:var(--surface);padding:0 10px;min-height:30px;cursor:pointer;font-size:12px;font-weight:500;color:var(--text2);white-space:nowrap}
+.seg button+button{border-left:1px solid var(--line2)}
+.seg button.on{background:color-mix(in srgb,var(--accent) 14%,var(--surface));color:var(--text);box-shadow:inset 0 -2px 0 var(--accent)}
+.demo{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-size:12px;color:var(--text3);padding:8px 12px;border:1px dashed var(--line2);border-radius:8px}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.tabs span{padding:8px 14px;font-size:13px;font-weight:500;color:var(--text3)}
+.tabs span.on{color:var(--text);box-shadow:inset 0 -2px 0 var(--accent)}
+/* list + card */
+.book{display:grid;grid-template-columns:310px minmax(0,1fr);background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:0 1px 2px rgb(0 0 0 / .04);min-height:520px;overflow:hidden}
+.list{border-right:1px solid var(--line);display:flex;flex-direction:column;min-width:0;background:color-mix(in srgb,var(--side) 35%,var(--surface))}
+.grp{display:flex;align-items:center;gap:6px;padding:6px 12px 6px;font-size:13px;font-weight:700;color:var(--text);border-bottom:1px solid var(--line)}
+.grp .sp{flex:1}
+.grp button{white-space:nowrap;border:0;background:transparent;color:var(--accent);font-size:12px;font-weight:600;cursor:pointer;text-transform:none;letter-spacing:0;padding:2px 4px;border-radius:4px}
+.item{display:block;width:100%;text-align:left;border:0;border-left:3px solid transparent;background:transparent;padding:7px 12px 7px 9px;cursor:pointer;min-width:0}
+.item:hover{background:color-mix(in srgb,var(--accent) 6%,var(--surface))}
+.item.sel{background:color-mix(in srgb,var(--accent) 13%,var(--surface));border-left-color:var(--accent)}
+.item .t{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .s{font-size:12px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .tags{display:flex;gap:4px;margin-top:3px;flex-wrap:wrap}
+.mini{font-size:10.5px;font-weight:600;padding:0 6px;border-radius:8px;border:1px solid var(--line2);color:var(--text2);line-height:16px}
+.mini.on{border-color:color-mix(in srgb,var(--accent) 55%,var(--line2));color:var(--accent)}
+.mini.wn{border-color:color-mix(in srgb,var(--warn) 50%,var(--line2));color:var(--warn)}
+.mini.ok{border-color:color-mix(in srgb,var(--pos) 45%,var(--line2));color:var(--pos)}
+.empty{padding:4px 12px 8px;font-size:12px;color:var(--text3)}
+.card{display:flex;flex-direction:column;min-width:0}
+.cbar{display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid var(--line);min-height:44px}
+.cbar h2{font-size:14px;font-weight:600;margin:0}
+.cbar .sp{flex:1}
+.cbody{padding:14px 16px;display:flex;flex-direction:column;gap:14px}
+.lab{display:block;font-size:12px;font-weight:600;color:var(--text3);margin-bottom:4px}
+.addrrow{display:grid;grid-template-columns:minmax(0,460px) auto;gap:12px 24px;align-items:start}
+.abox{border:1px solid var(--line2);border-radius:6px;background:var(--surface);overflow:hidden}
+.abox textarea{border:0;border-radius:0;resize:none;padding:10px 12px}
+.abox textarea:focus-visible{outline-offset:-2px}
+.insrow{border-top:1px solid var(--line);display:grid;grid-template-columns:auto minmax(0,1fr);align-items:start;gap:4px}
+.insrow label{font-size:13px;font-weight:600;color:var(--text2);padding:9px 0 0 12px}
+.maplink{display:inline-flex;align-items:center;gap:6px;color:var(--accent);font-size:13px;font-weight:500;text-decoration:none;margin-top:8px}
+.newbar{display:flex;justify-content:flex-end;padding:8px 10px 0}
+.newwrap{position:relative}
+.menu{position:absolute;right:0;top:30px;z-index:5;background:var(--surface);border:1px solid var(--line2);border-radius:6px;box-shadow:0 6px 18px rgb(0 0 0 / .12);display:flex;flex-direction:column;min-width:160px;padding:4px}
+.menu[hidden]{display:none}
+.menu button{border:0;background:transparent;text-align:left;padding:6px 10px;border-radius:4px;cursor:pointer;font-size:13px}
+.menu button:hover{background:color-mix(in srgb,var(--accent) 8%,var(--surface))}
+textarea,.in{width:100%;border:1px solid var(--line2);border-radius:6px;background:var(--surface);padding:6px 9px;line-height:20px;resize:vertical}
+.in{height:32px;padding:0 9px}
+.checks{display:flex;flex-direction:column;gap:10px;padding-top:6px}
+.chk{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;white-space:nowrap}
+.chk input{width:16px;height:16px;accent-color:var(--accent);margin:0}
+.chk.ro{color:var(--text3);cursor:default}
+.help{font-size:12px;color:var(--text3);margin-top:4px}
+.sugg{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:8px 16px;align-items:start;padding:8px 10px;border-radius:6px;background:color-mix(in srgb,var(--warn) 8%,var(--surface));border:1px solid color-mix(in srgb,var(--warn) 30%,var(--line))}
+.sugg .k{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);margin-bottom:2px}
+.sugg .v{white-space:pre-line;font-size:13px;line-height:18px}
+.sugg mark{background:color-mix(in srgb,var(--warn) 22%,transparent);color:inherit;border-radius:2px;padding:0 1px}
+.banner{display:flex;gap:8px;align-items:flex-start;padding:8px 10px;font-size:13px;border-radius:6px}
+.banner.wn{color:var(--warn);background:color-mix(in srgb,var(--warn) 8%,var(--surface))}
+.banner.inf{color:var(--info);background:color-mix(in srgb,var(--info) 7%,var(--surface))}
+.banner b{color:var(--text)}
+.ico{width:16px;height:16px;flex:none;margin-top:2px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}
+.pts{display:flex;flex-direction:column;gap:6px}
+.pt{display:grid;grid-template-columns:110px minmax(0,1fr);gap:8px;align-items:center}
+.foot{font-size:12px;color:var(--text3)}
+.notes{font-size:13px;color:var(--text2);padding:12px;background:var(--surface);border:1px solid var(--line);border-radius:8px}
+.notes ul{margin:4px 0 0;padding-left:18px}.notes li{margin-bottom:3px}.notes h3{font-size:13px;margin:10px 0 2px}.notes h3:first-child{margin-top:0}
+.inv{background:#fff;color:#000;border:1px solid var(--line2);border-radius:6px;padding:10px 14px;font:12px/1.4 Inter,Helvetica,Arial,sans-serif;max-width:520px}
+.inv .r{display:flex;justify-content:space-between;border-top:1px solid #000;margin-top:8px;padding-top:6px}
+@media (max-width:820px){.book{grid-template-columns:1fr}.list{border-right:0;border-bottom:1px solid var(--line)}.addrrow{grid-template-columns:1fr}.checks{padding-top:0}.sugg{grid-template-columns:1fr}.grid2{grid-template-columns:1fr}}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="warn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></symbol>
+  <symbol id="info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></symbol>
+</svg>
+
+<div class="wrap">
+  <div class="head">
+    <h1 id="custName">GRAND MIDTOWN HOTEL</h1>
+    <span class="st" id="custKind">Account · Hotels</span>
+    <span class="st" id="custMethod">Delivery · Route 4</span>
+  </div>
+
+  <div class="demo" role="group" aria-label="Mockup scenarios">
+    <b style="color:var(--text2)">Mockup — try a case:</b>
+    <div class="seg" id="cases">
+      <button class="on" data-case="acct">Delivered account</button>
+      <button data-case="pickup">Pickup customer</button>
+      <button data-case="dept">Department (inherits)</button>
+      <button data-case="noship">No Shipping address</button>
+    </div>
+  </div>
+
+  <div class="tabs" aria-hidden="true"><span>Profile</span><span class="on">Contacts</span><span>Pricing</span><span>Notes</span><span>Documents</span><span>Settings</span></div>
+
+  <div class="book">
+    <nav class="list" aria-label="Addresses, contacts and notes" id="list"></nav>
+    <section class="card" id="card" aria-live="polite"></section>
+  </div>
+
+  <div>
+    <div class="lab">Invoice (bill of lading) — bottom of the page</div>
+    <div class="inv" id="inv"></div>
+  </div>
+
+  <div class="notes">
+    <h3>Shipping and Billing Addresses</h3>
+    <ul>
+      <li>The left list is the customer's <b>contact records</b>: each address is named by its role (Billing &amp; Shipping, Billing, Shipping, or Address), then Notes and Contact Persons. <b>+ New</b> adds an Address, a Note or a Contact Person.</li>
+      <li>The address box holds the name or attention lines, the street and the city/state/ZIP. Google checks the street and city lines; the name lines are kept as typed. Delivery instructions go in <b>Instructions</b>, inside the same box.</li>
+      <li><b>Billing Address</b> and <b>Shipping Address</b> are checkboxes but each belongs to one address: ticking it here clears it on the customer's other address. The only Billing address can't be unticked (tick another one instead). One address may be both.</li>
+      <li><b>Instructions</b> belong to the address. The Shipping address's instructions print at the bottom of the invoice, which serves as the bill of lading.</li>
+      <li><b>Validated</b> is ticked by Google when it confirms the address, or by staff. Editing the address clears it. Google's correction appears under the address with <b>Accept</b> / <b>Reject</b>; both tick Address Validated.</li>
+      <li>Existing 3-line addresses: the middle line moves to Instructions unless it is a suite, floor or unit ("STE 200", "FL 3"); the moved ones get a list to spot-check.</li>
+      <li>Pickup customers: Billing only. A department with no addresses of its own uses its account's (read-only) until it gets its own.</li>
+    </ul>
+    <h3>Contacts and Notes</h3>
+    <ul>
+      <li>Contacts are the same people Organizer › Contacts shows.</li>
+      <li>Notes: anything staff want to note on the customer ("Call James to come to the door"), plus the old-system notes until they are tidied up.</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+const CASES = {
+  acct: { name: 'GRAND MIDTOWN HOTEL', kind: 'Account · Hotels', method: 'Delivery · Route 4', pickup: false,
+    addrs: [
+      { id: 'a1', txt: 'Grand Midtown Hotel\nAttn: Accounts Payable\n1200 Avenue of the Americas\nNew York, NY 10019', bill: true, ship: false, ok: true, ins: '' },
+      { id: 'a2', txt: 'Grand Midtown Hotel - Receiving\n153 W 54th St\nNew York, NY 10019', bill: false, ship: true, ok: false, ins: 'Delivery entrance on 55th St. Ring the receiving bell.',
+        sugg: 'Grand Midtown Hotel - Receiving\n153 W 54TH ST\nNEW YORK NY 10019-5416', diff: [2] },
+      { id: 'a3', txt: 'PO Box 4410\nNewark, NJ 07101', bill: false, ship: false, ok: false, ins: '' },
+    ],
+    people: [ { id: 'p1', name: 'Dana Moore', role: 'Accounts Payable', phone: '(212) 555-0142', email: 'dana.moore@grandmidtown.example' },
+              { id: 'p2', name: 'Carl Mendes', role: 'Executive Chef', phone: '(212) 555-0177', email: '' } ],
+    notes: [ { id: 'n1', text: 'Call James to come to the door.', by: 'Glen M.', at: 'Nov 27, 2026' },
+             { id: 'n2', text: 'Phone1: (212) 555-0142 / Fax: (212) 555-0177 / Beeper: (646) 555-0190', by: 'Old system', at: '', legacy: true } ] },
+  pickup: { name: 'LA BELLE CAFE', kind: 'Account · Restaurants', method: 'Pickup', pickup: true,
+    addrs: [ { id: 'a1', txt: '412 Washington St\nHoboken, NJ 07030', bill: true, ship: false, ok: true, ins: '' } ], people: [], notes: [] },
+  dept: { name: 'Zz Banquets (dept. of ACME FOOD SERVICE)', kind: 'Department · Aggregators', method: 'Delivery · Route 2', pickup: false,
+    from: 'ACME FOOD SERVICE',
+    addrs: [ { id: 'a1', txt: '88 Industrial Way\nSecaucus, NJ 07094', bill: true, ship: true, ok: true, ins: 'Dock 3, after 6 AM.' } ], people: [], notes: [] },
+  noship: { name: 'DANILO TORRES', kind: 'Account · Retail', method: 'Delivery · Route 2', pickup: false,
+    addrs: [ { id: 'a1', txt: 'Exit 100 on GSP\nNJ', bill: true, ship: false, ok: false, ins: '', notfound: true } ], people: [], notes: [] },
+};
+let cur = 'acct', sel = 'a1';
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const first = (t) => t.split('\n')[0];
+const rest = (t) => t.split('\n').slice(1).join(', ');
+
+function role(a) { return a.bill && a.ship ? 'Billing & Shipping' : a.bill ? 'Billing' : a.ship ? 'Shipping' : 'Address'; }
+const street = (t) => { const l = t.split('\n'); return l.length > 1 ? l[l.length - 2] + ', ' + l[l.length - 1] : l[0]; };
+function list() {
+  const c = CASES[cur];
+  const row = (id, t, s, tags = '') => `<button class="item${sel === id ? ' sel' : ''}" data-sel="${id}"><div class="t">${t}</div><div class="s">${s}</div>${tags ? `<div class="tags">${tags}</div>` : ''}</button>`;
+  const addr = c.addrs.map((a) => row(a.id, role(a), esc(street(a.txt)) + (c.from ? ` · from ${esc(c.from)}` : ''),
+    a.ok ? '<span class="mini ok">Validated</span>' : a.sugg ? '<span class="mini wn">Google suggests</span>' : a.notfound ? '<span class="mini wn">Not found</span>' : '')).join('');
+  const nts = c.notes.map((n) => row(n.id, n.legacy ? 'Note (old system)' : 'Note', esc(n.text))).join('');
+  const ppl = c.people.map((p) => row(p.id, 'Contact Person', `${esc(p.name)} · ${esc(p.role)}`)).join('');
+  document.getElementById('list').innerHTML = `
+    <div class="newbar"><div class="newwrap"><button class="btn sm" data-new aria-haspopup="menu">+ New</button>
+      <div class="menu" id="newmenu" hidden role="menu"><button role="menuitem">Address</button><button role="menuitem">Note</button><button role="menuitem">Contact Person</button></div></div></div>
+    <div class="grp">Contact Record</div>${addr}${nts}${ppl}`;
+}
+
+function card() {
+  const c = CASES[cur], el = document.getElementById('card');
+  const a = c.addrs.find((x) => x.id === sel), p = c.people.find((x) => x.id === sel), n = c.notes.find((x) => x.id === sel);
+  const bar = (title, extra = '') => `<div class="cbar"><h2>${title}</h2>${extra}<span class="sp"></span><button class="btn ghost sm">Remove</button><button class="btn sm">Cancel</button><button class="btn sm pri">Save</button></div>`;
+  if (a) {
+    const ro = !!c.from;
+    const hasShip = c.addrs.some((x) => x.ship);
+    let b = '';
+    if (ro) b += `<div class="banner inf"><svg class="ico"><use href="#info"/></svg><span>This department has no addresses of its own, so it uses its account's. Add its own address to bill or deliver it separately.</span></div>`;
+    if (!c.pickup && !hasShip) b += `<div class="banner wn"><svg class="ico"><use href="#warn"/></svg><span><b>No Shipping address.</b> This customer is delivered; tick Shipping Address on one address. Until then deliveries use the Billing address. Confirm against the old system.</span></div>`;
+    const sugg = a.sugg ? `<div class="sugg">
+        <div><div class="k">Typed</div><div class="v">${esc(a.txt)}</div></div>
+        <div><div class="k">Google suggests</div><div class="v">${a.sugg.split('\n').map((l, i) => a.diff.includes(i) ? `<mark>${esc(l)}</mark>` : esc(l)).join('\n')}</div></div>
+        <div style="display:flex;gap:6px"><button class="btn sm pri" data-acc>Accept</button><button class="btn sm" data-rej>Reject</button></div></div>`
+      : a.notfound ? `<div class="banner wn"><svg class="ico"><use href="#warn"/></svg><span>Google can't find this address. Correct it, or tick Address Validated if the drivers know it.</span></div>` : '';
+    el.innerHTML = (ro ? `<div class="cbar"><h2>${role(a)}</h2><span class="st inh">From account · ${esc(c.from)}</span></div>` : bar(role(a))) + `<div class="cbody">${b}
+      <div class="addrrow">
+        <div class="abox">
+          <textarea id="ad" rows="5" aria-label="Address" ${ro ? 'readonly' : ''}>${esc(a.txt)}</textarea>
+          <div class="insrow"><label for="ins">Instructions:</label><textarea id="ins" rows="2" ${ro ? 'readonly' : ''} placeholder="e.g. Delivery entrance on 55th St">${esc(a.ins)}</textarea></div>
+        </div>
+        <div class="checks">
+          <label class="chk${ro ? ' ro' : ''}"><input type="checkbox" data-k="bill" ${a.bill ? 'checked' : ''} ${ro ? 'disabled' : ''}>Billing Address</label>
+          ${c.pickup && !a.ship ? '' : `<label class="chk${ro ? ' ro' : ''}"><input type="checkbox" data-k="ship" ${a.ship ? 'checked' : ''} ${ro ? 'disabled' : ''}>Shipping Address</label>`}
+          <label class="chk${ro ? ' ro' : ''}"><input type="checkbox" data-k="ok" ${a.ok ? 'checked' : ''} ${ro ? 'disabled' : ''}>Validated</label>
+          <a class="maplink" href="#" title="Show on map" aria-label="Show on map"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/></svg>Map</a>
+        </div>
+      </div>
+      ${sugg}
+      <div class="help">Name or attention lines first, then street, then city, state and ZIP; Google checks the last two. Instructions belong to this address and, when it is the Shipping address, print at the bottom of the invoice.</div>
+    </div>`;
+  } else if (p) {
+    el.innerHTML = bar('Contact') + `<div class="cbody">
+      <div class="grid2"><div><label class="lab">Name</label><input class="in" value="${esc(p.name)}"></div><div><label class="lab">Role / title</label><input class="in" value="${esc(p.role)}"></div></div>
+      <div><label class="lab">Phone, email…</label><div class="pts">
+        <div class="pt"><select class="in"><option>Phone</option></select><input class="in" value="${esc(p.phone)}"></div>
+        ${p.email ? `<div class="pt"><select class="in"><option>Email</option></select><input class="in" value="${esc(p.email)}"></div>` : ''}
+        <div><button class="btn ghost sm">+ Add phone or email</button></div></div></div>
+      <div class="foot">Also shown in Organizer › Contacts (marked Customer).</div></div>`;
+  } else if (n) {
+    el.innerHTML = bar('Note', n.legacy ? '<span class="st wn">From the old system</span>' : '') + `<div class="cbody">
+      <div><label class="lab" for="nt">Note</label><textarea id="nt" rows="5">${esc(n.text)}</textarea></div>
+      <div class="foot">${n.legacy ? 'Imported from the old system — move what matters to Contacts, then remove.' : `Added by ${esc(n.by)} · ${esc(n.at)}`}</div></div>`;
+  } else el.innerHTML = '<div class="cbody muted">Select an item.</div>';
+}
+
+function invoice() {
+  const c = CASES[cur], s = c.addrs.find((a) => a.ship) || c.addrs.find((a) => a.bill);
+  document.getElementById('inv').innerHTML = c.pickup ? '<div><b>Customer pickup</b></div>'
+    : `<div><b>Ship to:</b> ${esc(s.txt).replace(/\n/g, ', ')}</div>${s.ins ? `<div><b>Delivery instructions:</b> ${esc(s.ins)}</div>` : '<div class="muted" style="color:#666">(no delivery instructions)</div>'}
+       <div class="r"><span>Received by: ____________________</span><span>Total $412.50</span></div>`;
+}
+function render() {
+  const c = CASES[cur];
+  document.getElementById('custName').textContent = c.name;
+  document.getElementById('custKind').textContent = c.kind;
+  document.getElementById('custMethod').textContent = c.method;
+  list(); card(); invoice();
+}
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('button'); if (!t) return;
+  const c = CASES[cur];
+  if (t.dataset.case) { cur = t.dataset.case; sel = 'a1'; document.querySelectorAll('#cases button').forEach((x) => x.classList.toggle('on', x === t)); render(); return; }
+  if (t.hasAttribute('data-new')) { const m = document.getElementById('newmenu'); m.hidden = !m.hidden; return; }
+  if (t.dataset.sel) { sel = t.dataset.sel; render(); return; }
+  const a = c.addrs.find((x) => x.id === sel);
+  if (t.hasAttribute('data-acc')) { a.txt = a.sugg; a.sugg = null; a.ok = true; render(); return; }
+  if (t.hasAttribute('data-rej')) { a.sugg = null; a.ok = true; render(); return; }
+});
+document.addEventListener('change', (e) => {
+  const k = e.target.dataset && e.target.dataset.k; if (!k) return;
+  const c = CASES[cur], a = c.addrs.find((x) => x.id === sel);
+  if (k === 'ok') { a.ok = e.target.checked; render(); return; }
+  if (!e.target.checked) { if (k === 'bill') { e.target.checked = true; return; } a.ship = false; render(); return; }
+  c.addrs.forEach((x) => { x[k] = x.id === a.id; }); render();
+});
+render();
+</script>

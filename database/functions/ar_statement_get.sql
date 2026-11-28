@@ -24,13 +24,9 @@ BEGIN
    WHERE c.tenant_id = p_tenant_id AND c.customer_id = p_account_id AND upper(btrim(c.customer_type)) = 'ACCOUNT';
   IF NOT FOUND THEN RAISE EXCEPTION 'Account not found'; END IF;
 
-  -- billing address: the account's ADDRESS labelled Billing, else its primary address
-  SELECT cp.value INTO v_address
-    FROM bps.fnd_contacts k JOIN bps.fnd_contact_points cp ON cp.contact_id = k.contact_id
-   WHERE k.tenant_id = p_tenant_id AND k.source_table = 'fnd_customers' AND k.entity_id = p_account_id
-     AND cp.type = 'ADDRESS' AND cp.is_active
-   ORDER BY (cp.label = 'Billing') DESC, cp.is_primary DESC, cp.sequence
-   LIMIT 1;
+  -- billing address: the account's Bill to address
+  SELECT cp.value INTO v_address FROM bps.fnd_contact_points cp
+   WHERE cp.contact_point_id = bps.fnd_customer_address_pick(p_tenant_id, p_account_id, 'BILL');
 
   WITH items AS (
     SELECT i.*, date_trunc('week', i.transaction_date)::date AS week_start

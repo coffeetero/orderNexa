@@ -15,7 +15,7 @@ export interface PrintInvoice {
   ar_transaction_id: number;
   /** null while the invoice is a DRAFT (not posted to AR): it prints marked DRAFT. */
   document_number: string | null; status?: string; production_date: string; weekday: string; production_code_label: string;
-  account_type: string | null; customer_name: string; customer_number: string | null; address_lines: string[]; phone: string | null;
+  account_type: string | null; customer_name: string; customer_number: string | null; address_lines: string[]; delivery_instructions?: string | null; phone: string | null;
   item_quantity: number; item_amount: number; delivery_amount: number; amount: number; groups: InvoiceGroup[];
   memos?: InvoiceMemo[]; total_with_memos?: number;
 }
@@ -137,6 +137,18 @@ export async function invoicesPdf(data: InvoicesData): Promise<Uint8Array> {
       const vals = [qty(inv.item_quantity), money(inv.item_amount), money(inv.delivery_amount), ''];
       FOOT.forEach(([, a, b], k) => { cell(a, b, top - 9, 13); y = top - 19; center(vals[k], a, b, 8.5); });
       cell(L, 224, top - 9, 13);
+      // the Shipping address's delivery instructions, in the box left of the totals (two lines at most)
+      if (inv.delivery_instructions) {
+        const words = safe(`Delivery: ${inv.delivery_instructions}`).split(/\s+/);
+        const lines: string[] = [''];
+        for (const w of words) {
+          const next = lines[lines.length - 1] ? `${lines[lines.length - 1]} ${w}` : w;
+          if (font.widthOfTextAtSize(next, 5.5) <= 224 - L - 6) lines[lines.length - 1] = next;
+          else if (lines.length < 2) lines.push(w);
+          else { lines[1] = `${lines[1].replace(/\S*$/, '').trimEnd()}...`; break; }
+        }
+        lines.forEach((ln, k) => { y = top - 15 - k * 6; text(ln, L + 3, 5.5); });
+      }
       cell(FOOT_TOTAL[0], FOOT_TOTAL[1], top - 9, 13); y = top - 19; center(`$${money(total)}`, FOOT_TOTAL[0], FOOT_TOTAL[1], 9, bold);
       y = 792 - 785; if (data.tagline) center(`'${data.tagline}'`, L, R, 9, bold);
       y = 792 - 143; right(`Page ${i + 1} of ${pages.length}`, R, 7.5);

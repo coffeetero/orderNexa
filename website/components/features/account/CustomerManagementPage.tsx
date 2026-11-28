@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, CornerUpLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { EntityComboBox } from '@/components/bps/EntityComboBox';
@@ -19,7 +19,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CustomerRoutes } from '@/components/features/account/CustomerRoutes';
 import { DocumentsList } from '@/components/features/financials/DocumentsList';
-import { CustomerContactsTab, CustomerContactsTabHandle } from '@/components/features/account/CustomerContactsTab';
+import type { CustomerContactsTabHandle } from '@/components/features/account/CustomerContactsTab';
+import { CustomerContactRecords } from '@/components/features/account/CustomerContactRecords';
 import { CustomerNotesTab, CustomerNotesTabHandle } from '@/components/features/account/CustomerNotesTab';
 import { CustomerPricebooksTab, CustomerPricebooksTabHandle } from '@/components/features/account/CustomerPricebooksTab';
 import { SaveChangesDialog } from '@/components/features/account/SaveChangesDialog';
@@ -86,6 +87,8 @@ type CustomerManagementPageProps = {
   initialCustomers: CustomerRow[];
   initialMessage?: string | null;
   isDebugActive?: boolean;
+  /** From the Dashboard's address warning (?review=1): only these customers are listed until "Show all". */
+  reviewIds?: number[] | null;
 };
 
 const CUSTOMER_TYPES = ['ACCOUNT', 'SITE', 'DEPARTMENT'] as const;
@@ -249,9 +252,22 @@ export function CustomerManagementPage({
   initialCustomers,
   initialMessage = null,
   isDebugActive = false,
+  reviewIds = null,
 }: CustomerManagementPageProps) {
   const [tenantId, setTenantId] = useState<number | null>(initialTenantId);
   const [customers, setCustomers] = useState<CustomerRow[]>(initialCustomers);
+  const [reviewOnly, setReviewOnly] = useState(!!reviewIds);
+  // review list: the customers needing address review, with their parents so the tree still reads
+  const listedCustomers = useMemo(() => {
+    if (!reviewOnly || !reviewIds) return customers;
+    const byId = new Map(customers.map((c) => [c.customer_id, c]));
+    const keep = new Set<number>();
+    for (const id of reviewIds) {
+      let c = byId.get(id);
+      while (c && !keep.has(c.customer_id)) { keep.add(c.customer_id); c = c.customer_parent_id ? byId.get(c.customer_parent_id) : undefined; }
+    }
+    return customers.filter((c) => keep.has(c.customer_id));
+  }, [customers, reviewOnly, reviewIds]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
   const [selectedOriginal, setSelectedOriginal] = useState<CustomerRow | null>(null);
   const [formState, setFormState] = useState<CustomerFormState>(() =>
@@ -640,12 +656,18 @@ export function CustomerManagementPage({
           <div className="grid grid-cols-3 gap-3 items-start">
             <div className="col-span-2 flex min-h-0 flex-col gap-1.5">
               <Label htmlFor="customer-combobox">Search Customer</Label>
+              {reviewOnly && reviewIds && (
+                <p className="flex flex-wrap items-center gap-2 rounded-md border border-warning/40 bg-warning-soft/40 px-2.5 py-1 text-xs text-warning">
+                  Showing the {reviewIds.length} customers whose addresses need review. Open a customer&apos;s Contacts tab to fix them.
+                  <button type="button" className="font-medium text-foreground underline" onClick={() => setReviewOnly(false)}>Show all customers</button>
+                </p>
+              )}
               <EntityComboBox<CustomerRow>
                 alwaysOpen
                 collapseOnSelect
                 initialListCollapsed={false}
                 triggerId="customer-combobox"
-                items={customers}
+                items={listedCustomers}
                 value={selectedCustomerId}
                 onChange={(customer) => {
                   if (customer) {
@@ -926,18 +948,18 @@ export function CustomerManagementPage({
 
                 <CustomerRoutes tenantId={tenantId ?? 0} customerId={selectedCustomerId} />
 
+                {/* departments have no Contacts tab: their addresses (their own, or their account's) show here */}
+                {isDepartment && selectedCustomerId && tenantId ? <CustomerContactRecords tenantId={tenantId} customerId={selectedCustomerId} /> : null}
+
                 {statusMessage && <p className="text-xs text-muted-foreground">{statusMessage}</p>}
                 </div>
               </TabsContent>
 
                 {!isDepartment && (<>
                 <TabsContent value="contacts" forceMount className="data-[state=inactive]:hidden">
-                  <CustomerContactsTab
-                    ref={contactsTabRef}
-                    tenantId={tenantId ?? 0}
-                    customerId={selectedCustomerId}
-                    onDirtyChange={setContactsIsDirty}
-                  />
+                  {selectedCustomerId && tenantId ? (
+                    <CustomerContactRecords ref={contactsTabRef} tenantId={tenantId} customerId={selectedCustomerId} onDirtyChange={setContactsIsDirty} />
+                  ) : <p className="py-4 text-sm text-muted-foreground">Select a customer to view contacts.</p>}
                 </TabsContent>
 
                 {isAccount && (

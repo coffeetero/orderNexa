@@ -175,6 +175,14 @@ export default async function ManageCustomersPage(props: {
     }
   }
 
+  // ?review=1 (Dashboard address warning): the customers whose addresses need review
+  let reviewIds: number[] | null = null;
+  if (initialTenantId !== null && getSearchParam(searchParams, 'review') === '1') {
+    const { data } = await supabase.rpc('fnd_address_review_get', { p_tenant_id: initialTenantId });
+    const ids = (data as { customer_ids?: unknown } | null)?.customer_ids;
+    reviewIds = Array.isArray(ids) ? ids.map((v) => toNumber(v)).filter((v): v is number => v !== null) : [];
+  }
+
   if (isDebug) {
     console.debug('[tenant/customers/page.tsx] data before return', {
       tenantCount: tenants.length,
@@ -194,6 +202,7 @@ export default async function ManageCustomersPage(props: {
       initialCustomers={initialCustomers}
       initialMessage={initialMessage}
       isDebugActive={isDebug}
+      reviewIds={reviewIds}
     />
   );
 }

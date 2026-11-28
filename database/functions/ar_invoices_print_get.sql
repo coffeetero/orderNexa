@@ -5,7 +5,8 @@
 -- BPS-made invoices (an invoice's slot comes from its run, else from its orders). Staff only.
 -- Returns { company_name, footer_note, tagline, invoices: [{
 --   ar_transaction_id, document_number, status, production_date, weekday, production_code, production_code_label,
---   account_type, customer_name, customer_number (masked), address_lines, phone (PHONE contact, else Phone1 of the legacy note),
+--   account_type, customer_name, customer_number (masked), address_lines (Billing address), delivery_instructions (of the Shipping
+--   address), phone (PHONE contact, else Phone1 of the legacy note),
 --   item_quantity, item_amount, delivery_amount, other_amount, amount,
 --   memos: [{ document_number, transaction_type (DM debit / CM credit), transaction_date, amount,
 --             lines: [{ description, quantity, unit_price, amount }] }]  (memos applied to the invoice, not cancelled),
@@ -98,10 +99,11 @@ BEGIN
                  'account_type', initcap(c.customer_type), 'customer_name', c.customer_name,
                  'customer_number', bps.fnd_customer_number_format(v_ten.customer_number_mask, c.customer_number),
                  'address_lines', COALESCE((SELECT jsonb_agg(a) FROM regexp_split_to_table(btrim(COALESCE((
-                       SELECT cp.value FROM fnd_contacts k JOIN fnd_contact_points cp ON cp.contact_id = k.contact_id
-                        WHERE k.tenant_id = p_tenant_id AND k.source_table = 'fnd_customers' AND k.entity_id = c.customer_id
-                          AND cp.type = 'ADDRESS' AND cp.is_active
-                        ORDER BY (cp.label = 'Billing') DESC, cp.is_primary DESC, cp.sequence LIMIT 1), '')), '\s*\n\s*') a WHERE a <> ''), '[]'::jsonb),
+                       SELECT cp.value FROM fnd_contact_points cp
+                        WHERE cp.contact_point_id = bps.fnd_customer_address_pick(p_tenant_id, c.customer_id, 'BILL')), '')), '\s*\n\s*') a WHERE a <> ''), '[]'::jsonb),
+                 -- the Shipping address's delivery instructions, printed at the bottom (the invoice travels as the bill of lading)
+                 'delivery_instructions', (SELECT cp.instructions FROM fnd_contact_points cp
+                                            WHERE cp.contact_point_id = bps.fnd_customer_address_pick(p_tenant_id, c.customer_id, 'SHIP')),
                  -- a PHONE contact point; migrated customers have their phone only as "Phone1: ..." in the Legacy Data note
                  'phone', (SELECT COALESCE(CASE WHEN cp.type = 'PHONE' THEN cp.value END,
                                            btrim(substring(cp.value FROM 'Phone1:\s*([^\n]+)')))
