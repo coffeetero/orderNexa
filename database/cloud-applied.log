@@ -130,3 +130,16 @@
 2026-11-27 22:44:38Z  9e83b61  OK      database/functions/fnd_hc_ar_open_items_drift.sql
 2026-11-27 22:44:39Z  9e83b61  OK      database/migration/seed_ar_legacy_settlements_cloud.sql
 2026-11-27 22:45:54Z  f76d184  OK      database/migration/seed_ar_legacy_settlements_cloud.sql
+2026-11-28 04:38:01Z  1340d55  OK      database/migration/add_customer_segments.sql
+2026-11-28 04:38:02Z  1340d55  OK      database/migration/add_address_roles.sql
+2026-11-28 04:38:04Z  1340d55  OK      database/functions/fnd_customer_addresses.sql
+2026-11-28 04:38:05Z  1340d55  OK      database/functions/fnd_address_validation.sql
+2026-11-28 04:38:06Z  1340d55  OK      database/functions/fnd_geocode_queue.sql
+2026-11-28 04:38:07Z  1340d55  OK      database/functions/om_customer_ship_point.sql
+2026-11-28 04:38:08Z  1340d55  OK      database/functions/om_customer_ship_address.sql
+2026-11-28 04:38:09Z  1340d55  OK      database/functions/om_route_stops_get.sql
+2026-11-28 04:38:10Z  1340d55  OK      database/functions/ar_invoices_print_get.sql
+2026-11-28 04:38:11Z  1340d55  OK      database/functions/ar_statement_get.sql
+2026-11-28 04:38:12Z  1340d55  OK      database/functions/ar_dashboard_get.sql
+2026-11-28 04:38:13Z  1340d55  OK      database/functions/ar_sales_dashboard_get.sql
+2026-11-28 04:38:14Z  1340d55  OK      database/functions/fnd_customers_save.sql
